@@ -110,7 +110,7 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
                                 .subText(SagerNet.appVersionNameForDisplay)
                                 .setOnClickAction {
                                     requireContext().launchCustomTab(
-                                        "https://github.com/qinwenjie716-qwj/OwnBoxForAndroid/releases"
+                                        "https://github.com/Own716/OwnBoxForAndroid/releases"
                                     )
                                 }
                                 .build())
@@ -218,7 +218,7 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
                                 .text(R.string.github)
                                 .setOnClickAction {
                                     requireContext().launchCustomTab(
-                                        "https://github.com/qinwenjie716-qwj/OwnBoxForAndroid"
+                                        "https://github.com/Own716/OwnBoxForAndroid"
                                     )
                                 }
                                 .build())
@@ -298,7 +298,7 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
                         tryProxyOutbound()
                     }
                     val response = client.newRequest().apply {
-                        setURL("https://api.github.com/repos/qinwenjie716-qwj/OwnBoxForAndroid/releases/latest")
+                        setURL("https://api.github.com/repos/Own716/OwnBoxForAndroid/releases/latest")
                     }.execute()
                     val release = JSONObject(Util.getStringBox(response.contentString))
                     val releaseName = release.getString("name")

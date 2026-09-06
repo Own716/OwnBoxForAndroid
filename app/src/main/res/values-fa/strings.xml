@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">Throne</string>
-    <string name="app_name_long" translatable="false">Throne for Android</string>
+    <string name="app_name" translatable="false">OwnBox</string>
+    <string name="app_name_long" translatable="false">OwnBox for Android</string>
     <string name="app_desc">مجموعه ابزار جامع پراکسی برای اندروید، نوشته‌شده با کاتلین.</string>
     <string name="project">پروژه</string>
     <string name="github">کد منبع</string>

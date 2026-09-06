@@ -35,7 +35,7 @@
 
 7. **界面优化与专属链接更新**：
    - 移除了关于界面中的“猫猫很可爱，请给猫猫捐款”按钮。
-   - “源代码”链接直接指向 [OwnBoxForAndroid](https://github.com/qinwenjie716-qwj/OwnBoxForAndroid)。
+   - “源代码”链接直接指向 [OwnBoxForAndroid](https://github.com/Own716/OwnBoxForAndroid)。
    - “Telegram 更新频道”链接更新为用户的专属频道：[t.me/KarenOwn](https://t.me/KarenOwn)。
    - 软件内“检查更新”将自动检测并同步本仓库的最新 Releases。
 

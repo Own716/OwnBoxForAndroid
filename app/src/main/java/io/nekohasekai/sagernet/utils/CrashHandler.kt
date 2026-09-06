@@ -62,7 +62,7 @@ object CrashHandler : Thread.UncaughtExceptionHandler {
 
     fun buildReportHeader(): String {
         var report = ""
-        report += "Throne for Android ${SagerNet.appVersionNameForDisplay} (${BuildConfig.VERSION_CODE})\n"
+        report += "OwnBox for Android ${SagerNet.appVersionNameForDisplay} (${BuildConfig.VERSION_CODE})\n"
         report += "Date: ${getCurrentMilliSecondUTCTimeStamp()}\n\n"
         report += "OS_VERSION: ${getSystemPropertyWithAndroidAPI("os.version")}\n"
         report += "SDK_INT: ${Build.VERSION.SDK_INT}\n"
