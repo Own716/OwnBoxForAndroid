@@ -67,7 +67,7 @@ data class ProxyEntity(
     var socksBean: SOCKSBean? = null,
     var httpBean: HttpBean? = null,
     var ssBean: ShadowsocksBean? = null,
-    var ssrBean: ShadowsocksRBean? = null,
+    @ColumnInfo(defaultValue = "NULL") var ssrBean: ShadowsocksRBean? = null,
     var vmessBean: VMessBean? = null,
     var trojanBean: TrojanBean? = null,
     var trojanGoBean: TrojanGoBean? = null,
@@ -83,7 +83,7 @@ data class ProxyEntity(
     var chainBean: ChainBean? = null,
     var nekoBean: NekoBean? = null,
     var configBean: ConfigBean? = null,
-    var snellBean: SnellBean? = null,
+    @ColumnInfo(defaultValue = "NULL") var snellBean: SnellBean? = null,
 ) : Serializable() {
 
     companion object {

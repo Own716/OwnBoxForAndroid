@@ -10,6 +10,7 @@ import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.fmt.KryoConverters
 import io.nekohasekai.sagernet.fmt.gson.GsonConverters
+import io.nekohasekai.sagernet.ktx.Logs
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -34,15 +35,31 @@ abstract class SagerDatabase : RoomDatabase() {
         @OptIn(DelicateCoroutinesApi::class)
         @Suppress("EXPERIMENTAL_API_USAGE")
         val instance by lazy {
-            SagerNet.application.getDatabasePath(Key.DB_PROFILE).parentFile?.mkdirs()
-            Room.databaseBuilder(SagerNet.application, SagerDatabase::class.java, Key.DB_PROFILE)
-//                .addMigrations(*SagerDatabase_Migrations.build())
-                .setJournalMode(JournalMode.TRUNCATE)
-                .allowMainThreadQueries()
-                .enableMultiInstanceInvalidation()
-                .fallbackToDestructiveMigration()
-                .setQueryExecutor { GlobalScope.launch { it.run() } }
-                .build()
+            val app = SagerNet.application
+            app.getDatabasePath(Key.DB_PROFILE).parentFile?.mkdirs()
+            fun buildDatabase(): SagerDatabase {
+                return Room.databaseBuilder(app, SagerDatabase::class.java, Key.DB_PROFILE)
+                    .setJournalMode(JournalMode.TRUNCATE)
+                    .allowMainThreadQueries()
+                    .enableMultiInstanceInvalidation()
+                    .fallbackToDestructiveMigration()
+                    .fallbackToDestructiveMigrationOnDowngrade()
+                    .setQueryExecutor { GlobalScope.launch { it.run() } }
+                    .build()
+            }
+            try {
+                val db = buildDatabase()
+                db.openHelper.writableDatabase
+                db
+            } catch (e: Throwable) {
+                Logs.e(e)
+                try {
+                    app.deleteDatabase(Key.DB_PROFILE)
+                } catch (t: Throwable) {
+                    Logs.e(t)
+                }
+                buildDatabase()
+            }
         }
 
         val groupDao get() = instance.groupDao()
