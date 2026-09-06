@@ -1,101 +1,75 @@
-# NekoBox for Android
+# Ownbox for Android
 
 [![API](https://img.shields.io/badge/API-21%2B-brightgreen.svg?style=flat)](https://android-arsenal.com/api?level=21)
-[![Releases](https://img.shields.io/github/v/release/MatsuriDayo/NekoBoxForAndroid)](https://github.com/MatsuriDayo/NekoBoxForAndroid/releases)
+[![Releases](https://img.shields.io/github/v/release/qinwenjie716-qwj/OwnBoxForAndroid)](https://github.com/qinwenjie716-qwj/OwnBoxForAndroid/releases)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-orange.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-sing-box / universal proxy toolchain for Android.
+基于 sing-box 内核的 Android 通用代理软件，定制增强版。
 
-一款使用 sing-box 的 Android 通用代理软件.
+---
 
-## 下载 / Downloads
+## 📱 功能亮点 / Features
 
-[![GitHub All Releases](https://img.shields.io/github/downloads/Matsuridayo/NekoBoxForAndroid/total?label=downloads-total&logo=github&style=flat-square)](https://github.com/Matsuridayo/NekoBoxForAndroid/releases)
+除支持常规的代理协议外，Ownbox 融入了多项高级增强特性：
 
-[GitHub Releases 下载](https://github.com/Matsuridayo/NekoBoxForAndroid/releases)
+1. **双网络加速（WiFi + 移动数据并发）**  
+   支持同时保持 WiFi 与移动网络连接并利用双通道，提升复杂网络环境下的网络吞吐与连接稳定性。
+2. **纯 TUN 入站（禁用混合代理端口）**  
+   提供纯粹的系统级 TUN 入站选项，不在本地开放额外的 Socks/HTTP 代理监听端口，防止局域网端口探测与应用泄漏。
+3. **订阅节点测速模式（Speed Test）**  
+   在节点列表界面支持一键节点下行/上行速率测试，支持自定义测速超时与测速下载地址。
+4. **HEVTUN 内核协议栈支持**  
+   在 TUN 实现选项中新增 `HEVTUN`（基于 hev-socks5-tunnel 的高性能轻量级协议栈）。
+5. **并发拨号（Parallel Dialing）**  
+   并发尝试建立连接，大幅缩短首包握手延迟。
+6. **严格路由（Strict Route）**  
+   防止流量绕过 TUN 接口造成直连泄露，保护数据隐私。
 
-**Google Play 版本自 2024 年 5 月起已被第三方控制，为非开源版本，请不要下载。**
+---
 
-**The Google Play version has been controlled by a third party since May 2024 and is a non-open
-source version. Please do not download it.**
+## 📥 下载指引 / Downloads
 
-## 更新日志 & Telegram 发布频道 / Changelog & Telegram Channel
+请前往仓库右侧的 **[Releases (发行版)](https://github.com/qinwenjie716-qwj/OwnBoxForAndroid/releases)** 页面下载最新版本的安装包（`.apk` 文件）。
 
-https://t.me/Matsuridayo
+### 各版本 APK 选择指南：
 
-## 项目主页 & 文档 / Homepage & Documents
+| 文件标识 | 适用设备 | 推荐说明 |
+|---|---|---|
+| `arm64-v8a.apk` | **现代主流安卓手机** | **绝大多数用户推荐下载此版本**（骁龙、联发科、天玑、麒麟等 64 位手机） |
+| `universal.apk` | **全设备通用包** | 包含所有 CPU 架构库，若不清楚自己手机型号，下载此包即可正常安装运行 |
+| `armeabi-v7a.apk` | 老款 32 位手机 | 适合 2016 年前生产或配置较低的老旧安卓设备 |
+| `x86_64.apk` | 电脑模拟器 / PC 平板 | 适合在 Windows/Mac 上的安卓模拟器（如 MuMu、雷电、逍遥等） |
 
-https://matsuridayo.github.io
+---
 
-## 支持的代理协议 / Supported Proxy Protocols
+## 📲 安装与使用说明 / How to Install & Use
+
+1. **下载安装包**：在手机浏览器中打开 [Releases 页面](https://github.com/qinwenjie716-qwj/OwnBoxForAndroid/releases)，选择对应架构的 `.apk` 文件下载。
+2. **允许安装**：在系统提示“允许安装未知来源应用”时勾选允许。
+3. **导入节点/订阅**：打开 Ownbox，点击右上角 `+` 号，选择从剪贴板导入订阅链接或扫描二维码。
+4. **节点测速**：在节点列表点击右上角菜单，选择 **“节点测速”**，即可测试各节点的实际下载带宽速度。
+5. **开启双网络加速**：在设置（Settings）-> 路由设置中开启 **“双网络加速”**（需确保系统同时开启了 WiFi 和蜂窝移动数据）。
+6. **启动代理**：点击右下角浮动操作按钮启动 VPN 代理服务。
+
+---
+
+## 🛠 支持的代理协议 / Supported Protocols
 
 * SOCKS (4/4a/5)
 * HTTP(S)
 * SSH
 * Shadowsocks
-* VMess
+* VMess / VLESS
 * Trojan
-* VLESS
-* AnyTLS
-* ShadowTLS
+* AnyTLS / ShadowTLS
 * TUIC
 * Hysteria 1/2
 * WireGuard
-* Trojan-Go (trojan-go-plugin)
-* NaïveProxy (naive-plugin)
-* Mieru (mieru-plugin)
 
-请到[这里](https://matsuridayo.github.io/nb4a-plugin/)下载插件以获得完整的代理支持.
+---
 
-Please visit [here](https://matsuridayo.github.io/nb4a-plugin/) to download plugins for full proxy
-supports.
+## 📄 开源许可 / License
 
-## 支持的订阅格式 / Supported Subscription Format
-
-* 一些广泛使用的格式 (如 Shadowsocks, ClashMeta 和 v2rayN)
-* sing-box 出站
-
-仅支持解析出站，即节点。分流规则等信息会被忽略。
-
-* Some widely used formats (like Shadowsocks, ClashMeta and v2rayN)
-* sing-box outbound
-
-Only resolving outbound, i.e. nodes, is supported. Information such as diversion rules are ignored.
-
-## 捐助 / Donate
-
-<details>
-
-如果这个项目对您有帮助, 可以通过捐赠的方式帮助我们维持这个项目.
-
-捐赠满等额 50 USD 可以在「[捐赠榜](https://mtrdnt.pages.dev/donation_list)」显示头像, 如果您未被添加到这里,
-欢迎联系我们补充.
-
-Donations of 50 USD or more can display your avatar on
-the [Donation List](https://mtrdnt.pages.dev/donation_list). If you are not added here, please
-contact us to add it.
-
-USDT TRC20
-
-`TRhnA7SXE5Sap5gSG3ijxRmdYFiD4KRhPs`
-
-XMR
-
-`49bwESYQjoRL3xmvTcjZKHEKaiGywjLYVQJMUv79bXonGiyDCs8AzE3KiGW2ytTybBCpWJUvov8SjZZEGg66a4e59GXa6k5`
-
-</details>
-
-## Credits
-
-Core:
-
-- [SagerNet/sing-box](https://github.com/SagerNet/sing-box)
-
-Android GUI:
-
-- [shadowsocks/shadowsocks-android](https://github.com/shadowsocks/shadowsocks-android)
-- [SagerNet/SagerNet](https://github.com/SagerNet/SagerNet)
-
-Web Dashboard:
+本项目遵循 GPL-3.0 开源许可协议。
 
 - [Yacd-meta](https://github.com/MetaCubeX/Yacd-meta)
