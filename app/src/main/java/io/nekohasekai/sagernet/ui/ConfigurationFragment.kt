@@ -1646,7 +1646,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                         GroupManager.updateGroup(proxyGroup)
                     }
                     onMainDispatcher {
-                        adapter.reloadProfiles()
+                        adapter?.reloadProfiles()
                     }
                 }
             }

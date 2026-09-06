@@ -200,12 +200,10 @@ class MainActivity : ThemedActivity(),
                                 }
                             }
                         } catch (e: io.nekohasekai.sagernet.ktx.SubscriptionFoundException) {
-                            onMainDispatcher {
-                                if (e.link.startsWith("sn://")) {
-                                    lifecycleScope.launch {
-                                        importSubscription(android.net.Uri.parse(e.link))
-                                    }
-                                } else {
+                            if (e.link.startsWith("sn://")) {
+                                importSubscription(android.net.Uri.parse(e.link))
+                            } else {
+                                onMainDispatcher {
                                     val subscriptionLink = android.net.Uri.parse(e.link).getQueryParameter("url") ?: e.link
                                     startActivity(Intent(this@MainActivity, GroupSettingsActivity::class.java).apply {
                                         putExtra(GroupSettingsActivity.EXTRA_FROM_CLIPBOARD, true)
