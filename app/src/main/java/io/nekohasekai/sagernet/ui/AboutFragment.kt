@@ -234,9 +234,10 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
                                 .build())
                         .addItem(
                             MaterialAboutActionItem.Builder()
-                                .icon(R.drawable.ic_baseline_code_24)
+                                .icon(R.drawable.ic_baseline_link_24)
                                 .text("上游仓库来源 (Fork)")
                                 .subText("-THRONE-for-android")
+                                .setOnClickAction { }
                                 .build())
                         .build())
                 .build()
