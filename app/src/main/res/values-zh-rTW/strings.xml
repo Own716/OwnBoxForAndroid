@@ -611,6 +611,13 @@
     <string name="snell_reuse_summary">僅 v4-v6</string>
     <string name="connection_test_url_test">URL 測試本組</string>
     <string name="connection_test_tcp_ping">TCP Ping 測試本組</string>
+    <string name="action_auto_lowest_latency">自動優選最低延遲節點 (URL-Test)</string>
+    <string name="route_preset_title">分流規則一鍵預設</string>
+    <string name="preset_bypass_cn_apps">預設：常用國內應用直連白名單 (微信/支付寶/淘寶/抖音等)</string>
+    <string name="preset_proxy_foreign_apps">預設：常用海外應用走代理 (Telegram/YouTube/Twitter/ChatGPT等)</string>
+    <string name="preset_applied_toast">預設分流規則已成功加入</string>
+    <string name="preset_cn_apps">勾選常用國內應用</string>
+    <string name="preset_foreign_apps">勾選常用海外應用</string>
     <string name="speed_test_settings">速度測試</string>
     <string name="speed_test_mode">速度測試模式</string>
     <string name="speed_test_mode_download_upload">下載 + 上傳</string>

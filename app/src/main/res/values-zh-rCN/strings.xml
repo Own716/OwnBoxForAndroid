@@ -615,6 +615,13 @@
     <string name="wireguard_persistent_keepalive">持久保活间隔</string>
     <string name="connection_test_url_test">URL 测试本组</string>
     <string name="connection_test_tcp_ping">TCP Ping 测试本组</string>
+    <string name="action_auto_lowest_latency">自动优选最低延迟节点 (URL-Test)</string>
+    <string name="route_preset_title">分流规则一键预设</string>
+    <string name="preset_bypass_cn_apps">预设：常用国内应用直连白名单 (微信/支付宝/淘宝/抖音等)</string>
+    <string name="preset_proxy_foreign_apps">预设：常用海外应用走代理 (Telegram/YouTube/Twitter/ChatGPT等)</string>
+    <string name="preset_applied_toast">预设分流规则已成功添加</string>
+    <string name="preset_cn_apps">勾选常用国内应用</string>
+    <string name="preset_foreign_apps">勾选常用海外应用</string>
     <string name="speed_test_settings">速度测试</string>
     <string name="speed_test_mode">速度测试模式</string>
     <string name="speed_test_mode_download_upload">下载 + 上传</string>

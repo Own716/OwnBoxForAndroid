@@ -385,6 +385,13 @@
     <string name="connection_test_clear_results">Clear test results</string>
     <string name="connection_test_url_test">URL test this group</string>
     <string name="connection_test_tcp_ping">TCP Ping this group</string>
+    <string name="action_auto_lowest_latency">Auto-select lowest latency (URL-Test)</string>
+    <string name="route_preset_title">Routing rule presets</string>
+    <string name="preset_bypass_cn_apps">Preset: Bypass common domestic apps</string>
+    <string name="preset_proxy_foreign_apps">Preset: Proxy common global apps</string>
+    <string name="preset_applied_toast">Preset rules applied successfully</string>
+    <string name="preset_cn_apps">Select domestic apps</string>
+    <string name="preset_foreign_apps">Select overseas apps</string>
     <string name="connection_test_domain_not_found">Domain not found</string>
     <string name="connection_test_refused">Connection refused</string>
     <string name="connection_test_unreachable">Unreachable</string>

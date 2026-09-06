@@ -55,15 +55,17 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
         } else {
             useSystemTheme.setOnPreferenceChangeListener { _, newValue ->
                 val enabled = newValue as Boolean
+                DataStore.useSystemTheme = enabled
                 appTheme.isEnabled = !enabled
-                needRestart()
+                activity?.recreate()
                 true
             }
             appTheme.isEnabled = !DataStore.useSystemTheme
         }
 
-        appTheme.setOnPreferenceChangeListener { _, _ ->
-            needRestart()
+        appTheme.setOnPreferenceChangeListener { _, newValue ->
+            DataStore.appTheme = (newValue as Number).toInt()
+            activity?.recreate()
             true
         }
 
@@ -73,8 +75,9 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
             Theme.applyNightTheme()
             true
         }
-        findPreference<SwitchPreference>("amoledTheme")?.setOnPreferenceChangeListener { _, _ ->
-            needRestart()
+        findPreference<SwitchPreference>("amoledTheme")?.setOnPreferenceChangeListener { _, newValue ->
+            DataStore.amoledTheme = newValue as Boolean
+            activity?.recreate()
             true
         }
         val appLanguage = findPreference<SimpleMenuPreference>(Key.APP_LANGUAGE)!!

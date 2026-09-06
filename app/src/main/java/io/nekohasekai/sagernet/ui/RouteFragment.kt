@@ -25,6 +25,43 @@ import io.nekohasekai.sagernet.widget.UndoSnackbarManager
 
 class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItemClickListener {
 
+    companion object {
+        val CN_APPS = setOf(
+            "com.tencent.mm",
+            "com.tencent.mobileqq",
+            "com.eg.android.AlipayGphone",
+            "com.taobao.taobao",
+            "com.jingdong.app.mall",
+            "tv.danmaku.bili",
+            "com.ss.android.ugc.aweme",
+            "com.netease.cloudmusic",
+            "com.autonavi.minimap",
+            "com.baidu.BaiduMap",
+            "com.xunmeng.pinduoduo",
+            "com.sankuai.meituan",
+            "com.zhihu.android",
+            "com.sina.weibo",
+            "com.coolapk.market",
+        )
+
+        val FOREIGN_APPS = setOf(
+            "org.telegram.messenger",
+            "org.thunderdog.challegram",
+            "com.google.android.youtube",
+            "com.twitter.android",
+            "com.android.chrome",
+            "com.google.android.gms",
+            "com.android.vending",
+            "com.discord",
+            "com.whatsapp",
+            "com.instagram.android",
+            "com.zhiliaoapp.musically",
+            "com.openai.chatgpt",
+            "com.netflix.mediaclient",
+            "com.spotify.music",
+        )
+    }
+
     lateinit var activity: MainActivity
     lateinit var ruleListView: RecyclerView
     lateinit var ruleAdapter: RuleAdapter
@@ -129,6 +166,54 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
             }
             R.id.action_manage_assets -> {
                 startActivity(Intent(requireContext(), AssetsActivity::class.java))
+            }
+            R.id.action_preset_routes -> {
+                val presets = arrayOf(
+                    getString(R.string.preset_bypass_cn_apps),
+                    getString(R.string.preset_proxy_foreign_apps),
+                    getString(R.string.route_opt_block_ads)
+                )
+                MaterialAlertDialogBuilder(activity)
+                    .setTitle(R.string.route_preset_title)
+                    .setItems(presets) { _, which ->
+                        runOnDefaultDispatcher {
+                            when (which) {
+                                0 -> {
+                                    val rule = RuleEntity(
+                                        name = getString(R.string.preset_bypass_cn_apps),
+                                        packages = CN_APPS,
+                                        outbound = -1L,
+                                        enabled = true
+                                    )
+                                    ProfileManager.createRule(rule)
+                                }
+                                1 -> {
+                                    val rule = RuleEntity(
+                                        name = getString(R.string.preset_proxy_foreign_apps),
+                                        packages = FOREIGN_APPS,
+                                        outbound = 0L,
+                                        enabled = true
+                                    )
+                                    ProfileManager.createRule(rule)
+                                }
+                                2 -> {
+                                    val rule = RuleEntity(
+                                        name = getString(R.string.route_opt_block_ads),
+                                        domains = "geosite:category-ads-all",
+                                        outbound = -2L,
+                                        enabled = true
+                                    )
+                                    ProfileManager.createRule(rule)
+                                }
+                            }
+                            onMainDispatcher {
+                                snackbar(R.string.preset_applied_toast).show()
+                                ruleAdapter.reload()
+                            }
+                        }
+                    }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
             }
         }
         return true

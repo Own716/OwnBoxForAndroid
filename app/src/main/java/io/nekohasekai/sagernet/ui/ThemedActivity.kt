@@ -24,8 +24,15 @@ abstract class ThemedActivity : AppCompatActivity {
     var themeResId = 0
     var uiMode = 0
     open val isDialog = false
+    private var lastUseSystemTheme: Boolean = false
+    private var lastAmoledTheme: Boolean = false
+    private var lastAppTheme: Int = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        lastUseSystemTheme = DataStore.useSystemTheme
+        lastAmoledTheme = DataStore.amoledTheme
+        lastAppTheme = DataStore.appTheme
+
         if (!isDialog) {
             Theme.apply(this)
         } else {
@@ -62,6 +69,15 @@ abstract class ThemedActivity : AppCompatActivity {
         super.setTheme(resId)
 
         themeResId = resId
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (lastUseSystemTheme != DataStore.useSystemTheme ||
+            lastAmoledTheme != DataStore.amoledTheme ||
+            (!DataStore.useSystemTheme && lastAppTheme != DataStore.appTheme)) {
+            ActivityCompat.recreate(this)
+        }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {

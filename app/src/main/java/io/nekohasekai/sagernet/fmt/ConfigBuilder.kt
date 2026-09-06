@@ -129,6 +129,18 @@ internal fun buildSelectorOutbound(defaultTag: String?, memberTags: List<String>
         outbounds = memberTags
     }
 
+internal fun buildUrlTestOutbound(memberTags: List<String>, testUrl: String? = null) =
+    Outbound_URLTestOptions().apply {
+        type = "urltest"
+        tag = TAG_PROXY
+        outbounds = memberTags
+        url = testUrl?.takeIf { it.isNotBlank() }
+            ?: DataStore.connectionTestURL.takeIf { it.isNotBlank() }
+            ?: "https://www.gstatic.com/generate_204"
+        interval = 300L
+        tolerance = 50
+    }
+
 private fun endpointTag(value: Any?): String? {
     return (value as? Map<*, *>)?.get("tag")?.toString()?.takeIf { it.isNotBlank() }
 }
@@ -797,13 +809,18 @@ fun buildConfig(
             return chainTagOut
         }
 
+        val useAutoSelect = !forTest && !forExport && DataStore.autoSelectLowestLatency
         // build outbounds
-        if (buildSelector) {
-            val list = group.id.let { SagerDatabase.proxyDao.getByGroup(it) }
+        if (buildSelector || useAutoSelect) {
+            val list = group?.id?.let { SagerDatabase.proxyDao.getByGroup(it) } ?: listOf(proxy)
             list.forEach {
                 tagMap[it.id] = buildChain(it.id, it)
             }
-            outbounds.add(0, buildSelectorOutbound(tagMap[proxy.id], tagMap.values.toList()))
+            if (useAutoSelect && tagMap.isNotEmpty()) {
+                outbounds.add(0, buildUrlTestOutbound(tagMap.values.toList()))
+            } else {
+                outbounds.add(0, buildSelectorOutbound(tagMap[proxy.id], tagMap.values.toList()))
+            }
         } else {
             val mainTag = buildChain(0, proxy)
             tagMap[proxy.id] = mainTag
@@ -813,7 +830,7 @@ fun buildConfig(
             tagMap[key] = buildChain(key, p)
         }
 
-        val mainProxyTag = (if (buildSelector) TAG_PROXY else tagMap[proxy.id]) ?: TAG_PROXY
+        val mainProxyTag = (if (buildSelector || useAutoSelect) TAG_PROXY else tagMap[proxy.id]) ?: TAG_PROXY
 
         // 在应用用户规则之前检查全局模式
         if (!forTest && DataStore.globalMode) {

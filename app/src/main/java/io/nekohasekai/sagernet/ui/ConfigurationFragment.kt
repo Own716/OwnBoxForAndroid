@@ -331,6 +331,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         if (!select) {
             toolbar.inflateMenu(R.menu.add_profile_menu)
             toolbar.menu.findItem(R.id.action_global_mode)?.isChecked = DataStore.globalMode
+            toolbar.menu.findItem(R.id.action_auto_lowest_latency)?.isChecked = DataStore.autoSelectLowestLatency
             toolbar.setOnMenuItemClickListener(this)
         } else {
             toolbar.setTitle(titleRes)
@@ -841,6 +842,23 @@ class ConfigurationFragment @JvmOverloads constructor(
                                 snackbar(getString(R.string.service_failed)).show()
                             }
                         }
+                    }
+                }
+                return true
+            }
+
+            R.id.action_auto_lowest_latency -> {
+                item.isChecked = !item.isChecked
+                DataStore.autoSelectLowestLatency = item.isChecked
+                if (DataStore.serviceState.canStop) {
+                    runOnDefaultDispatcher {
+                        delay(200)
+                        snackbar(getString(R.string.need_reload)).setAction(R.string.apply) {
+                            runOnDefaultDispatcher {
+                                delay(100)
+                                SagerNet.reloadService()
+                            }
+                        }.show()
                     }
                 }
                 return true

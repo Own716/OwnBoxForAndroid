@@ -20,6 +20,7 @@ import io.nekohasekai.sagernet.ktx.parsePort
 import io.nekohasekai.sagernet.ktx.string
 import io.nekohasekai.sagernet.ktx.stringToInt
 import io.nekohasekai.sagernet.ktx.stringToIntIfExists
+import io.nekohasekai.sagernet.utils.Theme
 import moe.matsuri.nb4a.TempDatabase
 
 object DataStore : OnPreferenceDataStoreChangeListener {
@@ -102,7 +103,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     //
 
     var isExpert by configurationStore.boolean(Key.APP_EXPERT)
-    var appTheme by configurationStore.int(Key.APP_THEME)
+    var appTheme by configurationStore.int(Key.APP_THEME) { Theme.GREEN }
     var useSystemTheme by configurationStore.boolean(Key.USE_SYSTEM_THEME)
     var nightTheme by configurationStore.stringToInt(Key.NIGHT_THEME)
     var appLanguage by configurationStore.string(Key.APP_LANGUAGE) { "" }
@@ -118,6 +119,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var amoledTheme by configurationStore.boolean("amoledTheme")
     var concurrentDial by configurationStore.boolean(Key.CONCURRENT_DIAL)
     var dualNetworkAcceleration by configurationStore.boolean(Key.DUAL_NETWORK_ACCELERATION)
+    var autoSelectLowestLatency by configurationStore.boolean(Key.AUTO_SELECT_LOWEST_LATENCY)
 
     var allowAccess by configurationStore.boolean(Key.ALLOW_ACCESS)
     var speedInterval by configurationStore.stringToInt(Key.SPEED_INTERVAL)

@@ -4,6 +4,12 @@
         android:id="@+id/action_invert_selections"
         android:title="@string/invert_selections" />
     <item
+        android:id="@+id/action_preset_cn_apps"
+        android:title="@string/preset_cn_apps" />
+    <item
+        android:id="@+id/action_preset_foreign_apps"
+        android:title="@string/preset_foreign_apps" />
+    <item
         android:id="@+id/action_clear_selections"
         android:title="@string/clear_selections"
         app:showAsAction="never" />

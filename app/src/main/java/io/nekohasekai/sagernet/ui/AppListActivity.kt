@@ -258,6 +258,54 @@ class AppListActivity : ThemedActivity() {
                 return true
             }
 
+            R.id.action_preset_cn_apps -> {
+                runOnDefaultDispatcher {
+                    val cnPackages = setOf(
+                        "com.tencent.mm", "com.tencent.mobileqq", "com.eg.android.AlipayGphone",
+                        "com.taobao.taobao", "com.jingdong.app.mall", "tv.danmaku.bili",
+                        "com.ss.android.ugc.aweme", "com.netease.cloudmusic", "com.autonavi.minimap",
+                        "com.baidu.BaiduMap", "com.xunmeng.pinduoduo", "com.sankuai.meituan",
+                        "com.zhihu.android", "com.sina.weibo", "com.coolapk.market"
+                    )
+                    for (app in apps) {
+                        if (cnPackages.contains(app.packageName)) {
+                            proxiedUids[app.uid] = true
+                        }
+                    }
+                    DataStore.routePackages = apps.filter { isProxiedApp(it) }
+                        .joinToString("\n") { it.packageName }
+                    apps = apps.sortedWith(compareBy({ !isProxiedApp(it) }, { it.name.toString() }))
+                    onMainDispatcher {
+                        appsAdapter.filter.filter(binding.search.text?.toString() ?: "")
+                    }
+                }
+                return true
+            }
+
+            R.id.action_preset_foreign_apps -> {
+                runOnDefaultDispatcher {
+                    val foreignPackages = setOf(
+                        "org.telegram.messenger", "org.thunderdog.challegram", "com.google.android.youtube",
+                        "com.twitter.android", "com.android.chrome", "com.google.android.gms",
+                        "com.android.vending", "com.discord", "com.whatsapp", "com.instagram.android",
+                        "com.zhiliaoapp.musically", "com.openai.chatgpt", "com.netflix.mediaclient",
+                        "com.spotify.music"
+                    )
+                    for (app in apps) {
+                        if (foreignPackages.contains(app.packageName)) {
+                            proxiedUids[app.uid] = true
+                        }
+                    }
+                    DataStore.routePackages = apps.filter { isProxiedApp(it) }
+                        .joinToString("\n") { it.packageName }
+                    apps = apps.sortedWith(compareBy({ !isProxiedApp(it) }, { it.name.toString() }))
+                    onMainDispatcher {
+                        appsAdapter.filter.filter(binding.search.text?.toString() ?: "")
+                    }
+                }
+                return true
+            }
+
             R.id.action_clear_selections -> {
                 runOnDefaultDispatcher {
                     proxiedUids.clear()
