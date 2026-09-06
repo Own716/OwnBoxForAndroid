@@ -60,7 +60,10 @@ class ConfigBuildResult(
 }
 
 fun buildConfig(
-    proxy: ProxyEntity, forTest: Boolean = false, forExport: Boolean = false
+    proxy: ProxyEntity,
+    forTest: Boolean = false,
+    forExport: Boolean = false,
+    testPort: Int = 0,
 ): ConfigBuildResult {
 
     if (proxy.type == TYPE_CONFIG) {
@@ -237,6 +240,13 @@ fun buildConfig(
                     sniff_override_destination = needSniffOverride
                 })
             }
+        } else if (testPort > 0) {
+            inbounds.add(Inbound_MixedOptions().apply {
+                type = "mixed"
+                tag = "test-mixed"
+                listen = LOCALHOST
+                listen_port = testPort
+            })
         }
 
         outbounds = mutableListOf()

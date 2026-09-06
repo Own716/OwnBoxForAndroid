@@ -600,4 +600,6 @@
     <string name="strict_route_summary">Enforce strict routing to prevent data leakage outside the TUN interface.</string>
     <string name="action_connection_speed_test">Speed Test</string>
     <string name="speed_test">Speed Test</string>
+    <string name="action_test_profile_speed">Test Node Speed</string>
+    <string name="testing_node_speed">Testing node speed...</string>
 </resources>

@@ -520,4 +520,6 @@
     <string name="strict_route_summary">启用严格路由以防止在 TUN 外部泄露流量</string>
     <string name="action_connection_speed_test">节点测速</string>
     <string name="speed_test">节点测速</string>
+    <string name="action_test_profile_speed">测当前节点速度</string>
+    <string name="testing_node_speed">正在测试节点速度...</string>
 </resources>

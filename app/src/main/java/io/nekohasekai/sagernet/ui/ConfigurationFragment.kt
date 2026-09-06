@@ -907,7 +907,9 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     /**
      * Speed test for all profiles in the current group.
-     * Results are stored in [ProxyEntity.error] as a formatted string (e.g. "↓ 1.2 MB/s")
+    /**
+     * Speed test for all profiles in the current group.
+     * Results are stored in [ProxyEntity.error] as a formatted string (e.g. "↓ 1.2 MB/s (85ms)")
      * and [ProxyEntity.status] is set to -1 so they display in the secondary text colour.
      */
     @OptIn(DelicateCoroutinesApi::class)
@@ -929,18 +931,13 @@ class ConfigurationFragment @JvmOverloads constructor(
                         val profile = profiles.poll() ?: break
                         profile.status = 0
                         try {
-                            val kbps = speedTest.doTest(profile)
-                            if (kbps >= 0) {
+                            val res = speedTest.doTest(profile)
+                            if (res.success) {
                                 profile.status = -1
-                                val mbps = kbps / 1000.0
-                                profile.error = if (mbps >= 1.0) {
-                                    "↓ %.2f MB/s".format(mbps / 1000.0)
-                                } else {
-                                    "↓ ${kbps} Kbps"
-                                }
+                                profile.error = res.formattedSpeed
                             } else {
                                 profile.status = 3
-                                profile.error = getString(R.string.unavailable)
+                                profile.error = res.error ?: getString(R.string.unavailable)
                             }
                         } catch (e: PluginManager.PluginNotFoundException) {
                             profile.status = 2
@@ -982,6 +979,47 @@ class ConfigurationFragment @JvmOverloads constructor(
                 "[${group.displayName()}] ${getString(R.string.speed_test)}"
             )
             dialog.hide()
+        }
+    }
+
+    /**
+     * Test download speed and latency for a single profile.
+     */
+    fun testSingleProfileSpeed(profile: ProxyEntity) {
+        profile.status = 0
+        ProfileManager.postUpdate(profile.id)
+        snackbar(getString(R.string.testing_node_speed)).show()
+
+        runOnDefaultDispatcher {
+            val speedTest = SpeedTest()
+            try {
+                val res = speedTest.doTest(profile)
+                if (res.success) {
+                    profile.status = -1
+                    profile.error = res.formattedSpeed
+                    ProfileManager.updateProfile(profile)
+                    onMainDispatcher {
+                        snackbar("[${profile.displayName()}] ${res.formattedSpeed}").show()
+                    }
+                } else {
+                    profile.status = 3
+                    profile.error = res.error ?: getString(R.string.unavailable)
+                    ProfileManager.updateProfile(profile)
+                    onMainDispatcher {
+                        snackbar("[${profile.displayName()}] ${profile.error}").show()
+                    }
+                }
+            } catch (e: Exception) {
+                Logs.w(e)
+                profile.status = 3
+                profile.error = e.readableMessage
+                ProfileManager.updateProfile(profile)
+                onMainDispatcher {
+                    snackbar("[${profile.displayName()}] ${e.readableMessage}").show()
+                }
+            } finally {
+                ProfileManager.postUpdate(profile.id)
+            }
         }
     }
 
@@ -1741,7 +1779,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                     if (!(select || proxyEntity.type == ProxyEntity.TYPE_CHAIN)) {
                         onMainDispatcher {
                             shareLayer.setBackgroundColor(Color.TRANSPARENT)
-                            shareButton.setImageResource(R.drawable.ic_social_share)
+                            shareButton.setImageResource(R.drawable.ic_baseline_more_vert_24)
                             shareButton.setColorFilter(Color.GRAY)
                             shareButton.isVisible = true
 
@@ -1769,6 +1807,9 @@ class ConfigurationFragment @JvmOverloads constructor(
                 try {
                     currentName = entity.displayName()!!
                     when (item.itemId) {
+                        R.id.action_test_profile_speed -> {
+                            testSingleProfileSpeed(entity)
+                        }
                         R.id.action_standard_qr -> showCode(entity.toStdLink())
                         R.id.action_standard_clipboard -> export(entity.toStdLink())
                         R.id.action_universal_qr -> showCode(entity.requireBean().toUniversalLink())

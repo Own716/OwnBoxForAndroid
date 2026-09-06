@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release Tag (e.g. v1.0.0)"
+        description: "Release Tag (e.g. v2.0.0)"
         required: true
-        default: "v1.0.0"
+        default: "v2.0.0"
       publish:
         description: "Publish: type y to skip publish"
         required: false
@@ -109,6 +109,7 @@ jobs:
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           name: Ownbox ${{ github.event.inputs.tag || github.ref_name }}
+          body_path: RELEASE_NOTES.md
           files: apks/*.apk
           draft: false
           prerelease: false
