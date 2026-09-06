@@ -48,8 +48,12 @@
     <string name="service_mode">Modo de servicio</string> 
     <string name="service_mode_proxy">Solo proxy</string> 
     <string name="service_mode_vpn" translatable="false">VPN</string> 
-    <string name="port_proxy">Puerto proxy SOCKS5</string> 
-    <string name="port_http">Puerto proxy HTTP</string> 
+    <string name="port_proxy">Puerto proxy SOCKS5</string>
+    <string name="port_http">Puerto proxy HTTP</string>
+    <string name="disable_mixed_inbound">Desactivar entrada mixta</string>
+    <string name="disable_mixed_inbound_sum">Entrada TUN pura; no escuchar en el puerto proxy local</string>
+    <string name="mixed_inbound_disabled">Desactivado</string>
+    <string name="disable_mixed_inbound_proxy_toast">La desactivación solo surte efecto en modo TUN; puerto de escucha actual: %1$d</string>
     <string name="port_transproxy">Puerto transproxy</string> 
     <string name="cag_route">Ajustes de ruta</string> 
     <string name="allow_access">Permitir conexiones desde la LAN</string> 
@@ -90,7 +94,7 @@
     <string name="port_local_dns">Puerto DNS local</string> 
     <string name="require_transproxy">Activar transproxy entrante</string> 
     <string name="transproxy_mode">Modo transproxy</string> 
-    <string name="connection_test_url">URL de prueba de conexión</string> 
+    <string name="connection_test_url">URL de prueba de latencia</string>
     <!-- proxy category --> 
     <string name="profile_name">Nombre de perfil</string> 
     <string name="server_address">Servidor</string> 
@@ -213,8 +217,10 @@
     <string name="action_export_clipboard">Exportar al portapapeles</string> 
     <string name="action_export">Exportar</string> 
     <string name="action_import">Importar desde portapapeles</string> 
-    <string name="action_import_file">Importar desde archivo</string> 
-    <string name="action_export_msg">¡Exportación exitosa!</string> 
+    <string name="action_import_file">Importar desde archivo</string>
+    <string name="scanner_toggle_flashlight">Alternar linterna</string>
+    <string name="scanner_select_image">Seleccionar imagen</string>
+    <string name="action_export_msg">¡Exportación exitosa!</string>
     <string name="action_export_err">Error al exportar.</string> 
     <string name="action_import_msg">¡Importación exitosa!</string> 
     <string name="action_import_err">No se pudo importar.</string> 
@@ -252,8 +258,6 @@
     <string name="no_proxies_found_in_file">No se encontraron proxys en el archivo</string> 
     <string name="no_proxies_found_in_clipboard">No se encontraron proxys en el portapapeles</string> 
     <string name="deduplication">Deduplicación</string> 
-    <string name="donate">Donar</string> 
-    <string name="donate_info">Amo el dinero</string> 
     <string name="ignore_battery_optimizations">Ignorar optimizaciones de batería</string> 
     <string name="ignore_battery_optimizations_sum">Eliminar algunas restricciones</string> 
     <!-- plugin --> 
@@ -294,17 +298,15 @@
     <string name="clear_traffic_statistics">Borrar estadísticas de tráfico</string> 
     <string name="connection_test">Prueba de conexión</string> 
     <string name="connection_test_clear_results">Borrar resultados de la prueba</string> 
-    <string name="connection_test_tcp_ping" translatable="false">TCPing</string> 
-    <string name="connection_test_tcp_ping_unavailable">TCPing no disponible</string> 
-    <string name="connection_test_icmp_ping" translatable="false">ICMPing</string> 
-    <string name="connection_test_icmp_ping_unavailable">ICMPing no disponible</string> 
-    <string name="connection_test_url_test" translatable="false">URL Test</string> 
+    <string name="connection_test_url_test">Probar URL de este grupo</string>
     <string name="connection_test_domain_not_found">Dominio no encontrado</string> 
     <string name="connection_test_refused">Conexión denegada</string> 
     <string name="connection_test_unreachable">Inalcanzable</string> 
-    <string name="connection_test_timeout">Se acabó el tiempo</string> 
-    <string name="append_http_proxy">Añadir proxy HTTP a la VPN</string> 
-    <string name="append_http_proxy_sum">El proxy HTTP se utilizará directamente desde (navegador/algunas aplicaciones compatibles), sin pasar por el dispositivo NIC virtual (Android 10+)</string>
+    <string name="connection_test_timeout_error">Se acabó el tiempo</string> 
+    <string name="mixed_auth_config">Configurar autenticación</string>
+    <string name="mixed_auth_username_hint">Nombre de usuario (deja ambos en blanco para no usar autenticación)</string>
+    <string name="mixed_auth_no_auth">Sin configurar (sin autenticación)</string>
+    <string name="mixed_auth_enabled_sum">Nombre de usuario: %1$s</string>
     <string name="protocol_settings">Ajustes de protocolo</string>
     <string name="trojan_provider">Proveedor Trojan</string> 
     <string name="group_basic">Básico</string> 
@@ -436,6 +438,9 @@
     <string name="backup_settings">Ajustes</string> 
     <string name="backup_summary">Si no se realiza un respaldo de los ajustes de enrutamiento con las configuraciones, se perderán las salidas personalizadas.</string> 
     <string name="backup_not_file">No es un archivo de respaldo: excepto .json, pero %s</string> 
+    <string name="backup_not_throne_desktop">No es una copia de Throne de escritorio: se esperaba .thrbackup, pero %s</string>
+    <string name="action_import_throne_desktop">Importar desde Throne de escritorio</string>
+    <string name="backup_import_throne_desktop_summary">Importa perfiles, rutas y ajustes desde un .thrbackup de Throne de escritorio. Se ignoran los iconos personalizados. Los datos existentes de las categorías seleccionadas se sobrescribirán.</string>
     <string name="invalid_backup_file">Archivo de respaldo no válido</string> 
     <string name="backup_import">Importar</string> 
     <string name="backup_import_summary">La importación sobrescribirá los datos existentes.</string> 
@@ -449,4 +454,54 @@
  
     <string name="connection_test_delete_unavailable">Borrado no disponible</string> 
 
-</resources> 
+    <string name="preview_hint_dont_show_again">No volver a mostrar</string>
+    <string name="speed_test_settings">Speed test</string>
+    <string name="speed_test_mode">Speed test mode</string>
+    <string name="speed_test_mode_download_upload">Download + upload</string>
+    <string name="speed_test_mode_download">Download only</string>
+    <string name="speed_test_mode_upload">Upload only</string>
+    <string name="speed_test_mode_simple_download">Simple download</string>
+    <string name="speed_test_timeout_ms">Speed test timeout (ms)</string>
+    <string name="speed_test_timeout_invalid">Enter a timeout greater than zero milliseconds</string>
+    <string name="simple_download_url">Simple download URL</string>
+    <string name="speed_test_url_invalid">Enter a valid HTTP or HTTPS URL</string>
+    <string name="speed_test_group">Probar velocidad de este grupo</string>
+    <string name="speed_test_confirm_title">Run speed test?</string>
+    <string name="speed_test_confirm_message">Speed testing can use significant data. Profiles are tested one at a time through their own proxy.</string>
+    <string name="speed_test_stage_pending">Waiting</string>
+    <string name="speed_test_stage_discovery">Finding a test server</string>
+    <string name="speed_test_stage_latency">Measuring server latency</string>
+    <string name="speed_test_stage_download">Downloading</string>
+    <string name="speed_test_stage_upload">Uploading</string>
+    <string name="speed_test_stage_complete">Complete</string>
+    <string name="speed_test_stage_cancelled">Cancelled</string>
+    <string name="speed_test_stage_error">Failed</string>
+    <string name="speed_test_latency_format">Latency: %1$d ms</string>
+    <string name="speed_test_server_format">Server: %1$s</string>
+    <string name="speed_test_download_format">Download: %1$s (%2$s)</string>
+    <string name="speed_test_upload_format">Upload: %1$s (%2$s)</string>
+    <string name="speed_test_rate_mbps">%1$.2f Mbps</string>
+
+    <!-- Custom Icon Pack -->
+    <string name="custom_icon">Icono personalizado</string>
+    <string name="custom_icon_import">Importar paquete de iconos</string>
+    <string name="custom_icon_reset">Restablecer valores predeterminados</string>
+    <string name="custom_icon_preview_shortcut">Icono de acceso directo</string>
+    <string name="custom_icon_shortcut_subtitle">La plataforma Android no admite modificar el icono de la aplicación. ¡Haga un fork si necesita cambiarlo!</string>
+    <string name="custom_icon_preview_tile">Mosaico de ajustes rápidos</string>
+    <string name="custom_icon_apply_pack">Aplicar este paquete de iconos</string>
+    <string name="custom_icon_apply_success">Paquete de iconos aplicado. Se solicitó el acceso directo.</string>
+    <string name="custom_icon_pin_shortcut_not_supported">Su lanzador no admite anclar accesos directos.</string>
+    <string name="custom_icon_no_pack_to_apply">Primero importe un paquete de iconos.</string>
+    <string name="custom_icon_tile_state_active">Activo (toca para cambiar)</string>
+    <string name="custom_icon_tile_state_inactive">Inactivo (toca para cambiar)</string>
+    <string name="custom_icon_import_success">Paquete de iconos importado con éxito</string>
+    <string name="custom_icon_reset_success">Iconos predeterminados restaurados</string>
+    <string name="custom_icon_reset_confirm">¿Está seguro de que desea restaurar los iconos predeterminados?</string>
+    <string name="custom_icon_error_missing">Falta archivo requerido en el paquete: %s</string>
+    <string name="custom_icon_error_dimension">La resolución de %1$s debe ser de 512x512 píxeles (actual: %2$dx%3$d)</string>
+    <string name="custom_icon_error_not_png">%s no es una imagen PNG válida</string>
+    <string name="custom_icon_error_security">Error de verificación de seguridad: %s</string>
+    <string name="custom_icon_requirement_tip">El paquete de iconos debe ser un ZIP que contenga icon.png y tile.png de 512x512.</string>
+</resources>
+

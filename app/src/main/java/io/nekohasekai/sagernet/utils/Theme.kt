@@ -2,6 +2,7 @@ package io.nekohasekai.sagernet.utils
 
 import android.content.Context
 import android.content.res.Configuration
+import android.os.Build
 import androidx.appcompat.app.AppCompatDelegate
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.DataStore
@@ -9,6 +10,7 @@ import io.nekohasekai.sagernet.ktx.app
 
 object Theme {
 
+    const val MONET = 0
     const val RED = 1
     const val PINK_SSR = 2
     const val PINK = 3
@@ -30,6 +32,7 @@ object Theme {
     const val GREY = 19
     const val BLUE_GREY = 20
     const val BLACK = 21
+    const val VERDANT_MINT = 22
 
     private fun defaultTheme() = PINK_SSR
 
@@ -42,15 +45,24 @@ object Theme {
     }
 
     fun getTheme(): Int {
-        return getTheme(DataStore.appTheme)
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && DataStore.useSystemTheme) {
+            getTheme(MONET)
+        } else {
+            getTheme(DataStore.appTheme)
+        }
     }
 
     fun getDialogTheme(): Int {
-        return getDialogTheme(DataStore.appTheme)
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && DataStore.useSystemTheme) {
+            getDialogTheme(MONET)
+        } else {
+            getDialogTheme(DataStore.appTheme)
+        }
     }
 
     fun getTheme(theme: Int): Int {
         return when (theme) {
+            MONET -> R.style.Theme_SagerNet_Monet
             RED -> R.style.Theme_SagerNet_Red
             PINK -> R.style.Theme_SagerNet
             PINK_SSR -> R.style.Theme_SagerNet_Pink_SSR
@@ -72,12 +84,14 @@ object Theme {
             GREY -> R.style.Theme_SagerNet_Grey
             BLUE_GREY -> R.style.Theme_SagerNet_BlueGrey
             BLACK -> R.style.Theme_SagerNet_Black
+            VERDANT_MINT -> R.style.Theme_SagerNet_VerdantMint
             else -> getTheme(defaultTheme())
         }
     }
 
     fun getDialogTheme(theme: Int): Int {
         return when (theme) {
+            MONET -> R.style.Theme_SagerNet_Dialog_Monet
             RED -> R.style.Theme_SagerNet_Dialog_Red
             PINK -> R.style.Theme_SagerNet_Dialog
             PINK_SSR -> R.style.Theme_SagerNet_Dialog_Pink_SSR
@@ -99,6 +113,7 @@ object Theme {
             GREY -> R.style.Theme_SagerNet_Dialog_Grey
             BLUE_GREY -> R.style.Theme_SagerNet_Dialog_BlueGrey
             BLACK -> R.style.Theme_SagerNet_Dialog_Black
+            VERDANT_MINT -> R.style.Theme_SagerNet_Dialog_VerdantMint
             else -> getDialogTheme(defaultTheme())
         }
     }

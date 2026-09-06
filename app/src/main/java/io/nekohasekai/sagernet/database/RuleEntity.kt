@@ -23,6 +23,8 @@ data class RuleEntity(
     var network: String = "",
     var source: String = "",
     var protocol: String = "",
+    @ColumnInfo(name = "ruleset", defaultValue = "")
+    var ruleset: String = "",
     var outbound: Long = 0,
     var packages: Set<String> = emptySet(),
 ) : Parcelable {
@@ -41,6 +43,7 @@ data class RuleEntity(
         if (port.isNotBlank()) summary += "dst port: $port\n"
         if (network.isNotBlank()) summary += "network: $network\n"
         if (protocol.isNotBlank()) summary += "protocol: $protocol\n"
+        if (ruleset.isNotBlank()) summary += "$ruleset\n"
         if (packages.isNotEmpty()) summary += app.getString(
             R.string.apps_message, packages.size
         ) + "\n"

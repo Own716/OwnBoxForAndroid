@@ -5,32 +5,20 @@
     android:id="@+id/content"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="4dp"
+    android:layout_margin="2dp"
     android:clickable="true"
     android:focusable="true"
-    app:cardElevation="2dp">
+    app:cardCornerRadius="@dimen/profile_card_corner_radius">
 
-    <LinearLayout
-        android:id="@+id/content_lin"
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:focusable="true"
-        android:orientation="horizontal">
+        android:layout_height="wrap_content">
 
         <LinearLayout
-            android:id="@+id/selected_view"
-            android:layout_width="4dp"
-            android:layout_height="match_parent"
-            android:background="?selectedColorPrimary"
-            android:orientation="horizontal"
-            android:visibility="invisible"
-            tools:visibility="visible" />
-
-        <LinearLayout
-
+            android:id="@+id/content_lin"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:nextFocusRight="@+id/edit"
+            android:layout_height="wrap_content"
+            android:focusable="true"
             android:orientation="vertical">
 
             <LinearLayout
@@ -51,8 +39,14 @@
 
                     <TextView
                         android:id="@+id/profile_name"
-                        android:layout_width="wrap_content"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:maxLines="2"
+                        android:ellipsize="end"
+                        android:breakStrategy="simple"
+                        android:hyphenationFrequency="none"
+                        android:lineBreakStyle="loose"
+                        android:lineBreakWordStyle="phrase"
                         android:textAppearance="?android:attr/textAppearanceSmall"
                         android:textColor="?android:attr/textColorPrimary"
                         android:textStyle="bold"
@@ -69,6 +63,18 @@
                     android:focusable="true"
                     android:padding="12dp"
                     app:srcCompat="@drawable/ic_image_edit" />
+
+                <androidx.appcompat.widget.AppCompatImageView
+                    android:id="@+id/double_column_menu"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="top"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/edit"
+                    android:focusable="true"
+                    android:padding="12dp"
+                    android:visibility="gone"
+                    app:srcCompat="@drawable/ic_baseline_more_vert_24" />
 
                 <LinearLayout
                     android:id="@+id/share"
@@ -123,6 +129,7 @@
                     android:id="@+id/profile_address"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:minLines="1"
                     android:text="@string/server_address"
                     android:textAppearance="?android:attr/textAppearanceSmall"
                     android:textColor="?android:attr/textColorSecondary" />
@@ -155,25 +162,37 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textAppearance="?android:attr/textAppearanceSmall"
-                    android:textColor="?attr/accentOrTextSecondary" />
+                    android:textColor="?android:textColorSecondary" />
 
-                <LinearLayout
+                <View
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="0dp"
                     android:layout_weight="1" />
 
                 <TextView
                     android:id="@+id/profile_status"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp"
+                    android:layout_marginStart="8dp"
+                    android:gravity="end"
+                    android:singleLine="true"
+                    android:ellipsize="end"
                     android:textAppearance="?android:attr/textAppearanceSmall"
-                    android:textColor="?attr/accentOrTextSecondary" />
+                    android:textColor="?android:textColorSecondary" />
 
             </LinearLayout>
 
         </LinearLayout>
 
-    </LinearLayout>
+        <View
+            android:id="@+id/selected_indicator"
+            android:layout_width="@dimen/profile_card_selected_bar_width"
+            android:layout_height="match_parent"
+            android:layout_gravity="start"
+            android:background="?attr/selectedColorPrimary"
+            android:visibility="gone"
+            tools:visibility="visible" />
+
+    </FrameLayout>
 
 </com.google.android.material.card.MaterialCardView>

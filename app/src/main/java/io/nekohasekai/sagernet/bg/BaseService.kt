@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.*
+import android.app.ActivityManager
 import android.widget.Toast
 import io.nekohasekai.sagernet.Action
 import io.nekohasekai.sagernet.BootReceiver
@@ -139,13 +140,19 @@ class BaseService {
             callbacks.unregister(cb)
         }
 
+        override fun resetTraffic(profileIds: LongArray) {
+            launch(Dispatchers.Default) {
+                data?.proxy?.looper?.resetTraffic(profileIds)
+            }
+        }
+
         override fun urlTest(): Int {
             if (data?.proxy?.box == null) {
                 error("core not started")
             }
             try {
                 return Libcore.urlTest(
-                    data!!.proxy!!.box, DataStore.connectionTestURL, 3000
+                    data!!.proxy!!.box, DataStore.connectionTestURL, DataStore.connectionTestTimeout
                 )
             } catch (e: Exception) {
                 error(Protocols.genFriendlyMsg(e.readableMessage))
@@ -221,46 +228,162 @@ class BaseService {
             else startService(Intent(this, javaClass))
         }
 
-        fun killProcesses() {
-            data.proxy?.close()
-            wakeLock?.apply {
-                release()
+        suspend fun killProcesses(): Throwable? {
+            val proxy = data.proxy
+            val serviceId = Integer.toHexString(System.identityHashCode(data))
+            val proxyId = proxy?.let { Integer.toHexString(System.identityHashCode(it)) } ?: "none"
+            var cleanupError: Throwable? = null
+            fun recordCleanupFailure(stage: String, error: Throwable) {
+                if (cleanupError == null) {
+                    cleanupError = error
+                } else if (cleanupError !== error) {
+                    cleanupError?.addSuppressed(error)
+                }
+                Logs.w(
+                    "ServiceLifecycleTrace serviceId=$serviceId proxyId=$proxyId " +
+                        "profileId=${proxy?.profile?.id ?: -1L} stage=$stage failed " +
+                        "type=${error.javaClass.name} message=${error.message}"
+                )
+            }
+            Logs.i(
+                "ServiceLifecycleTrace serviceId=$serviceId proxyId=$proxyId " +
+                    "profileId=${proxy?.profile?.id ?: -1L} stage=kill begin"
+            )
+            try {
+                proxy?.close()
+                Logs.i(
+                    "ServiceLifecycleTrace serviceId=$serviceId proxyId=$proxyId " +
+                        "profileId=${proxy?.profile?.id ?: -1L} stage=proxy-close success"
+                )
+            } catch (error: Throwable) {
+                recordCleanupFailure("proxy-close", error)
+            }
+
+            try {
+                wakeLock?.release()
+            } catch (error: Throwable) {
+                recordCleanupFailure("wake-lock-release", error)
+            } finally {
                 wakeLock = null
             }
-            runOnDefaultDispatcher {
+
+            try {
                 DefaultNetworkListener.stop(this)
+            } catch (error: Throwable) {
+                recordCleanupFailure("network-listener-stop", error)
             }
+
+            Logs.i(
+                "ServiceLifecycleTrace serviceId=$serviceId proxyId=$proxyId " +
+                    "profileId=${proxy?.profile?.id ?: -1L} stage=kill done " +
+                    "hasCleanupError=${cleanupError != null}"
+            )
+            return cleanupError
         }
 
         fun stopRunner(restart: Boolean = false, msg: String? = null) {
             DataStore.baseService = null
             DataStore.vpnService = null
+            DataStore.mixedInboundAuthed = false
 
-            if (data.state == State.Stopping) return
-            data.notification?.destroy()
-            data.notification = null
+            val serviceId = Integer.toHexString(System.identityHashCode(data))
+            val proxy = data.proxy
+            val proxyId = proxy?.let { Integer.toHexString(System.identityHashCode(it)) } ?: "none"
+            val caller = Thread.currentThread().stackTrace.firstOrNull { frame ->
+                frame.className != Thread::class.java.name && frame.methodName != "stopRunner"
+            }?.let { frame -> "${frame.className}.${frame.methodName}:${frame.lineNumber}" }
+                ?: "unknown"
+            Logs.i(
+                "ServiceStopTrace serviceId=$serviceId proxyId=$proxyId restart=$restart " +
+                    "state=${data.state} profileId=${proxy?.profile?.id ?: -1L} " +
+                    "hasMessage=${msg != null} caller=$caller"
+            )
+            if (data.state == State.Stopping) {
+                Logs.i(
+                    "ServiceStopTrace serviceId=$serviceId proxyId=$proxyId " +
+                        "stage=ignored-already-stopping"
+                )
+                return
+            }
             this as Service
 
             data.changeState(State.Stopping)
+            val originalMessage = msg
 
             runOnMainDispatcher {
-                data.connectingJob?.cancelAndJoin() // ensure stop connecting first
-                // we use a coroutineScope here to allow clean-up in parallel
-                coroutineScope {
-                    killProcesses()
-                    val data = data
+                var cleanupError: Throwable? = null
+                fun recordCleanupFailure(stage: String, error: Throwable) {
+                    if (cleanupError == null) {
+                        cleanupError = error
+                    } else if (cleanupError !== error) {
+                        cleanupError?.addSuppressed(error)
+                    }
+                    Logs.w(
+                        "ServiceStopTrace serviceId=$serviceId proxyId=$proxyId " +
+                            "stage=$stage failed type=${error.javaClass.name} " +
+                            "message=${error.message}"
+                    )
+                }
+
+                try {
+                    data.connectingJob?.cancelAndJoin() // ensure stop connecting first
+                } catch (error: Throwable) {
+                    recordCleanupFailure("connecting-job-cancel", error)
+                } finally {
+                    data.connectingJob = null
+                }
+
+                try {
+                    data.notification?.destroy()
+                } catch (error: Throwable) {
+                    recordCleanupFailure("notification-destroy", error)
+                } finally {
+                    data.notification = null
+                }
+
+                try {
+                    killProcesses()?.let { recordCleanupFailure("process-cleanup", it) }
+                } catch (error: Throwable) {
+                    recordCleanupFailure("process-cleanup-boundary", error)
+                }
+
+                try {
                     if (data.closeReceiverRegistered) {
                         unregisterReceiver(data.receiver)
-                        data.closeReceiverRegistered = false
                     }
+                } catch (error: Throwable) {
+                    recordCleanupFailure("receiver-unregister", error)
+                } finally {
+                    data.closeReceiverRegistered = false
                     data.proxy = null
                 }
 
-                // change the state
-                data.changeState(State.Stopped, msg)
-                // stop the service if nothing has bound to it
-                if (restart) startRunner() else {
-                    stopSelf()
+                cleanupError?.let { error ->
+                    Logs.w(
+                        "ServiceStopTrace serviceId=$serviceId proxyId=$proxyId " +
+                            "stage=cleanup failed type=${error.javaClass.name} " +
+                            "message=${error.message} suppressed=${error.suppressed.size} " +
+                            "originalMessagePreserved=${originalMessage != null}"
+                    )
+                }
+
+                try {
+                    data.changeState(State.Stopped, originalMessage)
+                } catch (error: Throwable) {
+                    recordCleanupFailure("state-stopped", error)
+                }
+                Logs.i(
+                    "ServiceStopTrace serviceId=$serviceId proxyId=$proxyId " +
+                        "stage=stopped restart=$restart hasCleanupError=${cleanupError != null}"
+                )
+
+                try {
+                    // stop the service if nothing has bound to it
+                    if (restart) startRunner() else {
+                        stopSelf()
+                    }
+                } catch (error: Throwable) {
+                    recordCleanupFailure("service-finish", error)
                 }
             }
         }
@@ -273,20 +396,21 @@ class BaseService {
         var upstreamInterfaceName: String?
 
         suspend fun preInit() {
-            DefaultNetworkListener.start(this) {
-                SagerNet.connectivity.getLinkProperties(it)?.also { link ->
-                    SagerNet.underlyingNetwork = it
+            // 只负责 underlyingNetwork / 网卡名跟踪，供 VpnService.setUnderlyingNetworks。
+            // 「网络变化时重置出站」由 DataStore.networkChangeResetConnections 控制，
+            // 经 NativeInterface → Libcore.setNetworkChangeResetConnections →
+            // interfaceMonitor 是否 callback → 官方 ResetNetwork 生效；
+            // 此处不再叠调 resetAllConnections（避免与内核双路径各拆一次）。
+            // 「唤醒时重置」见 receiver 内 DataStore.wakeResetConnections。
+            DefaultNetworkListener.start(this) { network ->
+                if (network == null) return@start
+                SagerNet.connectivity.getLinkProperties(network)?.also { link ->
+                    SagerNet.underlyingNetwork = network
                     DataStore.vpnService?.updateUnderlyingNetwork()
-                    //
                     val oldName = upstreamInterfaceName
                     if (oldName != link.interfaceName) {
+                        Logs.d("Network changed: $oldName -> ${link.interfaceName}")
                         upstreamInterfaceName = link.interfaceName
-                    }
-                    if (oldName != null && upstreamInterfaceName != null && oldName != upstreamInterfaceName) {
-                        Logs.d("Network changed: $oldName -> $upstreamInterfaceName")
-                        if (DataStore.networkChangeResetConnections) {
-                            Libcore.resetAllConnections(true)
-                        }
                     }
                 }
             }

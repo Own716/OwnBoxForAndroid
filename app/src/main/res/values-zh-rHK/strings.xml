@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="scanner_toggle_flashlight">切換電筒</string>
+    <string name="scanner_select_image">從相簿選擇圖片</string>
     <string name="github">源碼</string>
     <string name="app_version">版本</string>
     <string name="version_x">版本 (%s)</string>
@@ -45,7 +47,6 @@
     <string name="auto_connect_summary">在開機或本程式更新後將自動重新啓用代理</string>
     <string name="delete">移除</string>
     <string name="enable">啟用</string>
-    <string name="donate_info">貓貓好得意 請比貓貓錢</string>
     <string name="route_bypass">繞過</string>
     <string name="route_block">封鎖</string>
     <string name="add_profile_methods_scan_qr_code">掃描二維碼</string>
@@ -68,6 +69,10 @@
     <string name="group_duplicate">重複：
 \n%s</string>
     <string name="general_settings">應用程式設定</string>
+    <string name="disable_mixed_inbound">停用混合傳入</string>
+    <string name="disable_mixed_inbound_sum">純 TUN 傳入，不在本機監聽代理連接埠</string>
+    <string name="mixed_inbound_disabled">已停用</string>
+    <string name="disable_mixed_inbound_proxy_toast">停用僅在 TUN 模式有效，目前監聽連接埠：%1$d</string>
     <string name="cag_misc">其他設定</string>
     <string name="speed">%s/s</string>
     <string name="connection_test_error">失敗：%s</string>
@@ -93,5 +98,63 @@
     <string name="route_opt_block_ads">封鎖廣告</string>
     <string name="route_asset_no_update">沒有更新</string>
     <string name="insecure">不安全</string>
-    <string name="connection_test_icmp_ping_unavailable">ICMPing 不可用</string>
+    <string name="sort_and_layout">排序與外觀</string>
+    <string name="card_style">卡片</string>
+    <string name="card_style_classic">經典</string>
+    <string name="card_style_stroke">描邊</string>
+    <string name="preview_hint_dont_show_again">不再顯示</string>
+    <string name="backup_not_throne_desktop">不是 Throne 電腦版備份檔案，預期 .thrbackup，但 %s</string>
+    <string name="action_import_throne_desktop">從 Throne 電腦版匯入</string>
+    <string name="backup_import_throne_desktop_summary">從 Throne 電腦版 .thrbackup 匯入設定檔、路由與設定（忽略自訂圖示）。勾選的類別將覆蓋本機現有資料。</string>
+    <string name="connection_test_url">延遲測試 URL</string>
+    <string name="connection_test_url_test">URL 測試本組</string>
+    <string name="speed_test_settings">速度測試</string>
+    <string name="speed_test_mode">速度測試模式</string>
+    <string name="speed_test_mode_download_upload">下載 + 上載</string>
+    <string name="speed_test_mode_download">僅下載</string>
+    <string name="speed_test_mode_upload">僅上載</string>
+    <string name="speed_test_mode_simple_download">簡單下載</string>
+    <string name="speed_test_timeout_ms">速度測試逾時（毫秒）</string>
+    <string name="speed_test_timeout_invalid">請輸入大於零毫秒的逾時時間</string>
+    <string name="simple_download_url">簡單下載 URL</string>
+    <string name="speed_test_url_invalid">請輸入有效的 HTTP 或 HTTPS URL</string>
+    <string name="speed_test_group">速度測試本組</string>
+    <string name="speed_test_confirm_title">執行速度測試？</string>
+    <string name="speed_test_confirm_message">速度測試可能使用大量數據。各設定檔會依次透過其自身代理進行測試。</string>
+    <string name="speed_test_stage_pending">等候中</string>
+    <string name="speed_test_stage_discovery">正在尋找測試伺服器</string>
+    <string name="speed_test_stage_latency">正在測量伺服器延遲</string>
+    <string name="speed_test_stage_download">正在下載</string>
+    <string name="speed_test_stage_upload">正在上載</string>
+    <string name="speed_test_stage_complete">已完成</string>
+    <string name="speed_test_stage_cancelled">已取消</string>
+    <string name="speed_test_stage_error">失敗</string>
+    <string name="speed_test_latency_format">延遲：%1$d 毫秒</string>
+    <string name="speed_test_server_format">伺服器：%1$s</string>
+    <string name="speed_test_download_format">下載：%1$s（%2$s）</string>
+    <string name="speed_test_upload_format">上載：%1$s（%2$s）</string>
+    <string name="speed_test_rate_mbps">%1$.2f Mbps</string>
+
+    <!-- Custom Icon Pack -->
+    <string name="custom_icon">自訂圖示</string>
+    <string name="custom_icon_import">匯入圖示包</string>
+    <string name="custom_icon_reset">恢復預設</string>
+    <string name="custom_icon_preview_shortcut">捷徑圖示</string>
+    <string name="custom_icon_shortcut_subtitle">Android平台不支援修改軟體圖示，若有需要請自行fork後修改！</string>
+    <string name="custom_icon_preview_tile">快速設定圖示</string>
+    <string name="custom_icon_apply_pack">套用此圖示包</string>
+    <string name="custom_icon_apply_success">已套用圖示包並請求建立桌面捷徑。</string>
+    <string name="custom_icon_pin_shortcut_not_supported">目前桌面啟動器不支援建立桌面捷徑。</string>
+    <string name="custom_icon_no_pack_to_apply">請先匯入圖示包。</string>
+    <string name="custom_icon_tile_state_active">開啟狀態（點擊切換）</string>
+    <string name="custom_icon_tile_state_inactive">關閉狀態（點擊切換）</string>
+    <string name="custom_icon_import_success">圖示包匯入成功</string>
+    <string name="custom_icon_reset_success">已恢復預設圖示</string>
+    <string name="custom_icon_reset_confirm">確定要恢復預設圖示嗎？</string>
+    <string name="custom_icon_error_missing">圖示包缺少必要檔案：%s</string>
+    <string name="custom_icon_error_dimension">%1$s 解析度必須為 512x512 像素（目前為：%2$dx%3$d）</string>
+    <string name="custom_icon_error_not_png">%s 不是有效的 PNG 圖片檔案</string>
+    <string name="custom_icon_error_security">安全檢查失敗：%s</string>
+    <string name="custom_icon_requirement_tip">圖示包須為 ZIP 壓縮包，內含 512x512 的 icon.png 與 tile.png。</string>
 </resources>
+

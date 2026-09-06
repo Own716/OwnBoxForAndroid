@@ -3,11 +3,6 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <include
-        layout="@layout/layout_appbar"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
-
     <androidx.camera.view.PreviewView
         android:id="@+id/previewView"
         android:layout_width="match_parent"
@@ -18,11 +13,30 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <ImageView
+    <ImageButton
         android:id="@+id/ivFlashlight"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:layout_marginTop="@dimen/zxl_flashlight_margin_top"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_gravity="bottom|start"
+        android:layout_marginStart="24dp"
+        android:layout_marginBottom="32dp"
+        android:background="@drawable/scanner_action_background"
+        android:contentDescription="@string/scanner_toggle_flashlight"
+        android:padding="14dp"
+        android:scaleType="centerInside"
         android:src="@drawable/zxl_flashlight_selector" />
+
+    <ImageButton
+        android:id="@+id/ivPhotoLibrary"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="24dp"
+        android:layout_marginBottom="32dp"
+        android:background="@drawable/scanner_action_background"
+        android:contentDescription="@string/scanner_select_image"
+        android:padding="16dp"
+        android:scaleType="centerInside"
+        android:src="@drawable/ic_image_photo"
+        android:tint="@android:color/white" />
 </FrameLayout>

@@ -28,6 +28,7 @@ abstract class BoxInstance(
     val profile: ProxyEntity
 ) : AbstractInstance {
 
+    private val diagnosticId = Integer.toHexString(System.identityHashCode(this))
     lateinit var config: ConfigBuildResult
     lateinit var box: BoxInstance
 
@@ -46,6 +47,7 @@ abstract class BoxInstance(
 
     protected open fun buildConfig() {
         config = buildConfig(profile)
+        DataStore.mixedInboundAuthed = DataStore.mixedInboundNeedsAuth
     }
 
     protected open suspend fun loadConfig() {
@@ -89,7 +91,7 @@ abstract class BoxInstance(
         loadConfig()
     }
 
-    override fun launch() {
+    protected fun launchExternal() {
         // TODO move, this is not box
         val cacheDir = File(SagerNet.application.cacheDir, "tmpcfg")
         cacheDir.mkdirs()
@@ -185,7 +187,14 @@ abstract class BoxInstance(
                             "--config",
                             configFile.absolutePath,
                             "--log-level",
-                            if (DataStore.logLevel > 0) "trace" else "warn",
+                            when (DataStore.logLevel) {
+                                0 -> "panic"
+                                1 -> "warn"
+                                2 -> "info"
+                                3 -> "debug"
+                                4 -> "trace"
+                                else -> "info"
+                            },
                             "client"
                         )
 
@@ -198,25 +207,85 @@ abstract class BoxInstance(
                 }
             }
         }
+    }
 
-        box.start()
+    override fun launch() {
+        launchExternal()
+        Logs.i(
+            "BoxLifecycleTrace androidId=$diagnosticId profileId=${profile.id} " +
+                "stage=start begin"
+        )
+        try {
+            box.start()
+            Logs.i(
+                "BoxLifecycleTrace androidId=$diagnosticId profileId=${profile.id} " +
+                    "stage=start success"
+            )
+        } catch (error: Throwable) {
+            Logs.w(
+                "BoxLifecycleTrace androidId=$diagnosticId profileId=${profile.id} " +
+                    "stage=start failed type=${error.javaClass.name} message=${error.message}"
+            )
+            throw error
+        }
     }
 
     @Suppress("EXPERIMENTAL_API_USAGE")
     override fun close() {
-        for (instance in externalInstances.values) {
-            runCatching {
-                instance.close()
+        var closeError: Throwable? = null
+        fun recordCloseError(error: Throwable) {
+            if (closeError == null) {
+                closeError = error
+            } else if (closeError !== error) {
+                closeError?.addSuppressed(error)
+            }
+        }
+
+        for ((port, instance) in externalInstances) {
+            runCatching { instance.close() }.onFailure { error ->
+                Logs.w(
+                    "BoxLifecycleTrace androidId=$diagnosticId profileId=${profile.id} " +
+                        "stage=close-external failed port=$port " +
+                        "type=${error.javaClass.name} message=${error.message}"
+                )
+                recordCloseError(error)
             }
         }
 
         cacheFiles.removeAll { it.delete(); true }
 
-        if (::processes.isInitialized) processes.close(GlobalScope + Dispatchers.IO)
+        if (::processes.isInitialized) {
+            runCatching { processes.close(GlobalScope + Dispatchers.IO) }.onFailure { error ->
+                Logs.w(
+                    "BoxLifecycleTrace androidId=$diagnosticId profileId=${profile.id} " +
+                        "stage=close-processes failed " +
+                        "type=${error.javaClass.name} message=${error.message}"
+                )
+                recordCloseError(error)
+            }
+        }
 
         if (::box.isInitialized) {
-            box.close()
+            Logs.i(
+                "BoxLifecycleTrace androidId=$diagnosticId profileId=${profile.id} " +
+                    "stage=close begin"
+            )
+            try {
+                box.close()
+                Logs.i(
+                    "BoxLifecycleTrace androidId=$diagnosticId profileId=${profile.id} " +
+                        "stage=close success"
+                )
+            } catch (error: Throwable) {
+                Logs.w(
+                    "BoxLifecycleTrace androidId=$diagnosticId profileId=${profile.id} " +
+                        "stage=close failed type=${error.javaClass.name} message=${error.message}"
+                )
+                recordCloseError(error)
+            }
         }
+
+        closeError?.let { throw it }
     }
 
 }

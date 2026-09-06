@@ -21,8 +21,10 @@ import io.nekohasekai.sagernet.GroupType
 import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.SagerNet
+import io.nekohasekai.sagernet.SubscriptionFilterMode
 import io.nekohasekai.sagernet.database.*
 import io.nekohasekai.sagernet.database.preference.OnPreferenceDataStoreChangeListener
+import io.nekohasekai.sagernet.group.GroupUpdater
 import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.applyDefaultValues
 import io.nekohasekai.sagernet.ktx.onMainDispatcher
@@ -49,8 +51,10 @@ class GroupSettingsActivity(
 
         DataStore.frontProxy = frontProxy
         DataStore.landingProxy = landingProxy
-        DataStore.frontProxyTmp = if (frontProxy >= 0) 3 else 0
-        DataStore.landingProxyTmp = if (landingProxy >= 0) 3 else 0
+        DataStore.frontProxyTmp =
+            if (frontProxy >= 0) OutboundPreference.VALUE_SELECT_PROFILE.toInt() else 0
+        DataStore.landingProxyTmp =
+            if (landingProxy >= 0) OutboundPreference.VALUE_SELECT_PROFILE.toInt() else 0
 
         val subscription = subscription ?: SubscriptionBean().applyDefaultValues()
         DataStore.subscriptionLink = subscription.link
@@ -60,6 +64,11 @@ class GroupSettingsActivity(
         DataStore.subscriptionUserAgent = subscription.customUserAgent
         DataStore.subscriptionAutoUpdate = subscription.autoUpdate
         DataStore.subscriptionAutoUpdateDelay = subscription.autoUpdateDelay
+        DataStore.subscriptionFilterMode = subscription.filterMode
+        DataStore.subscriptionFilterRegex = subscription.filterRegex
+        // Throne upstream 尚未支持自定义服务器 DNS，入口停用期间不再加载其 UI 缓存。
+        // 保留原代码以便未来恢复功能：
+        // DataStore.subscriptionServerDns = subscription.serverDnsResolver ?: ""
     }
 
     fun ProxyGroup.serialize() {
@@ -68,8 +77,18 @@ class GroupSettingsActivity(
         order = DataStore.groupOrder
         isSelector = DataStore.groupIsSelector
 
-        frontProxy = if (DataStore.frontProxyTmp == 3) DataStore.frontProxy else -1
-        landingProxy = if (DataStore.landingProxyTmp == 3) DataStore.landingProxy else -1
+        frontProxy =
+            if (DataStore.frontProxyTmp == OutboundPreference.VALUE_SELECT_PROFILE.toInt()) {
+                DataStore.frontProxy
+            } else {
+                -1
+            }
+        landingProxy =
+            if (DataStore.landingProxyTmp == OutboundPreference.VALUE_SELECT_PROFILE.toInt()) {
+                DataStore.landingProxy
+            } else {
+                -1
+            }
 
         val isSubscription = type == GroupType.SUBSCRIPTION
         if (isSubscription) {
@@ -81,13 +100,19 @@ class GroupSettingsActivity(
                 customUserAgent = DataStore.subscriptionUserAgent
                 autoUpdate = DataStore.subscriptionAutoUpdate
                 autoUpdateDelay = DataStore.subscriptionAutoUpdateDelay
+                filterMode = DataStore.subscriptionFilterMode
+                filterRegex = DataStore.subscriptionFilterRegex
+                // 入口停用期间不要用未展示的 UI 缓存覆盖历史数据库值。
+                // 保留原代码以便未来恢复功能：
+                // serverDnsResolver = DataStore.subscriptionServerDns
             }
         }
     }
 
+    private var isFromClipboard = false
+
     fun needSave(): Boolean {
-        if (!DataStore.dirty) return false
-        return true
+        return DataStore.dirty
     }
 
     fun PreferenceFragmentCompat.createPreferences(
@@ -100,10 +125,17 @@ class GroupSettingsActivity(
         frontProxyPreference.apply {
             setEntries(R.array.front_proxy_entry)
             setEntryValues(R.array.front_proxy_value)
+            value = DataStore.frontProxyTmp.toString()
             setOnPreferenceChangeListener { _, newValue ->
-                if (newValue.toString() == "3") {
+                if (newValue.toString() == OutboundPreference.VALUE_SELECT_PROFILE) {
                     selectProfileForAddFront.launch(
-                        Intent(this@GroupSettingsActivity, ProfileSelectActivity::class.java)
+                        Intent(
+                            this@GroupSettingsActivity, ProfileSelectActivity::class.java
+                        ).apply {
+                            ProfileManager.getProfile(DataStore.frontProxy)?.let {
+                                putExtra(ProfileSelectActivity.EXTRA_SELECTED, it)
+                            }
+                        }
                     )
                     false
                 } else {
@@ -115,10 +147,17 @@ class GroupSettingsActivity(
         landingProxyPreference.apply {
             setEntries(R.array.front_proxy_entry)
             setEntryValues(R.array.front_proxy_value)
+            value = DataStore.landingProxyTmp.toString()
             setOnPreferenceChangeListener { _, newValue ->
-                if (newValue.toString() == "3") {
+                if (newValue.toString() == OutboundPreference.VALUE_SELECT_PROFILE) {
                     selectProfileForAddLanding.launch(
-                        Intent(this@GroupSettingsActivity, ProfileSelectActivity::class.java)
+                        Intent(
+                            this@GroupSettingsActivity, ProfileSelectActivity::class.java
+                        ).apply {
+                            ProfileManager.getProfile(DataStore.landingProxy)?.let {
+                                putExtra(ProfileSelectActivity.EXTRA_SELECTED, it)
+                            }
+                        }
                     )
                     false
                 } else {
@@ -160,6 +199,46 @@ class GroupSettingsActivity(
             subscriptionAutoUpdateDelay.isEnabled = (newValue as Boolean)
             true
         }
+
+        val subscriptionFilterMode =
+            findPreference<SimpleMenuPreference>(Key.SUBSCRIPTION_FILTER_MODE)!!
+        val subscriptionFilterRegex =
+            findPreference<EditTextPreference>(Key.SUBSCRIPTION_FILTER_REGEX)!!
+
+        fun updateFilterMode(filterMode: Int = DataStore.subscriptionFilterMode) {
+            subscriptionFilterRegex.isVisible = filterMode != SubscriptionFilterMode.DISABLED
+        }
+        updateFilterMode()
+        subscriptionFilterMode.setOnPreferenceChangeListener { _, newValue ->
+            updateFilterMode((newValue as String).toInt())
+            true
+        }
+
+        // Throne upstream 尚未支持自定义服务器 DNS，XML 入口及对应监听同步停用。
+        // 若仅移除 XML 而继续强制查找 Preference，findPreference() 会返回 null，
+        // 随后的 !! 会使整个设置页进入 createPreferences 异常处理。
+        /* 保留原代码以便未来恢复功能：
+        val subscriptionServerDns =
+            findPreference<EditTextPreference>(Key.SUBSCRIPTION_SERVER_DNS)!!
+        subscriptionServerDns.setOnPreferenceChangeListener { pref, newValue ->
+            val value = (newValue as String).trim()
+            if (isValidServerDns(value)) {
+                if (value != newValue) {
+                    (pref as EditTextPreference).text = value
+                    false
+                } else {
+                    true
+                }
+            } else {
+                Toast.makeText(
+                    requireContext(),
+                    R.string.server_dns_invalid,
+                    Toast.LENGTH_LONG,
+                ).show()
+                false
+            }
+        }
+        */
     }
 
     class UnsavedChangesDialogFragment : AlertDialogFragment<Empty, Empty>() {
@@ -194,6 +273,8 @@ class GroupSettingsActivity(
 
     companion object {
         const val EXTRA_GROUP_ID = "id"
+        const val EXTRA_FROM_CLIPBOARD = "fromClipboard"
+        const val EXTRA_GROUP_SUBSCRIPTION_LINK = "subscription_link"
     }
 
     @SuppressLint("CommitTransaction")
@@ -208,10 +289,20 @@ class GroupSettingsActivity(
 
         if (savedInstanceState == null) {
             val editingId = intent.getLongExtra(EXTRA_GROUP_ID, 0L)
+            isFromClipboard = intent.getBooleanExtra(EXTRA_FROM_CLIPBOARD, false)
+            val subscriptionLink = intent.getStringExtra(EXTRA_GROUP_SUBSCRIPTION_LINK)
             DataStore.editingId = editingId
             runOnDefaultDispatcher {
                 if (editingId == 0L) {
-                    ProxyGroup().init()
+                    val group = ProxyGroup()
+                    group.init()
+                    
+                    // 如果有订阅链接，设置为订阅类型并填充链接
+                    if (!subscriptionLink.isNullOrEmpty()) {
+                        DataStore.groupType = GroupType.SUBSCRIPTION
+                        DataStore.subscriptionLink = subscriptionLink
+                        DataStore.dirty = true
+                    }
                 } else {
                     val entity = SagerDatabase.groupDao.getById(editingId)
                     if (entity == null) {
@@ -241,7 +332,10 @@ class GroupSettingsActivity(
 
         val editingId = DataStore.editingId
         if (editingId == 0L) {
-            GroupManager.createGroup(ProxyGroup().apply { serialize() })
+            val newGroup = GroupManager.createGroup(ProxyGroup().apply { serialize() })
+            if (isFromClipboard && newGroup.type == GroupType.SUBSCRIPTION && !newGroup.subscription?.link.isNullOrEmpty()) {
+                GroupUpdater.startUpdate(newGroup, true)
+            }
         } else if (needSave()) {
             val entity = SagerDatabase.groupDao.getById(DataStore.editingId)
             if (entity == null) {
@@ -365,7 +459,7 @@ class GroupSettingsActivity(
             ) ?: return@runOnDefaultDispatcher
             DataStore.frontProxy = profile.id
             onMainDispatcher {
-                frontProxyPreference.value = "3"
+                frontProxyPreference.value = OutboundPreference.VALUE_SELECT_PROFILE
             }
         }
     }
@@ -379,9 +473,29 @@ class GroupSettingsActivity(
             ) ?: return@runOnDefaultDispatcher
             DataStore.landingProxy = profile.id
             onMainDispatcher {
-                landingProxyPreference.value = "3"
+                landingProxyPreference.value = OutboundPreference.VALUE_SELECT_PROFILE
             }
         }
     }
 
 }
+
+/* 自定义服务器 DNS 的 UI 恢复时一并恢复此校验函数。
+private fun isValidServerDns(raw: String): Boolean {
+    val value = raw.trim()
+    if (value.isEmpty()) return true
+    if (value.any { it.isISOControl() || it.isWhitespace() }) return false
+
+    if (value.contains("://")) {
+        val scheme = value.substringBefore("://").lowercase()
+        if (scheme !in setOf("https", "tls", "quic")) return false
+        val rest = value.substringAfter("://")
+        val host = rest.substringBefore("/").substringBefore("?")
+        val bare = host.substringBeforeLast(":").trim('[', ']')
+        return bare.isNotEmpty()
+    }
+
+    val host = value.substringBeforeLast(":").trim('[', ']')
+    return host.isNotEmpty()
+}
+*/

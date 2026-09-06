@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="scanner_toggle_flashlight">Пераключыць ліхтарык</string>
+    <string name="scanner_select_image">Выбраць выяву</string>
     <string name="logcat">Экспартаваць інфармацыю пра адладку</string>
     <string name="version_x">Версія (%s)</string>
     <string name="app_version">Версія</string>
@@ -28,7 +30,7 @@
     <string name="server_port">Аддалены порт</string>
     <string name="server_address">Сервер</string>
     <string name="profile_name">Імя профілю</string>
-    <string name="connection_test_url">Тэст URL падлучэння</string>
+    <string name="connection_test_url">URL тэсту затрымкі</string>
     <string name="transproxy_mode">Рэжым Transproxy</string>
     <string name="require_transproxy">Уключыць Transproxy Уваходныя</string>
     <string name="inbound_settings">Уключыць Transproxy Уваходныя</string>
@@ -70,6 +72,10 @@
     <string name="port_transproxy">Transproxy порт</string>
     <string name="port_http">Проксі -порт HTTP</string>
     <string name="port_proxy">Порт проксі -сервера SOCKS5</string>
+    <string name="disable_mixed_inbound">Адключыць змешаны ўваход</string>
+    <string name="disable_mixed_inbound_sum">Чысты ўваход TUN; не праслухоўваць лакальны порт проксі</string>
+    <string name="mixed_inbound_disabled">Адключана</string>
+    <string name="disable_mixed_inbound_proxy_toast">Адключэнне дзейнічае толькі ў рэжыме TUN; бягучы порт праслухоўвання: %1$d</string>
     <string name="service_mode_proxy">Толькі проксі</string>
     <string name="service_mode">Рэжым абслугоўвання</string>
     <string name="group_duplicate">Дублікат:
@@ -108,4 +114,58 @@
     <string name="menu_about">Пра</string>
     <string name="menu_group">Група</string>
     <string name="menu_configuration">Канфігурацыя</string>
+    <string name="preview_hint_dont_show_again">Больш не паказваць</string>
+    <string name="backup_not_throne_desktop">Гэта не рэзервовая копія Throne для ПК: чакаўся .thrbackup, а не %s</string>
+    <string name="action_import_throne_desktop">Імпарт з Throne для ПК</string>
+    <string name="backup_import_throne_desktop_summary">Імпарт профіляў, маршрутаў і налад з .thrbackup Throne для ПК. Карыстальніцкія значкі ігнаруюцца. Існуючыя даныя выбраных катэгорый будуць перазапісаны.</string>
+    <string name="connection_test_url_test">Тэст URL для гэтай групы</string>
+    <string name="speed_test_settings">Speed test</string>
+    <string name="speed_test_mode">Speed test mode</string>
+    <string name="speed_test_mode_download_upload">Download + upload</string>
+    <string name="speed_test_mode_download">Download only</string>
+    <string name="speed_test_mode_upload">Upload only</string>
+    <string name="speed_test_mode_simple_download">Simple download</string>
+    <string name="speed_test_timeout_ms">Speed test timeout (ms)</string>
+    <string name="speed_test_timeout_invalid">Enter a timeout greater than zero milliseconds</string>
+    <string name="simple_download_url">Simple download URL</string>
+    <string name="speed_test_url_invalid">Enter a valid HTTP or HTTPS URL</string>
+    <string name="speed_test_group">Тэст хуткасці гэтай групы</string>
+    <string name="speed_test_confirm_title">Run speed test?</string>
+    <string name="speed_test_confirm_message">Speed testing can use significant data. Profiles are tested one at a time through their own proxy.</string>
+    <string name="speed_test_stage_pending">Waiting</string>
+    <string name="speed_test_stage_discovery">Finding a test server</string>
+    <string name="speed_test_stage_latency">Measuring server latency</string>
+    <string name="speed_test_stage_download">Downloading</string>
+    <string name="speed_test_stage_upload">Uploading</string>
+    <string name="speed_test_stage_complete">Complete</string>
+    <string name="speed_test_stage_cancelled">Cancelled</string>
+    <string name="speed_test_stage_error">Failed</string>
+    <string name="speed_test_latency_format">Latency: %1$d ms</string>
+    <string name="speed_test_server_format">Server: %1$s</string>
+    <string name="speed_test_download_format">Download: %1$s (%2$s)</string>
+    <string name="speed_test_upload_format">Upload: %1$s (%2$s)</string>
+    <string name="speed_test_rate_mbps">%1$.2f Mbps</string>
+
+    <!-- Custom Icon Pack -->
+    <string name="custom_icon">Користувацькі іконки</string>
+    <string name="custom_icon_import">Імпортувати набір іконок</string>
+    <string name="custom_icon_reset">Скинути за замовчуванням</string>
+    <string name="custom_icon_preview_shortcut">Іконка ярлика</string>
+    <string name="custom_icon_shortcut_subtitle">Платформа Android не підтримує зміну іконки програми. За потреби зробіть fork та змініть самостійно!</string>
+    <string name="custom_icon_preview_tile">Плитка швидких налаштувань</string>
+    <string name="custom_icon_apply_pack">Застосувати цей набір іконок</string>
+    <string name="custom_icon_apply_success">Набір іконок застосовано. Запитано створення ярлика на робочому столі.</string>
+    <string name="custom_icon_pin_shortcut_not_supported">Поточний лаунчер не підтримує закріплення ярликів.</string>
+    <string name="custom_icon_no_pack_to_apply">Спочатку імпортуйте набір іконок.</string>
+    <string name="custom_icon_tile_state_active">Увімкнено (натисніть для перемикання)</string>
+    <string name="custom_icon_tile_state_inactive">Вимкнено (натисніть для перемикання)</string>
+    <string name="custom_icon_import_success">Набір іконок успішно імпортовано</string>
+    <string name="custom_icon_reset_success">Відновлено іконки за замовчуванням</string>
+    <string name="custom_icon_reset_confirm">Ви впевнені, що хочете відновити іконки за замовчуванням?</string>
+    <string name="custom_icon_error_missing">У наборі іконок відсутній обов\'язковий файл: %s</string>
+    <string name="custom_icon_error_dimension">Роздільна здатність %1$s має бути 512x512 пікселів (поточна: %2$dx%3$d)</string>
+    <string name="custom_icon_error_not_png">%s не є коректним зображенням PNG</string>
+    <string name="custom_icon_error_security">Помилка перевірки безпеки: %s</string>
+    <string name="custom_icon_requirement_tip">Набір іконок має бути ZIP-архівом, що містить icon.png та tile.png розміром 512x512.</string>
 </resources>
+

@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="scanner_toggle_flashlight">Alternar lanterna</string>
+    <string name="scanner_select_image">Selecionar imagem</string>
     <string name="group_name">Nome do grupo</string>
     <string name="group_default">Desagrupado</string>
     <string name="document">Documento</string>
@@ -17,4 +19,63 @@
     <string name="app_desc">Um conjunto de ferramentas de proxy universal para Android, escrito em Kotlin.</string>
     <string name="group_subscription_link">Link de inscrição</string>
     <string name="group_update">Atualizar</string>
+    <string name="disable_mixed_inbound">Desativar entrada mista</string>
+    <string name="disable_mixed_inbound_sum">Entrada TUN pura; não escutar na porta proxy local</string>
+    <string name="mixed_inbound_disabled">Desativado</string>
+    <string name="disable_mixed_inbound_proxy_toast">A desativação só tem efeito no modo TUN; porta de escuta atual: %1$d</string>
+    <string name="preview_hint_dont_show_again">Não mostrar novamente</string>
+    <string name="backup_not_throne_desktop">Não é um backup do Throne para desktop: esperado .thrbackup, mas %s</string>
+    <string name="action_import_throne_desktop">Importar do Throne para desktop</string>
+    <string name="backup_import_throne_desktop_summary">Importa perfis, rotas e configurações de um arquivo .thrbackup do Throne para desktop. Ícones personalizados são ignorados. Os dados existentes das categorias selecionadas serão sobrescritos.</string>
+    <string name="connection_test_url">URL do teste de latência</string>
+    <string name="connection_test_url_test">Testar URL deste grupo</string>
+    <string name="speed_test_settings">Speed test</string>
+    <string name="speed_test_mode">Speed test mode</string>
+    <string name="speed_test_mode_download_upload">Download + upload</string>
+    <string name="speed_test_mode_download">Download only</string>
+    <string name="speed_test_mode_upload">Upload only</string>
+    <string name="speed_test_mode_simple_download">Simple download</string>
+    <string name="speed_test_timeout_ms">Speed test timeout (ms)</string>
+    <string name="speed_test_timeout_invalid">Enter a timeout greater than zero milliseconds</string>
+    <string name="simple_download_url">Simple download URL</string>
+    <string name="speed_test_url_invalid">Enter a valid HTTP or HTTPS URL</string>
+    <string name="speed_test_group">Testar velocidade deste grupo</string>
+    <string name="speed_test_confirm_title">Run speed test?</string>
+    <string name="speed_test_confirm_message">Speed testing can use significant data. Profiles are tested one at a time through their own proxy.</string>
+    <string name="speed_test_stage_pending">Waiting</string>
+    <string name="speed_test_stage_discovery">Finding a test server</string>
+    <string name="speed_test_stage_latency">Measuring server latency</string>
+    <string name="speed_test_stage_download">Downloading</string>
+    <string name="speed_test_stage_upload">Uploading</string>
+    <string name="speed_test_stage_complete">Complete</string>
+    <string name="speed_test_stage_cancelled">Cancelled</string>
+    <string name="speed_test_stage_error">Failed</string>
+    <string name="speed_test_latency_format">Latency: %1$d ms</string>
+    <string name="speed_test_server_format">Server: %1$s</string>
+    <string name="speed_test_download_format">Download: %1$s (%2$s)</string>
+    <string name="speed_test_upload_format">Upload: %1$s (%2$s)</string>
+    <string name="speed_test_rate_mbps">%1$.2f Mbps</string>
+
+    <!-- Custom Icon Pack -->
+    <string name="custom_icon">Ícone personalizado</string>
+    <string name="custom_icon_import">Importar pacote de ícones</string>
+    <string name="custom_icon_reset">Restaurar padrão</string>
+    <string name="custom_icon_preview_shortcut">Ícone do atalho</string>
+    <string name="custom_icon_shortcut_subtitle">O Android não suporta alterar o ícone do app. Se necessário, faça um fork e modifique você mesmo!</string>
+    <string name="custom_icon_preview_tile">Bloco de configurações rápidas</string>
+    <string name="custom_icon_apply_pack">Aplicar este pacote de ícones</string>
+    <string name="custom_icon_apply_success">Pacote aplicado. Criação de atalho solicitada.</string>
+    <string name="custom_icon_pin_shortcut_not_supported">Seu inicializador não suporta fixar atalhos.</string>
+    <string name="custom_icon_no_pack_to_apply">Por favor, importe um pacote de ícones primeiro.</string>
+    <string name="custom_icon_tile_state_active">Ativo (toque para alternar)</string>
+    <string name="custom_icon_tile_state_inactive">Inativo (toque para alternar)</string>
+    <string name="custom_icon_import_success">Pacote de ícones importado com sucesso</string>
+    <string name="custom_icon_reset_success">Ícones padrão restaurados</string>
+    <string name="custom_icon_reset_confirm">Tem certeza de que deseja restaurar os ícones padrão?</string>
+    <string name="custom_icon_error_missing">O pacote deve conter o arquivo: %s</string>
+    <string name="custom_icon_error_dimension">A resolução de %1$s deve ser 512x512 pixels (atual: %2$dx%3$d)</string>
+    <string name="custom_icon_error_not_png">%s não é uma imagem PNG válida</string>
+    <string name="custom_icon_error_security">Falha na verificação de segurança: %s</string>
+    <string name="custom_icon_requirement_tip">O pacote deve ser um arquivo ZIP contendo icon.png e tile.png de 512x512.</string>
 </resources>
+

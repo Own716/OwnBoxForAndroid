@@ -16,7 +16,7 @@ object ProfileManager {
 
     interface Listener {
         suspend fun onAdd(profile: ProxyEntity)
-        suspend fun onUpdated(data: TrafficData)
+        suspend fun onUpdated(data: List<TrafficData>)
         suspend fun onUpdated(profile: ProxyEntity, noTraffic: Boolean)
         suspend fun onRemoved(groupId: Long, profileId: Long)
     }
@@ -97,6 +97,16 @@ object ProfileManager {
         }
     }
 
+    suspend fun updateTraffic(profileId: Long, rx: Long, tx: Long) {
+        SagerDatabase.proxyDao.updateTraffic(profileId, rx, tx)
+    }
+
+    suspend fun resetTraffic(profileIds: LongArray) {
+        if (profileIds.isNotEmpty()) {
+            SagerDatabase.proxyDao.resetTraffic(profileIds)
+        }
+    }
+
     suspend fun deleteProfile2(groupId: Long, profileId: Long) {
         if (SagerDatabase.proxyDao.deleteById(profileId) == 0) return
         if (DataStore.selectedProxy == profileId) {
@@ -149,7 +159,8 @@ object ProfileManager {
         iterator { onUpdated(profile, noTraffic) }
     }
 
-    suspend fun postUpdate(data: TrafficData) {
+    suspend fun postUpdate(data: List<TrafficData>) {
+        if (data.isEmpty()) return
         iterator { onUpdated(data) }
     }
 
@@ -188,8 +199,8 @@ object ProfileManager {
             createRule(
                 RuleEntity(
                     name = app.getString(R.string.route_opt_block_quic),
-                    port = "443",
                     network = "udp",
+                    protocol = "quic",
                     outbound = -2
                 )
             )
@@ -213,7 +224,7 @@ object ProfileManager {
                 if (country == "cn") createRule(
                     RuleEntity(
                         name = app.getString(R.string.route_play_store, displayCountry),
-                        domains = "googleapis.cn",
+                        domains = "domain:googleapis.cn\ndomain:xn--ngstr-lra8j.com\ndomain:xn--ngstr-cn-8za9o.com",
                     ), false
                 )
                 createRule(

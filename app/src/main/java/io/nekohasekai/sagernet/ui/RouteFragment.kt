@@ -6,7 +6,9 @@ import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import androidx.appcompat.widget.Toolbar
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
+import androidx.core.view.updatePadding
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -39,6 +41,7 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
         toolbar.setOnMenuItemClickListener(this)
 
         ruleListView = view.findViewById(R.id.route_list)
+        updateBottomPadding()
         ruleListView.layoutManager = FixedLinearLayoutManager(ruleListView)
         ruleAdapter = RuleAdapter()
         ProfileManager.addListener(ruleAdapter)
@@ -91,6 +94,12 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
                 ruleAdapter.commitMove()
             }
         }).attachToRecyclerView(ruleListView)
+    }
+
+    fun updateBottomPadding() {
+        if (!::ruleListView.isInitialized) return
+        ruleListView.clipToPadding = false
+        ruleListView.updatePadding(bottom = dp2px(if (DataStore.showBottomBar) 80 else 4))
     }
 
     override fun onDestroy() {
@@ -284,9 +293,20 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
                 profileName.text = rule.displayName()
                 profileType.text = rule.mkSummary()
                 routeOutbound.text = rule.displayOutbound()
-                itemView.setOnClickListener {
-                    enableSwitch.performClick()
+
+                // 根据路由类型设置文字颜色
+                val colorRes = when (rule.outbound) {
+                    -2L -> R.color.color_route_block   // 屏蔽：红色
+                    -1L -> R.color.color_route_direct  // 直连：绿色
+                    0L -> R.color.color_route_proxy    // 代理：蓝色
+                    else -> R.color.color_route_config // 配置：紫色
                 }
+                routeOutbound.setTextColor(ContextCompat.getColor(itemView.context, colorRes))
+
+                itemView.setOnClickListener(null)
+                itemView.isClickable = false
+                itemView.isFocusable = false
+                enableSwitch.setOnCheckedChangeListener(null)
                 enableSwitch.isChecked = rule.enabled
                 enableSwitch.setOnCheckedChangeListener { _, isChecked ->
                     runOnDefaultDispatcher {

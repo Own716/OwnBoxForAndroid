@@ -19,4 +19,9 @@ type BoxPlatformInterface interface {
 	PackageNameByUid(uid int32) (string, error)
 	UIDByPackageName(packageName string) (int32, error)
 	WIFIState() string
+	// 默认接口监视器（官方内核强制平台提供，见 interface_monitor.go）
+	StartDefaultInterfaceMonitor(listener InterfaceUpdateListener) error
+	CloseDefaultInterfaceMonitor(listener InterfaceUpdateListener) error
+	// 平台网络接口枚举（官方内核拨号路径强制要求，见 platform_box.go NetworkInterfaces）
+	GetInterfaces() (NetworkInterfaceIterator, error)
 }

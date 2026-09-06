@@ -22,6 +22,9 @@ public class SubscriptionBean extends Serializable {
     public Boolean autoUpdate;
     public Integer autoUpdateDelay;
     public Integer lastUpdated;
+    public Integer filterMode;
+    public String filterRegex;
+    public String serverDnsResolver;
 
     // SIP008
 
@@ -44,7 +47,7 @@ public class SubscriptionBean extends Serializable {
 
     @Override
     public void serializeToBuffer(ByteBufferOutput output) {
-        output.writeInt(1);
+        output.writeInt(3);
 
         output.writeInt(type);
 
@@ -59,6 +62,13 @@ public class SubscriptionBean extends Serializable {
         output.writeInt(lastUpdated);
 
         output.writeString(subscriptionUserinfo);
+
+        // v2
+        output.writeInt(filterMode);
+        output.writeString(filterRegex);
+
+        // v3
+        output.writeString(serverDnsResolver);
     }
 
     public void serializeForShare(ByteBufferOutput output) {
@@ -88,6 +98,16 @@ public class SubscriptionBean extends Serializable {
         autoUpdateDelay = input.readInt();
         lastUpdated = input.readInt();
         subscriptionUserinfo = input.readString();
+
+        // v2
+        if (version >= 2) {
+            filterMode = input.readInt();
+            filterRegex = input.readString();
+        }
+
+        if (version >= 3) {
+            serverDnsResolver = input.readString();
+        }
     }
 
     public void deserializeFromShare(ByteBufferInput input) {
@@ -113,6 +133,9 @@ public class SubscriptionBean extends Serializable {
         if (autoUpdate == null) autoUpdate = false;
         if (autoUpdateDelay == null) autoUpdateDelay = 1440;
         if (lastUpdated == null) lastUpdated = 0;
+        if (filterMode == null) filterMode = 0;
+        if (filterRegex == null) filterRegex = "";
+        if (serverDnsResolver == null) serverDnsResolver = "";
 
         if (bytesUsed == null) bytesUsed = 0L;
         if (bytesRemaining == null) bytesRemaining = 0L;

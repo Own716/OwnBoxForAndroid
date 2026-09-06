@@ -9,6 +9,12 @@ plugins {
 
 setupApp()
 
+val generatedLicenseAssets = layout.buildDirectory.dir("generated/assets/rootLicense")
+val generateRootLicenseAsset by tasks.registering(Copy::class) {
+    from(rootProject.layout.projectDirectory.file("LICENSE"))
+    into(generatedLicenseAssets)
+}
+
 android {
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
@@ -36,6 +42,13 @@ android {
     androidResources {
         generateLocaleConfig = true
     }
+    sourceSets.named("main") {
+        assets.srcDir(generatedLicenseAssets)
+    }
+}
+
+tasks.matching { it.name == "preBuild" }.configureEach {
+    dependsOn(generateRootLicenseAsset)
 }
 
 dependencies {
@@ -72,6 +85,9 @@ dependencies {
     implementation("com.esotericsoftware:kryo:5.2.1")
     implementation("com.google.guava:guava:31.0.1-android")
     implementation("org.ini4j:ini4j:0.5.4")
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20231013")
 
     implementation("com.simplecityapps:recyclerview-fastscroll:2.0.1") {
         exclude(group = "androidx.recyclerview")

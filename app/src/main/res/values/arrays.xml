@@ -1,6 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
+    <string-array name="language_entries">
+        <item>@string/follow_system</item>
+        <item>English</item>
+        <item>日本語</item>
+        <item>한국어</item>
+        <item>فارسی</item>
+        <item>Русский</item>
+        <item>简体中文</item>
+        <item>繁體中文</item>
+    </string-array>
+    <string-array name="language_values">
+        <item></item>
+        <item>en</item>
+        <item>ja</item>
+        <item>ko</item>
+        <item>fa</item>
+        <item>ru</item>
+        <item>zh-CN</item>
+        <item>zh-TW</item>
+    </string-array>
+
     <string-array name="int_array_2">
         <item>0</item>
         <item>1</item>
@@ -25,6 +46,19 @@
         <item>2</item>
         <item>3</item>
         <item>4</item>
+    </string-array>
+
+    <string-array name="speed_test_modes">
+        <item>@string/speed_test_mode_download_upload</item>
+        <item>@string/speed_test_mode_download</item>
+        <item>@string/speed_test_mode_upload</item>
+        <item>@string/speed_test_mode_simple_download</item>
+    </string-array>
+    <string-array name="speed_test_mode_values" translatable="false">
+        <item>download_upload</item>
+        <item>download</item>
+        <item>upload</item>
+        <item>simple_download</item>
     </string-array>
 
     <string-array name="bypass_private_route">
@@ -186,10 +220,10 @@
     </string-array>
 
     <string-array name="ss_enc_method_value">
+        <item>none</item>
         <item>2022-blake3-aes-128-gcm</item>
         <item>2022-blake3-aes-256-gcm</item>
         <item>2022-blake3-chacha20-poly1305</item>
-        <item>none</item>
         <item>aes-128-gcm</item>
         <item>aes-192-gcm</item>
         <item>aes-256-gcm</item>
@@ -204,6 +238,64 @@
         <item>rc4-md5</item>
         <item>chacha20-ietf</item>
         <item>xchacha20</item>
+    </string-array>
+
+    <string-array name="ssr_enc_method_value">
+        <item>none</item>
+        <item>aes-128-ctr</item>
+        <item>aes-192-ctr</item>
+        <item>aes-256-ctr</item>
+        <item>aes-128-cfb</item>
+        <item>aes-192-cfb</item>
+        <item>aes-256-cfb</item>
+        <item>aes-128-cfb8</item>
+        <item>aes-192-cfb8</item>
+        <item>aes-256-cfb8</item>
+        <item>aes-128-ofb</item>
+        <item>aes-192-ofb</item>
+        <item>aes-256-ofb</item>
+        <item>camellia-128-cfb</item>
+        <item>camellia-192-cfb</item>
+        <item>camellia-256-cfb</item>
+        <item>camellia-128-cfb8</item>
+        <item>camellia-192-cfb8</item>
+        <item>camellia-256-cfb8</item>
+        <item>rc4-md5</item>
+        <item>rc4-md5-6</item>
+        <item>rc4</item>
+        <item>bf-cfb</item>
+        <item>cast5-cfb</item>
+        <item>des-cfb</item>
+        <item>idea-cfb</item>
+        <item>rc2-cfb</item>
+        <item>seed-cfb</item>
+        <item>chacha20-ietf</item>
+        <item>xchacha20</item>
+        <item>chacha20</item>
+        <item>xsalsa20</item>
+        <item>salsa20</item>
+        <item>table</item>
+        <item>rabbit</item>
+        <item>hc128</item>
+        <item>zuc128</item>
+    </string-array>
+
+    <string-array name="ssr_protocol_value">
+        <item>origin</item>
+        <item>auth_sha1_v4</item>
+        <item>auth_aes128_sha1</item>
+        <item>auth_aes128_md5</item>
+        <item>auth_chain_a</item>
+        <item>auth_chain_b</item>
+    </string-array>
+
+    <string-array name="ssr_obfs_value">
+        <item>plain</item>
+        <item>http_simple</item>
+        <item>http_post</item>
+        <item>tls1.2_ticket_auth</item>
+        <item>tls1.2_ticket_fastauth</item>
+        <item>random_head</item>
     </string-array>
 
     <string-array name="service_modes">
@@ -259,11 +351,51 @@
 
     <string-array name="networks_value">
         <item>tcp</item>
+        <item>kcp</item>
         <item>ws</item>
         <item>http</item>
         <item>quic</item>
         <item>grpc</item>
         <item>httpupgrade</item>
+        <item>xhttp</item>
+    </string-array>
+
+    <string-array name="kcp_headers_value">
+        <item>none</item>
+        <item>srtp</item>
+        <item>utp</item>
+        <item>wechat-video</item>
+        <item>dtls</item>
+        <item>wireguard</item>
+        <item>dns</item>
+    </string-array>
+
+    <string-array name="kcp_cwnd_multiplier_entry">
+        <item>20</item>
+        <item>10</item>
+        <item>5</item>
+        <item>1</item>
+    </string-array>
+
+    <string-array name="kcp_cwnd_multiplier_value">
+        <item>20</item>
+        <item>10</item>
+        <item>5</item>
+        <item>1</item>
+    </string-array>
+
+    <string-array name="xhttp_mode_entry">
+        <item>auto</item>
+        <item>packet-up</item>
+        <item>stream-up</item>
+        <item>stream-one</item>
+    </string-array>
+
+    <string-array name="xhttp_mode_value">
+        <item>auto</item>
+        <item>packet-up</item>
+        <item>stream-up</item>
+        <item>stream-one</item>
     </string-array>
 
     <string-array name="trojan_go_networks_entry">
@@ -365,6 +497,7 @@
         <item>Loyalsoldier (soffchen/sing-geosite)</item>
         <item>Chocolate4U/Iran-sing-box-rules</item>
         <item>L11R/Antizapret-sing-box-geo</item>
+        <item>@string/custom_rules_provider</item>
     </string-array>
 
     <string-array name="balancer_type">
@@ -420,6 +553,12 @@
         <item>@string/group_order_by_delay</item>
     </string-array>
 
+    <string-array name="filter_modes">
+        <item>@string/filter_disabled</item>
+        <item>@string/filter_include</item>
+        <item>@string/filter_exclude</item>
+    </string-array>
+
     <string-array name="ssh_auth_type">
         <item>@string/ssh_auth_type_none</item>
         <item>@string/password</item>
@@ -430,14 +569,6 @@
         <item>gVisor</item>
         <item>System</item>
         <item>Mixed</item>
-        <item>HEVTUN</item>
-    </string-array>
-
-    <string-array name="speed_test_mode_entries">
-        <item>@string/speed_test_mode_download_only</item>
-        <item>@string/speed_test_mode_upload_only</item>
-        <item>@string/speed_test_mode_full</item>
-        <item>@string/speed_test_mode_simple_dl</item>
     </string-array>
 
     <string-array name="hysteria_protocol">
@@ -463,6 +594,11 @@
         <item>h2mux</item>
         <item>smux</item>
         <item>yamux</item>
+    </string-array>
+
+    <string-array name="mux_mode">
+        <item>@string/mux_mode_max_streams</item>
+        <item>@string/mux_mode_connections</item>
     </string-array>
 
     <string-array name="dns_network_select">
@@ -532,10 +668,65 @@
         <item>3</item>
     </string-array>
 
+    <!-- sing-box 1.13 已移除 sniff_override_destination，override 档已下线 -->
     <string-array name="traffic_sniffing_values">
         <item>@string/off</item>
         <item>@string/sniff_routing</item>
-        <item>@string/sniff_override</item>
+    </string-array>
+
+    <!-- Snell Protocol -->
+    <string-array name="snell_versions_entry">
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+        <item>6</item>
+    </string-array>
+
+    <string-array name="snell_versions_value">
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+        <item>6</item>
+    </string-array>
+
+    <string-array name="snell_obfs_modes_entry">
+        <item>None</item>
+        <item>HTTP</item>
+        <item>TLS</item>
+    </string-array>
+
+    <string-array name="snell_obfs_modes_value">
+        <item></item>
+        <item>http</item>
+        <item>tls</item>
+    </string-array>
+
+    <string-array name="snell_network_entry">
+        <item>Auto</item>
+        <item>TCP</item>
+        <item>UDP</item>
+    </string-array>
+
+    <string-array name="snell_network_value">
+        <item></item>
+        <item>tcp</item>
+        <item>udp</item>
+    </string-array>
+
+    <string-array name="snell_v6_modes_entry">
+        <item>Default</item>
+        <item>Unshaped</item>
+        <item>Unsafe Raw</item>
+    </string-array>
+
+    <string-array name="snell_v6_modes_value">
+        <item>default</item>
+        <item>unshaped</item>
+        <item>unsafe-raw</item>
     </string-array>
 
 </resources>

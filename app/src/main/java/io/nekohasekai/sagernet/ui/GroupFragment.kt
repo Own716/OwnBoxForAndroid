@@ -51,6 +51,7 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
         toolbar.setOnMenuItemClickListener(this)
 
         groupListView = view.findViewById(R.id.group_list)
+        updateBottomPadding()
         layoutManager = FixedLinearLayoutManager(groupListView)
         groupListView.layoutManager = layoutManager
         groupAdapter = GroupAdapter()
@@ -105,6 +106,12 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
             }
         }).attachToRecyclerView(groupListView)
 
+    }
+
+    fun updateBottomPadding() {
+        if (!::groupListView.isInitialized) return
+        groupListView.clipToPadding = false
+        groupListView.updatePadding(bottom = dp2px(if (DataStore.showBottomBar) 80 else 4))
     }
 
     override fun onMenuItemClick(item: MenuItem): Boolean {

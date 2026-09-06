@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">NekoBox</string>
-    <string name="app_name_long" translatable="false">NekoBox for Android</string>
+    <string name="app_name" translatable="false">Throne</string>
+    <string name="app_name_long" translatable="false">Throne for Android</string>
     <string name="app_desc">Універсальний набір інструментів проксі для Android, написаний на Kotlin.</string>
     <string name="project">Проєкт</string>
     <string name="github">Вихідний код</string>
@@ -54,6 +54,10 @@
     <string name="service_mode_vpn" translatable="false">VPN</string>
     <string name="port_proxy">Порт проксі-сервера SOCKS5</string>
     <string name="port_http">Проксі-порт HTTP</string>
+    <string name="disable_mixed_inbound">Вимкнути змішаний вхід</string>
+    <string name="disable_mixed_inbound_sum">Чистий вхід TUN; не прослуховувати локальний порт проксі</string>
+    <string name="mixed_inbound_disabled">Вимкнено</string>
+    <string name="disable_mixed_inbound_proxy_toast">Вимкнення діє лише в режимі TUN; поточний порт прослуховування: %1$d</string>
     <string name="port_transproxy">Транспроксі-порт</string>
     <string name="cag_route">Налаштування маршруту</string>
     <string name="allow_access">Дозволити підключення з локальної мережі</string>
@@ -94,7 +98,7 @@
     <string name="port_local_dns">Локальний порт DNS</string>
     <string name="require_transproxy">Увімкнути вхідний сигнал Transproxy</string>
     <string name="transproxy_mode">Режим Transproxy</string>
-    <string name="connection_test_url">URL-адреса перевірки з\'єднання</string>
+    <string name="connection_test_url">URL перевірки затримки</string>
     <!-- proxy category -->
     <string name="profile_name">Ім\'я профілю</string>
     <string name="server_address">Сервер</string>
@@ -234,6 +238,8 @@
     <string name="action_export">Експорт</string>
     <string name="action_import">Імпортувати з буфера обміну</string>
     <string name="action_import_file">Імпортувати з файлу</string>
+    <string name="scanner_toggle_flashlight">Перемкнути ліхтарик</string>
+    <string name="scanner_select_image">Вибрати зображення</string>
     <string name="action_export_msg">Експортовано успішно!</string>
     <string name="action_export_err">Не вдалося експортувати.</string>
     <string name="action_import_msg">Імпортовано успішно!</string>
@@ -276,8 +282,6 @@
     <string name="no_proxies_found_in_file">У файлі не знайдено проксі</string>
     <string name="no_proxies_found_in_clipboard">У буфері обміну не знайдено проксі</string>
     <string name="deduplication">Дедуплікація</string>
-    <string name="donate">Пожертвувати</string>
-    <string name="donate_info">Я люблю гроші</string>
     <string name="ignore_battery_optimizations">Ігнорувати оптимізацію батареї</string>
     <string name="ignore_battery_optimizations_sum">Зняти деякі обмеження</string>
     <!-- plugin -->
@@ -318,17 +322,15 @@
     <string name="clear_traffic_statistics">Очистити статистику трафіку</string>
     <string name="connection_test">Тест з\'єднання</string>
     <string name="connection_test_clear_results">Очистити результати тесту</string>
-    <string name="connection_test_tcp_ping" translatable="false">TCPing</string>
-    <string name="connection_test_tcp_ping_unavailable">TCPing недоступний</string>
-    <string name="connection_test_icmp_ping" translatable="false">ICMPing</string>
-    <string name="connection_test_icmp_ping_unavailable">ICMPing недоступний</string>
-    <string name="connection_test_url_test" translatable="false">URL Test</string>
+    <string name="connection_test_url_test">Перевірити URL цієї групи</string>
     <string name="connection_test_domain_not_found">Домен не знайдено</string>
     <string name="connection_test_refused">З\'єднання відхилено</string>
     <string name="connection_test_unreachable">Недоступний</string>
     <string name="connection_test_timeout">Час очікування минув</string>
-    <string name="append_http_proxy">Додати HTTP-проксі до VPN</string>
-    <string name="append_http_proxy_sum">HTTP-проксі буде використовуватися безпосередньо (браузером / деякими підтримуваними програмами), не проходячи через віртуальний мережевий пристрій (Android 10+)</string>
+    <string name="mixed_auth_config">Налаштувати автентифікацію</string>
+    <string name="mixed_auth_username_hint">Ім\'я користувача (залиште обидва поля порожніми — без автентифікації)</string>
+    <string name="mixed_auth_no_auth">Не задано (без автентифікації)</string>
+    <string name="mixed_auth_enabled_sum">Ім\'я користувача: %1$s</string>
     <string name="protocol_settings">Налаштування протоколу</string>
     <string name="trojan_provider">Постачальник Trojan</string>
     <string name="group_basic">Основні</string>
@@ -451,6 +453,9 @@
     <string name="backup_settings">Налаштування</string>
     <string name="backup_summary">Якщо налаштування маршрутизації не будуть збережені разом з конфігураціями, власні вихідні з\'єднання будуть втрачені.</string>
     <string name="backup_not_file">Не є файлом резервної копії: очікувався .json, але отримано %s</string>
+    <string name="backup_not_throne_desktop">Це не резервна копія Throne для ПК: очікувався .thrbackup, але %s</string>
+    <string name="action_import_throne_desktop">Імпорт із Throne для ПК</string>
+    <string name="backup_import_throne_desktop_summary">Імпорт профілів, маршрутів і налаштувань із .thrbackup Throne для ПК. Користувацькі піктограми ігноруються. Наявні дані вибраних категорій буде перезаписано.</string>
     <string name="invalid_backup_file">Неправильний файл резервної копії</string>
     <string name="backup_import">Імпорт</string>
     <string name="backup_import_summary">Імпортування перезапише наявні дані.</string>
@@ -522,4 +527,54 @@
     <string name="padding">Заповнення (Padding)</string>
     <string name="network_change_reset_connections">Скидати вихідні з\'єднання при зміні мережі</string>
     <string name="wake_reset_connections">Скидати вихідні з\'єднання при виході пристрою зі сну</string>
+    <string name="preview_hint_dont_show_again">Більше не показувати</string>
+    <string name="speed_test_settings">Speed test</string>
+    <string name="speed_test_mode">Speed test mode</string>
+    <string name="speed_test_mode_download_upload">Download + upload</string>
+    <string name="speed_test_mode_download">Download only</string>
+    <string name="speed_test_mode_upload">Upload only</string>
+    <string name="speed_test_mode_simple_download">Simple download</string>
+    <string name="speed_test_timeout_ms">Speed test timeout (ms)</string>
+    <string name="speed_test_timeout_invalid">Enter a timeout greater than zero milliseconds</string>
+    <string name="simple_download_url">Simple download URL</string>
+    <string name="speed_test_url_invalid">Enter a valid HTTP or HTTPS URL</string>
+    <string name="speed_test_group">Перевірити швидкість цієї групи</string>
+    <string name="speed_test_confirm_title">Run speed test?</string>
+    <string name="speed_test_confirm_message">Speed testing can use significant data. Profiles are tested one at a time through their own proxy.</string>
+    <string name="speed_test_stage_pending">Waiting</string>
+    <string name="speed_test_stage_discovery">Finding a test server</string>
+    <string name="speed_test_stage_latency">Measuring server latency</string>
+    <string name="speed_test_stage_download">Downloading</string>
+    <string name="speed_test_stage_upload">Uploading</string>
+    <string name="speed_test_stage_complete">Complete</string>
+    <string name="speed_test_stage_cancelled">Cancelled</string>
+    <string name="speed_test_stage_error">Failed</string>
+    <string name="speed_test_latency_format">Latency: %1$d ms</string>
+    <string name="speed_test_server_format">Server: %1$s</string>
+    <string name="speed_test_download_format">Download: %1$s (%2$s)</string>
+    <string name="speed_test_upload_format">Upload: %1$s (%2$s)</string>
+    <string name="speed_test_rate_mbps">%1$.2f Mbps</string>
+
+    <!-- Custom Icon Pack -->
+    <string name="custom_icon">Користувацькі іконки</string>
+    <string name="custom_icon_import">Імпортувати набір іконок</string>
+    <string name="custom_icon_reset">Скинути за замовчуванням</string>
+    <string name="custom_icon_preview_shortcut">Іконка ярлика</string>
+    <string name="custom_icon_shortcut_subtitle">Платформа Android не підтримує зміну іконки програми. За потреби зробіть fork та змініть самостійно!</string>
+    <string name="custom_icon_preview_tile">Плитка швидких налаштувань</string>
+    <string name="custom_icon_apply_pack">Застосувати цей набір іконок</string>
+    <string name="custom_icon_apply_success">Набір іконок застосовано. Запитано створення ярлика на робочому столі.</string>
+    <string name="custom_icon_pin_shortcut_not_supported">Поточний лаунчер не підтримує закріплення ярликів.</string>
+    <string name="custom_icon_no_pack_to_apply">Спочатку імпортуйте набір іконок.</string>
+    <string name="custom_icon_tile_state_active">Увімкнено (натисніть для перемикання)</string>
+    <string name="custom_icon_tile_state_inactive">Вимкнено (натисніть для перемикання)</string>
+    <string name="custom_icon_import_success">Набір іконок успішно імпортовано</string>
+    <string name="custom_icon_reset_success">Відновлено іконки за замовчуванням</string>
+    <string name="custom_icon_reset_confirm">Ви впевнені, що хочете відновити іконки за замовчуванням?</string>
+    <string name="custom_icon_error_missing">У наборі іконок відсутній обов\'язковий файл: %s</string>
+    <string name="custom_icon_error_dimension">Роздільна здатність %1$s має бути 512x512 пікселів (поточна: %2$dx%3$d)</string>
+    <string name="custom_icon_error_not_png">%s не є коректним зображенням PNG</string>
+    <string name="custom_icon_error_security">Помилка перевірки безпеки: %s</string>
+    <string name="custom_icon_requirement_tip">Набір іконок має бути ZIP-архівом, що містить icon.png та tile.png розміром 512x512.</string>
 </resources>
+

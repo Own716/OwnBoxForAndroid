@@ -3,12 +3,10 @@ package libcore
 import (
 	"fmt"
 	"net"
-	"path/filepath"
 	"strings"
 
 	"github.com/oschwald/maxminddb-golang"
 	C "github.com/sagernet/sing-box/constant"
-	"github.com/sagernet/sing-box/nekoutils"
 	"github.com/sagernet/sing-box/option"
 )
 
@@ -58,13 +56,13 @@ func (g *geoip) Rules(countryCode string) ([]option.HeadlessRule, error) {
 	}, nil
 }
 
-func init() {
-	nekoutils.GetGeoIPHeadlessRules = func(name string) ([]option.HeadlessRule, error) {
-		g := new(geoip)
-		if err := g.Open(filepath.Join(externalAssetsPath, "geoip.db")); err != nil {
-			return nil, err
-		}
-		defer g.geoipReader.Close()
-		return g.Rules(name)
+// loadGeoIPRules 从 geoip.db 读取指定国家代码的规则
+// （替代 fork 的 nekoutils.GetGeoIPHeadlessRules 钩子）。
+func loadGeoIPRules(dbPath string, code string) ([]option.HeadlessRule, error) {
+	g := new(geoip)
+	if err := g.Open(dbPath); err != nil {
+		return nil, err
 	}
+	defer g.geoipReader.Close()
+	return g.Rules(code)
 }

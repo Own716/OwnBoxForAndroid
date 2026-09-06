@@ -16,13 +16,16 @@ import io.nekohasekai.sagernet.fmt.internal.ChainBean;
 import io.nekohasekai.sagernet.fmt.mieru.MieruBean;
 import io.nekohasekai.sagernet.fmt.naive.NaiveBean;
 import io.nekohasekai.sagernet.fmt.shadowsocks.ShadowsocksBean;
+import io.nekohasekai.sagernet.fmt.shadowsocksr.ShadowsocksRBean;
 import moe.matsuri.nb4a.proxy.anytls.AnyTLSBean;
 import moe.matsuri.nb4a.proxy.shadowtls.ShadowTLSBean;
+import io.nekohasekai.sagernet.fmt.snell.SnellBean;
 import io.nekohasekai.sagernet.fmt.socks.SOCKSBean;
 import io.nekohasekai.sagernet.fmt.ssh.SSHBean;
 import io.nekohasekai.sagernet.fmt.trojan.TrojanBean;
 import io.nekohasekai.sagernet.fmt.trojan_go.TrojanGoBean;
 import io.nekohasekai.sagernet.fmt.tuic.TuicBean;
+import io.nekohasekai.sagernet.fmt.juicity.JuicityBean;
 import io.nekohasekai.sagernet.fmt.v2ray.VMessBean;
 import io.nekohasekai.sagernet.fmt.wireguard.WireGuardBean;
 import io.nekohasekai.sagernet.ktx.KryosKt;
@@ -75,6 +78,12 @@ public class KryoConverters {
     public static ShadowsocksBean shadowsocksDeserialize(byte[] bytes) {
         if (JavaUtil.isEmpty(bytes)) return null;
         return deserialize(new ShadowsocksBean(), bytes);
+    }
+
+    @TypeConverter
+    public static ShadowsocksRBean shadowsocksrDeserialize(byte[] bytes) {
+        if (JavaUtil.isEmpty(bytes)) return null;
+        return deserialize(new ShadowsocksRBean(), bytes);
     }
 
     @TypeConverter
@@ -138,6 +147,12 @@ public class KryoConverters {
     }
 
     @TypeConverter
+    public static JuicityBean juicityDeserialize(byte[] bytes) {
+        if (JavaUtil.isEmpty(bytes)) return null;
+        return deserialize(new JuicityBean(), bytes);
+    }
+
+    @TypeConverter
     public static ShadowTLSBean shadowTLSDeserialize(byte[] bytes) {
         if (JavaUtil.isEmpty(bytes)) return null;
         return deserialize(new ShadowTLSBean(), bytes);
@@ -149,6 +164,11 @@ public class KryoConverters {
         return deserialize(new AnyTLSBean(), bytes);
     }
 
+    @TypeConverter
+    public static SnellBean snellDeserialize(byte[] bytes) {
+        if (JavaUtil.isEmpty(bytes)) return null;
+        return deserialize(new SnellBean(), bytes);
+    }
 
     @TypeConverter
     public static ChainBean chainDeserialize(byte[] bytes) {

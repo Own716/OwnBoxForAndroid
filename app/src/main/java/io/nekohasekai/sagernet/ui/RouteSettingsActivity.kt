@@ -66,12 +66,13 @@ class RouteSettingsActivity(
         DataStore.routeNetwork = network
         DataStore.routeSource = source
         DataStore.routeProtocol = protocol
+        DataStore.routeRuleset = ruleset
         DataStore.routeOutboundRule = outbound
         DataStore.routeOutbound = when (outbound) {
             0L -> 0
             -1L -> 1
             -2L -> 2
-            else -> 3
+            else -> OutboundPreference.VALUE_SELECT_PROFILE.toInt()
         }
         DataStore.routePackages = packages.joinToString("\n")
     }
@@ -86,6 +87,7 @@ class RouteSettingsActivity(
         network = DataStore.routeNetwork
         source = DataStore.routeSource
         protocol = DataStore.routeProtocol
+        ruleset = DataStore.routeRuleset
         outbound = when (DataStore.routeOutbound) {
             0 -> 0L
             1 -> -1L
@@ -133,7 +135,7 @@ class RouteSettingsActivity(
             ) ?: return@runOnDefaultDispatcher
             DataStore.routeOutboundRule = profile.id
             onMainDispatcher {
-                outbound.value = "3"
+                outbound.value = OutboundPreference.VALUE_SELECT_PROFILE
             }
         }
     }
@@ -152,11 +154,15 @@ class RouteSettingsActivity(
         apps = findPreference(Key.ROUTE_PACKAGES)!!
 
         outbound.setOnPreferenceChangeListener { _, newValue ->
-            if (newValue.toString() == "3") {
+            if (newValue.toString() == OutboundPreference.VALUE_SELECT_PROFILE) {
                 selectProfileForAdd.launch(
                     Intent(
                         this@RouteSettingsActivity, ProfileSelectActivity::class.java
-                    )
+                    ).apply {
+                        ProfileManager.getProfile(DataStore.routeOutboundRule)?.let {
+                            putExtra(ProfileSelectActivity.EXTRA_SELECTED, it)
+                        }
+                    }
                 )
                 false
             } else {

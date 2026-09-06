@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="scanner_toggle_flashlight">Zaklamp in-/uitschakelen</string>
+    <string name="scanner_select_image">Afbeelding selecteren</string>
     <string name="logcat">Foutopsporing Informatie exporteren</string>
     <string name="version_x">Versie (%s)</string>
     <string name="app_version">Versie</string>
@@ -8,4 +10,63 @@
     <string name="github">Broncode</string>
     <string name="project">Project</string>
     <string name="app_desc">De universele proxy-toolchain voor Android, geschreven in Kotlin.</string>
+    <string name="disable_mixed_inbound">Gemengde inbound uitschakelen</string>
+    <string name="disable_mixed_inbound_sum">Pure TUN-inbound; niet luisteren op de lokale proxypoort</string>
+    <string name="mixed_inbound_disabled">Uitgeschakeld</string>
+    <string name="disable_mixed_inbound_proxy_toast">Uitschakelen werkt alleen in TUN-modus; huidige luisterpoort: %1$d</string>
+    <string name="preview_hint_dont_show_again">Niet opnieuw weergeven</string>
+    <string name="backup_not_throne_desktop">Geen Throne-desktopback-up: .thrbackup verwacht, maar %s</string>
+    <string name="action_import_throne_desktop">Importeren vanuit Throne-desktop</string>
+    <string name="backup_import_throne_desktop_summary">Importeert profielen, routes en instellingen uit een Throne-desktop-.thrbackup-bestand. Aangepaste pictogrammen worden genegeerd. Bestaande gegevens in geselecteerde categorieën worden overschreven.</string>
+    <string name="connection_test_url">URL voor latentietest</string>
+    <string name="connection_test_url_test">URL-test voor deze groep</string>
+    <string name="speed_test_settings">Speed test</string>
+    <string name="speed_test_mode">Speed test mode</string>
+    <string name="speed_test_mode_download_upload">Download + upload</string>
+    <string name="speed_test_mode_download">Download only</string>
+    <string name="speed_test_mode_upload">Upload only</string>
+    <string name="speed_test_mode_simple_download">Simple download</string>
+    <string name="speed_test_timeout_ms">Speed test timeout (ms)</string>
+    <string name="speed_test_timeout_invalid">Enter a timeout greater than zero milliseconds</string>
+    <string name="simple_download_url">Simple download URL</string>
+    <string name="speed_test_url_invalid">Enter a valid HTTP or HTTPS URL</string>
+    <string name="speed_test_group">Snelheidstest voor deze groep</string>
+    <string name="speed_test_confirm_title">Run speed test?</string>
+    <string name="speed_test_confirm_message">Speed testing can use significant data. Profiles are tested one at a time through their own proxy.</string>
+    <string name="speed_test_stage_pending">Waiting</string>
+    <string name="speed_test_stage_discovery">Finding a test server</string>
+    <string name="speed_test_stage_latency">Measuring server latency</string>
+    <string name="speed_test_stage_download">Downloading</string>
+    <string name="speed_test_stage_upload">Uploading</string>
+    <string name="speed_test_stage_complete">Complete</string>
+    <string name="speed_test_stage_cancelled">Cancelled</string>
+    <string name="speed_test_stage_error">Failed</string>
+    <string name="speed_test_latency_format">Latency: %1$d ms</string>
+    <string name="speed_test_server_format">Server: %1$s</string>
+    <string name="speed_test_download_format">Download: %1$s (%2$s)</string>
+    <string name="speed_test_upload_format">Upload: %1$s (%2$s)</string>
+    <string name="speed_test_rate_mbps">%1$.2f Mbps</string>
+
+    <!-- Custom Icon Pack -->
+    <string name="custom_icon">Aangepast pictogram</string>
+    <string name="custom_icon_import">Pictogrampakket importeren</string>
+    <string name="custom_icon_reset">Standaardinstellingen herstellen</string>
+    <string name="custom_icon_preview_shortcut">Snelkoppelingspictogram</string>
+    <string name="custom_icon_shortcut_subtitle">Android ondersteunt het wijzigen van het app-pictogram niet. Fork en pas aan indien nodig!</string>
+    <string name="custom_icon_preview_tile">Snelle instellingen-tegel</string>
+    <string name="custom_icon_apply_pack">Dit pictogrampakket toepassen</string>
+    <string name="custom_icon_apply_success">Pictogrampakket toegepast. Snelkoppeling aangevraagd.</string>
+    <string name="custom_icon_pin_shortcut_not_supported">Uw startscherm ondersteunt het vastzetten van snelkoppelingen niet.</string>
+    <string name="custom_icon_no_pack_to_apply">Importeer eerst een pictogrampakket.</string>
+    <string name="custom_icon_tile_state_active">Actief (tik om te wisselen)</string>
+    <string name="custom_icon_tile_state_inactive">Inactief (tik om te wisselen)</string>
+    <string name="custom_icon_import_success">Pictogrampakket succesvol geïmporteerd</string>
+    <string name="custom_icon_reset_success">Standaardpictogrammen hersteld</string>
+    <string name="custom_icon_reset_confirm">Weet u zeker dat u de standaardpictogrammen wilt herstellen?</string>
+    <string name="custom_icon_error_missing">Pictogrampakket moet het volgende bevatten: %s</string>
+    <string name="custom_icon_error_dimension">%1$s moet 512x512 pixels zijn (huidig: %2$dx%3$d)</string>
+    <string name="custom_icon_error_not_png">%s is geen geldige PNG-afbeelding</string>
+    <string name="custom_icon_error_security">Beveiligingscontrole mislukt: %s</string>
+    <string name="custom_icon_requirement_tip">Pictogrampakket moet een ZIP-bestand zijn met 512x512 icon.png en tile.png.</string>
 </resources>
+

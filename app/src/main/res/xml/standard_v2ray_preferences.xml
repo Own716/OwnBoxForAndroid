@@ -45,6 +45,12 @@
             app:key="encryption"
             app:title="@string/encryption"
             app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:icon="@drawable/ic_notification_enhanced_encryption"
+            app:key="vlessEncryption"
+            app:title="@string/vless_encryption"
+            app:dialogMessage="@string/vless_encryption_hint"
+            app:useSimpleSummaryProvider="true" />
         <moe.matsuri.nb4a.ui.SimpleMenuPreference
             app:entries="@array/packet_encoding_entry"
             app:entryValues="@array/int_array_3"
@@ -70,6 +76,38 @@
             app:title="@string/http_path"
             app:useSimpleSummaryProvider="true" />
         <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:defaultValue="none"
+            app:entries="@array/kcp_headers_value"
+            app:entryValues="@array/kcp_headers_value"
+            app:icon="@drawable/ic_baseline_texture_24"
+            app:key="headerType"
+            app:title="@string/kcp_header_type"
+            app:useSimpleSummaryProvider="true" />
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:defaultValue="20"
+            app:entries="@array/kcp_cwnd_multiplier_entry"
+            app:entryValues="@array/kcp_cwnd_multiplier_value"
+            app:icon="@drawable/ic_baseline_speed_24"
+            app:key="kcpCwndMultiplier"
+            app:title="@string/kcp_cwnd_multiplier"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:dialogLayout="@layout/layout_password_dialog"
+            app:icon="@drawable/ic_baseline_format_align_left_24"
+            app:key="mKcpSeed"
+            app:title="@string/kcp_seed"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:icon="@drawable/ic_baseline_tune_24"
+            app:key="kcpMtu"
+            app:title="@string/kcp_mtu"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:icon="@drawable/ic_baseline_speed_24"
+            app:key="kcpTti"
+            app:title="@string/kcp_tti"
+            app:useSimpleSummaryProvider="true" />
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference
             app:entries="@array/transport_layer_encryption_value"
             app:entryValues="@array/transport_layer_encryption_value"
             app:icon="@drawable/ic_baseline_layers_24"
@@ -92,6 +130,24 @@
             app:icon="@drawable/ic_baseline_stream_24"
             app:key="earlyDataHeaderName"
             app:title="@string/early_data_header_name"
+            app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:key="serverXhttpCategory"
+        app:title="@string/xhttp_settings">
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:defaultValue="auto"
+            app:entries="@array/xhttp_mode_entry"
+            app:entryValues="@array/xhttp_mode_value"
+            app:icon="@drawable/ic_baseline_stream_24"
+            app:key="xhttpMode"
+            app:title="@string/xhttp_mode"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:icon="@drawable/ic_action_settings"
+            app:key="xhttpExtra"
+            app:title="@string/xhttp_extra"
             app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
 
@@ -158,16 +214,52 @@
             app:key="muxType"
             app:title="@string/mux_type"
             app:useSimpleSummaryProvider="true" />
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:defaultValue="0"
+            app:entries="@array/mux_mode"
+            app:entryValues="@array/int_array_2"
+            app:icon="@drawable/ic_baseline_tune_24"
+            app:key="muxMode"
+            app:title="@string/mux_mode"
+            app:useSimpleSummaryProvider="true" />
         <EditTextPreference
-            app:defaultValue="1"
+            app:defaultValue="8"
             app:icon="@drawable/ic_baseline_low_priority_24"
             app:key="muxConcurrency"
             app:title="@string/mux_concurrency"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:defaultValue="4"
+            app:icon="@drawable/ic_baseline_low_priority_24"
+            app:key="muxMaxConnections"
+            app:title="@string/mux_max_connections"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:defaultValue="4"
+            app:icon="@drawable/ic_baseline_low_priority_24"
+            app:key="muxMinStreams"
+            app:title="@string/mux_min_streams"
             app:useSimpleSummaryProvider="true" />
         <SwitchPreference
             app:icon="@drawable/baseline_developer_board_24"
             app:key="muxPadding"
             app:title="@string/padding" />
+        <SwitchPreference
+            app:icon="@drawable/ic_baseline_speed_24"
+            app:key="muxBrutal"
+            app:title="@string/mux_brutal" />
+        <EditTextPreference
+            app:defaultValue="100"
+            app:icon="@drawable/ic_baseline_upload_24"
+            app:key="muxBrutalUpMbps"
+            app:title="@string/mux_brutal_up_mbps"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:defaultValue="100"
+            app:icon="@drawable/ic_baseline_download_24"
+            app:key="muxBrutalDownMbps"
+            app:title="@string/mux_brutal_down_mbps"
+            app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
 
     <PreferenceCategory
@@ -181,6 +273,11 @@
             app:icon="@drawable/ic_baseline_nfc_24"
             app:key="echConfig"
             app:title="@string/ech_config"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:icon="@drawable/ic_baseline_domain_24"
+            app:key="echQueryServerName"
+            app:title="@string/ech_query_server_name"
             app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
 

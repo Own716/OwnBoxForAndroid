@@ -16,10 +16,10 @@ public class VMessBean extends StandardV2RayBean {
         super.initializeDefaultValues();
 
         alterId = alterId != null ? alterId : 0;
-
+        
         if (alterId == -1) {
             encryption = JavaUtil.isNotBlank(encryption) ? encryption : "";
-        } else {
+        } else if (!isVLESS()) {
             encryption = JavaUtil.isNotBlank(encryption) ? encryption : "auto";
         }
     }

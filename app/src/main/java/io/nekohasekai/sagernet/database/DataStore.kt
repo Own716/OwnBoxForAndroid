@@ -2,11 +2,11 @@ package io.nekohasekai.sagernet.database
 
 import android.os.Binder
 import androidx.preference.PreferenceDataStore
-import io.nekohasekai.sagernet.CONNECTION_TEST_URL
 import io.nekohasekai.sagernet.GroupType
 import io.nekohasekai.sagernet.IPv6Mode
 import io.nekohasekai.sagernet.Key
-import io.nekohasekai.sagernet.SpeedTestMode
+import io.nekohasekai.sagernet.R
+import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.TunImplementation
 import io.nekohasekai.sagernet.bg.BaseService
 import io.nekohasekai.sagernet.bg.VpnService
@@ -27,6 +27,9 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     // share service state in main & bg process
     @Volatile
     var serviceState = BaseService.State.Idle
+
+    @Volatile
+    var mixedInboundAuthed: Boolean = false
 
     val configurationStore = RoomPreferenceDataStore(PublicDatabase.kvPairDao)
     val profileCacheStore = RoomPreferenceDataStore(TempDatabase.profileCacheDao)
@@ -88,6 +91,9 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var appTLSVersion by configurationStore.string(Key.APP_TLS_VERSION)
     var enableClashAPI by configurationStore.boolean(Key.ENABLE_CLASH_API)
     var showBottomBar by configurationStore.boolean(Key.SHOW_BOTTOM_BAR)
+    var confirmProfileDelete by configurationStore.boolean(Key.CONFIRM_PROFILE_DELETE) { true }
+    var groupLayoutMode by configurationStore.stringToInt(Key.GROUP_LAYOUT_MODE) { 0 }
+    var profileCardStyle by configurationStore.stringToInt(Key.PROFILE_CARD_STYLE) { 0 }
 
     var allowInsecureOnRequest by configurationStore.boolean(Key.ALLOW_INSECURE_ON_REQUEST)
     var networkChangeResetConnections by configurationStore.boolean(Key.NETWORK_CHANGE_RESET_CONNECTIONS) { true }
@@ -97,7 +103,9 @@ object DataStore : OnPreferenceDataStoreChangeListener {
 
     var isExpert by configurationStore.boolean(Key.APP_EXPERT)
     var appTheme by configurationStore.int(Key.APP_THEME)
+    var useSystemTheme by configurationStore.boolean(Key.USE_SYSTEM_THEME)
     var nightTheme by configurationStore.stringToInt(Key.NIGHT_THEME)
+    var appLanguage by configurationStore.string(Key.APP_LANGUAGE) { "" }
     var serviceMode by configurationStore.string(Key.SERVICE_MODE) { Key.MODE_VPN }
 
     var trafficSniffing by configurationStore.stringToInt(Key.TRAFFIC_SNIFFING) { 1 }
@@ -107,6 +115,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
 
     var bypassLan by configurationStore.boolean(Key.BYPASS_LAN)
     var bypassLanInCore by configurationStore.boolean(Key.BYPASS_LAN_IN_CORE)
+    var dualNetworkAcceleration by configurationStore.boolean(Key.DUAL_NETWORK_ACCELERATION)
 
     var allowAccess by configurationStore.boolean(Key.ALLOW_ACCESS)
     var speedInterval by configurationStore.stringToInt(Key.SPEED_INTERVAL)
@@ -123,12 +132,36 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var logLevel by configurationStore.stringToInt(Key.LOG_LEVEL)
     var logBufSize by configurationStore.int(Key.LOG_BUF_SIZE) { 0 }
     var acquireWakeLock by configurationStore.boolean(Key.ACQUIRE_WAKE_LOCK)
+    var hideFromRecentApps by configurationStore.boolean(Key.HIDE_FROM_RECENT_APPS)
+    // 记录用户选择"不再显示"的预览版版本号，仅对该版本隐藏提示
+    var previewHintDismissedVersion by configurationStore.string(Key.PREVIEW_HINT_DISMISSED_VERSION) { "" }
+
+    var rulesGeositeUrl by configurationStore.string(Key.RULES_GEOSITE_URL) { "https://github.com/SagerNet/sing-geoip/releases/latest/download/geoip.db" }
+    var rulesGeoipUrl by configurationStore.string(Key.RULES_GEOIP_URL) { "https://github.com/SagerNet/sing-geosite/releases/latest/download/geosite.db" }
+    var rulesUpdateInterval by configurationStore.string(Key.RULES_UPDATE_INTERVAL) { "0" } // 默认为0，不自动更新
 
     // hopefully hashCode = mHandle doesn't change, currently this is true from KitKat to Nougat
     private val userIndex by lazy { Binder.getCallingUserHandle().hashCode() }
+
     var mixedPort: Int
         get() = getLocalPort(Key.MIXED_PORT, 2080)
         set(value) = saveLocalPort(Key.MIXED_PORT, value)
+
+    var disableMixedInbound by configurationStore.boolean(Key.DISABLE_MIXED_INBOUND)
+
+    // 仅在 TUN 模式下真正生效；系统代理模式必须保留 mixed 入站
+    val mixedInboundDisabled: Boolean
+        get() = disableMixedInbound && serviceMode == Key.MODE_VPN
+
+    // 混合入站账密由用户设置决定：用户名留空即不启用认证（本机回环免密直连）
+    var mixedUsername by configurationStore.string(Key.MIXED_USERNAME) { "" }
+    var mixedPassword by configurationStore.string(Key.MIXED_PASSWORD) { "" }
+
+    val mixedInboundNeedsAuth: Boolean
+        get() = serviceMode == Key.MODE_VPN && !mixedInboundDisabled && mixedUsername.isNotBlank()
+
+    val mixedInboundUser: String get() = if (mixedInboundAuthed) mixedUsername else ""
+    val mixedInboundPass: String get() = if (mixedInboundAuthed) mixedPassword else ""
 
     fun initGlobal() {
         if (configurationStore.getString(Key.MIXED_PORT) == null) {
@@ -155,28 +188,45 @@ object DataStore : OnPreferenceDataStoreChangeListener {
 
     val persistAcrossReboot by configurationStore.boolean(Key.PERSIST_ACROSS_REBOOT) { false }
 
-    var appendHttpProxy by configurationStore.boolean(Key.APPEND_HTTP_PROXY)
-    var connectionTestURL by configurationStore.string(Key.CONNECTION_TEST_URL) { CONNECTION_TEST_URL }
-    var connectionTestConcurrent by configurationStore.int("connectionTestConcurrent") { 5 }
+    var httpProxyBypass by configurationStore.string(Key.HTTP_PROXY_BYPASS) { "" }
+    var dnsHosts by configurationStore.string(Key.DNS_HOSTS) { "" }
+    var strictRoute by configurationStore.boolean(Key.STRICT_ROUTE) { true }
+    var connectionTestURL by configurationStore.string(Key.CONNECTION_TEST_URL) {
+        SagerNet.application.getString(R.string.default_connection_test_url)
+    }
+    var connectionTestConcurrent by configurationStore.int(Key.CONNECTION_TEST_CONCURRENT) {
+        SagerNet.application.getString(R.string.default_connection_test_concurrent).toInt()
+    }
+    var connectionTestTimeout by configurationStore.int(Key.CONNECTION_TEST_TIMEOUT) { 3000 }
+    var speedTestMode by configurationStore.string(Key.SPEED_TEST_MODE) {
+        SagerNet.application.getString(R.string.default_speed_test_mode)
+    }
+    var speedTestTimeoutMs by configurationStore.stringToInt(Key.SPEED_TEST_TIMEOUT_MS) {
+        SagerNet.application.getString(R.string.default_speed_test_timeout_ms).toInt()
+    }
+    var speedTestServerListURL by configurationStore.string(Key.SPEED_TEST_SERVER_LIST_URL) {
+        SagerNet.application.getString(R.string.default_speed_test_server_list_url)
+    }
+    var speedTestFallbackServerListURL by configurationStore.string(Key.SPEED_TEST_FALLBACK_SERVER_LIST_URL) {
+        SagerNet.application.getString(R.string.default_speed_test_fallback_server_list_url)
+    }
+    var simpleDownloadURL by configurationStore.string(Key.SIMPLE_DOWNLOAD_URL) {
+        SagerNet.application.getString(R.string.default_simple_download_url)
+    }
     var alwaysShowAddress by configurationStore.boolean(Key.ALWAYS_SHOW_ADDRESS)
 
     var tunImplementation by configurationStore.stringToInt(Key.TUN_IMPLEMENTATION) { TunImplementation.GVISOR }
     var profileTrafficStatistics by configurationStore.boolean(Key.PROFILE_TRAFFIC_STATISTICS) { true }
-
-    // Ownbox new features
-    var disableMixedInbound by configurationStore.boolean(Key.DISABLE_MIXED_INBOUND) { false }
-    var strictRoute by configurationStore.boolean(Key.STRICT_ROUTE) { true }
-    var parallelDial by configurationStore.boolean(Key.PARALLEL_DIAL) { false }
-    var dualNetwork by configurationStore.boolean(Key.DUAL_NETWORK) { false }
-    var speedTestMode by configurationStore.stringToInt(Key.SPEED_TEST_MODE) { SpeedTestMode.SIMPLE_DOWNLOAD }
-    var speedTestTimeout by configurationStore.stringToInt(Key.SPEED_TEST_TIMEOUT) { 10000 }
-    var simpleDlUrl by configurationStore.string(Key.SIMPLE_DL_URL) { "https://speed.cloudflare.com/__down?bytes=10000000" }
 
     var yacdURL by configurationStore.string("yacdURL") { "http://127.0.0.1:9090/ui" }
 
     // protocol
 
     var globalAllowInsecure by configurationStore.boolean(Key.GLOBAL_ALLOW_INSECURE) { false }
+
+    var enableTLSFragment by configurationStore.boolean(Key.ENABLE_TLS_FRAGMENT) { false }
+    var fragmentLength by configurationStore.string(Key.FRAGMENT_LENGTH) { "100-200" }
+    var fragmentInterval by configurationStore.string(Key.FRAGMENT_INTERVAL) { "10-20" }
 
     // old cache, DO NOT ADD
 
@@ -196,6 +246,8 @@ object DataStore : OnPreferenceDataStoreChangeListener {
 
     var serverProtocol by profileCacheStore.string(Key.SERVER_PROTOCOL)
     var serverObfs by profileCacheStore.string(Key.SERVER_OBFS)
+    var serverProtocolParam by profileCacheStore.string(Key.SERVER_PROTOCOL_PARAM)
+    var serverObfsParam by profileCacheStore.string(Key.SERVER_OBFS_PARAM)
 
     var serverNetwork by profileCacheStore.string(Key.SERVER_NETWORK)
     var serverHost by profileCacheStore.string(Key.SERVER_HOST)
@@ -227,6 +279,9 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var serverDisableSNI by profileCacheStore.boolean(Key.SERVER_DISABLE_SNI)
     var serverReduceRTT by profileCacheStore.boolean(Key.SERVER_REDUCE_RTT)
 
+    var serverUserId by profileCacheStore.string(Key.SERVER_USER_ID)
+    var serverPinnedCertChainSha256 by profileCacheStore.string(Key.SERVER_PINNED_CERT_CHAIN_SHA256)
+
     var routeName by profileCacheStore.string(Key.ROUTE_NAME)
     var routeDomain by profileCacheStore.string(Key.ROUTE_DOMAIN)
     var routeIP by profileCacheStore.string(Key.ROUTE_IP)
@@ -235,6 +290,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var routeNetwork by profileCacheStore.string(Key.ROUTE_NETWORK)
     var routeSource by profileCacheStore.string(Key.ROUTE_SOURCE)
     var routeProtocol by profileCacheStore.string(Key.ROUTE_PROTOCOL)
+    var routeRuleset by profileCacheStore.string(Key.ROUTE_RULESET)
     var routeOutbound by profileCacheStore.stringToInt(Key.ROUTE_OUTBOUND)
     var routeOutboundRule by profileCacheStore.long(Key.ROUTE_OUTBOUND + "Long")
     var routePackages by profileCacheStore.string(Key.ROUTE_PACKAGES)
@@ -260,8 +316,31 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var subscriptionUserAgent by profileCacheStore.string(Key.SUBSCRIPTION_USER_AGENT)
     var subscriptionAutoUpdate by profileCacheStore.boolean(Key.SUBSCRIPTION_AUTO_UPDATE)
     var subscriptionAutoUpdateDelay by profileCacheStore.stringToInt(Key.SUBSCRIPTION_AUTO_UPDATE_DELAY) { 360 }
+    var subscriptionFilterMode by profileCacheStore.stringToInt(Key.SUBSCRIPTION_FILTER_MODE) { 0 }
+    var subscriptionFilterRegex by profileCacheStore.string(Key.SUBSCRIPTION_FILTER_REGEX)
+    var subscriptionServerDns by profileCacheStore.string(Key.SUBSCRIPTION_SERVER_DNS)
 
     var rulesFirstCreate by profileCacheStore.boolean("rulesFirstCreate")
+
+    // var enableTLSFragment by configurationStore.boolean(Key.ENABLE_TLS_FRAGMENT)
+
+    var webdavServer: String?
+        get() = configurationStore.getString("webdavServer")
+        set(value) = configurationStore.putString("webdavServer", value)
+
+    var webdavUsername: String?
+        get() = configurationStore.getString("webdavUsername")
+        set(value) = configurationStore.putString("webdavUsername", value)
+
+    var webdavPassword: String?
+        get() = configurationStore.getString("webdavPassword")
+        set(value) = configurationStore.putString("webdavPassword", value)
+
+    var webdavPath: String?
+        get() = configurationStore.getString("webdavPath") ?: "Throne"  // 设置默认值
+        set(value) = configurationStore.putString("webdavPath", value)
+
+    var globalMode by configurationStore.boolean(Key.GLOBAL_MODE)
 
     override fun onPreferenceDataStoreChanged(store: PreferenceDataStore, key: String) {
     }

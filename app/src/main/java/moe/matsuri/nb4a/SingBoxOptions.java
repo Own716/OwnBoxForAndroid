@@ -111,6 +111,8 @@ public class SingBoxOptions {
 
         public List<Inbound> inbounds;
 
+        public List<Endpoint> endpoints;
+
         public List<SingBoxOption> outbounds;
 
         public RouteOptions route;
@@ -170,6 +172,8 @@ public class SingBoxOptions {
         public DNSOptions dns;
 
         public NTPOptions ntp;
+
+        public List<Endpoint> endpoints;
 
         public List<Inbound> inbounds;
 
@@ -231,7 +235,7 @@ public class SingBoxOptions {
 
         // Generate note: option type:  public Boolean UDPFragmentDefault;
 
-        public Long udp_timeout;
+        public String udp_timeout;
 
         public Boolean proxy_protocol;
 
@@ -882,6 +886,35 @@ public class SingBoxOptions {
 
     }
 
+    public static class Endpoint extends SingBoxOption {
+
+        public String type;
+
+        public String tag;
+
+    }
+
+    public static class DomainResolveOptions extends SingBoxOption {
+
+        public String server;
+
+        public String strategy;
+
+        public Boolean disable_cache;
+
+        public Integer rewrite_ttl;
+
+        public String client_subnet;
+
+    }
+
+    public static class Fragment extends SingBoxOption {
+
+        public String length;
+
+        public String interval;
+    }
+
     public static class DialerOptions extends SingBoxOption {
 
         public String detour;
@@ -892,13 +925,17 @@ public class SingBoxOptions {
 
         public String inet6_bind_address;
 
+        public Boolean bind_address_no_port;
+
         public String protect_path;
 
         public Integer routing_mark;
 
         public Boolean reuse_addr;
 
-        public Long connect_timeout;
+        public String netns;
+
+        public String connect_timeout;
 
         public Boolean tcp_fast_open;
 
@@ -935,6 +972,18 @@ public class SingBoxOptions {
         public Integer max_streams;
 
         public Boolean padding;
+
+        public BrutalOptions brutal;
+
+    }
+
+    public static class BrutalOptions extends SingBoxOption {
+
+        public Boolean enabled;
+
+        public Integer up_mbps;
+
+        public Integer down_mbps;
 
     }
 
@@ -1063,6 +1112,9 @@ public class SingBoxOptions {
 
         public Integer default_mark;
 
+        // sing-box 1.13 网络策略（default/fallback/hybrid），替代已移除的 concurrent_dial
+        public String default_network_strategy;
+
     }
 
 
@@ -1087,6 +1139,8 @@ public class SingBoxOptions {
         public String path;
 
         public String url;
+
+	public String update_interval;
 
     }
 
@@ -1973,6 +2027,9 @@ public class SingBoxOptions {
 
         public String config_path;
 
+        // Since sing-box 1.13.0
+        public String query_server_name;
+
     }
 
     public static class OutboundUTLSOptions extends SingBoxOption {
@@ -2382,6 +2439,8 @@ public class SingBoxOptions {
 
         public Integer server_port;
 
+        public List<String> bypass_domain;
+
         // End of public ServerOptions ;
 
     }
@@ -2710,6 +2769,7 @@ public class SingBoxOptions {
 
     }
 
+    // Legacy WireGuard outbound options; retained for old JSON compatibility/diagnostics only.
     public static class WireGuardOutboundOptions extends SingBoxOption {
 
         // Generate note: nested type DialerOptions
@@ -2778,6 +2838,7 @@ public class SingBoxOptions {
 
     public static class WireGuardPeer extends SingBoxOption {
 
+        // Legacy WireGuard outbound peer; retained for old JSON compatibility only.
         // Generate note: nested type ServerOptions
         public String server;
 
@@ -2797,17 +2858,100 @@ public class SingBoxOptions {
 
     }
 
+    public static class Endpoint_WireGuardPeer extends SingBoxOption {
+
+        public String address;
+
+        public Integer port;
+
+        public String public_key;
+
+        public String pre_shared_key;
+
+        // Generate note: Listable
+        public List<String> allowed_ips;
+
+        public Integer persistent_keepalive_interval;
+
+        // Generate note: Base64 String
+        public String reserved;
+
+    }
+
+    public static class Endpoint_WireGuardOptions extends Endpoint {
+
+        public Boolean system;
+
+        public String name;
+
+        public Integer mtu;
+
+        // Generate note: Listable
+        public List<String> address;
+
+        public String private_key;
+
+        public Integer listen_port;
+
+        public List<Endpoint_WireGuardPeer> peers;
+
+        public Long udp_timeout;
+
+        public Integer workers;
+
+        // Generate note: nested type DialerOptions
+        public String detour;
+
+        public String bind_interface;
+
+        public String inet4_bind_address;
+
+        public String inet6_bind_address;
+
+        public String protect_path;
+
+        public Integer routing_mark;
+
+        public Boolean reuse_addr;
+
+        public Long connect_timeout;
+
+        public Boolean tcp_fast_open;
+
+        public Boolean tcp_multi_path;
+
+        public Boolean disable_tcp_keep_alive;
+
+        public String tcp_keep_alive;
+
+        public String tcp_keep_alive_interval;
+
+        public Boolean udp_fragment;
+
+        public DomainResolveOptions domain_resolver;
+
+        public String network_strategy;
+
+        // Generate note: Listable
+        public List<String> network_type;
+
+        // Generate note: Listable
+        public List<String> fallback_network_type;
+
+        public String fallback_delay;
+
+        // End of public DialerOptions ;
+
+    }
+
     public static class Inbound_TunOptions extends Inbound {
 
         public String interface_name;
 
         public Integer mtu;
 
-        // Generate note: Listable
-        public List<String> inet4_address;
-
-        // Generate note: Listable
-        public List<String> inet6_address;
+        // Generate note: Listable（sing-box 1.12 起替代 inet4_address/inet6_address 的合并字段）
+        public List<String> address;
 
         public Boolean auto_route;
 
@@ -3851,6 +3995,7 @@ public class SingBoxOptions {
 
     }
 
+    // Legacy WireGuard outbound options; product builders must use Endpoint_WireGuardOptions.
     public static class Outbound_WireGuardOptions extends Outbound {
 
         // Generate note: nested type DialerOptions
@@ -4232,6 +4377,8 @@ public class SingBoxOptions {
 
         public String flow;
 
+        public String encryption;
+
         public String network;
 
         public OutboundTLSOptions tls;
@@ -4298,6 +4445,56 @@ public class SingBoxOptions {
         public Long heartbeat;
 
         public String network;
+
+        public OutboundTLSOptions tls;
+
+    }
+
+    public static class Outbound_JuicityOptions extends Outbound {
+
+        // Generate note: nested type DialerOptions
+        public String detour;
+
+        public String bind_interface;
+
+        public String inet4_bind_address;
+
+        public String inet6_bind_address;
+
+        public String protect_path;
+
+        public Integer routing_mark;
+
+        public Boolean reuse_addr;
+
+        public Long connect_timeout;
+
+        public Boolean tcp_fast_open;
+
+        public Boolean tcp_multi_path;
+
+        public Boolean udp_fragment;
+
+        public String domain_strategy;
+
+        public Long fallback_delay;
+
+        // End of public DialerOptions ;
+
+        // Generate note: nested type ServerOptions
+        public String server;
+
+        public Integer server_port;
+
+        // End of public ServerOptions ;
+
+        public String uuid;
+
+        public String password;
+
+        public String network;
+
+        public String pin_cert_sha256;
 
         public OutboundTLSOptions tls;
 
@@ -4456,6 +4653,9 @@ public class SingBoxOptions {
 
         public String outbound;
 
+        // sing-box 1.13 resolve 规则动作使用（RouteActionResolve.strategy）
+        public String strategy;
+
     }
 
     public static class DNSRule_DefaultOptions extends DNSRule {
@@ -4588,6 +4788,65 @@ public class SingBoxOptions {
 
     }
 
+    public static class V2RayTransportOptions_XHTTPOptions extends V2RayTransportOptions {
+
+        public String mode;
+
+        public String host;
+
+        public String path;
+
+        // Advanced field from extra config
+        public com.google.gson.JsonElement download;
+        public com.google.gson.JsonElement xmux;
+        public Map<String, String> headers;
+        public com.google.gson.JsonElement x_padding_bytes;
+        public com.google.gson.JsonElement no_grpc_header;
+        public com.google.gson.JsonElement no_sse_header;
+        public com.google.gson.JsonElement sc_max_each_post_bytes;
+        public com.google.gson.JsonElement sc_min_posts_interval_ms;
+        public com.google.gson.JsonElement sc_max_buffered_posts;
+        public com.google.gson.JsonElement sc_stream_up_server_secs;
+        public com.google.gson.JsonElement x_padding_obfs_mode;
+        public com.google.gson.JsonElement x_padding_key;
+        public com.google.gson.JsonElement x_padding_header;
+        public com.google.gson.JsonElement x_padding_placement;
+        public com.google.gson.JsonElement x_padding_method;
+        public com.google.gson.JsonElement uplink_http_method;
+        public com.google.gson.JsonElement session_placement;
+        public com.google.gson.JsonElement session_key;
+        public com.google.gson.JsonElement seq_placement;
+        public com.google.gson.JsonElement seq_key;
+        public com.google.gson.JsonElement uplink_data_placement;
+        public com.google.gson.JsonElement uplink_data_key;
+        public com.google.gson.JsonElement uplink_chunk_size;
+
+    }
+
+    public static class V2RayTransportOptions_KCPOptions extends V2RayTransportOptions {
+
+        public Integer mtu;
+
+        public Integer tti;
+
+        public Integer uplink_capacity;
+
+        public Integer downlink_capacity;
+
+        public Boolean congestion;
+
+        public Integer read_buffer_size;
+
+        public Integer write_buffer_size;
+
+        public Integer cwnd_multiplier;
+
+        public String header_type;
+
+        public String seed;
+
+    }
+
     // sing-box Options 生成器已经坏了，以下是从 husi 抄的
 
     public static class Outbound_AnyTLSOptions extends Outbound {
@@ -4638,6 +4897,65 @@ public class SingBoxOptions {
         public String idle_session_check_interval;
 
         public String idle_session_timeout;
+
+    }
+
+    public static class Outbound_SnellOptions extends Outbound {
+
+        // Generate note: nested type DialerOptions
+        public String detour;
+
+        public String bind_interface;
+
+        public String inet4_bind_address;
+
+        public String inet6_bind_address;
+
+        public String protect_path;
+
+        public Integer routing_mark;
+
+        public Boolean reuse_addr;
+
+        public String connect_timeout;
+
+        public Boolean tcp_fast_open;
+
+        public Boolean tcp_multi_path;
+
+        public Boolean udp_fragment;
+
+        public String domain_strategy;
+
+        public String network_strategy;
+
+        public List<String> network_type;
+
+        public List<String> fallback_network_type;
+
+        public String fallback_delay;
+
+        // Generate note: nested type ServerOptions
+        public String server;
+
+        public Integer server_port;
+
+        // Snell specific options
+        public String psk;
+
+        public String userkey;
+
+        public Integer version;
+
+        public String network;
+
+        public String obfs_mode;
+
+        public String obfs_host;
+
+        public String mode;
+
+        public Boolean reuse;
 
     }
 

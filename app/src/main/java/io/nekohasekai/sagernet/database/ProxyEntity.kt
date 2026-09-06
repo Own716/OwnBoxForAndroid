@@ -17,7 +17,11 @@ import io.nekohasekai.sagernet.fmt.naive.NaiveBean
 import io.nekohasekai.sagernet.fmt.naive.buildNaiveConfig
 import io.nekohasekai.sagernet.fmt.naive.toUri
 import io.nekohasekai.sagernet.fmt.shadowsocks.*
+import io.nekohasekai.sagernet.fmt.shadowsocksr.ShadowsocksRBean
+import io.nekohasekai.sagernet.fmt.shadowsocksr.toUri
 import moe.matsuri.nb4a.proxy.shadowtls.ShadowTLSBean
+import io.nekohasekai.sagernet.fmt.snell.SnellBean
+import io.nekohasekai.sagernet.fmt.snell.toUri
 import io.nekohasekai.sagernet.fmt.socks.SOCKSBean
 import io.nekohasekai.sagernet.fmt.socks.toUri
 import io.nekohasekai.sagernet.fmt.ssh.SSHBean
@@ -27,10 +31,13 @@ import io.nekohasekai.sagernet.fmt.trojan_go.buildTrojanGoConfig
 import io.nekohasekai.sagernet.fmt.trojan_go.toUri
 import io.nekohasekai.sagernet.fmt.tuic.TuicBean
 import io.nekohasekai.sagernet.fmt.tuic.toUri
+import io.nekohasekai.sagernet.fmt.juicity.JuicityBean
+import io.nekohasekai.sagernet.fmt.juicity.toUri
 import io.nekohasekai.sagernet.fmt.v2ray.*
 import io.nekohasekai.sagernet.fmt.wireguard.WireGuardBean
 import io.nekohasekai.sagernet.ktx.app
 import io.nekohasekai.sagernet.ui.profile.*
+import moe.matsuri.nb4a.SingBoxOptions.BrutalOptions
 import moe.matsuri.nb4a.SingBoxOptions.MultiplexOptions
 import moe.matsuri.nb4a.proxy.anytls.AnyTLSBean
 import moe.matsuri.nb4a.proxy.anytls.AnyTLSSettingsActivity
@@ -54,9 +61,13 @@ data class ProxyEntity(
     var ping: Int = 0,
     var uuid: String = "",
     var error: String? = null,
+    @ColumnInfo(defaultValue = "''") var speedTestMode: String = "",
+    @ColumnInfo(defaultValue = "0") var speedTestDownloadBitsPerSecond: Long = 0L,
+    @ColumnInfo(defaultValue = "0") var speedTestUploadBitsPerSecond: Long = 0L,
     var socksBean: SOCKSBean? = null,
     var httpBean: HttpBean? = null,
     var ssBean: ShadowsocksBean? = null,
+    var ssrBean: ShadowsocksRBean? = null,
     var vmessBean: VMessBean? = null,
     var trojanBean: TrojanBean? = null,
     var trojanGoBean: TrojanGoBean? = null,
@@ -64,6 +75,7 @@ data class ProxyEntity(
     var naiveBean: NaiveBean? = null,
     var hysteriaBean: HysteriaBean? = null,
     var tuicBean: TuicBean? = null,
+    var juicityBean: JuicityBean? = null,
     var sshBean: SSHBean? = null,
     var wgBean: WireGuardBean? = null,
     var shadowTLSBean: ShadowTLSBean? = null,
@@ -71,12 +83,14 @@ data class ProxyEntity(
     var chainBean: ChainBean? = null,
     var nekoBean: NekoBean? = null,
     var configBean: ConfigBean? = null,
+    var snellBean: SnellBean? = null,
 ) : Serializable() {
 
     companion object {
         const val TYPE_SOCKS = 0
         const val TYPE_HTTP = 1
         const val TYPE_SS = 2
+        const val TYPE_SSR = 3
         const val TYPE_VMESS = 4
         const val TYPE_TROJAN = 6
 
@@ -90,6 +104,8 @@ data class ProxyEntity(
         const val TYPE_TUIC = 20
         const val TYPE_MIERU = 21
         const val TYPE_ANYTLS = 22
+        const val TYPE_JUICITY = 23
+        const val TYPE_SNELL = 24
 
         const val TYPE_CONFIG = 998
         const val TYPE_NEKO = 999
@@ -119,7 +135,7 @@ data class ProxyEntity(
     }
 
     override fun serializeToBuffer(output: ByteBufferOutput) {
-        output.writeInt(0)
+        output.writeInt(1)
 
         output.writeLong(id)
         output.writeLong(groupId)
@@ -131,6 +147,9 @@ data class ProxyEntity(
         output.writeInt(ping)
         output.writeString(uuid)
         output.writeString(error)
+        output.writeString(speedTestMode)
+        output.writeLong(speedTestDownloadBitsPerSecond)
+        output.writeLong(speedTestUploadBitsPerSecond)
 
         val data = KryoConverters.serialize(requireBean())
         output.writeVarInt(data.size, true)
@@ -152,6 +171,11 @@ data class ProxyEntity(
         ping = input.readInt()
         uuid = input.readString()
         error = input.readString()
+        if (version >= 1) {
+            speedTestMode = input.readString() ?: ""
+            speedTestDownloadBitsPerSecond = input.readLong()
+            speedTestUploadBitsPerSecond = input.readLong()
+        }
         putByteArray(input.readBytes(input.readVarInt(true)))
 
         dirty = input.readBoolean()
@@ -163,6 +187,7 @@ data class ProxyEntity(
             TYPE_SOCKS -> socksBean = KryoConverters.socksDeserialize(byteArray)
             TYPE_HTTP -> httpBean = KryoConverters.httpDeserialize(byteArray)
             TYPE_SS -> ssBean = KryoConverters.shadowsocksDeserialize(byteArray)
+            TYPE_SSR -> ssrBean = KryoConverters.shadowsocksrDeserialize(byteArray)
             TYPE_VMESS -> vmessBean = KryoConverters.vmessDeserialize(byteArray)
             TYPE_TROJAN -> trojanBean = KryoConverters.trojanDeserialize(byteArray)
             TYPE_TROJAN_GO -> trojanGoBean = KryoConverters.trojanGoDeserialize(byteArray)
@@ -172,11 +197,13 @@ data class ProxyEntity(
             TYPE_SSH -> sshBean = KryoConverters.sshDeserialize(byteArray)
             TYPE_WG -> wgBean = KryoConverters.wireguardDeserialize(byteArray)
             TYPE_TUIC -> tuicBean = KryoConverters.tuicDeserialize(byteArray)
+            TYPE_JUICITY -> juicityBean = KryoConverters.juicityDeserialize(byteArray)
             TYPE_SHADOWTLS -> shadowTLSBean = KryoConverters.shadowTLSDeserialize(byteArray)
             TYPE_ANYTLS -> anyTLSBean = KryoConverters.anyTLSDeserialize(byteArray)
             TYPE_CHAIN -> chainBean = KryoConverters.chainDeserialize(byteArray)
             TYPE_NEKO -> nekoBean = KryoConverters.nekoDeserialize(byteArray)
             TYPE_CONFIG -> configBean = KryoConverters.configDeserialize(byteArray)
+            TYPE_SNELL -> snellBean = KryoConverters.snellDeserialize(byteArray)
         }
     }
 
@@ -184,6 +211,7 @@ data class ProxyEntity(
         TYPE_SOCKS -> socksBean!!.protocolName()
         TYPE_HTTP -> if (httpBean!!.isTLS()) "HTTPS" else "HTTP"
         TYPE_SS -> "Shadowsocks"
+        TYPE_SSR -> "ShadowsocksR"
         TYPE_VMESS -> if (vmessBean!!.isVLESS) "VLESS" else "VMess"
         TYPE_TROJAN -> "Trojan"
         TYPE_TROJAN_GO -> "Trojan-Go"
@@ -193,11 +221,13 @@ data class ProxyEntity(
         TYPE_SSH -> "SSH"
         TYPE_WG -> "WireGuard"
         TYPE_TUIC -> "TUIC"
+        TYPE_JUICITY -> "Juicity"
         TYPE_SHADOWTLS -> "ShadowTLS"
         TYPE_ANYTLS -> "AnyTLS"
         TYPE_CHAIN -> chainName
         TYPE_NEKO -> nekoBean!!.displayType()
         TYPE_CONFIG -> configBean!!.displayType()
+        TYPE_SNELL -> "Snell"
         else -> "Undefined type $type"
     }
 
@@ -209,6 +239,7 @@ data class ProxyEntity(
             TYPE_SOCKS -> socksBean
             TYPE_HTTP -> httpBean
             TYPE_SS -> ssBean
+            TYPE_SSR -> ssrBean
             TYPE_VMESS -> vmessBean
             TYPE_TROJAN -> trojanBean
             TYPE_TROJAN_GO -> trojanGoBean
@@ -218,11 +249,13 @@ data class ProxyEntity(
             TYPE_SSH -> sshBean
             TYPE_WG -> wgBean
             TYPE_TUIC -> tuicBean
+            TYPE_JUICITY -> juicityBean
             TYPE_SHADOWTLS -> shadowTLSBean
             TYPE_ANYTLS -> anyTLSBean
             TYPE_CHAIN -> chainBean
             TYPE_NEKO -> nekoBean
             TYPE_CONFIG -> configBean
+            TYPE_SNELL -> snellBean
             else -> error("Undefined type $type")
         } ?: error("Null ${displayType()} profile")
     }
@@ -250,13 +283,16 @@ data class ProxyEntity(
             is SOCKSBean -> toUri()
             is HttpBean -> toUri()
             is ShadowsocksBean -> toUri()
+            is ShadowsocksRBean -> toUri()
             is VMessBean -> toUriVMessVLESSTrojan(false)
             is TrojanBean -> toUriVMessVLESSTrojan(true)
             is TrojanGoBean -> toUri()
             is NaiveBean -> toUri()
             is HysteriaBean -> toUri()
             is TuicBean -> toUri()
+            is JuicityBean -> toUri()
             is AnyTLSBean -> toUri()
+            is SnellBean -> toUri()
             is NekoBean -> ""
             else -> toUniversalLink()
         }
@@ -319,22 +355,72 @@ data class ProxyEntity(
             TYPE_VMESS -> MultiplexOptions().apply {
                 enabled = vmessBean!!.enableMux
                 padding = vmessBean!!.muxPadding
-                max_streams = vmessBean!!.muxConcurrency
                 protocol = when (vmessBean!!.muxType) {
                     1 -> "smux"
                     2 -> "yamux"
                     else -> "h2mux"
+                }
+                // muxMode 0: max_streams mode, 1: connections mode
+                if (vmessBean!!.muxMode == 1) {
+                    max_connections = vmessBean!!.muxMaxConnections
+                    min_streams = vmessBean!!.muxMinStreams
+                } else {
+                    max_streams = vmessBean!!.muxConcurrency
+                }
+                if (vmessBean!!.muxBrutal == true) {
+                    brutal = BrutalOptions().apply {
+                        enabled = true
+                        up_mbps = vmessBean!!.muxBrutalUpMbps
+                        down_mbps = vmessBean!!.muxBrutalDownMbps
+                    }
                 }
             }
 
             TYPE_TROJAN -> MultiplexOptions().apply {
                 enabled = trojanBean!!.enableMux
                 padding = trojanBean!!.muxPadding
-                max_streams = trojanBean!!.muxConcurrency
                 protocol = when (trojanBean!!.muxType) {
                     1 -> "smux"
                     2 -> "yamux"
                     else -> "h2mux"
+                }
+                // muxMode 0: max_streams mode, 1: connections mode
+                if (trojanBean!!.muxMode == 1) {
+                    max_connections = trojanBean!!.muxMaxConnections
+                    min_streams = trojanBean!!.muxMinStreams
+                } else {
+                    max_streams = trojanBean!!.muxConcurrency
+                }
+                if (trojanBean!!.muxBrutal == true) {
+                    brutal = BrutalOptions().apply {
+                        enabled = true
+                        up_mbps = trojanBean!!.muxBrutalUpMbps
+                        down_mbps = trojanBean!!.muxBrutalDownMbps
+                    }
+                }
+            }
+
+            TYPE_SS -> MultiplexOptions().apply {
+                enabled = ssBean!!.enableMux
+                padding = ssBean!!.muxPadding
+                protocol = when (ssBean!!.muxType) {
+                    1 -> "smux"
+                    2 -> "yamux"
+                    else -> "h2mux"
+                }
+                // muxMode 0: max_streams mode, 1: connections mode
+                if (ssBean!!.muxMode == 1) {
+                    max_connections = ssBean!!.muxMaxConnections
+                    min_streams = ssBean!!.muxMinStreams
+                } else {
+                    max_streams = ssBean!!.muxConcurrency
+                }
+                if (ssBean!!.muxBrutal == true) {
+                    brutal = BrutalOptions().apply {
+                        enabled = true
+                        up_mbps = ssBean!!.muxBrutalUpMbps
+                        down_mbps = ssBean!!.muxBrutalDownMbps
+                    }
                 }
             }
 
@@ -346,6 +432,7 @@ data class ProxyEntity(
         socksBean = null
         httpBean = null
         ssBean = null
+        ssrBean = null
         vmessBean = null
         trojanBean = null
         trojanGoBean = null
@@ -355,6 +442,7 @@ data class ProxyEntity(
         sshBean = null
         wgBean = null
         tuicBean = null
+        juicityBean = null
         shadowTLSBean = null
         anyTLSBean = null
         chainBean = null
@@ -375,6 +463,11 @@ data class ProxyEntity(
             is ShadowsocksBean -> {
                 type = TYPE_SS
                 ssBean = bean
+            }
+
+            is ShadowsocksRBean -> {
+                type = TYPE_SSR
+                ssrBean = bean
             }
 
             is VMessBean -> {
@@ -422,6 +515,11 @@ data class ProxyEntity(
                 tuicBean = bean
             }
 
+            is JuicityBean -> {
+                type = TYPE_JUICITY
+                juicityBean = bean
+            }
+
             is ShadowTLSBean -> {
                 type = TYPE_SHADOWTLS
                 shadowTLSBean = bean
@@ -430,6 +528,11 @@ data class ProxyEntity(
             is AnyTLSBean -> {
                 type = TYPE_ANYTLS
                 anyTLSBean = bean
+            }
+
+            is SnellBean -> {
+                type = TYPE_SNELL
+                snellBean = bean
             }
 
             is ChainBean -> {
@@ -458,6 +561,7 @@ data class ProxyEntity(
                 TYPE_SOCKS -> SocksSettingsActivity::class.java
                 TYPE_HTTP -> HttpSettingsActivity::class.java
                 TYPE_SS -> ShadowsocksSettingsActivity::class.java
+                TYPE_SSR -> ShadowsocksRSettingsActivity::class.java
                 TYPE_VMESS -> VMessSettingsActivity::class.java
                 TYPE_TROJAN -> TrojanSettingsActivity::class.java
                 TYPE_TROJAN_GO -> TrojanGoSettingsActivity::class.java
@@ -467,10 +571,12 @@ data class ProxyEntity(
                 TYPE_SSH -> SSHSettingsActivity::class.java
                 TYPE_WG -> WireGuardSettingsActivity::class.java
                 TYPE_TUIC -> TuicSettingsActivity::class.java
+                TYPE_JUICITY -> JuicitySettingsActivity::class.java
                 TYPE_SHADOWTLS -> ShadowTLSSettingsActivity::class.java
                 TYPE_ANYTLS -> AnyTLSSettingsActivity::class.java
                 TYPE_CHAIN -> ChainSettingsActivity::class.java
                 TYPE_CONFIG -> ConfigSettingActivity::class.java
+                TYPE_SNELL -> SnellSettingsActivity::class.java
                 else -> throw IllegalArgumentException()
             }
         ).apply {
@@ -523,6 +629,38 @@ data class ProxyEntity(
 
         @Update
         fun updateProxy(proxies: List<ProxyEntity>): Int
+
+        @Query("UPDATE proxy_entities SET rx = :rx, tx = :tx WHERE id = :proxyId")
+        fun updateTraffic(proxyId: Long, rx: Long, tx: Long): Int
+
+        @Query("UPDATE proxy_entities SET rx = 0, tx = 0 WHERE id IN (:profileIds)")
+        fun resetTraffic(profileIds: LongArray): Int
+
+        @Query(
+            """UPDATE proxy_entities SET
+                speedTestMode = :mode,
+                speedTestDownloadBitsPerSecond = :downloadBitsPerSecond,
+                speedTestUploadBitsPerSecond = :uploadBitsPerSecond
+                WHERE id = :proxyId"""
+        )
+        fun updateSpeedTestResult(
+            proxyId: Long,
+            mode: String,
+            downloadBitsPerSecond: Long,
+            uploadBitsPerSecond: Long,
+        ): Int
+
+        @Query(
+            """UPDATE proxy_entities SET
+                status = 0,
+                ping = 0,
+                error = NULL,
+                speedTestMode = '',
+                speedTestDownloadBitsPerSecond = 0,
+                speedTestUploadBitsPerSecond = 0
+                WHERE groupId = :groupId"""
+        )
+        fun clearTestResults(groupId: Long): Int
 
         @Insert
         fun addProxy(proxy: ProxyEntity): Long

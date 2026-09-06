@@ -54,6 +54,11 @@ func (p *platformLocalDNSTransport) Close() error {
 	return nil
 }
 
+// Reset 实现 adapter.DNSTransport（官方 v1.13 接口新增，网络切换时重置连接）。
+// 平台 transport 走 JNI 无持久连接，空实现（对齐官方 dns/transport/local）。
+func (p *platformLocalDNSTransport) Reset() {
+}
+
 func (p *platformLocalDNSTransport) Exchange(ctx context.Context, message *mDNS.Msg) (*mDNS.Msg, error) {
 	if p.raw && rawQueryFunc != nil {
 		// Raw - Android 10 及以上才有

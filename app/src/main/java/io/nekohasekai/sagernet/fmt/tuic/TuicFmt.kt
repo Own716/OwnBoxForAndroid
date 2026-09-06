@@ -42,7 +42,7 @@ fun parseTuic(url: String): TuicBean {
             udpRelayMode = it
         }
         link.queryParameter("alpn")?.let {
-            alpn = it
+            if (it != "none") alpn = it
         }
         link.queryParameter("allow_insecure")?.let {
             if (it == "1") allowInsecure = true

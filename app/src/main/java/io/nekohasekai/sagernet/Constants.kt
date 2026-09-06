@@ -1,7 +1,5 @@
 package io.nekohasekai.sagernet
 
-const val CONNECTION_TEST_URL = "http://cp.cloudflare.com/"
-
 object Key {
 
     const val DB_PUBLIC = "configuration.db"
@@ -9,9 +7,13 @@ object Key {
 
     const val PERSIST_ACROSS_REBOOT = "isAutoConnect"
 
+    const val CLEAR_CACHE = "clearCache"
+
     const val APP_EXPERT = "isExpert"
     const val APP_THEME = "appTheme"
+    const val USE_SYSTEM_THEME = "useSystemTheme"
     const val NIGHT_THEME = "nightTheme"
+    const val APP_LANGUAGE = "appLanguage"
     const val SERVICE_MODE = "serviceMode"
     const val MODE_VPN = "vpn"
     const val MODE_PROXY = "proxy"
@@ -35,15 +37,31 @@ object Key {
 
     const val BYPASS_LAN = "bypassLan"
     const val BYPASS_LAN_IN_CORE = "bypassLanInCore"
+    const val CONCURRENT_DIAL = "concurrentDial" // 留作未来补回并发拨号功能
+    const val DUAL_NETWORK_ACCELERATION = "dualNetworkAcceleration"
 
     const val MIXED_PORT = "mixedPort"
+    const val DISABLE_MIXED_INBOUND = "disableMixedInbound"
+    const val MIXED_USERNAME = "mixedUsername" // 混合入站认证用户名；留空即不启用认证
+    const val MIXED_PASSWORD = "mixedPassword" // 混合入站认证密码
+    const val MIXED_AUTH_CONFIG = "mixedAuthConfig" // 设置页「配置身份验证」入口，仅 UI 查找用
     const val ALLOW_ACCESS = "allowAccess"
     const val SPEED_INTERVAL = "speedInterval"
     const val SHOW_DIRECT_SPEED = "showDirectSpeed"
 
-    const val APPEND_HTTP_PROXY = "appendHttpProxy"
+    const val HTTP_PROXY_BYPASS = "httpProxyBypass"
+    const val DNS_HOSTS = "dnsHosts"
+    const val STRICT_ROUTE = "strictRoute"
 
     const val CONNECTION_TEST_URL = "connectionTestURL"
+    const val CONNECTION_TEST_CONCURRENT = "connectionTestConcurrent"
+    const val CONNECTION_TEST_TIMEOUT = "connectionTestTimeout"
+
+    const val SPEED_TEST_MODE = "speedTestMode"
+    const val SPEED_TEST_TIMEOUT_MS = "speedTestTimeoutMs"
+    const val SPEED_TEST_SERVER_LIST_URL = "speedTestServerListURL"
+    const val SPEED_TEST_FALLBACK_SERVER_LIST_URL = "speedTestFallbackServerListURL"
+    const val SIMPLE_DOWNLOAD_URL = "simpleDownloadURL"
 
     const val NETWORK_CHANGE_RESET_CONNECTIONS = "networkChangeResetConnections"
     const val WAKE_RESET_CONNECTIONS = "wakeResetConnections"
@@ -53,11 +71,20 @@ object Key {
     const val MTU = "mtu"
     const val ALWAYS_SHOW_ADDRESS = "alwaysShowAddress"
 
+    const val RULES_GEOSITE_URL = "rulesGeositeUrl"
+    const val RULES_GEOIP_URL = "rulesGeoipUrl"
+    const val RULES_UPDATE_INTERVAL = "rulesUpdateInterval"
+
     // Protocol Settings
     const val GLOBAL_ALLOW_INSECURE = "globalAllowInsecure"
 
     const val ACQUIRE_WAKE_LOCK = "acquireWakeLock"
+    const val HIDE_FROM_RECENT_APPS = "hideFromRecentApps"
+    const val PREVIEW_HINT_DISMISSED_VERSION = "previewHintDismissedVersion"
     const val SHOW_BOTTOM_BAR = "showBottomBar"
+    const val CONFIRM_PROFILE_DELETE = "confirmProfileDelete"
+    const val GROUP_LAYOUT_MODE = "groupLayoutMode"
+    const val PROFILE_CARD_STYLE = "profileCardStyle"
 
     const val ALLOW_INSECURE_ON_REQUEST = "allowInsecureOnRequest"
 
@@ -81,6 +108,9 @@ object Key {
 
     const val SERVER_PROTOCOL = "serverProtocol"
     const val SERVER_OBFS = "serverObfs"
+
+    const val SERVER_PROTOCOL_PARAM = "serverProtocolParam"
+    const val SERVER_OBFS_PARAM = "serverObfsParam"
 
     const val SERVER_NETWORK = "serverNetwork"
     const val SERVER_HOST = "serverHost"
@@ -119,6 +149,9 @@ object Key {
     const val SERVER_DISABLE_SNI = "serverDisableSNI"
     const val SERVER_REDUCE_RTT = "serverReduceRTT"
 
+    const val SERVER_USER_ID = "serverUserId"
+    const val SERVER_PINNED_CERT_CHAIN_SHA256 = "serverPinnedCertChainSha256"
+
     const val ROUTE_NAME = "routeName"
     const val ROUTE_DOMAIN = "routeDomain"
     const val ROUTE_IP = "routeIP"
@@ -127,6 +160,7 @@ object Key {
     const val ROUTE_NETWORK = "routeNetwork"
     const val ROUTE_SOURCE = "routeSource"
     const val ROUTE_PROTOCOL = "routeProtocol"
+    const val ROUTE_RULESET = "routeRuleset"
     const val ROUTE_OUTBOUND = "routeOutbound"
     const val ROUTE_PACKAGES = "routePackages"
 
@@ -146,33 +180,32 @@ object Key {
     const val SUBSCRIPTION_USER_AGENT = "subscriptionUserAgent"
     const val SUBSCRIPTION_AUTO_UPDATE = "subscriptionAutoUpdate"
     const val SUBSCRIPTION_AUTO_UPDATE_DELAY = "subscriptionAutoUpdateDelay"
+    const val SUBSCRIPTION_FILTER_MODE = "subscriptionFilterMode"
+    const val SUBSCRIPTION_FILTER_REGEX = "subscriptionFilterRegex"
+    const val SUBSCRIPTION_SERVER_DNS = "subscriptionServerDns"
 
     //
 
     const val APP_TLS_VERSION = "appTLSVersion"
     const val ENABLE_CLASH_API = "enableClashAPI"
 
-    const val DISABLE_MIXED_INBOUND = "disableMixedInbound"
-    const val STRICT_ROUTE = "strictRoute"
-    const val PARALLEL_DIAL = "parallelDial"
-    const val DUAL_NETWORK = "dualNetwork"
-    const val SPEED_TEST_MODE = "speedTestMode"
-    const val SPEED_TEST_TIMEOUT = "speedTestTimeout"
-    const val SIMPLE_DL_URL = "simpleDlUrl"
+    const val ENABLE_TLS_FRAGMENT = "enableTLSFragment"
+
+    const val FRAGMENT_LENGTH = "fragmentLength"
+    const val FRAGMENT_INTERVAL = "fragmentInterval"
+
+    const val WEBDAV_SERVER = "webdavServer"
+    const val WEBDAV_USERNAME = "webdavUsername"
+    const val WEBDAV_PASSWORD = "webdavPassword"
+    const val WEBDAV_PATH = "webdavPath"
+
+    const val GLOBAL_MODE = "globalMode"
 }
 
 object TunImplementation {
     const val GVISOR = 0
     const val SYSTEM = 1
     const val MIXED = 2
-    const val HEVTUN = 3
-}
-
-object SpeedTestMode {
-    const val DOWNLOAD_ONLY = 0
-    const val UPLOAD_ONLY = 1
-    const val FULL = 2
-    const val SIMPLE_DOWNLOAD = 3
 }
 
 object IPv6Mode {
@@ -191,6 +224,12 @@ object GroupOrder {
     const val ORIGIN = 0
     const val BY_NAME = 1
     const val BY_DELAY = 2
+}
+
+object SubscriptionFilterMode {
+    const val DISABLED = 0
+    const val INCLUDE = 1
+    const val EXCLUDE = 2
 }
 
 object Action {

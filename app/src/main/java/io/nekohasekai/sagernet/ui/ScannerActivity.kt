@@ -7,8 +7,6 @@ import android.graphics.ImageDecoder
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
-import android.view.Menu
-import android.view.MenuItem
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.getSystemService
@@ -42,21 +40,14 @@ class ScannerActivity : ThemedActivity(),
         if (Build.VERSION.SDK_INT >= 25) getSystemService<ShortcutManager>()!!.reportShortcutUsed("scan")
         binding = LayoutScannerBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        setSupportActionBar(findViewById(R.id.toolbar))
-        supportActionBar?.apply {
-            setDisplayHomeAsUpEnabled(true)
-            setHomeAsUpIndicator(R.drawable.ic_navigation_close)
-        }
 
         // 二维码库
         initCameraScan()
         startCamera()
         binding.ivFlashlight.setOnClickListener { toggleTorchState() }
-    }
-
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.scanner_menu, menu)
-        return true
+        binding.ivPhotoLibrary.setOnClickListener {
+            startFilesForResult(importCodeFile, "image/*")
+        }
     }
 
     val importCodeFile = registerForActivityResult(ActivityResultContracts.GetMultipleContents()) {
@@ -89,15 +80,6 @@ class ScannerActivity : ThemedActivity(),
                     Toast.makeText(app, e.readableMessage, Toast.LENGTH_LONG).show()
                 }
             }
-        }
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        return if (item.itemId == R.id.action_import_file) {
-            startFilesForResult(importCodeFile, "image/*")
-            true
-        } else {
-            super.onOptionsItemSelected(item)
         }
     }
 

@@ -36,7 +36,9 @@ type HTTPClient interface {
 	ModernTLS()
 	PinnedTLS12()
 	PinnedSHA256(sumHex string)
-	TrySocks5(port int32)
+	TrySocks5(port int32, username string, password string)
+	// TryBoxOutbound 经 mainInstance 默认 outbound 拨号（纯 TUN / 禁用 mixed 时用）。
+	TryBoxOutbound()
 	TryH3Direct()
 	KeepAlive()
 	NewRequest() HTTPRequest
@@ -114,7 +116,7 @@ func (c *httpClient) PinnedSHA256(sumHex string) {
 	}
 }
 
-func (c *httpClient) TrySocks5(port int32) {
+func (c *httpClient) TrySocks5(port int32, username string, password string) {
 	dialer := new(net.Dialer)
 	c.h1h2Transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
 		for {
@@ -125,7 +127,7 @@ func (c *httpClient) TrySocks5(port int32) {
 				}
 				break
 			}
-			_, err = socks.ClientHandshake5(socksConn, socks5.CommandConnect, metadata.ParseSocksaddr(addr), "", "")
+			_, err = socks.ClientHandshake5(socksConn, socks5.CommandConnect, metadata.ParseSocksaddr(addr), username, password)
 			if err != nil {
 				if c.tryH3Direct {
 					return nil, errFailConnectSocks5
@@ -137,6 +139,26 @@ func (c *httpClient) TrySocks5(port int32) {
 		return dialer.DialContext(ctx, network, addr)
 	}
 	c.trySocks5 = true
+}
+
+// TryBoxOutbound 经当前 main box 默认 outbound 拨号。
+// 用于 disableMixedInbound（纯 TUN）场景：VPN 应用自身流量默认不进 tun，
+// 不能再走 127.0.0.1:mixedPort（入站已不存在），必须显式经节点出站。
+func (c *httpClient) TryBoxOutbound() {
+	c.h1h2Transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		b := mainInstance
+		if b == nil || b.Box == nil {
+			if c.tryH3Direct {
+				return nil, errors.New("box not running")
+			}
+			return new(net.Dialer).DialContext(ctx, network, addr)
+		}
+		outbound := b.Outbound().Default()
+		if outbound == nil {
+			return nil, errors.New("no default outbound")
+		}
+		return outbound.DialContext(ctx, network, metadata.ParseSocksaddr(addr))
+	}
 }
 
 func (c *httpClient) TryH3Direct() {
@@ -214,8 +236,10 @@ func (r *httpRequest) Execute() (HTTPResponse, error) {
 	}
 	response, err := r.h1h2Client.Do(&r.request)
 	if err != nil {
+		log.Println("http execute via socks5 failed:", err)
 		// trySocks5 && tryH3Direct
 		if r.tryH3Direct && errors.Is(err, errFailConnectSocks5) {
+			log.Println("http execute: socks5 unavailable, falling back to H3 direct")
 			return r.doH3Direct()
 		}
 		return nil, err
@@ -270,7 +294,9 @@ func (r *httpRequest) doH3Direct() (HTTPResponse, error) {
 				Transport: &http3.Transport{
 					TLSClientConfig: r.tls.Clone(),
 					QUICConfig: &quic.Config{
-						MaxIdleTimeout: time.Second,
+						// 与 doH3Direct 整体 10s 超时保持一致，避免 QUIC 空闲超时(1s)过早触发
+						// 导致 "no recent network activity" 误报订阅更新失败
+						MaxIdleTimeout: 10 * time.Second,
 					},
 				},
 			}
@@ -305,6 +331,7 @@ func (r *httpRequest) doH3Direct() (HTTPResponse, error) {
 			// 执行HTTP请求
 			rsp, err := f()
 			if rsp == nil || err != nil {
+				log.Println("h3 direct request", t, "failed:", err)
 				mu.Lock()
 				finalErr = errors.Join(finalErr, fmt.Errorf("%s: %w", t, err))
 				mu.Unlock()

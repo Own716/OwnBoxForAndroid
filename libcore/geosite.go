@@ -2,11 +2,9 @@ package libcore
 
 import (
 	"fmt"
-	"path/filepath"
 
 	geosites "github.com/sagernet/sing-box/common/geosite"
 	C "github.com/sagernet/sing-box/constant"
-	"github.com/sagernet/sing-box/nekoutils"
 	"github.com/sagernet/sing-box/option"
 )
 
@@ -43,12 +41,12 @@ func (g *geosite) Rules(code string) ([]option.HeadlessRule, error) {
 	}, nil
 }
 
-func init() {
-	nekoutils.GetGeoSiteHeadlessRules = func(name string) ([]option.HeadlessRule, error) {
-		g := new(geosite)
-		if err := g.Open(filepath.Join(externalAssetsPath, "geosite.db")); err != nil {
-			return nil, err
-		}
-		return g.Rules(name)
+// loadGeoSiteRules 从 geosite.db 读取指定代码的规则
+// （替代 fork 的 nekoutils.GetGeoSiteHeadlessRules 钩子）。
+func loadGeoSiteRules(dbPath string, code string) ([]option.HeadlessRule, error) {
+	g := new(geosite)
+	if err := g.Open(dbPath); err != nil {
+		return nil, err
 	}
+	return g.Rules(code)
 }

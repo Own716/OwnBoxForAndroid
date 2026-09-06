@@ -13,6 +13,18 @@ import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONObject
 
+private val supportedKcpHeaderType = arrayOf(
+    "none", "srtp", "utp", "wechat-video", "dtls", "wireguard", "dns"
+)
+
+fun normalizeXhttpMode(mode: String?): String {
+    val normalized = mode?.trim()
+    return when (normalized) {
+        "packet-up", "stream-up", "stream-one" -> normalized
+        else -> "auto"
+    }
+}
+
 data class VmessQRCode(
     var v: String = "",
     var ps: String = "",
@@ -50,10 +62,12 @@ fun parseV2Ray(link: String): StandardV2RayBean {
         }
     }
 
-    try {
-        return tryResolveVmess4Kitsunebi(link)
-    } catch (e: Exception) {
-        Logs.i("try Kitsunebi: " + e.readableMessage)
+    if (link.startsWith("vmess://")) {
+        try {
+            return tryResolveVmess4Kitsunebi(link)
+        } catch (e: Exception) {
+            Logs.i("try Kitsunebi: " + e.readableMessage)
+        }
     }
 
     // "std" format
@@ -126,6 +140,21 @@ fun parseV2Ray(link: String): StandardV2RayBean {
                     bean.host = it
                 }
             }
+
+            "xhttp" -> {
+                url.queryParameter("host")?.let {
+                    bean.host = it
+                }
+                url.queryParameter("path")?.let {
+                    bean.path = it
+                }
+                url.queryParameter("mode")?.let {
+                    bean.xhttpMode = normalizeXhttpMode(it)
+                }
+                url.queryParameter("extra")?.let {
+                    bean.xhttpExtra = XhttpExtraConverter.xrayToSingBox(it)
+                }
+            }
         }
     } else {
         // also vless format
@@ -173,7 +202,7 @@ fun StandardV2RayBean.parseDuckSoft(url: HttpUrl) {
                 if (sni.isNullOrBlank()) sni = it
             }
             url.queryParameter("alpn")?.let {
-                alpn = it
+                if (it != "none") alpn = it
             }
             url.queryParameter("cert")?.let {
                 certificates = it
@@ -183,6 +212,17 @@ fun StandardV2RayBean.parseDuckSoft(url: HttpUrl) {
             }
             url.queryParameter("sid")?.let {
                 realityShortId = it
+            }
+            // 社区格式: ech=<ECH查询域名>+<DoH地址>（Xray echConfigList 风格），或 ech=true/1
+            url.queryParameter("ech")?.let {
+                if (it.isNotBlank() && !it.equals("none", true) && it != "0" && !it.equals("false", true)) {
+                    enableECH = true
+                    // sing-box 不支持为 ECH 查询单独指定 DoH（走自身 DNS 路由），仅保留域名部分
+                    val queryDomain = it.substringBefore('+')
+                    if (queryDomain.isNotBlank() && !queryDomain.equals("true", true) && queryDomain != "1") {
+                        echQueryServerName = queryDomain
+                    }
+                }
             }
         }
     }
@@ -194,6 +234,27 @@ fun StandardV2RayBean.parseDuckSoft(url: HttpUrl) {
             }
             url.queryParameter("path")?.let {
                 path = it
+            }
+        }
+
+        "kcp" -> {
+            url.queryParameter("seed")?.let {
+                mKcpSeed = it
+            }
+            url.queryParameter("headerType")?.let {
+                if (it.isNotBlank()) {
+                    if (it !in supportedKcpHeaderType) error("unsupported headerType")
+                    headerType = it
+                }
+            }
+            url.queryParameter("mtu")?.let {
+                kcpMtu = it.toIntOrNull()
+            }
+            url.queryParameter("tti")?.let {
+                kcpTti = it.toIntOrNull()
+            }
+            url.queryParameter("cwnd")?.let {
+                kcpCwndMultiplier = it.toIntOrNull()
             }
         }
 
@@ -227,6 +288,21 @@ fun StandardV2RayBean.parseDuckSoft(url: HttpUrl) {
                 path = it
             }
         }
+
+        "xhttp" -> {
+            url.queryParameter("host")?.let {
+                host = it
+            }
+            url.queryParameter("path")?.let {
+                path = it
+            }
+            url.queryParameter("mode")?.let {
+                xhttpMode = normalizeXhttpMode(it)
+            }
+            url.queryParameter("extra")?.let {
+                xhttpExtra = XhttpExtraConverter.xrayToSingBox(it)
+            }
+        }
     }
 
     // maybe from matsuri vmess exoprt
@@ -246,6 +322,13 @@ fun StandardV2RayBean.parseDuckSoft(url: HttpUrl) {
     url.queryParameter("flow")?.let {
         if (isVLESS) {
             encryption = it.removeSuffix("-udp443")
+        }
+    }
+
+    // VLESS encryption (ML-KEM-768)
+    url.queryParameter("encryption")?.let {
+        if (isVLESS && it != "none") {
+            vlessEncryption = it
         }
     }
 
@@ -347,7 +430,7 @@ fun parseV2RayN(link: String): VMessBean {
             bean.security = "tls"
             bean.sni = vmessQRCode.sni
             if (bean.sni.isNullOrBlank()) bean.sni = bean.host
-            bean.alpn = vmessQRCode.alpn
+            if (vmessQRCode.alpn != "none") bean.alpn = vmessQRCode.alpn
             bean.utlsFingerprint = vmessQRCode.fp
         }
     }
@@ -442,7 +525,13 @@ fun StandardV2RayBean.toUriVMessVLESSTrojan(isTrojan: Boolean): String {
         .addQueryParameter("type", type)
 
     if (isVLESS) {
-        builder.addQueryParameter("encryption", "none")
+        // Add encryption if configured
+        if (vlessEncryption.isNotBlank() && vlessEncryption != "none") {
+            builder.addQueryParameter("encryption", vlessEncryption)
+        } else {
+            builder.addQueryParameter("encryption", "none")
+        }
+
         if (encryption != "auto") builder.addQueryParameter("flow", encryption)
     }
 
@@ -465,6 +554,39 @@ fun StandardV2RayBean.toUriVMessVLESSTrojan(isTrojan: Boolean): String {
             } else if (type == "http" && !isTLS()) {
                 builder.setQueryParameter("type", "tcp")
                 builder.addQueryParameter("headerType", "http")
+            }
+        }
+
+        "kcp" -> {
+            if (headerType.isNotBlank() && headerType != "none") {
+                builder.addQueryParameter("headerType", headerType)
+            }
+            if (mKcpSeed.isNotBlank()) {
+                builder.addQueryParameter("seed", mKcpSeed)
+            }
+            if (kcpMtu != null && kcpMtu!! > 0) {
+                builder.addQueryParameter("mtu", kcpMtu.toString())
+            }
+            if (kcpTti != null && kcpTti!! > 0) {
+                builder.addQueryParameter("tti", kcpTti.toString())
+            }
+            if (kcpCwndMultiplier != null && kcpCwndMultiplier!! > 0) {
+                builder.addQueryParameter("cwnd", kcpCwndMultiplier.toString())
+            }
+        }
+
+        "xhttp" -> {
+            if (host.isNotBlank()) {
+                builder.addQueryParameter("host", host)
+            }
+            if (path.isNotBlank()) {
+                builder.addQueryParameter("path", path)
+            }
+            if (xhttpMode.isNotBlank()) {
+                builder.addQueryParameter("mode", xhttpMode)
+            }
+            if (xhttpExtra.isNotBlank()) {
+                builder.addQueryParameter("extra", XhttpExtraConverter.singBoxToXray(xhttpExtra))
             }
         }
 
@@ -498,6 +620,12 @@ fun StandardV2RayBean.toUriVMessVLESSTrojan(isTrojan: Boolean): String {
                     builder.setQueryParameter("security", "reality")
                     builder.addQueryParameter("pbk", realityPubKey)
                     builder.addQueryParameter("sid", realityShortId)
+                }
+                if (enableECH) {
+                    builder.addQueryParameter(
+                        "ech",
+                        echQueryServerName.ifBlank { "true" }
+                    )
                 }
             }
         }
@@ -553,6 +681,26 @@ fun buildSingBoxOutboundStreamSettings(bean: StandardV2RayBean): V2RayTransportO
             }
         }
 
+        "kcp" -> {
+            return V2RayTransportOptions_KCPOptions().apply {
+                type = "kcp"
+                mtu = if (bean.kcpMtu != null && bean.kcpMtu!! > 0) bean.kcpMtu!! else 1350
+                tti = if (bean.kcpTti != null && bean.kcpTti!! > 0) bean.kcpTti!! else 50
+                uplink_capacity = 12
+                downlink_capacity = 100
+                congestion = false
+                read_buffer_size = 1
+                write_buffer_size = 1
+                if (bean.kcpCwndMultiplier != null && bean.kcpCwndMultiplier!! > 0) {
+                    cwnd_multiplier = bean.kcpCwndMultiplier!!
+                }
+                header_type = bean.headerType.takeIf { it.isNotBlank() } ?: "none"
+                if (bean.mKcpSeed.isNotBlank()) {
+                    seed = bean.mKcpSeed
+                }
+            }
+        }
+
         "http" -> {
             return V2RayTransportOptions_HTTPOptions().apply {
                 type = "http"
@@ -584,6 +732,64 @@ fun buildSingBoxOutboundStreamSettings(bean: StandardV2RayBean): V2RayTransportO
                 path = bean.path
             }
         }
+
+        "xhttp" -> {
+            val baseConfig = V2RayTransportOptions_XHTTPOptions().apply {
+                type = "xhttp"
+                mode = normalizeXhttpMode(bean.xhttpMode)
+                host = bean.host.takeIf { it.isNotBlank() }
+                path = bean.path.takeIf { it.isNotBlank() } ?: "/"
+            }
+            
+            // Merge xhttpExtra JSON config if present
+            if (bean.xhttpExtra.isNotBlank()) {
+                try {
+                    val gson = Gson()
+                    // Convert base config to JSON
+                    val baseJson = JSONObject(gson.toJson(baseConfig))
+                    // Parse extra config
+                    val extraJson = JSONObject(bean.xhttpExtra)
+                    // Merge extra fields into base config
+                    val allowedKeys = arrayOf(
+                        "download",
+                        "xmux",
+                        "headers",
+                        "x_padding_bytes",
+                        "no_grpc_header",
+                        "no_sse_header",
+                        "sc_max_each_post_bytes",
+                        "sc_min_posts_interval_ms",
+                        "sc_max_buffered_posts",
+                        "sc_stream_up_server_secs",
+                        "x_padding_obfs_mode",
+                        "x_padding_key",
+                        "x_padding_header",
+                        "x_padding_placement",
+                        "x_padding_method",
+                        "uplink_http_method",
+                        "session_placement",
+                        "session_key",
+                        "seq_placement",
+                        "seq_key",
+                        "uplink_data_placement",
+                        "uplink_data_key",
+                        "uplink_chunk_size"
+                    )
+                    allowedKeys.forEach { key ->
+                        if (extraJson.has(key)) {
+                            baseJson.put(key, extraJson.get(key))
+                        }
+                    }
+                    // Convert merged JSON back to object
+                    return gson.fromJson(baseJson.toString(), V2RayTransportOptions_XHTTPOptions::class.java)
+                } catch (e: Exception) {
+                    // If parsing fails, return base config
+                    e.printStackTrace()
+                    return baseConfig
+                }
+            }
+            return baseConfig
+        }
     }
 
     return null
@@ -595,7 +801,16 @@ fun buildSingBoxOutboundTLS(bean: StandardV2RayBean): OutboundTLSOptions? {
         enabled = true
         insecure = bean.allowInsecure || DataStore.globalAllowInsecure
         if (bean.sni.isNotBlank()) server_name = bean.sni
-        if (bean.alpn.isNotBlank()) alpn = bean.alpn.listByLineOrComma()
+        if (bean.alpn.isNotBlank()) {
+            // 当传输协议为WebSocket时，过滤掉h2和h3
+            val alpnList = bean.alpn.listByLineOrComma()
+            if (bean.type == "ws") {
+                val filtered = alpnList.filter { it == "http/1.1" }
+                if (filtered.isNotEmpty()) alpn = filtered
+            } else {
+                alpn = alpnList
+            }
+        }
         if (bean.certificates.isNotBlank()) certificate = bean.certificates
         var fp = bean.utlsFingerprint
         if (bean.realityPubKey.isNotBlank()) {
@@ -615,8 +830,15 @@ fun buildSingBoxOutboundTLS(bean: StandardV2RayBean): OutboundTLSOptions? {
         if (bean.enableECH) {
             ech = OutboundECHOptions().apply {
                 enabled = true
+                if (bean.echQueryServerName.isNotBlank()) {
+                    query_server_name = bean.echQueryServerName
+                }
                 if (bean.echConfig.isNotBlank()) {
-                    config = bean.echConfig.lines()
+                    config = if (bean.echConfig.contains("BEGIN ECH CONFIGS")) {
+                        bean.echConfig.lines()
+                    } else {
+                        listOf("-----BEGIN ECH CONFIGS-----", bean.echConfig.trim(), "-----END ECH CONFIGS-----")
+                    }
                 }
             }
         }
@@ -644,6 +866,9 @@ fun buildSingBoxOutboundStandardV2RayBean(bean: StandardV2RayBean): Outbound {
                 uuid = bean.uuid
                 if (bean.encryption.isNotBlank() && bean.encryption != "auto") {
                     flow = bean.encryption
+                }
+                if (bean.vlessEncryption.isNotBlank() && bean.vlessEncryption != "none") {
+                    encryption = bean.vlessEncryption
                 }
                 when (bean.packetEncoding) {
                     0 -> packet_encoding = ""

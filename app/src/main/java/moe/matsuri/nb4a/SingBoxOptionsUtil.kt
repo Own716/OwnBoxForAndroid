@@ -2,6 +2,9 @@ package moe.matsuri.nb4a
 
 import io.nekohasekai.sagernet.database.DataStore
 import moe.matsuri.nb4a.SingBoxOptions.RuleSet
+import io.nekohasekai.sagernet.R
+import io.nekohasekai.sagernet.SagerNet
+import kotlin.Exception
 
 object SingBoxOptionsUtil {
 
@@ -34,7 +37,7 @@ fun SingBoxOptions.DNSRule_DefaultOptions.makeSingBoxRule(list: List<String>) {
     domain_regex = mutableListOf<String>()
     domain_keyword = mutableListOf<String>()
     list.forEach {
-        if (it.startsWith("geosite:")) {
+        if (it.startsWith("geosite:") || it.startsWith("geosite-")) {
             rule_set.plusAssign(it)
         } else if (it.startsWith("full:")) {
             domain.plusAssign(it.removePrefix("full:").lowercase())
@@ -73,7 +76,7 @@ fun SingBoxOptions.DNSRule_DefaultOptions.checkEmpty(): Boolean {
 fun generateRuleSet(ruleSetString: List<String>, ruleSet: MutableList<RuleSet>) {
     ruleSetString.forEach {
         when {
-            it.startsWith("geoip:") -> {
+            it.startsWith("geoip:") || it.startsWith("geoip-") -> {
                 ruleSet.add(RuleSet().apply {
                     type = "local"
                     tag = it
@@ -82,7 +85,7 @@ fun generateRuleSet(ruleSetString: List<String>, ruleSet: MutableList<RuleSet>) 
                 })
             }
 
-            it.startsWith("geosite:") -> {
+            it.startsWith("geosite:") || it.startsWith("geosite-") -> {
                 ruleSet.add(RuleSet().apply {
                     type = "local"
                     tag = it
@@ -107,8 +110,8 @@ fun SingBoxOptions.Rule_DefaultOptions.makeSingBoxRule(list: List<String>, isIP:
     }
     list.forEach {
         if (isIP) {
-            if (it.startsWith("geoip:")) {
-                if (it == "geoip:private") {
+            if (it.startsWith("geoip:") || it.startsWith("geoip-")) {
+                if (it == "geoip:private" || it == "geoip-private") {
                     ip_is_private = true
                 } else {
                     rule_set.plusAssign(it)
@@ -118,7 +121,7 @@ fun SingBoxOptions.Rule_DefaultOptions.makeSingBoxRule(list: List<String>, isIP:
             }
             return@forEach
         }
-        if (it.startsWith("geosite:")) {
+        if (it.startsWith("geosite:") || it.startsWith("geosite-")) {
             rule_set.plusAssign(it)
         } else if (it.startsWith("full:")) {
             domain.plusAssign(it.removePrefix("full:").lowercase())
@@ -139,6 +142,7 @@ fun SingBoxOptions.Rule_DefaultOptions.makeSingBoxRule(list: List<String>, isIP:
     domain_regex?.removeIf { it.isNullOrBlank() }
     domain_keyword?.removeIf { it.isNullOrBlank() }
     if (ip_cidr?.isEmpty() == true) ip_cidr = null
+    if (rule_set?.isEmpty() == true) rule_set = null
     if (domain?.isEmpty() == true) domain = null
     if (domain_suffix?.isEmpty() == true) domain_suffix = null
     if (domain_regex?.isEmpty() == true) domain_regex = null
@@ -153,6 +157,7 @@ fun SingBoxOptions.Rule_DefaultOptions.checkEmpty(): Boolean {
     if (domain_regex?.isNotEmpty() == true) return false
     if (domain_keyword?.isNotEmpty() == true) return false
     if (user_id?.isNotEmpty() == true) return false
+    if (protocol?.isNotEmpty() == true) return false
     //
     if (port?.isNotEmpty() == true) return false
     if (port_range?.isNotEmpty() == true) return false
@@ -160,4 +165,36 @@ fun SingBoxOptions.Rule_DefaultOptions.checkEmpty(): Boolean {
     //
     if (!_hack_custom_config.isNullOrBlank()) return false
     return true
+}
+
+fun processRulesetUrl(origUrl: String): Pair<String, Boolean> {
+    return when {
+        origUrl.startsWith("rsip:") -> {
+            // IP类型ruleset
+            Pair(origUrl.substring(5), true)
+        }
+        origUrl.startsWith("rssite:") -> {
+            // 域名类型ruleset
+            Pair(origUrl.substring(7), false)
+        }
+        else -> {
+            throw kotlin.Exception(SagerNet.application.getString(R.string.ruleset_prefix_error))
+        }
+    }
+}
+
+fun generateRemoteRuleSet(url: String, ruleSets: MutableList<RuleSet>, updateInterval: String): String {
+    val hashCode = kotlin.math.abs(url.hashCode())
+    val tag = "ruleset-$hashCode"
+    
+    // 添加到规则集列表
+    ruleSets.add(RuleSet().apply {
+        type = "remote"
+        this.tag = tag
+        format = "binary"
+        this.url = url
+        update_interval = updateInterval
+    })
+    
+    return tag
 }

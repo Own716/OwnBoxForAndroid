@@ -42,6 +42,10 @@
     <string name="port_transproxy">Transproxy Portu</string>
     <string name="port_http">HTTP Vekil Sunucu Portu</string>
     <string name="port_proxy">SOCKS5 Vekil Sunucu Portu</string>
+    <string name="disable_mixed_inbound">Karışık Girişi Devre Dışı Bırak</string>
+    <string name="disable_mixed_inbound_sum">Saf TUN girişi; yerel vekil sunucu portunu dinleme</string>
+    <string name="mixed_inbound_disabled">Devre dışı</string>
+    <string name="disable_mixed_inbound_proxy_toast">Devre dışı bırakma yalnızca TUN modunda geçerlidir; mevcut dinleme portu: %1$d</string>
     <string name="service_mode_proxy">Sadece vekil sunucu</string>
     <string name="service_mode">Servis Modu</string>
     <string name="group_duplicate">%s
@@ -84,7 +88,7 @@
     <string name="server_port">Uzak Bağlantı Noktası</string>
     <string name="server_address">Sunucu</string>
     <string name="profile_name">Profil ismi</string>
-    <string name="connection_test_url">Bağlantı Testi URL\'si</string>
+    <string name="connection_test_url">Gecikme testi URL\'si</string>
     <string name="transproxy_mode">Transproxy Modu</string>
     <string name="require_transproxy">Transproxy Gelenini Etkinleştir</string>
     <string name="port_local_dns">Yerel DNS Bağlantı Noktası</string>
@@ -221,14 +225,14 @@
     <string name="group_basic">Basit</string>
     <string name="trojan_provider">Trojan Sağlayıcısı</string>
     <string name="protocol_settings">Protokol Ayarları</string>
-    <string name="append_http_proxy_sum">HTTP vekil sunucu direkt tarayıcı veya bazı destekli uygulamalar tarafından, sanal NIC aygıtından geçmeden kullanılır (Android 10+)</string>
-    <string name="append_http_proxy">HTTP Vekil Sunucuyu VPN\'e Dahil Et</string>
-    <string name="connection_test_timeout">Zaman Aşımı</string>
+    <string name="mixed_auth_config">Kimlik doğrulamayı yapılandır</string>
+    <string name="mixed_auth_username_hint">Kullanıcı adı (ikisi de boş bırakılırsa kimlik doğrulama yok)</string>
+    <string name="mixed_auth_no_auth">Ayarlanmadı (kimlik doğrulama yok)</string>
+    <string name="mixed_auth_enabled_sum">Kullanıcı adı: %1$s</string>
+    <string name="connection_test_timeout_error">Zaman Aşımı</string>
     <string name="connection_test_unreachable">Erişilemez</string>
     <string name="connection_test_refused">Bağlantı reddedildi</string>
     <string name="connection_test_domain_not_found">Alan adı bulunamadı</string>
-    <string name="connection_test_icmp_ping_unavailable">ICMPing kullanılamıyor</string>
-    <string name="connection_test_tcp_ping_unavailable">TCPing kullanılamıyor</string>
     <string name="connection_test_clear_results">Test sonuçlarını temizle</string>
     <string name="connection_test">Bağlantı testi</string>
     <string name="clear_traffic_statistics">Trafik istatistiklerini temizle</string>
@@ -262,8 +266,6 @@
     <string name="plugin">Eklenti</string>
     <string name="ignore_battery_optimizations_sum">Bazı kısıtlamaları kaldır</string>
     <string name="ignore_battery_optimizations">Pil optimizasyonlarını devre dışı bırak</string>
-    <string name="donate_info">Paraya aşığım</string>
-    <string name="donate">Bağış yap</string>
     <string name="deduplication">Tekilleştirme</string>
     <string name="no_proxies_found_in_clipboard">Kopyalama panosunda vekil sunucu bulunamadı</string>
     <string name="no_proxies_found_in_file">Dosya içinde vekil sunucu bulunamadı</string>
@@ -295,6 +297,8 @@
     <string name="action_export_err">Dışa aktarma başarısız oldu.</string>
     <string name="action_export_msg">Başarıyla dışa aktarıldı!</string>
     <string name="action_import_file">Dosyadan aktar</string>
+    <string name="scanner_toggle_flashlight">El fenerini aç/kapat</string>
+    <string name="scanner_select_image">Görsel seç</string>
     <string name="action_import">Kopyalama Panosundan Aktar</string>
     <string name="action_export">Dışa Aktar</string>
     <string name="action_export_clipboard">Kopyalama Panosuna Aktar</string>
@@ -388,4 +392,58 @@
     <string name="naive_insecure_concurrency_summary">Kötü ağ koşullarında daha sağlam olmak için N eşzamanlı tünel bağlantısı kullan. Daha fazla bağlantı, tünellemeyi algılamayı kolaylaştırır ve daha az güvenli hale getirir. Bu proje, trafik çözümlemesine karşı en güçlü güvenlik için çaba göstermektedir. Güvensiz bir şekilde kullanmak amacını bozar.
 \n
 \nBunu kullanmanız gerekiyorsa, sorunlarınızı çözüp çözmediğini görmek için önce N=2 değerini deneyin. Burada 4\'ten fazla bağlantı kullanmamanızı şiddetle tavsiye ederiz.</string>
+    <string name="preview_hint_dont_show_again">Bir daha gösterme</string>
+    <string name="backup_not_throne_desktop">Throne masaüstü yedeği değil: .thrbackup bekleniyordu, ancak %s</string>
+    <string name="action_import_throne_desktop">Throne masaüstünden içe aktar</string>
+    <string name="backup_import_throne_desktop_summary">Throne masaüstü .thrbackup dosyasından profilleri, rotaları ve ayarları içe aktarır. Özel simgeler yok sayılır. Seçili kategorilerdeki mevcut verilerin üzerine yazılır.</string>
+    <string name="connection_test_url_test">Bu grubun URL\'sini test et</string>
+    <string name="speed_test_settings">Speed test</string>
+    <string name="speed_test_mode">Speed test mode</string>
+    <string name="speed_test_mode_download_upload">Download + upload</string>
+    <string name="speed_test_mode_download">Download only</string>
+    <string name="speed_test_mode_upload">Upload only</string>
+    <string name="speed_test_mode_simple_download">Simple download</string>
+    <string name="speed_test_timeout_ms">Speed test timeout (ms)</string>
+    <string name="speed_test_timeout_invalid">Enter a timeout greater than zero milliseconds</string>
+    <string name="simple_download_url">Simple download URL</string>
+    <string name="speed_test_url_invalid">Enter a valid HTTP or HTTPS URL</string>
+    <string name="speed_test_group">Bu grubun hızını test et</string>
+    <string name="speed_test_confirm_title">Run speed test?</string>
+    <string name="speed_test_confirm_message">Speed testing can use significant data. Profiles are tested one at a time through their own proxy.</string>
+    <string name="speed_test_stage_pending">Waiting</string>
+    <string name="speed_test_stage_discovery">Finding a test server</string>
+    <string name="speed_test_stage_latency">Measuring server latency</string>
+    <string name="speed_test_stage_download">Downloading</string>
+    <string name="speed_test_stage_upload">Uploading</string>
+    <string name="speed_test_stage_complete">Complete</string>
+    <string name="speed_test_stage_cancelled">Cancelled</string>
+    <string name="speed_test_stage_error">Failed</string>
+    <string name="speed_test_latency_format">Latency: %1$d ms</string>
+    <string name="speed_test_server_format">Server: %1$s</string>
+    <string name="speed_test_download_format">Download: %1$s (%2$s)</string>
+    <string name="speed_test_upload_format">Upload: %1$s (%2$s)</string>
+    <string name="speed_test_rate_mbps">%1$.2f Mbps</string>
+
+    <!-- Custom Icon Pack -->
+    <string name="custom_icon">Özel Simge</string>
+    <string name="custom_icon_import">Simge Paketini İçe Aktar</string>
+    <string name="custom_icon_reset">Varsayılana Sıfırla</string>
+    <string name="custom_icon_preview_shortcut">Kısayol Simgesi</string>
+    <string name="custom_icon_shortcut_subtitle">Android platformu uygulama simgesini değiştirmeyi desteklemez. Gerekirse kendiniz fork edin!</string>
+    <string name="custom_icon_preview_tile">Hızlı Ayarlar Kutucuğu</string>
+    <string name="custom_icon_apply_pack">Bu Simge Paketini Uygula</string>
+    <string name="custom_icon_apply_success">Simge paketi uygulandı. Masaüstü kısayolu istendi.</string>
+    <string name="custom_icon_pin_shortcut_not_supported">Başlatıcınız kısayol sabitlemeyi desteklemiyor.</string>
+    <string name="custom_icon_no_pack_to_apply">Lütfen önce bir simge paketi içe aktarın.</string>
+    <string name="custom_icon_tile_state_active">Etkin (Değiştirmek için dokunun)</string>
+    <string name="custom_icon_tile_state_inactive">Devre dışı (Değiştirmek için dokunun)</string>
+    <string name="custom_icon_import_success">Simge paketi başarıyla içe aktarıldı</string>
+    <string name="custom_icon_reset_success">Varsayılan simgeler geri yüklendi</string>
+    <string name="custom_icon_reset_confirm">Varsayılan simgeleri geri yüklemek istediğinizden emin misiniz?</string>
+    <string name="custom_icon_error_missing">Simge paketi şunu içermelidir: %s</string>
+    <string name="custom_icon_error_dimension">%1$s çözünürlüğü 512x512 piksel olmalıdır (mevcut: %2$dx%3$d)</string>
+    <string name="custom_icon_error_not_png">%s geçerli bir PNG resmi değil</string>
+    <string name="custom_icon_error_security">Güvenlik doğrulaması başarısız: %s</string>
+    <string name="custom_icon_requirement_tip">Simge paketi 512x512 icon.png ve tile.png içeren bir ZIP arşivi olmalıdır.</string>
 </resources>
+

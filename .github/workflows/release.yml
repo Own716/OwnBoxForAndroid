@@ -9,12 +9,6 @@ on:
         description: "Release Tag (e.g. v2.0.0)"
         required: true
         default: "v2.0.0"
-      publish:
-        description: "Publish: type y to skip publish"
-        required: false
-      play:
-        description: "Play: type y to build play bundle"
-        required: false
 
 permissions:
   contents: write
@@ -25,26 +19,40 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Golang Status
-        run: find buildScript libcore/*.sh | xargs cat | sha1sum > golang_status
+        run: find buildScript libcore/*.sh nb4a.properties | xargs cat | sha1sum > golang_status
       - name: Libcore Status
         run: git ls-files libcore | xargs cat | sha1sum > libcore_status
       - name: LibCore Cache
         id: cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             app/libs/libcore.aar
           key: ${{ hashFiles('.github/workflows/*', 'golang_status', 'libcore_status') }}
       - name: Install Golang
         if: steps.cache.outputs.cache-hit != 'true'
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
-          go-version: ">=1.23"
+          go-version: ^1.25
       - name: Native Build
         if: steps.cache.outputs.cache-hit != 'true'
         run: ./run lib core
+      - name: Verify LibCore AAR
+        run: |
+          test -s app/libs/libcore.aar
+          unzip -p app/libs/libcore.aar classes.jar > /tmp/libcore-classes.jar
+          unzip -l /tmp/libcore-classes.jar | grep -q 'libcore/Libcore.class'
+          unzip -l /tmp/libcore-classes.jar | grep -q 'go/Seq.class'
+      - name: Upload LibCore AAR
+        uses: actions/upload-artifact@v5
+        with:
+          name: libcore-aar
+          path: app/libs/libcore.aar
+          if-no-files-found: error
+          retention-days: 1
+
   build:
     name: Build OSS APK
     runs-on: ubuntu-latest
@@ -52,19 +60,25 @@ jobs:
       - libcore
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-      - name: Golang Status
-        run: find buildScript libcore/*.sh | xargs cat | sha1sum > golang_status
-      - name: Libcore Status
-        run: git ls-files libcore | xargs cat | sha1sum > libcore_status
-      - name: LibCore Cache
-        uses: actions/cache@v4
+        uses: actions/checkout@v5
+      - name: Setup Java
+        uses: actions/setup-java@v5
         with:
-          path: |
-            app/libs/libcore.aar
-          key: ${{ hashFiles('.github/workflows/*', 'golang_status', 'libcore_status') }}
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Download LibCore AAR
+        uses: actions/download-artifact@v5
+        with:
+          name: libcore-aar
+          path: app/libs
+      - name: Verify LibCore AAR
+        run: |
+          test -s app/libs/libcore.aar
+          unzip -p app/libs/libcore.aar classes.jar > /tmp/libcore-classes.jar
+          unzip -l /tmp/libcore-classes.jar | grep -q 'libcore/Libcore.class'
+          unzip -l /tmp/libcore-classes.jar | grep -q 'go/Seq.class'
       - name: Gradle cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.gradle
           key: gradle-oss-${{ hashFiles('**/*.gradle.kts') }}
@@ -76,26 +90,45 @@ jobs:
           echo "ndk.dir=${ANDROID_HOME}/ndk/25.0.8775105" >> local.properties
           export LOCAL_PROPERTIES="${{ secrets.LOCAL_PROPERTIES }}"
           ./run init action gradle
-          ./gradlew app:assembleOssRelease
+          ./gradlew app:assemblePreviewRelease
+
+          KEYSTORE_PATH="release.keystore"
+          APKSIGNER=$(find ${ANDROID_HOME}/build-tools -name apksigner | sort -V | tail -n 1)
+          if [ -z "$APKSIGNER" ]; then
+            APKSIGNER="apksigner"
+          fi
+          echo "Using apksigner: $APKSIGNER"
+
           APK=$(find app/build/outputs/apk -name '*arm64-v8a*.apk')
-          APK=$(dirname $APK)
-          echo "APK=$APK" >> $GITHUB_ENV
-      - uses: actions/upload-artifact@v4
+          APK_DIR=$(dirname $APK)
+
+          echo "Signing APKs in $APK_DIR..."
+          for apk in "$APK_DIR"/*-unsigned.apk; do
+            if [ -f "$apk" ]; then
+              signed_apk="${apk%-unsigned.apk}-signed.apk"
+              echo "Signing $apk -> $signed_apk"
+              $APKSIGNER sign --ks "$KEYSTORE_PATH" --ks-pass pass:ownbox123 --key-pass pass:ownbox123 --ks-key-alias ownbox --out "$signed_apk" "$apk"
+              rm "$apk"
+            fi
+          done
+
+          echo "APK=$APK_DIR" >> $GITHUB_ENV
+      - uses: actions/upload-artifact@v5
         with:
           name: APKs
           path: ${{ env.APK }}
+
   publish:
     name: Publish Release
-    if: github.event.inputs.publish != 'y'
     runs-on: ubuntu-latest
     needs: build
     permissions:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Download Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: APKs
           path: artifacts
@@ -114,42 +147,4 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: true
-  play:
-    name: Build Play Bundle
-    if: github.event.inputs.play == 'y'
-    runs-on: ubuntu-latest
-    needs:
-      - libcore
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Golang Status
-        run: find buildScript libcore/*.sh | xargs cat | sha1sum > golang_status
-      - name: Libcore Status
-        run: git ls-files libcore | xargs cat | sha1sum > libcore_status
-      - name: LibCore Cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            app/libs/libcore.aar
-          key: ${{ hashFiles('.github/workflows/*', 'golang_status', 'libcore_status') }}
-      - name: Gradle cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.gradle
-          key: gradle-play-${{ hashFiles('**/*.gradle.kts') }}
-      - name: Checkout Library
-        run: |
-          git submodule update --init 'app/*'
-      - name: Gradle Build
-        run: |
-          echo "sdk.dir=${ANDROID_HOME}" > local.properties
-          echo "ndk.dir=${ANDROID_HOME}/ndk/25.0.8775105" >> local.properties
-          export LOCAL_PROPERTIES="${{ secrets.LOCAL_PROPERTIES }}"
-          ./run init action gradle
-          ./gradlew bundlePlayRelease
-      - uses: actions/upload-artifact@v3
-        with:
-          name: AAB
-          path: app/build/outputs/bundle/playRelease/app-play-release.aab
 

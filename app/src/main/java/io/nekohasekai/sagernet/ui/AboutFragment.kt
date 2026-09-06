@@ -8,18 +8,25 @@ import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
 import android.text.util.Linkify
 import android.view.View
+import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.result.component1
 import androidx.activity.result.component2
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
+import androidx.core.view.doOnPreDraw
 import androidx.recyclerview.widget.RecyclerView
 import com.danielstone.materialaboutlibrary.MaterialAboutFragment
 import com.danielstone.materialaboutlibrary.items.MaterialAboutActionItem
 import com.danielstone.materialaboutlibrary.model.MaterialAboutCard
 import com.danielstone.materialaboutlibrary.model.MaterialAboutList
+import com.google.android.material.card.MaterialCardView
 import io.nekohasekai.sagernet.BuildConfig
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.databinding.LayoutAboutBinding
@@ -46,7 +53,23 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
         ViewCompat.setOnApplyWindowInsetsListener(view, ListListener)
         toolbar.setTitle(R.string.menu_about)
 
-        parentFragmentManager.beginTransaction()
+        binding.license.maxLines = LICENSE_COLLAPSED_MAX_LINES
+        var isLicenseExpanded = false
+        binding.licenseToggle.setOnClickListener {
+            val scrollY = binding.aboutScroll.scrollY
+            isLicenseExpanded = !isLicenseExpanded
+            binding.license.maxLines = if (isLicenseExpanded) {
+                Int.MAX_VALUE
+            } else {
+                LICENSE_COLLAPSED_MAX_LINES
+            }
+            binding.licenseIndicator.text = if (isLicenseExpanded) "▲" else "▼"
+            binding.aboutScroll.doOnPreDraw {
+                binding.aboutScroll.scrollTo(0, scrollY)
+            }
+        }
+
+        childFragmentManager.beginTransaction()
             .replace(R.id.about_fragment_holder, AboutContent())
             .commitAllowingStateLoss()
 
@@ -57,6 +80,10 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
                 Linkify.addLinks(binding.license, Linkify.EMAIL_ADDRESSES or Linkify.WEB_URLS)
             }
         }
+    }
+
+    companion object {
+        private const val LICENSE_COLLAPSED_MAX_LINES = 8
     }
 
     class AboutContent : MaterialAboutFragment() {
@@ -75,7 +102,7 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
             return MaterialAboutList.Builder()
                 .addCard(
                     MaterialAboutCard.Builder()
-                        .outline(false)
+                        .outline(true)
                         .addItem(
                             MaterialAboutActionItem.Builder()
                                 .icon(R.drawable.ic_baseline_update_24)
@@ -89,16 +116,35 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
                                 .build())
                         .addItem(
                             MaterialAboutActionItem.Builder()
-                                .text(R.string.check_update_release)
+                                // Throne has no stable release yet: grey out the item
+                                .text(
+                                    SpannableString(getString(R.string.check_update_release)).apply {
+                                        setSpan(
+                                            ForegroundColorSpan(
+                                                ContextCompat.getColor(
+                                                    activityContext,
+                                                    android.R.color.darker_gray
+                                                )
+                                            ),
+                                            0,
+                                            length,
+                                            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                                        )
+                                    }
+                                )
                                 .setOnClickAction {
-                                    checkUpdate(false)
+                                    Toast.makeText(
+                                        app,
+                                        R.string.release_not_available,
+                                        Toast.LENGTH_SHORT
+                                    ).show()
                                 }
                                 .build())
                         .addItem(
                             MaterialAboutActionItem.Builder()
                                 .text(R.string.check_update_preview)
                                 .setOnClickAction {
-                                    checkUpdate(true)
+                                    checkUpdate()
                                 }
                                 .build())
                         .addItem(
@@ -164,7 +210,7 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
                         .build())
                 .addCard(
                     MaterialAboutCard.Builder()
-                        .outline(false)
+                        .outline(true)
                         .title(R.string.project)
                         .addItem(
                             MaterialAboutActionItem.Builder()
@@ -194,43 +240,73 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
         override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
             super.onViewCreated(view, savedInstanceState)
 
-            view.findViewById<RecyclerView>(R.id.mal_recyclerview).apply {
-                overScrollMode = RecyclerView.OVER_SCROLL_NEVER
+            view.layoutParams = (view.layoutParams ?: ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )).apply {
+                height = ViewGroup.LayoutParams.WRAP_CONTENT
+            }
+            view.findViewById<RecyclerView>(R.id.mal_recyclerview)?.apply {
+                isNestedScrollingEnabled = false
+                overScrollMode = View.OVER_SCROLL_NEVER
+                layoutParams = (layoutParams ?: ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                )).apply {
+                    height = ViewGroup.LayoutParams.WRAP_CONTENT
+                }
+
+                val cardStrokeWidth = resources.getDimensionPixelSize(
+                    R.dimen.card_stroke_width
+                )
+                val cardStrokeColor = ContextCompat.getColor(
+                    requireContext(),
+                    R.color.card_stroke
+                )
+                val cardCornerRadius = resources.getDimension(
+                    R.dimen.card_corner_radius
+                )
+                fun applyApplicationCardStyle(child: View) {
+                    (child as? MaterialCardView)?.apply {
+                        strokeWidth = cardStrokeWidth
+                        strokeColor = cardStrokeColor
+                        radius = cardCornerRadius
+                        cardElevation = 0f
+                    }
+                }
+
+                addOnChildAttachStateChangeListener(
+                    object : RecyclerView.OnChildAttachStateChangeListener {
+                        override fun onChildViewAttachedToWindow(child: View) {
+                            applyApplicationCardStyle(child)
+                        }
+
+                        override fun onChildViewDetachedFromWindow(child: View) = Unit
+                    }
+                )
+                for (index in 0 until childCount) {
+                    applyApplicationCardStyle(getChildAt(index))
+                }
             }
         }
 
-        fun checkUpdate(checkPreview: Boolean) {
+        fun checkUpdate() {
             runOnIoDispatcher {
                 try {
                     val client = Libcore.newHttpClient().apply {
                         modernTLS()
-                        trySocks5(DataStore.mixedPort)
+                        tryProxyOutbound()
                     }
                     val response = client.newRequest().apply {
-                        if (checkPreview) {
-                            setURL("https://api.github.com/repos/qinwenjie716-qwj/OwnBoxForAndroid/releases/tags/preview")
-                        } else {
-                            setURL("https://api.github.com/repos/qinwenjie716-qwj/OwnBoxForAndroid/releases/latest")
-                        }
+                        setURL("https://api.github.com/repos/qinwenjie716-qwj/OwnBoxForAndroid/releases/latest")
                     }.execute()
                     val release = JSONObject(Util.getStringBox(response.contentString))
                     val releaseName = release.getString("name")
                     val releaseUrl = release.getString("html_url")
-                    var haveUpdate = releaseName.isNotBlank()
-                    haveUpdate = if (isPreview) {
-                        if (checkPreview) {
-                            haveUpdate && releaseName != BuildConfig.PRE_VERSION_NAME
-                        } else {
-                            // User: 1.3.9 pre-1.4.0 Stable: 1.3.9 -> No update
-                            haveUpdate && releaseName != BuildConfig.VERSION_NAME
-                        }
-                    } else {
-                        // User: 1.4.0 Preview: pre-1.4.0 -> No update
-                        // User: 1.4.0 Preview: pre-1.4.1 -> Update
-                        // User: 1.4.0 Stable: 1.4.0 -> No update
-                        // User: 1.4.0 Stable: 1.4.1 -> Update
-                        haveUpdate && !releaseName.contains(BuildConfig.VERSION_NAME)
-                    }
+                    // Release name is the git tag, e.g. "v1.4.2-m20-10".
+                    // Compare it with the local version name segment by segment.
+                    val haveUpdate = releaseName.isNotBlank() &&
+                            compareVersionNames(releaseName, BuildConfig.VERSION_NAME) > 0
                     runOnMainDispatcher {
                         if (haveUpdate) {
                             val context = requireContext()
@@ -260,6 +336,48 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
                     }
                 }
             }
+        }
+
+        companion object {
+
+            private val numberRegex = Regex("\\d+")
+
+            /**
+             * Compares two version names segment by segment (split by "-").
+             * Each segment is compared by its numeric groups in order,
+             * and left segments dominate right ones, e.g.
+             * "v1.2.3-m21-1" > "v1.2.3-m20-100".
+             *
+             * Returns a positive value if [a] is newer than [b],
+             * a negative value if it is older, and 0 if they are equal.
+             */
+            fun compareVersionNames(a: String, b: String): Int {
+                val segmentsA = a.split("-")
+                val segmentsB = b.split("-")
+                for (i in 0 until maxOf(segmentsA.size, segmentsB.size)) {
+                    val segmentA = segmentsA.getOrNull(i).orEmpty()
+                    val segmentB = segmentsB.getOrNull(i).orEmpty()
+                    val numbersA = extractNumbers(segmentA)
+                    val numbersB = extractNumbers(segmentB)
+                    if (numbersA.isEmpty() && numbersB.isEmpty()) {
+                        val compared = segmentA.compareTo(segmentB)
+                        if (compared != 0) return compared
+                        continue
+                    }
+                    for (j in 0 until maxOf(numbersA.size, numbersB.size)) {
+                        val numberA = numbersA.getOrNull(j)
+                        val numberB = numbersB.getOrNull(j)
+                        if (numberA == null) return -1
+                        if (numberB == null) return 1
+                        if (numberA != numberB) return if (numberA < numberB) -1 else 1
+                    }
+                }
+                return 0
+            }
+
+            private fun extractNumbers(segment: String): List<Long> =
+                numberRegex.findAll(segment).mapNotNull { it.value.toLongOrNull() }.toList()
+
         }
 
     }
