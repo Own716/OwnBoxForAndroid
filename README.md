@@ -29,10 +29,10 @@
 
 | 架构 / 平台 | 适用设备 | 推荐下载文件 |
 | :--- | :--- | :--- |
-| **ARM64 (推荐)** | 绝大部分现代安卓机型 (一加、小米、华为、OPPO、三星、vivo等) | `Ownbox-2.3.1-arm64-v8a-release.apk` |
-| **ARMv7** | 较老旧的 32 位安卓机型 | `Ownbox-2.3.1-armeabi-v7a-release.apk` |
-| **x86_64** | 电脑 64 位安卓模拟器、ChromeOS | `Ownbox-2.3.1-x86_64-release.apk` |
-| **x86** | 电脑 32 位安卓模拟器 | `Ownbox-2.3.1-x86-release.apk` |
+| **ARM64 (推荐)** | 绝大部分现代安卓机型 (一加、小米、华为、OPPO、三星、vivo等) | `Ownbox-2.3.2-arm64-v8a-release.apk` |
+| **ARMv7** | 较老旧的 32 位安卓机型 | `Ownbox-2.3.2-armeabi-v7a-release.apk` |
+| **x86_64** | 电脑 64 位安卓模拟器、ChromeOS | `Ownbox-2.3.2-x86_64-release.apk` |
+| **x86** | 电脑 32 位安卓模拟器 | `Ownbox-2.3.2-x86-release.apk` |
 
 ---
 

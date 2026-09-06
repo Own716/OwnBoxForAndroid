@@ -610,6 +610,7 @@
     <string name="snell_reuse">重用</string>
     <string name="snell_reuse_summary">僅 v4-v6</string>
     <string name="connection_test_url_test">URL 測試本組</string>
+    <string name="connection_test_tcp_ping">TCP Ping 測試本組</string>
     <string name="speed_test_settings">速度測試</string>
     <string name="speed_test_mode">速度測試模式</string>
     <string name="speed_test_mode_download_upload">下載 + 上傳</string>

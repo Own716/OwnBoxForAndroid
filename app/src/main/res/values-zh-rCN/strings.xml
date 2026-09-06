@@ -614,6 +614,7 @@
     <string name="wireguard_listen_port">监听端口</string>
     <string name="wireguard_persistent_keepalive">持久保活间隔</string>
     <string name="connection_test_url_test">URL 测试本组</string>
+    <string name="connection_test_tcp_ping">TCP Ping 测试本组</string>
     <string name="speed_test_settings">速度测试</string>
     <string name="speed_test_mode">速度测试模式</string>
     <string name="speed_test_mode_download_upload">下载 + 上传</string>

@@ -108,6 +108,7 @@
     <string name="backup_import_throne_desktop_summary">從 Throne 電腦版 .thrbackup 匯入設定檔、路由與設定（忽略自訂圖示）。勾選的類別將覆蓋本機現有資料。</string>
     <string name="connection_test_url">延遲測試 URL</string>
     <string name="connection_test_url_test">URL 測試本組</string>
+    <string name="connection_test_tcp_ping">TCP Ping 測試本組</string>
     <string name="speed_test_settings">速度測試</string>
     <string name="speed_test_mode">速度測試模式</string>
     <string name="speed_test_mode_download_upload">下載 + 上載</string>

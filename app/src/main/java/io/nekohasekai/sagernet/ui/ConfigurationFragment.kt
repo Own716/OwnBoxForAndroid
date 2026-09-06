@@ -809,6 +809,10 @@ class ConfigurationFragment @JvmOverloads constructor(
                 urlTest()
             }
 
+            R.id.action_connection_tcp_ping -> {
+                tcpPingTest()
+            }
+
             R.id.action_global_mode -> {
                 item.isChecked = !item.isChecked
                 DataStore.globalMode = item.isChecked
@@ -1309,6 +1313,76 @@ class ConfigurationFragment @JvmOverloads constructor(
             test.notification = ConnectionTestNotification(
                 dialog.context,
                 "[${group.displayName()}] ${getString(R.string.connection_test)}"
+            )
+            dialog.hide()
+        }
+    }
+
+    @OptIn(DelicateCoroutinesApi::class)
+    fun tcpPingTest() {
+        if (DataStore.runningTest) return else DataStore.runningTest = true
+        val test = TestDialog()
+        val dialog = test.builder.show()
+        val testJobs = mutableListOf<Job>()
+        val group = DataStore.currentGroup()
+        Logs.d("TcpPingTrace batch=start groupId=${group.id} group=${group.name}")
+
+        val mainJob = runOnDefaultDispatcher {
+            val profilesList = SagerDatabase.proxyDao.getByGroup(group.id)
+            test.proxyN = profilesList.size
+            val profiles = ConcurrentLinkedQueue(profilesList)
+            val tcpPing = io.nekohasekai.sagernet.bg.proto.TcpPing()
+            repeat(DataStore.connectionTestConcurrent) { workerId ->
+                testJobs.add(launch(Dispatchers.IO) {
+                    while (isActive) {
+                        val profile = profiles.poll() ?: break
+                        profile.status = 0
+                        try {
+                            val result = tcpPing.doTest(profile)
+                            profile.status = 1
+                            profile.ping = result
+                            profile.error = null
+                            Logs.d("TcpPing ${profile.displayName()}: done, ping=${result}ms")
+                        } catch (e: Exception) {
+                            profile.status = 3
+                            profile.error = e.readableMessage
+                            Logs.w("TcpPing ${profile.displayName()} failed error=${e.readableMessage}")
+                        }
+
+                        test.update(profile)
+                    }
+                })
+            }
+
+            testJobs.joinAll()
+            Logs.d("TcpPingTrace batch=finished profiles=${profilesList.size}")
+
+            runOnMainDispatcher {
+                test.cancel()
+            }
+        }
+        test.cancel = {
+            test.dialogStatus.set(2)
+            dialog.dismiss()
+            runOnDefaultDispatcher {
+                mainJob.cancel()
+                testJobs.forEach { it.cancel() }
+                test.results.forEach {
+                    try {
+                        ProfileManager.updateProfile(it)
+                    } catch (e: Exception) {
+                        Logs.w(e)
+                    }
+                }
+                GroupManager.postReload(DataStore.currentGroupId())
+                DataStore.runningTest = false
+            }
+        }
+        test.minimize = {
+            test.dialogStatus.set(1)
+            test.notification = ConnectionTestNotification(
+                dialog.context,
+                "[${group.displayName()}] TCP Ping"
             )
             dialog.hide()
         }
