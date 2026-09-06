@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
+        android:id="@+id/action_test_profile_speed"
+        android:title="@string/action_test_profile_speed" />
+    <item
         android:id="@+id/action_group_qr"
         android:title="@string/share_qr_nfc">
         <menu>
@@ -37,7 +40,4 @@
                 android:title="@string/action_export_file" />
         </menu>
     </item>
-    <item
-        android:id="@+id/action_test_profile_speed"
-        android:title="@string/action_test_profile_speed" />
 </menu>

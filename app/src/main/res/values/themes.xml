@@ -644,4 +644,12 @@
         <item name="windowNoTitle">true</item>
     </style>
 
+    <style name="Theme.SagerNet.Amoled">
+        <item name="android:colorBackground">@color/black</item>
+        <item name="android:windowBackground">@color/black</item>
+        <item name="colorSurface">@color/black</item>
+        <item name="cardElevatedSurfaceColor">#0D0D0D</item>
+        <item name="cardStroke">#33FFFFFF</item>
+    </style>
+
 </resources>

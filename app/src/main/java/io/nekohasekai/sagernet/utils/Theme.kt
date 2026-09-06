@@ -38,10 +38,19 @@ object Theme {
 
     fun apply(context: Context) {
         context.setTheme(getTheme())
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && DataStore.useSystemTheme && context is android.app.Activity) {
+            com.google.android.material.color.DynamicColors.applyIfAvailable(context)
+        }
+        if (DataStore.amoledTheme && usingNightMode()) {
+            context.theme.applyStyle(R.style.Theme_SagerNet_Amoled, true)
+        }
     }
 
     fun applyDialog(context: Context) {
         context.setTheme(getDialogTheme())
+        if (DataStore.amoledTheme && usingNightMode()) {
+            context.theme.applyStyle(R.style.Theme_SagerNet_Amoled, true)
+        }
     }
 
     fun getTheme(): Int {

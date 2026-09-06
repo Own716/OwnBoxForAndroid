@@ -80,8 +80,13 @@ object RawUpdater : GroupUpdater() {
             proxies = parseRaw(Util.getStringBox(response.contentString))
                 ?: error(app.getString(R.string.no_proxies_found))
 
-            subscription.subscriptionUserinfo =
-                Util.getStringBox(response.getHeader("Subscription-Userinfo"))
+            val userInfo = response.getHeader("Subscription-Userinfo")
+                ?: response.getHeader("subscription-userinfo")
+                ?: response.getHeader("Subscription-UserInfo")
+            val userInfoStr = Util.getStringBox(userInfo)
+            if (userInfoStr.isNotBlank()) {
+                subscription.subscriptionUserinfo = userInfoStr
+            }
 
             // 修改默认名字
             if (proxyGroup.name?.startsWith("Subscription #") == true) {

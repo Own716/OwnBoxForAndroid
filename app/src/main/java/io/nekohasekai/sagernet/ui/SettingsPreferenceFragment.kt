@@ -73,6 +73,10 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
             Theme.applyNightTheme()
             true
         }
+        findPreference<SwitchPreference>("amoledTheme")?.setOnPreferenceChangeListener { _, _ ->
+            needRestart()
+            true
+        }
         val appLanguage = findPreference<SimpleMenuPreference>(Key.APP_LANGUAGE)!!
         appLanguage.setOnPreferenceChangeListener { _, newValue ->
             AppLocale.apply(newValue as String)
@@ -283,6 +287,7 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
 
         val dualNetworkAcceleration = findPreference<SwitchPreference>(Key.DUAL_NETWORK_ACCELERATION)!!
         dualNetworkAcceleration.onPreferenceChangeListener = reloadListener
+        findPreference<SwitchPreference>(Key.CONCURRENT_DIAL)?.onPreferenceChangeListener = reloadListener
 
         enableFakeDns.onPreferenceChangeListener = reloadListener
         remoteDns.onPreferenceChangeListener = reloadListener

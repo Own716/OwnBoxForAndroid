@@ -59,32 +59,39 @@ class TileService : BaseTileService(), SagerConnection.Callback {
 
     private fun updateTile(serviceState: BaseService.State, profileName: String?) {
         qsTile?.apply {
-            label = null
             val currentIcon = getTileIcon()
+            icon = currentIcon
             when (serviceState) {
                 BaseService.State.Idle -> error("serviceState")
                 BaseService.State.Connecting -> {
-                    icon = currentIcon
                     state = Tile.STATE_ACTIVE
+                    label = getString(R.string.connecting)
                 }
 
                 BaseService.State.Connected -> {
-                    icon = currentIcon
-                    label = profileName
                     state = Tile.STATE_ACTIVE
+                    label = profileName ?: getString(R.string.app_name)
                 }
 
                 BaseService.State.Stopping -> {
-                    icon = currentIcon
                     state = Tile.STATE_UNAVAILABLE
+                    label = getString(R.string.stopping)
                 }
 
                 BaseService.State.Stopped -> {
-                    icon = currentIcon
                     state = Tile.STATE_INACTIVE
+                    label = getString(R.string.app_name)
                 }
             }
-            label = label ?: getString(R.string.app_name)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                subtitle = when (serviceState) {
+                    BaseService.State.Connected -> profileName ?: getString(R.string.vpn_connected)
+                    BaseService.State.Connecting -> getString(R.string.connecting)
+                    BaseService.State.Stopping -> getString(R.string.stopping)
+                    BaseService.State.Stopped -> getString(R.string.not_connected)
+                    else -> null
+                }
+            }
             updateTile()
         }
     }

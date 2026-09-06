@@ -115,6 +115,8 @@ object DataStore : OnPreferenceDataStoreChangeListener {
 
     var bypassLan by configurationStore.boolean(Key.BYPASS_LAN)
     var bypassLanInCore by configurationStore.boolean(Key.BYPASS_LAN_IN_CORE)
+    var amoledTheme by configurationStore.boolean("amoledTheme")
+    var concurrentDial by configurationStore.boolean(Key.CONCURRENT_DIAL)
     var dualNetworkAcceleration by configurationStore.boolean(Key.DUAL_NETWORK_ACCELERATION)
 
     var allowAccess by configurationStore.boolean(Key.ALLOW_ACCESS)

@@ -665,4 +665,9 @@
     <string name="more">更多</string>
     <string name="action_test_profile_speed">测当前节点速度</string>
     <string name="testing_node_speed">正在测试节点速度...</string>
+    <string name="concurrent_dial">并发拨号 (Happy Eyeballs)</string>
+    <string name="concurrent_dial_summary">启用并发连接以更快地建立网络（可能会增加电池使用量）</string>
+    <string name="amoled_theme">AMOLED 纯黑模式</string>
+    <string name="amoled_theme_summary">深色模式下使用纯黑背景以最大程度节省 OLED 屏幕耗电</string>
+    <string name="import_clipboard_prompt">检测到剪贴板中存在节点配置或订阅链接，是否立即导入？</string>
 </resources>

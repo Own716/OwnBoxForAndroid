@@ -748,4 +748,9 @@
     <string name="more">More</string>
     <string name="action_test_profile_speed">Test Node Speed</string>
     <string name="testing_node_speed">Testing node speed...</string>
+    <string name="concurrent_dial">Concurrent Dial (Happy Eyeballs)</string>
+    <string name="concurrent_dial_summary">Enable concurrent connection establishment for faster networking</string>
+    <string name="amoled_theme">AMOLED True Black</string>
+    <string name="amoled_theme_summary">Use pure black #000000 background in dark mode to save OLED battery</string>
+    <string name="import_clipboard_prompt">Detected proxy or subscription configuration in clipboard. Do you want to import it?</string>
 </resources>

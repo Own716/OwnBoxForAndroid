@@ -157,6 +157,75 @@ class MainActivity : ThemedActivity(),
         if (DataStore.hideFromRecentApps) {
             applyHideFromRecentApps(DataStore.hideFromRecentApps)
         }
+
+        checkClipboardOnResume()
+    }
+
+    private var lastPromptedClipboard: String = ""
+
+    private fun checkClipboardOnResume() {
+        try {
+            val text = SagerNet.getClipboardText().trim()
+            if (text.isBlank() || text == lastPromptedClipboard || text.length < 8) return
+            val looksLikeProxy = text.startsWith("vless://", ignoreCase = true) ||
+                    text.startsWith("vmess://", ignoreCase = true) ||
+                    text.startsWith("ss://", ignoreCase = true) ||
+                    text.startsWith("ssr://", ignoreCase = true) ||
+                    text.startsWith("trojan://", ignoreCase = true) ||
+                    text.startsWith("hysteria://", ignoreCase = true) ||
+                    text.startsWith("hysteria2://", ignoreCase = true) ||
+                    text.startsWith("hy2://", ignoreCase = true) ||
+                    text.startsWith("tuic://", ignoreCase = true) ||
+                    text.startsWith("sn://", ignoreCase = true) ||
+                    text.startsWith("clash://", ignoreCase = true)
+
+            if (!looksLikeProxy) return
+            lastPromptedClipboard = text
+
+            com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.action_import)
+                .setMessage(R.string.import_clipboard_prompt)
+                .setPositiveButton(R.string.action_import) { _, _ ->
+                    runOnDefaultDispatcher {
+                        try {
+                            val proxies = io.nekohasekai.sagernet.group.RawUpdater.parseRaw(text)
+                            if (!proxies.isNullOrEmpty()) {
+                                onMainDispatcher {
+                                    val frag = currentMainFragment as? ConfigurationFragment
+                                    if (frag != null) {
+                                        frag.import(proxies)
+                                    } else {
+                                        snackbar(getString(R.string.action_import_msg)).show()
+                                    }
+                                }
+                            }
+                        } catch (e: io.nekohasekai.sagernet.ktx.SubscriptionFoundException) {
+                            onMainDispatcher {
+                                if (e.link.startsWith("sn://")) {
+                                    lifecycleScope.launch {
+                                        importSubscription(android.net.Uri.parse(e.link))
+                                    }
+                                } else {
+                                    val subscriptionLink = android.net.Uri.parse(e.link).getQueryParameter("url") ?: e.link
+                                    startActivity(Intent(this@MainActivity, GroupSettingsActivity::class.java).apply {
+                                        putExtra(GroupSettingsActivity.EXTRA_FROM_CLIPBOARD, true)
+                                        putExtra(GroupSettingsActivity.EXTRA_GROUP_SUBSCRIPTION_LINK, subscriptionLink)
+                                    })
+                                }
+                            }
+                        } catch (e: Exception) {
+                            io.nekohasekai.sagernet.ktx.Logs.w(e)
+                            onMainDispatcher {
+                                snackbar(e.readableMessage).show()
+                            }
+                        }
+                    }
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        } catch (e: Exception) {
+            io.nekohasekai.sagernet.ktx.Logs.w(e)
+        }
     }
 
     override fun onPostResume() {

@@ -469,7 +469,7 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
                 var text = ""
 
                 fun get(regex: String): String? {
-                    return regex.toRegex().findAll(subscription.subscriptionUserinfo).mapNotNull {
+                    return Regex(regex, RegexOption.IGNORE_CASE).findAll(subscription.subscriptionUserinfo).mapNotNull {
                         if (it.groupValues.size > 1) it.groupValues[1] else null
                     }.firstOrNull()
                 }

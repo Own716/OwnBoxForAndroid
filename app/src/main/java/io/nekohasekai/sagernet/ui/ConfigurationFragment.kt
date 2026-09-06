@@ -1639,10 +1639,15 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
 
             fun updateTo(order: Int) {
-                if (proxyGroup.order == order) return
+                val needUpdateDb = proxyGroup.order != order
+                proxyGroup.order = order
                 runOnDefaultDispatcher {
-                    proxyGroup.order = order
-                    GroupManager.updateGroup(proxyGroup)
+                    if (needUpdateDb) {
+                        GroupManager.updateGroup(proxyGroup)
+                    }
+                    onMainDispatcher {
+                        adapter.reloadProfiles()
+                    }
                 }
             }
 
@@ -2355,6 +2360,13 @@ class ConfigurationFragment @JvmOverloads constructor(
                         showShareMenu(it, proxyEntity)
                     }
                 }
+                view.setOnLongClickListener {
+                    val proxyEntity = entity
+                    if (!select && proxyEntity.type != ProxyEntity.TYPE_CHAIN) {
+                        showShareMenu(shareLayout, proxyEntity)
+                        true
+                    } else false
+                }
             }
 
             private fun selectProfile(proxyEntity: ProxyEntity) {
@@ -2542,7 +2554,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                 entity = proxyEntity
                 val bean = proxyEntity.requireBean()
 
-                profileName.text = bean.displayName()
+                profileName.text = io.nekohasekai.sagernet.utils.CountryFlagUtils.formatWithFlag(bean.displayName())
                 profileType.text = proxyEntity.displayType()
                 profileType.setTextColor(requireContext().getProtocolColor(proxyEntity.type))
 

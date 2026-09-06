@@ -487,8 +487,13 @@ fun buildConfig(
             rules = mutableListOf()
             rule_set = mutableListOf()
 
-            // 双网络加速：hybrid = 在所有可用网络接口（WiFi/移动数据）上并发传输
-            if (DataStore.dualNetworkAcceleration) default_network_strategy = "hybrid"
+            // 双网络加速与并发拨号策略
+            // hybrid: 在所有可用接口并发传输；fallback: 并发快速容灾拨号（Happy Eyeballs）
+            if (DataStore.dualNetworkAcceleration) {
+                default_network_strategy = "hybrid"
+            } else if (DataStore.concurrentDial) {
+                default_network_strategy = "fallback"
+            }
         }
 
         // returns outbound tag

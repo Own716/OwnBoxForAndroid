@@ -26,6 +26,12 @@
             app:key="nightTheme"
             app:title="@string/night_mode"
             app:useSimpleSummaryProvider="true" />
+        <SwitchPreference
+            app:defaultValue="false"
+            app:icon="@drawable/ic_baseline_wb_sunny_24"
+            app:key="amoledTheme"
+            app:title="@string/amoled_theme"
+            app:summary="@string/amoled_theme_summary" />
         <moe.matsuri.nb4a.ui.SimpleMenuPreference
             app:defaultValue=""
             app:entries="@array/language_entries"
@@ -136,6 +142,11 @@
              app:key="dualNetworkAcceleration"
              app:title="@string/dual_network_acceleration"
              app:summary="@string/dual_network_acceleration_summary" />
+        <SwitchPreference
+             app:icon="@drawable/ic_baseline_speed_24"
+             app:key="concurrentDial"
+             app:title="@string/concurrent_dial"
+             app:summary="@string/concurrent_dial_summary" />
         <moe.matsuri.nb4a.ui.SimpleMenuPreference
             app:defaultValue="1"
             app:entries="@array/traffic_sniffing_values"
