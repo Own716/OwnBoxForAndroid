@@ -39,4 +39,12 @@ class ConnectionTestNotification(val context: Context, val title: String) {
             Logs.w(e)
         }
     }
+
+    fun cancel() {
+        try {
+            SagerNet.notification.cancel(notificationId)
+        } catch (e: Exception) {
+            Logs.w(e)
+        }
+    }
 }

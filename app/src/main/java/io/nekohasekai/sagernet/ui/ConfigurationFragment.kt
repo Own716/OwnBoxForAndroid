@@ -1083,6 +1083,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                     if (speedTestDialog === dialog) {
                         speedTestDialog = null
                     }
+                    speedTestNotification?.updateNotification(0, 0, true)
                     speedTestNotification?.cancel()
                     speedTestNotification = null
                     speedTestHidden = false
