@@ -499,4 +499,25 @@
     <string name="minimize">最小化</string>
     <string name="app_list_permission_denied">无法读取已安装的应用。\n这通常是由于系统限制了应用的读取权限（例如某些中国厂商系统）。\n请在系统设置中授予权限。</string>
     <string name="open_app_settings">打开系统设置</string>
+    <!-- Ownbox & Throne 特性 -->
+    <string name="dual_network">双网络加速</string>
+    <string name="dual_network_summary">使用 WiFi 和移动数据并发连接。需要系统中保持 WiFi 与移动数据同时开启，且会增加耗电量。</string>
+    <string name="disable_mixed_inbound">禁用混合入站内容</string>
+    <string name="disable_mixed_inbound_summary">即纯 TUN 入站，不在本地监听代理入口。</string>
+    <string name="speed_test_mode">订阅节点测速模式</string>
+    <string name="speed_test_mode_download_only">仅测试下载</string>
+    <string name="speed_test_mode_upload_only">仅测试上传</string>
+    <string name="speed_test_mode_full">测速下载加上传</string>
+    <string name="speed_test_mode_simple_dl">简单的测速下载</string>
+    <string name="speed_test_mode_summary">为每个订阅节点提供速度测试模式。简单的测速下载消耗流量并不多，测速也快。</string>
+    <string name="speed_test_timeout">自定义测速超时 (毫秒)</string>
+    <string name="speed_test_timeout_summary">可以自定义速度测试的超时毫秒数</string>
+    <string name="simple_dl_url">自定义简单下载 URL</string>
+    <string name="simple_dl_url_summary">可以设置简单下载的测试链接</string>
+    <string name="parallel_dial">并发拨号</string>
+    <string name="parallel_dial_summary">启用之后可通过并发连接以更快地建立网络。这可能会增加电池使用量。该功能与之前的“网络 WiFi 和移动数据并发”不同，但目的都是为了提高网络速度。</string>
+    <string name="strict_route">严格路由</string>
+    <string name="strict_route_summary">启用严格路由以防止在 TUN 外部泄露流量</string>
+    <string name="action_connection_speed_test">节点测速</string>
+    <string name="speed_test">节点测速</string>
 </resources>

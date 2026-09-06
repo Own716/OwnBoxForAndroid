@@ -31,7 +31,7 @@
         <moe.matsuri.nb4a.ui.SimpleMenuPreference
             app:defaultValue="0"
             app:entries="@array/tun_implementation"
-            app:entryValues="@array/int_array_3"
+            app:entryValues="@array/int_array_4"
             app:icon="@drawable/ic_baseline_flip_camera_android_24"
             app:key="tunImplementation"
             app:title="@string/tun_implementation"
@@ -138,6 +138,24 @@
             app:key="rulesProvider"
             app:title="@string/route_rules_provider"
             app:useSimpleSummaryProvider="true" />
+        <SwitchPreference
+            app:defaultValue="false"
+            app:icon="@drawable/ic_baseline_speed_24"
+            app:key="dualNetwork"
+            app:summary="@string/dual_network_summary"
+            app:title="@string/dual_network" />
+        <SwitchPreference
+            app:defaultValue="false"
+            app:icon="@drawable/ic_baseline_cast_connected_24"
+            app:key="parallelDial"
+            app:summary="@string/parallel_dial_summary"
+            app:title="@string/parallel_dial" />
+        <SwitchPreference
+            app:defaultValue="true"
+            app:icon="@drawable/ic_action_lock"
+            app:key="strictRoute"
+            app:summary="@string/strict_route_summary"
+            app:title="@string/strict_route" />
     </PreferenceCategory>
 
     <PreferenceCategory app:title="@string/cag_dns">
@@ -196,6 +214,12 @@
             app:useSimpleSummaryProvider="true" />
         <SwitchPreference
             app:defaultValue="false"
+            app:icon="@drawable/ic_navigation_apps"
+            app:key="disableMixedInbound"
+            app:summary="@string/disable_mixed_inbound_summary"
+            app:title="@string/disable_mixed_inbound" />
+        <SwitchPreference
+            app:defaultValue="false"
             app:key="appendHttpProxy"
             app:summary="@string/append_http_proxy_sum"
             app:title="@string/append_http_proxy" />
@@ -212,6 +236,29 @@
             app:icon="@drawable/ic_baseline_cast_connected_24"
             app:key="connectionTestURL"
             app:title="@string/connection_test_url"
+            app:useSimpleSummaryProvider="true" />
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:defaultValue="3"
+            app:entries="@array/speed_test_mode_entries"
+            app:entryValues="@array/int_array_4"
+            app:icon="@drawable/ic_baseline_shutter_speed_24"
+            app:key="speedTestMode"
+            app:summary="@string/speed_test_mode_summary"
+            app:title="@string/speed_test_mode"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:defaultValue="10000"
+            app:icon="@drawable/ic_baseline_shutter_speed_24"
+            app:key="speedTestTimeout"
+            app:summary="@string/speed_test_timeout_summary"
+            app:title="@string/speed_test_timeout"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:defaultValue="https://speed.cloudflare.com/__down?bytes=10000000"
+            app:icon="@drawable/ic_baseline_cast_connected_24"
+            app:key="simpleDlUrl"
+            app:summary="@string/simple_dl_url_summary"
+            app:title="@string/simple_dl_url"
             app:useSimpleSummaryProvider="true" />
         <SwitchPreference
             app:icon="@drawable/baseline_construction_24"

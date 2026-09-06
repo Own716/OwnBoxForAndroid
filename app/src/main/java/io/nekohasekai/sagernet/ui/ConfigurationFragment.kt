@@ -43,6 +43,7 @@ import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.aidl.TrafficData
 import io.nekohasekai.sagernet.bg.BaseService
+import io.nekohasekai.sagernet.bg.proto.SpeedTest
 import io.nekohasekai.sagernet.bg.proto.UrlTest
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.GroupManager
@@ -590,6 +591,10 @@ class ConfigurationFragment @JvmOverloads constructor(
             R.id.action_connection_url_test -> {
                 urlTest()
             }
+
+            R.id.action_connection_speed_test -> {
+                speedTest()
+            }
         }
         return true
     }
@@ -899,6 +904,87 @@ class ConfigurationFragment @JvmOverloads constructor(
             dialog.hide()
         }
     }
+
+    /**
+     * Speed test for all profiles in the current group.
+     * Results are stored in [ProxyEntity.error] as a formatted string (e.g. "↓ 1.2 MB/s")
+     * and [ProxyEntity.status] is set to -1 so they display in the secondary text colour.
+     */
+    @OptIn(DelicateCoroutinesApi::class)
+    fun speedTest() {
+        if (DataStore.runningTest) return else DataStore.runningTest = true
+        val test = TestDialog()
+        val dialog = test.builder.show()
+        val testJobs = mutableListOf<Job>()
+        val group = DataStore.currentGroup()
+
+        val mainJob = runOnDefaultDispatcher {
+            val profilesList = SagerDatabase.proxyDao.getByGroup(group.id)
+            test.proxyN = profilesList.size
+            val profiles = ConcurrentLinkedQueue(profilesList)
+            repeat(DataStore.connectionTestConcurrent) {
+                testJobs.add(launch(Dispatchers.IO) {
+                    val speedTest = SpeedTest()
+                    while (isActive) {
+                        val profile = profiles.poll() ?: break
+                        profile.status = 0
+                        try {
+                            val kbps = speedTest.doTest(profile)
+                            if (kbps >= 0) {
+                                profile.status = -1
+                                val mbps = kbps / 1000.0
+                                profile.error = if (mbps >= 1.0) {
+                                    "↓ %.2f MB/s".format(mbps / 1000.0)
+                                } else {
+                                    "↓ ${kbps} Kbps"
+                                }
+                            } else {
+                                profile.status = 3
+                                profile.error = getString(R.string.unavailable)
+                            }
+                        } catch (e: PluginManager.PluginNotFoundException) {
+                            profile.status = 2
+                            profile.error = e.readableMessage
+                        } catch (e: Exception) {
+                            profile.status = 3
+                            profile.error = e.readableMessage
+                        }
+                        test.update(profile)
+                    }
+                })
+            }
+            testJobs.joinAll()
+            runOnMainDispatcher {
+                test.cancel()
+            }
+        }
+        test.cancel = {
+            test.dialogStatus.set(2)
+            dialog.dismiss()
+            runOnDefaultDispatcher {
+                mainJob.cancel()
+                testJobs.forEach { it.cancel() }
+                test.results.forEach {
+                    try {
+                        ProfileManager.updateProfile(it)
+                    } catch (e: Exception) {
+                        Logs.w(e)
+                    }
+                }
+                GroupManager.postReload(DataStore.currentGroupId())
+                DataStore.runningTest = false
+            }
+        }
+        test.minimize = {
+            test.dialogStatus.set(1)
+            test.notification = ConnectionTestNotification(
+                dialog.context,
+                "[${group.displayName()}] ${getString(R.string.speed_test)}"
+            )
+            dialog.hide()
+        }
+    }
+
 
     inner class GroupPagerAdapter : FragmentStateAdapter(this),
         ProfileManager.Listener,

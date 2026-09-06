@@ -5,6 +5,10 @@ import android.annotation.SuppressLint
 import android.app.Service
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.net.ProxyInfo
 import android.os.Build
 import android.os.ParcelFileDescriptor
@@ -35,6 +39,10 @@ class VpnService : BaseVpnService(),
 
     private var metered = false
 
+    // Dual network acceleration: keep cellular alive while on WiFi
+    private var cellularNetwork: Network? = null
+    private var cellularNetworkCallback: ConnectivityManager.NetworkCallback? = null
+
     override var upstreamInterfaceName: String? = null
 
     override suspend fun startProcesses() {
@@ -52,6 +60,14 @@ class VpnService : BaseVpnService(),
 
     @Suppress("EXPERIMENTAL_API_USAGE")
     override fun killProcesses() {
+        // Release dual network cellular callback
+        cellularNetworkCallback?.let {
+            try {
+                SagerNet.connectivity.unregisterNetworkCallback(it)
+            } catch (_: Exception) {}
+            cellularNetworkCallback = null
+        }
+        cellularNetwork = null
         conn?.close()
         conn = null
         super.killProcesses()
@@ -196,15 +212,60 @@ class VpnService : BaseVpnService(),
         if (Build.VERSION.SDK_INT >= 29) builder.setMetered(metered)
         conn = builder.establish() ?: throw NullConnectionException()
 
+        // Start dual network cellular keep-alive if enabled
+        startDualNetwork()
+
         return conn!!.fd
     }
 
     fun updateUnderlyingNetwork(builder: Builder? = null) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
-            SagerNet.underlyingNetwork?.let {
-                builder?.setUnderlyingNetworks(arrayOf(SagerNet.underlyingNetwork))
-                    ?: setUnderlyingNetworks(arrayOf(SagerNet.underlyingNetwork))
+            val primary = SagerNet.underlyingNetwork
+            if (DataStore.dualNetwork && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                // Build network list: primary + cellular (if different)
+                val networks = mutableListOf<Network>()
+                primary?.let { networks.add(it) }
+                cellularNetwork?.let { cell ->
+                    if (cell != primary) networks.add(cell)
+                }
+                val arr = if (networks.isNotEmpty()) networks.toTypedArray() else null
+                builder?.setUnderlyingNetworks(arr) ?: setUnderlyingNetworks(arr)
+            } else {
+                primary?.let {
+                    builder?.setUnderlyingNetworks(arrayOf(it))
+                        ?: setUnderlyingNetworks(arrayOf(it))
+                }
             }
+        }
+    }
+
+    /** Request cellular network to stay alive for dual network acceleration. */
+    @Suppress("EXPERIMENTAL_API_USAGE")
+    fun startDualNetwork() {
+        if (!DataStore.dualNetwork || Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
+        if (cellularNetworkCallback != null) return
+        val request = NetworkRequest.Builder()
+            .addTransportType(NetworkCapabilities.TRANSPORT_CELLULAR)
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .build()
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                cellularNetwork = network
+                updateUnderlyingNetwork()
+            }
+            override fun onLost(network: Network) {
+                if (cellularNetwork == network) {
+                    cellularNetwork = null
+                    updateUnderlyingNetwork()
+                }
+            }
+        }
+        cellularNetworkCallback = callback
+        try {
+            SagerNet.connectivity.requestNetwork(request, callback)
+        } catch (e: Exception) {
+            Logs.w("Dual network request failed: $e")
+            cellularNetworkCallback = null
         }
     }
 

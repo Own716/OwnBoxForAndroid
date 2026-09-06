@@ -6,6 +6,7 @@ import io.nekohasekai.sagernet.CONNECTION_TEST_URL
 import io.nekohasekai.sagernet.GroupType
 import io.nekohasekai.sagernet.IPv6Mode
 import io.nekohasekai.sagernet.Key
+import io.nekohasekai.sagernet.SpeedTestMode
 import io.nekohasekai.sagernet.TunImplementation
 import io.nekohasekai.sagernet.bg.BaseService
 import io.nekohasekai.sagernet.bg.VpnService
@@ -161,6 +162,15 @@ object DataStore : OnPreferenceDataStoreChangeListener {
 
     var tunImplementation by configurationStore.stringToInt(Key.TUN_IMPLEMENTATION) { TunImplementation.GVISOR }
     var profileTrafficStatistics by configurationStore.boolean(Key.PROFILE_TRAFFIC_STATISTICS) { true }
+
+    // Ownbox new features
+    var disableMixedInbound by configurationStore.boolean(Key.DISABLE_MIXED_INBOUND) { false }
+    var strictRoute by configurationStore.boolean(Key.STRICT_ROUTE) { true }
+    var parallelDial by configurationStore.boolean(Key.PARALLEL_DIAL) { false }
+    var dualNetwork by configurationStore.boolean(Key.DUAL_NETWORK) { false }
+    var speedTestMode by configurationStore.stringToInt(Key.SPEED_TEST_MODE) { SpeedTestMode.SIMPLE_DOWNLOAD }
+    var speedTestTimeout by configurationStore.stringToInt(Key.SPEED_TEST_TIMEOUT) { 10000 }
+    var simpleDlUrl by configurationStore.string(Key.SIMPLE_DL_URL) { "https://speed.cloudflare.com/__down?bytes=10000000" }
 
     var yacdURL by configurationStore.string("yacdURL") { "http://127.0.0.1:9090/ui" }
 

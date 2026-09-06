@@ -202,8 +202,10 @@ fun buildConfig(
                 stack = when (DataStore.tunImplementation) {
                     TunImplementation.GVISOR -> "gvisor"
                     TunImplementation.SYSTEM -> "system"
+                    TunImplementation.HEVTUN -> "hev"
                     else -> "mixed"
                 }
+                strict_route = DataStore.strictRoute
                 endpoint_independent_nat = true
                 mtu = DataStore.mtu
                 domain_strategy = genDomainStrategy(DataStore.resolveDestination)
@@ -224,15 +226,17 @@ fun buildConfig(
                     }
                 }
             })
-            inbounds.add(Inbound_MixedOptions().apply {
-                type = "mixed"
-                tag = TAG_MIXED
-                listen = bind
-                listen_port = DataStore.mixedPort
-                domain_strategy = genDomainStrategy(DataStore.resolveDestination)
-                sniff = needSniff
-                sniff_override_destination = needSniffOverride
-            })
+            if (!DataStore.disableMixedInbound) {
+                inbounds.add(Inbound_MixedOptions().apply {
+                    type = "mixed"
+                    tag = TAG_MIXED
+                    listen = bind
+                    listen_port = DataStore.mixedPort
+                    domain_strategy = genDomainStrategy(DataStore.resolveDestination)
+                    sniff = needSniff
+                    sniff_override_destination = needSniffOverride
+                })
+            }
         }
 
         outbounds = mutableListOf()

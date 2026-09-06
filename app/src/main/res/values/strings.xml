@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">NekoBox</string>
-    <string name="app_name_long" translatable="false">NekoBox for Android</string>
+    <string name="app_name" translatable="false">Ownbox</string>
+    <string name="app_name_long" translatable="false">Ownbox</string>
     <string name="app_desc">The universal proxy toolchain for Android, written in Kotlin.</string>
     <string name="project">Project</string>
     <string name="github">Source code</string>
@@ -579,4 +579,25 @@
     <string name="minimize">Minimize</string>
     <string name="app_list_permission_denied">Unable to read installed apps.\nThis is usually because the system has restricted app read permissions.\nPlease grant permissions in the system settings.</string>
     <string name="open_app_settings">Open System Settings</string>
+    <!-- Ownbox & Throne features -->
+    <string name="dual_network">Dual Network Acceleration</string>
+    <string name="dual_network_summary">Concurrently connect using WiFi and mobile data. Requires keeping both WiFi and mobile data enabled, and will increase battery usage.</string>
+    <string name="disable_mixed_inbound">Disable Mixed Inbound</string>
+    <string name="disable_mixed_inbound_summary">Pure TUN inbound mode, does not listen for proxy entrance on local ports.</string>
+    <string name="speed_test_mode">Speed Test Mode</string>
+    <string name="speed_test_mode_download_only">Download Only</string>
+    <string name="speed_test_mode_upload_only">Upload Only</string>
+    <string name="speed_test_mode_full">Download and Upload</string>
+    <string name="speed_test_mode_simple_dl">Simple Download</string>
+    <string name="speed_test_mode_summary">Provide speed testing for subscription nodes. Simple download consumes little data and runs quickly.</string>
+    <string name="speed_test_timeout">Speed Test Timeout (ms)</string>
+    <string name="speed_test_timeout_summary">Customize speed test timeout in milliseconds</string>
+    <string name="simple_dl_url">Simple Download Test URL</string>
+    <string name="simple_dl_url_summary">Set URL used for simple download speed test</string>
+    <string name="parallel_dial">Concurrent Dialing</string>
+    <string name="parallel_dial_summary">Establish connections faster via concurrent dialing. May increase battery consumption.</string>
+    <string name="strict_route">Strict Route</string>
+    <string name="strict_route_summary">Enforce strict routing to prevent data leakage outside the TUN interface.</string>
+    <string name="action_connection_speed_test">Speed Test</string>
+    <string name="speed_test">Speed Test</string>
 </resources>

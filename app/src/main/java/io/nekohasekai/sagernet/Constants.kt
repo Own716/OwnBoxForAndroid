@@ -151,12 +151,28 @@ object Key {
 
     const val APP_TLS_VERSION = "appTLSVersion"
     const val ENABLE_CLASH_API = "enableClashAPI"
+
+    const val DISABLE_MIXED_INBOUND = "disableMixedInbound"
+    const val STRICT_ROUTE = "strictRoute"
+    const val PARALLEL_DIAL = "parallelDial"
+    const val DUAL_NETWORK = "dualNetwork"
+    const val SPEED_TEST_MODE = "speedTestMode"
+    const val SPEED_TEST_TIMEOUT = "speedTestTimeout"
+    const val SIMPLE_DL_URL = "simpleDlUrl"
 }
 
 object TunImplementation {
     const val GVISOR = 0
     const val SYSTEM = 1
     const val MIXED = 2
+    const val HEVTUN = 3
+}
+
+object SpeedTestMode {
+    const val DOWNLOAD_ONLY = 0
+    const val UPLOAD_ONLY = 1
+    const val FULL = 2
+    const val SIMPLE_DOWNLOAD = 3
 }
 
 object IPv6Mode {

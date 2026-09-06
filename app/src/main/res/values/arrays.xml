@@ -430,6 +430,14 @@
         <item>gVisor</item>
         <item>System</item>
         <item>Mixed</item>
+        <item>HEVTUN</item>
+    </string-array>
+
+    <string-array name="speed_test_mode_entries">
+        <item>@string/speed_test_mode_download_only</item>
+        <item>@string/speed_test_mode_upload_only</item>
+        <item>@string/speed_test_mode_full</item>
+        <item>@string/speed_test_mode_simple_dl</item>
     </string-array>
 
     <string-array name="hysteria_protocol">
