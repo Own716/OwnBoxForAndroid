@@ -190,13 +190,13 @@ class MainActivity : ThemedActivity(),
                         try {
                             val proxies = io.nekohasekai.sagernet.group.RawUpdater.parseRaw(text)
                             if (!proxies.isNullOrEmpty()) {
+                                val targetId = DataStore.selectedGroupForImport()
+                                proxies.forEach { profile ->
+                                    ProfileManager.createProfile(targetId, profile)
+                                }
                                 onMainDispatcher {
-                                    val frag = currentMainFragment as? ConfigurationFragment
-                                    if (frag != null) {
-                                        frag.import(proxies)
-                                    } else {
-                                        snackbar(getString(R.string.action_import_msg)).show()
-                                    }
+                                    displayFragmentWithId(R.id.nav_configuration)
+                                    snackbar(resources.getQuantityString(R.plurals.added, proxies.size, proxies.size)).show()
                                 }
                             }
                         } catch (e: io.nekohasekai.sagernet.ktx.SubscriptionFoundException) {

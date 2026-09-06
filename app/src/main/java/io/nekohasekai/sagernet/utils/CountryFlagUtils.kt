@@ -1,8 +1,8 @@
-﻿package io.nekohasekai.sagernet.utils
+package io.nekohasekai.sagernet.utils
 
 object CountryFlagUtils {
 
-    private val REGIONAL_INDICATOR_REGEX = Regex("[\uD83C][\uDDE6-\uDDFF]{2}")
+    private val REGIONAL_INDICATOR_REGEX = Regex("[\uD83C][\uDDE6-\uDDFF][\uD83C][\uDDE6-\uDDFF]")
 
     fun hasFlag(name: String): Boolean {
         return REGIONAL_INDICATOR_REGEX.containsMatchIn(name)

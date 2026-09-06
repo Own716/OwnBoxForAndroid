@@ -84,13 +84,13 @@ class TileService : BaseTileService(), SagerConnection.Callback {
                 }
             }
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                subtitle = when (serviceState) {
+                setSubtitle(when (serviceState) {
                     BaseService.State.Connected -> profileName ?: getString(R.string.vpn_connected)
                     BaseService.State.Connecting -> getString(R.string.connecting)
                     BaseService.State.Stopping -> getString(R.string.stopping)
                     BaseService.State.Stopped -> getString(R.string.not_connected)
                     else -> null
-                }
+                })
             }
             updateTile()
         }
