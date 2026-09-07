@@ -17,103 +17,11 @@
 
 ## 📖 项目介绍 / Introduction
 
-**OwnBox for Android** 是一款基于 Sing-box 官方最新原生核心（v1.13.16）深度定制打造的 Android 通用网络代理客户端。集合全协议栈支持、自定义桌面图标切换 (19 款质感图标，含 4 款原神角色图标)、TCP Ping 极速真连测试、常用应用分流一键预设、单节点独立测速、并发拨号、双网络加速、WebDAV 云备份同步、控制中心四叶草快捷磁贴与桌面小组件等丰富功能，兼具极速连接、低耗电量与优雅简洁的用户界面。
+**OwnBox for Android** 是一款基于 Sing-box 官方原生核心深度定制打造的 Android 通用网络代理客户端。集合全协议栈支持、自定义桌面图标切换 (19 款质感图标，含 4 款原神角色图标)、TCP Ping 极速真连测试、常用应用分流一键预设、单节点独立测速、并发拨号、双网络加速、WebDAV 云备份同步、控制中心四叶草快捷磁贴与桌面小组件等丰富功能，兼具极速连接、低耗电量与优雅简洁的用户界面。
 
 ---
 
-## 📥 最新发行版下载 / Downloads (v2.3.5)
-
-请前往官方发行版页面获取经过正式签名的全架构 APK 安装包：
-
-👉 **[前往 GitHub Releases 官方发布页面](https://github.com/Own716/OwnBoxForAndroid/releases/tag/v2.3.5)**
-
-| 架构 / 平台 | 适用设备 | 文件名 | 官方下载直链 |
-| :--- | :--- | :--- | :--- |
-| **ARM64 (强力推荐)** | **绝大多数现代安卓手机 (一加、小米、华为、OPPO、vivo、三星、荣耀等)** | `Ownbox-2.3.5-arm64-v8a-release.apk` | [**📥 点击直接下载**](https://github.com/Own716/OwnBoxForAndroid/releases/download/v2.3.5/Ownbox-2.3.5-arm64-v8a-release.apk) |
-| **ARMv7** | 较老旧的 32 位安卓机型 | `Ownbox-2.3.5-armeabi-v7a-release.apk` | [**📥 点击直接下载**](https://github.com/Own716/OwnBoxForAndroid/releases/download/v2.3.5/Ownbox-2.3.5-armeabi-v7a-release.apk) |
-| **x86_64** | 电脑 64 位安卓模拟器、ChromeOS | `Ownbox-2.3.5-x86_64-release.apk` | [**📥 点击直接下载**](https://github.com/Own716/OwnBoxForAndroid/releases/download/v2.3.5/Ownbox-2.3.5-x86_64-release.apk) |
-| **x86** | 电脑 32 位安卓模拟器 | `Ownbox-2.3.5-x86-release.apk` | [**📥 点击直接下载**](https://github.com/Own716/OwnBoxForAndroid/releases/download/v2.3.5/Ownbox-2.3.5-x86-release.apk) |
-
----
-
-## Ownbox v2.3.5 更新说明 / Release Notes
-
-欢迎使用 Ownbox 2.3.5 正式版！本次更新凝聚了自定义应用桌面图标选择、四叶草控制中心磁贴彻底修复、网络诊断面板、多订阅管理、桌面小组件等多项深度定制与实用功能升级，包括移除存在兼容性问题的自动优选节点功能、常用分流一键预设、TCP Ping 极速测速、MONET 动态取色即时生效、默认生机绿主题以及多项细节修正。
-
----
-
-### 🆕 相较于 2.3.2 版本的更新与修复明细
-
-#### 🌟 新增功能与深度增强
-1. **全新独立官方包名与签名系统（完美支持与原版并存）**：
-   - **专属独立包名**：正式采用全新独立包名 `com.ownbox.app`，彻底摆脱旧包名冲突，与原版及各类分支实现**同一设备双开共存**，可同时安装并独立运行！
-   - **OwnBox 全新专属官方签名**：采用自动生成的 25 年长效专属官方签名密钥库（RSA-2048），彻底避免签名覆盖失败与冲突问题；
-     - 证书拥有者：`CN=OwnBox, OU=com.ownbox.app, O=OwnBox, L=Beijing, ST=Beijing, C=CN`
-     - SHA-256 指纹：`41:28:8D:77:E4:CA:EB:28:86:18:DA:2E:E1:E2:23:37:25:3A:E4:C4:F8:57:EB:AC:62:70:7E:F4:FC:96:D3:FC`
-     - SHA-1 指纹：`D0:B6:90:82:10:6B:23:BD:05:CC:43:51:19:42:E3:0E:BE:82:86:54`
-
-2. **全新「修改应用图标」(Change icon) 弹窗功能（扩充至 19 款，含 4 款原神角色图标）**：
-   - 深度集成 `eleutherifer/NekoBoxPlus` 图标切换引擎，在设置菜单中提供专属「修改图标 (Change icon)」入口；
-   - **全新扩充至 19 款精美高质感图标**：
-     - **4 款精选角色图标**：**胡桃 (Hu Tao)**、**芙宁娜 (Furina)**、**雷电将军 (Raiden Shogun)**、**甘雨 (Ganyu)**；
-     - **15 款原版质感图标**：**Dynamic**（随系统日夜动态自适应）、**Light mode**（浅色模式）、**Dark mode**（深色模式）、**Old NekoBox+**（经典旧版）、**NekoBox**、**Midnight**（午夜深蓝）、**Heavens**（极境天空）、**Halloween**（万圣奇妙夜）、**Cyberpunk**（赛博朋克霓虹）、**Black and White**（纯粹黑白）、**Pink**（甜美粉红）、**Druid**（自然德鲁伊）、**Red**（烈焰红）、**Russian**（俄罗斯方块复古）、**Text**（极简文字）；
-   - 采用标准 Material 3 对话框设计，自适应 Android 8.0+ 矢量分层，卡片式预览高亮当前选用图标，点击即刻原子级动态切换手机桌面图标，无需杀死或重启应用。
-
-3. **彻底修复控制中心四叶草磁贴变纯白圆圈 Bug**：
-   - 深入重构磁贴图标生成逻辑，引入高精度色彩分离算法，彻底剔除不透明背景底盘，输出符合 Android 规范的纯 Alpha 蒙版通道；
-   - 解决此前控制中心磁贴被系统染色成实心白圆盘的视觉问题，无论在快捷开关开启还是关闭状态下，中心四叶草 Logo 均大尺寸居中、高清晰锐利呈现。
-
-4. **彻底移除「自动优选最低延迟节点」功能**：
-   - 响应用户反馈，彻底移除了存在开启异常及响应不灵敏的实验性自动选优功能，保障主程序与核心网络调度的极致稳定。
-
-5. **桌面快捷开关小组件 (App Widget)**：
-   - 新增桌面小组件支持，无需点进 App 即可在手机主屏幕上一键启停代理连接，并实时呈现当前节点名称与网络状态。
-
-6. **常用应用分流一键预设 (国内应用直连 / 海外应用代理)**：
-   - 在「分流规则」页面菜单中提供「分流规则一键预设」：
-     - **常用国内应用直连白名单**：一键注入微信、QQ、支付宝、淘宝、京东、抖音、哔哩哔哩、美团、拼多多、网易云音乐、高德地图、百度地图等 Direct 直连规则；
-     - **常用海外应用走代理**：一键注入 Telegram、YouTube、Twitter/X、Chrome、ChatGPT、Discord、WhatsApp、TikTok、Netflix、Spotify 等 Proxy 代理规则；
-   - 在「分应用代理」列表中同步支持一键快捷勾选国内与海外头部应用。
-
-7. **REALITY 与 ECH 规范完整对齐**：
-   - REALITY 完整支持 `tls.reality`（`public_key`, `short_id`, `server_name`）与客户端 `tls.utls.fingerprint` 模拟指纹（如 chrome）；
-   - 对齐 sing-box 1.12+ ECH 标准库规范，剔除废弃的 `pq_signature_schemes_enabled`，保障 TLS 握手稳定性。
-
-8. **Hysteria 2 端口跳跃解析修复**：
-   - 彻底修复内核端口跳跃 `server_ports` 字段解析规范，支持短横线区间格式（如 `2080-3000`），确保 sing-box 1.12+ 内核不出现解析报错。
-
-9. **AmneziaWG 智能兼容降级解析**：
-   - 支持导入 `awg://` 链接与 AmneziaWG 配置文件，智能剥离非标混淆参数（`Jc/Jmin/S1/H1`）并以标准 WireGuard 字段稳定运行，自动在节点名称增加 `[AWG-Compat]` 标示。
-
-10. **多订阅/分组独立启用与禁用开关**：
-   - 分组卡片专属操作菜单新增“禁用/启用此分组”，被禁用的分组在界面半透明弱化显示，并在内核配置生成中彻底排除。
-
-11. **智能粘贴导入预览弹窗**：
-    - 剪贴板识别到多个节点链接时，弹出清晰美观的协议与节点名称预览确认对话框，防止一次性误导入混乱列表。
-
-12. **Fake-IP / DNS 泄漏实时检测面板**：
-    - 在网络工具箱中新增 DNS 泄漏与 Fake-IP 映射实时检测，一目了然验证当前 DNS 解析环境。
-
-13. **崩溃日志一键导出与本地诊断**：
-    - 支持捕获应用与 sing-box 核心异常日志并一键导出至外置存储，极大方便技术排查。
-
-14. **本地配置自动定时备份**：
-    - 支持一键将节点、分组、分流规则与首选项完整打包存储在本地，并自动保留最近 5 份历史快照。
-
-#### 🛠️ 体验修复与优化
-1. **系统 MONET 动态取色功能深度修复**：
-   - 修复在设置中开启“使用系统 MONET 动态取色”后无反应的问题；
-   - 开启后即刻跟随 Android 12+ 系统壁纸色彩动态重绘界面，返回主界面即时生效。
-
-2. **首次安装默认主题颜色调整为「绿色」**：
-   - 默认主题颜色修改为清新自然的**生机绿 (Green)**，视觉体验更舒适护眼。
-
-3. **关于页面（About）上游仓库来源名称精确修正**：
-   - 关于页面底部“上游仓库来源 (Fork)”名称正式修正为：`Throne for Android `。
-
----
-
-### 📱 2.3.5 全量功能与软件特色总览
+## 📱 核心功能与软件特色 / Key Features
 
 #### 🚀 1. 现代化协议栈全协议支持
 * **下一代高速网络协议**：VLESS XHTTP (SplitHTTP)、Juicity、Snell (v1-v6)、ShadowsocksR (SSR)、Hysteria 1 / Hysteria 2、TUIC (v5)；
@@ -152,11 +60,23 @@
 
 ---
 
-### 📦 安装包文件说明 / Package Assets
+## 📥 发行版下载 / Downloads
 
-| 架构平台 | 推荐机型 | 文件名 |
-| :--- | :--- | :--- |
-| **ARM64 (强力推荐)** | **绝大多数现代安卓手机 (一加、小米、华为、OPPO、vivo、三星、荣耀等)** | `Ownbox-2.3.5-arm64-v8a-release.apk` |
-| **ARMv7** | 较老旧的 32 位安卓机型 | `Ownbox-2.3.5-armeabi-v7a-release.apk` |
-| **x86_64** | 电脑 64 位安卓模拟器、ChromeOS | `Ownbox-2.3.5-x86_64-release.apk` |
-| **x86** | 电脑 32 位安卓模拟器 | `Ownbox-2.3.5-x86-release.apk` |
+请前往官方发行版页面获取经过正式签名的全架构 APK 安装包：
+
+👉 **[前往 GitHub Releases 官方发布页面](https://github.com/Own716/OwnBoxForAndroid/releases)**
+
+| 架构 / 平台 | 适用设备 | 文件名 | 官方下载直链 |
+| :--- | :--- | :--- | :--- |
+| **ARM64 (强力推荐)** | **绝大多数现代安卓手机 (一加、小米、华为、OPPO、vivo、三星、荣耀等)** | `Ownbox-2.3.5-arm64-v8a-release.apk` | [**📥 点击直接下载**](https://github.com/Own716/OwnBoxForAndroid/releases/download/v2.3.5/Ownbox-2.3.5-arm64-v8a-release.apk) |
+| **ARMv7** | 较老旧的 32 位安卓机型 | `Ownbox-2.3.5-armeabi-v7a-release.apk` | [**📥 点击直接下载**](https://github.com/Own716/OwnBoxForAndroid/releases/download/v2.3.5/Ownbox-2.3.5-armeabi-v7a-release.apk) |
+| **x86_64** | 电脑 64 位安卓模拟器、ChromeOS | `Ownbox-2.3.5-x86_64-release.apk` | [**📥 点击直接下载**](https://github.com/Own716/OwnBoxForAndroid/releases/download/v2.3.5/Ownbox-2.3.5-x86_64-release.apk) |
+| **x86** | 电脑 32 位安卓模拟器 | `Ownbox-2.3.5-x86-release.apk` | [**📥 点击直接下载**](https://github.com/Own716/OwnBoxForAndroid/releases/download/v2.3.5/Ownbox-2.3.5-x86-release.apk) |
+
+---
+
+### 📦 安装包架构说明 / Architecture Notes
+
+* **ARM64 (v8a)**：适用于绝大多数主流 64 位安卓手机与平板设备；
+* **ARMeabi-v7a**：适用于较老款的 32 位安卓设备或部分电视盒子；
+* **x86_64 / x86**：适用于主流 PC 电脑安卓模拟器。
