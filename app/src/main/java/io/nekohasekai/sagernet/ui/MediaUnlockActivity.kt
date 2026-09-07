@@ -11,7 +11,6 @@ import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProfileManager
 import io.nekohasekai.sagernet.databinding.ActivityMediaUnlockBinding
 import io.nekohasekai.sagernet.ktx.USER_AGENT
-import io.nekohasekai.sagernet.ktx.modernTLS
 import io.nekohasekai.sagernet.ktx.tryProxyOutbound
 import io.nekohasekai.sagernet.utils.LandingIpManager
 import kotlinx.coroutines.Dispatchers
@@ -108,9 +107,9 @@ class MediaUnlockActivity : ThemedActivity() {
         binding.tvChatgptStatus.visibility = View.GONE
         binding.tvChatgptDesc.text = "正在检测 OpenAI 接入与 Cloudflare 风控..."
 
-        binding.progressYouTube.visibility = View.VISIBLE
-        binding.tvYouTubeStatus.visibility = View.GONE
-        binding.tvYouTubeDesc.text = "正在检测 YouTube Premium 地区开放状态..."
+        binding.progressYoutube.visibility = View.VISIBLE
+        binding.tvYoutubeStatus.visibility = View.GONE
+        binding.tvYoutubeDesc.text = "正在检测 YouTube Premium 地区开放状态..."
     }
 
     private fun showAllNotConnected() {
@@ -129,10 +128,10 @@ class MediaUnlockActivity : ThemedActivity() {
         binding.tvChatgptStatus.text = "未连接"
         binding.tvChatgptStatus.setTextColor(Color.parseColor("#94A3B8"))
 
-        binding.progressYouTube.visibility = View.GONE
-        binding.tvYouTubeStatus.visibility = View.VISIBLE
-        binding.tvYouTubeStatus.text = "未连接"
-        binding.tvYouTubeStatus.setTextColor(Color.parseColor("#94A3B8"))
+        binding.progressYoutube.visibility = View.GONE
+        binding.tvYoutubeStatus.visibility = View.VISIBLE
+        binding.tvYoutubeStatus.text = "未连接"
+        binding.tvYoutubeStatus.setTextColor(Color.parseColor("#94A3B8"))
     }
 
     // --- Netflix ---
@@ -149,11 +148,14 @@ class MediaUnlockActivity : ThemedActivity() {
                 setURL("https://www.netflix.com/title/81280792")
                 setUserAgent(USER_AGENT)
             }
-            val resp1 = req1.execute()
-            val code1 = resp1.statusCode
-            val body1 = Util.getStringBox(resp1.contentString)
+            val body1 = try {
+                val resp1 = req1.execute()
+                Util.getStringBox(resp1.contentString)
+            } catch (e: Throwable) {
+                ""
+            }
 
-            if (code1 in 200..299 && !body1.contains("page-404") && (body1.contains("title/81280792") || body1.contains("watch") || body1.contains("Breaking Bad"))) {
+            if (body1.isNotBlank() && !body1.contains("page-404") && (body1.contains("title/81280792") || body1.contains("watch") || body1.contains("Breaking Bad"))) {
                 return@withContext TestResult(1, "已原生解锁", "完整支持全部非自制原生版权剧集与自制剧")
             }
 
@@ -162,11 +164,14 @@ class MediaUnlockActivity : ThemedActivity() {
                 setURL("https://www.netflix.com/title/80018499")
                 setUserAgent(USER_AGENT)
             }
-            val resp2 = req2.execute()
-            val code2 = resp2.statusCode
-            val body2 = Util.getStringBox(resp2.contentString)
+            val body2 = try {
+                val resp2 = req2.execute()
+                Util.getStringBox(resp2.contentString)
+            } catch (e: Throwable) {
+                ""
+            }
 
-            if (code2 in 200..299 && (body2.contains("title/80018499") || body2.contains("watch"))) {
+            if (body2.isNotBlank() && (body2.contains("title/80018499") || body2.contains("watch"))) {
                 TestResult(2, "仅自制剧", "仅支持播放 Netflix 自制剧集，非自制版权剧受限")
             } else {
                 TestResult(0, "未解锁", "当前节点 IP 无法正常访问 Netflix 或受区域限制")
@@ -196,18 +201,20 @@ class MediaUnlockActivity : ThemedActivity() {
                 setUserAgent(USER_AGENT)
             }
             val resp = req.execute()
-            val code = resp.statusCode
             val body = Util.getStringBox(resp.contentString)
 
-            if (code in 200..299 && !body.contains("not available in your region") && !body.contains("restricted")) {
+            if (!body.contains("not available in your region") && !body.contains("restricted")) {
                 TestResult(1, "已解锁", "支持正常访问与播放 Disney+ 流媒体内容")
-            } else if (code == 403 || body.contains("not available")) {
-                TestResult(0, "未解锁", "地区不支持或服务受限 (HTTP $code)")
             } else {
-                TestResult(0, "未解锁", "访问受限 (HTTP $code)")
+                TestResult(0, "未解锁", "地区不支持或服务受限")
             }
         } catch (e: Throwable) {
-            TestResult(-1, "检测超时", "连接超时或节点网络异常: ${e.message}")
+            val msg = e.message ?: ""
+            if (msg.contains("403") || msg.contains("restricted") || msg.contains("not available")) {
+                TestResult(0, "未解锁", "地区不支持或服务受限")
+            } else {
+                TestResult(-1, "检测超时", "连接超时或节点网络异常: $msg")
+            }
         }
     }
 
@@ -231,18 +238,20 @@ class MediaUnlockActivity : ThemedActivity() {
                 setUserAgent(USER_AGENT)
             }
             val resp = req.execute()
-            val code = resp.statusCode
             val body = Util.getStringBox(resp.contentString)
 
-            if (code in 200..299 && !body.contains("cf-mitigated") && !body.contains("Attention Required")) {
+            if (!body.contains("cf-mitigated") && !body.contains("Attention Required")) {
                 TestResult(1, "已解锁", "支持网页端与 API 正常登录对话，无 Cloudflare 拦截")
-            } else if (code == 403 || body.contains("Attention Required") || body.contains("cf-mitigated")) {
-                TestResult(0, "未解锁 (CF 拦截)", "触发 Cloudflare 人机验证或 IP 限制")
             } else {
-                TestResult(0, "未解锁", "访问受阻 (HTTP $code)")
+                TestResult(0, "未解锁 (CF 拦截)", "触发 Cloudflare 人机验证或 IP 限制")
             }
         } catch (e: Throwable) {
-            TestResult(-1, "检测超时", "连接超时或网络异常: ${e.message}")
+            val msg = e.message ?: ""
+            if (msg.contains("403") || msg.contains("cf-mitigated") || msg.contains("Attention Required")) {
+                TestResult(0, "未解锁 (CF 拦截)", "触发 Cloudflare 人机验证或 IP 限制")
+            } else {
+                TestResult(-1, "检测超时", "连接超时或网络异常: $msg")
+            }
         }
     }
 
@@ -266,21 +275,15 @@ class MediaUnlockActivity : ThemedActivity() {
                 setUserAgent(USER_AGENT)
             }
             val resp = req.execute()
-            val code = resp.statusCode
             val body = Util.getStringBox(resp.contentString)
 
-            if (code in 200..299) {
-                if (body.contains("Premium is not available in your country")) {
-                    TestResult(0, "未解锁", "YouTube Premium 在当前节点所在地区暂未开放")
-                } else {
-                    // Try extract country code
-                    val matcher = Pattern.compile("\"countryCode\":\"([A-Z]{2})\"").matcher(body)
-                    val country = if (matcher.find()) matcher.group(1) else ""
-                    val extra = if (country.isNotBlank()) " ($country 地区)" else ""
-                    TestResult(1, "已解锁$extra", "支持 YouTube Premium 订阅购买与后台画中画播放")
-                }
+            if (body.contains("Premium is not available in your country")) {
+                TestResult(0, "未解锁", "YouTube Premium 在当前节点所在地区暂未开放")
             } else {
-                TestResult(0, "未解锁", "页面响应异常 (HTTP $code)")
+                val matcher = Pattern.compile("\"countryCode\":\"([A-Z]{2})\"").matcher(body)
+                val country = if (matcher.find()) matcher.group(1) else ""
+                val extra = if (country.isNotBlank()) " ($country 地区)" else ""
+                TestResult(1, "已解锁$extra", "支持 YouTube Premium 订阅购买与后台画中画播放")
             }
         } catch (e: Throwable) {
             TestResult(-1, "检测超时", "连接超时或网络异常: ${e.message}")
@@ -288,11 +291,11 @@ class MediaUnlockActivity : ThemedActivity() {
     }
 
     private fun renderYouTube(res: TestResult) {
-        binding.progressYouTube.visibility = View.GONE
-        binding.tvYouTubeStatus.visibility = View.VISIBLE
-        binding.tvYouTubeStatus.text = res.tag
-        binding.tvYouTubeDesc.text = res.message
-        binding.tvYouTubeStatus.setTextColor(statusColor(res.status))
+        binding.progressYoutube.visibility = View.GONE
+        binding.tvYoutubeStatus.visibility = View.VISIBLE
+        binding.tvYoutubeStatus.text = res.tag
+        binding.tvYoutubeDesc.text = res.message
+        binding.tvYoutubeStatus.setTextColor(statusColor(res.status))
     }
 
     private fun statusColor(status: Int): Int {

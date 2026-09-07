@@ -9,7 +9,6 @@ import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.databinding.ActivityIpPurityBinding
 import io.nekohasekai.sagernet.ktx.USER_AGENT
-import io.nekohasekai.sagernet.ktx.modernTLS
 import io.nekohasekai.sagernet.ktx.tryProxyOutbound
 import io.nekohasekai.sagernet.utils.LandingIpManager
 import kotlinx.coroutines.Dispatchers

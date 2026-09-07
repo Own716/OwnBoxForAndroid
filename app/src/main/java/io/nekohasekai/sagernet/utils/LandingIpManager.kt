@@ -1,7 +1,6 @@
 package io.nekohasekai.sagernet.utils
 
 import io.nekohasekai.sagernet.ktx.USER_AGENT
-import io.nekohasekai.sagernet.ktx.modernTLS
 import io.nekohasekai.sagernet.ktx.tryProxyOutbound
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
