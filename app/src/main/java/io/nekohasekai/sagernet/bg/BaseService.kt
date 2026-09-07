@@ -87,7 +87,7 @@ class BaseService {
             state = s
             DataStore.serviceState = s
             binder.stateChanged(s, msg)
-            runCatching { io.nekohasekai.sagernet.widget.OwnBoxWidgetProvider.updateWidgets(service) }
+            runCatching { io.nekohasekai.sagernet.widget.OwnBoxWidgetProvider.updateWidgets(SagerNet.application) }
         }
     }
 

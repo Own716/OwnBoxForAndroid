@@ -50,7 +50,7 @@ class OwnBoxWidgetProvider : AppWidgetProvider() {
             ACTION_SWITCH_NODE -> {
                 runOnDefaultDispatcher {
                     try {
-                        val allProxies = SagerDatabase.proxyDao.allProxies()
+                        val allProxies = SagerDatabase.proxyDao.getAll()
                         if (allProxies.isNotEmpty()) {
                             val currentId = DataStore.selectedProxy
                             val currentIndex = allProxies.indexOfFirst { it.id == currentId }
