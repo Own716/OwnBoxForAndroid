@@ -822,7 +822,7 @@ fun buildConfig(
         }
 
         val isGroupUrlTest = group?.let { DataStore.isGroupUrlTest(it.id) } == true
-        val useAutoSelect = !forTest && !forExport && (DataStore.autoSelectLowestLatency || isGroupUrlTest)
+        val useAutoSelect = !forTest && !forExport && isGroupUrlTest
         // build outbounds
         if (buildSelector || useAutoSelect) {
             val list = if (group != null && group.id != 0L) {

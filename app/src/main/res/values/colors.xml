@@ -329,4 +329,8 @@
     <color name="card_elevated_black">#EEEEEE</color>
     <color name="card_elevated_verdant_mint">#EBF9F3</color>
 
+    <color name="app_icon_red_background">#BC0000</color>
+        <color name="ic_launcher_background">#B4DFF0</color>
+        <color name="ic_launcher_background_light">#B4DFF0</color>
+        <color name="ic_launcher_background_dark">#071029</color>
 </resources>

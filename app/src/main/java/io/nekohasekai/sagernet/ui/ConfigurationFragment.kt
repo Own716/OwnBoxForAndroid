@@ -331,7 +331,6 @@ class ConfigurationFragment @JvmOverloads constructor(
         if (!select) {
             toolbar.inflateMenu(R.menu.add_profile_menu)
             toolbar.menu.findItem(R.id.action_global_mode)?.isChecked = DataStore.globalMode
-            toolbar.menu.findItem(R.id.action_auto_lowest_latency)?.isChecked = DataStore.autoSelectLowestLatency
             toolbar.setOnMenuItemClickListener(this)
         } else {
             toolbar.setTitle(titleRes)
@@ -405,7 +404,6 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     override fun onPrepareOptionsMenu(menu: Menu) {
         menu.findItem(R.id.action_global_mode)?.isChecked = DataStore.globalMode
-        menu.findItem(R.id.action_auto_lowest_latency)?.isChecked = DataStore.autoSelectLowestLatency
         super.onPrepareOptionsMenu(menu)
     }
 
@@ -860,29 +858,6 @@ class ConfigurationFragment @JvmOverloads constructor(
                             }
                         }
                     }
-                }
-                return true
-            }
-
-            R.id.action_auto_lowest_latency -> {
-                val newState = !DataStore.autoSelectLowestLatency
-                item.isChecked = newState
-                DataStore.autoSelectLowestLatency = newState
-                toolbar.menu.findItem(R.id.action_auto_lowest_latency)?.isChecked = newState
-                val msg = if (newState) {
-                    getString(R.string.auto_lowest_latency_enabled)
-                } else {
-                    getString(R.string.auto_lowest_latency_disabled)
-                }
-                if (DataStore.serviceState.canStop) {
-                    snackbar(getString(R.string.need_reload)).setAction(R.string.apply) {
-                        runOnDefaultDispatcher {
-                            delay(100)
-                            SagerNet.reloadService()
-                        }
-                    }.show()
-                } else {
-                    snackbar(msg).show()
                 }
                 return true
             }

@@ -718,4 +718,21 @@
     <string name="subscription_disabled">已禁用此订阅</string>
     <string name="widget_name">OwnBox 快捷开关</string>
     <string name="widget_toggle">点击切换连接</string>
+    <string name="change_icon">修改应用图标</string>
+        <string name="app_icon_dynamic">动态</string>
+        <string name="app_icon_light_mode">浅色模式</string>
+        <string name="app_icon_dark_mode">深色模式</string>
+        <string name="app_icon_old_nekobox_plus">旧版 NekoBox+</string>
+        <string name="app_icon_nekobox">NekoBox</string>
+        <string name="app_icon_midnight">午夜</string>
+        <string name="app_icon_heavens">天空</string>
+        <string name="app_icon_halloween">万圣节</string>
+        <string name="app_icon_cyberpunk">赛博朋克</string>
+        <string name="app_icon_black_white">黑白</string>
+        <string name="app_icon_pink">粉红</string>
+        <string name="app_icon_druid">德鲁伊</string>
+        <string name="app_icon_red">红色</string>
+        <string name="app_icon_russian">俄罗斯方块</string>
+        <string name="app_icon_text">文本</string>
+        <string name="app_icon_selected">已选择</string>
 </resources>

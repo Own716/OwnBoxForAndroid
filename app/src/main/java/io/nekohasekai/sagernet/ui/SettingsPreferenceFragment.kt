@@ -48,6 +48,12 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
         DataStore.initGlobal()
         addPreferencesFromResource(R.xml.global_preferences)
 
+        findPreference<Preference>("changeIcon")?.setOnPreferenceClickListener {
+            AppIconDialog.show(requireContext())
+            true
+        }
+
+
         val appTheme = findPreference<ColorPickerPreference>(Key.APP_THEME)!!
         val useSystemTheme = findPreference<SwitchPreference>(Key.USE_SYSTEM_THEME)!!
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {

@@ -801,4 +801,21 @@
     <string name="subscription_disabled">Subscription disabled</string>
     <string name="widget_name">OwnBox Quick Switch</string>
     <string name="widget_toggle">Tap to toggle connection</string>
+    <string name="change_icon">Change icon</string>
+        <string name="app_icon_dynamic">Dynamic</string>
+        <string name="app_icon_light_mode">Light mode</string>
+        <string name="app_icon_dark_mode">Dark mode</string>
+        <string name="app_icon_old_nekobox_plus">Old NekoBox+</string>
+        <string name="app_icon_nekobox" translatable="false">NekoBox</string>
+        <string name="app_icon_midnight">Midnight</string>
+        <string name="app_icon_heavens">Heavens</string>
+        <string name="app_icon_halloween">Halloween</string>
+        <string name="app_icon_cyberpunk">Cyberpunk</string>
+        <string name="app_icon_black_white">Black and White</string>
+        <string name="app_icon_pink">Pink</string>
+        <string name="app_icon_druid">Druid</string>
+        <string name="app_icon_red">Red</string>
+        <string name="app_icon_russian">Russian</string>
+        <string name="app_icon_text">Text</string>
+        <string name="app_icon_selected">Selected</string>
 </resources>

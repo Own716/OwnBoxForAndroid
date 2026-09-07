@@ -126,12 +126,6 @@
                 android:checked="false"
                 app:showAsAction="never" />
             <item
-                android:id="@+id/action_auto_lowest_latency"
-                android:title="@string/action_auto_lowest_latency"
-                android:checkable="true"
-                android:checked="false"
-                app:showAsAction="never" />
-            <item
                 android:id="@+id/action_order_layout"
                 android:title="@string/sort_and_layout">
                 <menu>

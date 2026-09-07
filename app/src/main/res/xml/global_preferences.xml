@@ -40,6 +40,11 @@
             app:key="appLanguage"
             app:title="@string/language"
             app:useSimpleSummaryProvider="true" />
+        <Preference
+            app:icon="@mipmap/ic_launcher"
+            app:key="changeIcon"
+            app:title="@string/change_icon" />
+
         <moe.matsuri.nb4a.ui.SimpleMenuPreference
             app:defaultValue="vpn"
             app:entries="@array/service_modes"
@@ -294,12 +299,6 @@
             app:key="strictRoute"
             app:title="@string/strict_route"
             app:summary="@string/strict_route_sum" />
-        <SwitchPreference
-            app:defaultValue="false"
-            app:icon="@drawable/ic_baseline_speed_24"
-            app:key="autoSelectLowestLatency"
-            app:title="@string/action_auto_lowest_latency"
-            app:summary="@string/auto_lowest_latency_summary" />
         <SwitchPreference
             app:icon="@drawable/ic_baseline_nat_24"
             app:key="allowAccess"
