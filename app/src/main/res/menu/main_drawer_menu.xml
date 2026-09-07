@@ -26,7 +26,7 @@
     <item android:title="@string/network_tools">
         <menu>
             <item
-                android:id="@+id/nav_traffic_chart"
+                android:id="@+id/nav_traffic"
                 android:icon="@drawable/ic_device_data_usage"
                 android:title="@string/traffic_chart_title" />
             <item

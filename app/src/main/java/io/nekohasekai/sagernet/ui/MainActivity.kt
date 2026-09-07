@@ -259,7 +259,7 @@ class MainActivity : ThemedActivity(),
 
     fun refreshNavMenu(clashApi: Boolean) {
         if (::navigation.isInitialized) {
-            navigation.menu.findItem(R.id.nav_traffic)?.isVisible = clashApi
+            navigation.menu.findItem(R.id.nav_traffic)?.isVisible = true
         }
     }
 
@@ -508,7 +508,7 @@ class MainActivity : ThemedActivity(),
                 startActivity(Intent(this, MediaUnlockActivity::class.java))
                 return false
             }
-            R.id.nav_traffic, R.id.nav_traffic_chart -> {
+            R.id.nav_traffic -> {
                 startActivity(Intent(this, TrafficChartActivity::class.java))
                 return false
             }
