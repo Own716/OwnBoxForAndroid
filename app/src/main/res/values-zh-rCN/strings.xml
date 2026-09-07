@@ -751,4 +751,5 @@
     <string name="traffic_no_connections">暂无活跃连接</string>
     <string name="traffic_waiting_clash">正在等待 Clash API 连接，请确保 VPN 已启动...</string>
     <string name="group_all">全部</string>
+    <string name="close">关闭</string>
 </resources>

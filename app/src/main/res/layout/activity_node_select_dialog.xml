@@ -42,7 +42,7 @@
                 android:layout_width="30dp"
                 android:layout_height="30dp"
                 android:background="?android:attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/close"
+                android:contentDescription="@null"
                 android:padding="5dp"
                 android:src="@drawable/ic_dialog_close" />
 

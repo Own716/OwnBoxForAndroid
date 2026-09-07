@@ -834,4 +834,5 @@
     <string name="traffic_no_connections">No active connections</string>
     <string name="traffic_waiting_clash">Waiting for Clash API or VPN not started...</string>
     <string name="group_all">All</string>
+    <string name="close">Close</string>
 </resources>
