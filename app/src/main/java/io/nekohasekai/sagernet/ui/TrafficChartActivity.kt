@@ -1,6 +1,7 @@
 package io.nekohasekai.sagernet.ui
 
 import android.annotation.SuppressLint
+import android.graphics.Color
 import android.os.Bundle
 import android.text.format.Formatter
 import android.view.LayoutInflater
@@ -63,6 +64,14 @@ class TrafficChartActivity : AppCompatActivity() {
                 .setNegativeButton(android.R.string.cancel, null)
                 .show()
         }
+
+        binding.btnRefreshConnections.setOnClickListener {
+            fetchConnectionsManual()
+        }
+
+        binding.btnGoConnect.setOnClickListener {
+            finish()
+        }
     }
 
     override fun onStart() {
@@ -79,11 +88,17 @@ class TrafficChartActivity : AppCompatActivity() {
 
     private fun startMonitoring() {
         if (!DataStore.serviceState.connected) {
+            binding.cardNotConnected.visibility = View.VISIBLE
+            binding.tvMonitorStatus.text = "● 监控等待中 (未连接 VPN)"
+            binding.tvMonitorStatus.setTextColor(Color.parseColor("#E65100"))
             binding.chartStatusHint.visibility = View.VISIBLE
             binding.chartStatusHint.text = getString(R.string.traffic_waiting_clash)
             return
         }
 
+        binding.cardNotConnected.visibility = View.GONE
+        binding.tvMonitorStatus.text = getString(R.string.traffic_chart_monitor_active)
+        binding.tvMonitorStatus.setTextColor(Color.parseColor("#059669"))
         binding.chartStatusHint.visibility = View.GONE
 
         // 1. Connect WebSocket to /traffic
@@ -94,8 +109,14 @@ class TrafficChartActivity : AppCompatActivity() {
         pollingJob = lifecycleScope.launch(Dispatchers.IO) {
             while (isActive && isForeground) {
                 fetchConnections()
-                delay(2000)
+                delay(1500)
             }
+        }
+    }
+
+    private fun fetchConnectionsManual() {
+        lifecycleScope.launch(Dispatchers.IO) {
+            fetchConnections()
         }
     }
 
@@ -237,6 +258,7 @@ class TrafficChartActivity : AppCompatActivity() {
                     .delete()
                     .build()
                 client.newCall(req).execute().close()
+                delay(200)
                 fetchConnections()
             } catch (_: Exception) {
             }
@@ -251,6 +273,7 @@ class TrafficChartActivity : AppCompatActivity() {
                     .delete()
                     .build()
                 client.newCall(req).execute().close()
+                delay(200)
                 fetchConnections()
             } catch (_: Exception) {
             }

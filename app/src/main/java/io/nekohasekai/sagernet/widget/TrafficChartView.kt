@@ -93,11 +93,20 @@ class TrafficChartView @JvmOverloads constructor(
         postInvalidate()
     }
 
+    private fun isDarkTheme(): Boolean {
+        val mode = context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK
+        return mode == android.content.res.Configuration.UI_MODE_NIGHT_YES
+    }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val w = width.toFloat()
         val h = height.toFloat()
         if (w <= 0 || h <= 0) return
+
+        val isDark = isDarkTheme()
+        gridPaint.color = if (isDark) Color.parseColor("#26FFFFFF") else Color.parseColor("#1F000000")
+        textPaint.color = if (isDark) Color.parseColor("#99FFFFFF") else Color.parseColor("#99000000")
 
         val paddingBottom = 40f
         val paddingTop = 20f

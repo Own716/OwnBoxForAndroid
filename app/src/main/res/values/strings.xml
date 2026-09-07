@@ -867,4 +867,17 @@
     <string name="port_test_success">Connected (TCP Handshake OK)</string>
     <string name="port_test_failed">Connection Failed</string>
     <string name="vpn_not_connected_warning">Please connect VPN proxy first</string>
+    <string name="menu_community">Telegram Channel</string>
+    <string name="ip_purity_device_net">Device Network</string>
+    <string name="ip_purity_device_cellular">📱 Mobile Cellular (4G/5G)</string>
+    <string name="ip_purity_device_wifi">📶 Wi-Fi Network</string>
+    <string name="ip_purity_device_other">🌐 Wired / Other Network</string>
+    <string name="ip_purity_mobile_title">Exit Node is Mobile Cellular (Mobile IP)</string>
+    <string name="ip_purity_mobile_tip">💡 Note: \"Exit is Mobile IP\" detects the proxy exit server line type, not your device\'s local network connection. Your local network status is displayed above.</string>
+    <string name="traffic_chart_monitor_active">● Live Monitor Active</string>
+    <string name="traffic_chart_not_connected_hint">Proxy service is disconnected. Please connect on main screen to monitor traffic and connections.</string>
+    <string name="traffic_chart_go_connect">Go Connect</string>
+    <string name="traffic_chart_refresh">Refresh</string>
+    <string name="traffic_total_upload">Total Up</string>
+    <string name="traffic_total_download">Total Down</string>
 </resources>

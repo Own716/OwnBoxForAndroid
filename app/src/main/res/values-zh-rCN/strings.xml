@@ -784,4 +784,17 @@
     <string name="port_test_success">TCP 握手连通成功</string>
     <string name="port_test_failed">连接失败或超时</string>
     <string name="vpn_not_connected_warning">请先连接代理节点后再进行测试</string>
+    <string name="menu_community">Telegram 官方频道</string>
+    <string name="ip_purity_device_net">本机网络环境</string>
+    <string name="ip_purity_device_cellular">📱 移动蜂窝网络 (4G/5G)</string>
+    <string name="ip_purity_device_wifi">📶 Wi-Fi 无线网络</string>
+    <string name="ip_purity_device_other">🌐 本地有线/其他网络</string>
+    <string name="ip_purity_mobile_title">节点出口是否为蜂窝 IP (Mobile IP)</string>
+    <string name="ip_purity_mobile_tip">💡 提示：“节点出口是否为蜂窝 IP”检测的是代理节点落地服务器的出口线路属性，并非您手机当前的物理连接方式。上方已为您同步展示手机本机的联网状态。</string>
+    <string name="traffic_chart_monitor_active">● 实时监控已就绪</string>
+    <string name="traffic_chart_not_connected_hint">代理服务未连接，请先在主界面开启代理连接以监控实时流量与活跃连接</string>
+    <string name="traffic_chart_go_connect">前往连接</string>
+    <string name="traffic_chart_refresh">刷新连接</string>
+    <string name="traffic_total_upload">总上传</string>
+    <string name="traffic_total_download">总下载</string>
 </resources>

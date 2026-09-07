@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Own716/OwnBoxForAndroid/releases"><img src="https://img.shields.io/badge/Release-v2.3.5-blue.svg?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/Own716/OwnBoxForAndroid/releases"><img src="https://img.shields.io/badge/Release-v2.3.6-blue.svg?style=flat-square" alt="Version"></a>
   <a href="https://android-arsenal.com/api?level=21"><img src="https://img.shields.io/badge/Android-5.0%2B%20(API%2021%2B)-brightgreen.svg?style=flat-square" alt="API"></a>
   <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/License-GPL--3.0-orange.svg?style=flat-square" alt="License"></a>
   <a href="https://t.me/KarenOwn"><img src="https://img.shields.io/badge/Telegram-@KarenOwn-2CA5E0.svg?logo=telegram&style=flat-square" alt="Telegram"></a>
@@ -30,10 +30,10 @@
 
 | 架构 / 平台 | 适用设备 | 文件名 | 官方下载直链 |
 | :--- | :--- | :--- | :--- |
-| **ARM64 (强力推荐)** | **绝大多数现代安卓手机 (一加、小米、华为、OPPO、vivo、三星、荣耀等)** | `Ownbox-2.3.5-arm64-v8a-release.apk` | [**📥 点击直接下载**](https://github.com/Own716/OwnBoxForAndroid/releases/download/v2.3.5/Ownbox-2.3.5-arm64-v8a-release.apk) |
-| **ARMv7** | 较老旧的 32 位安卓机型 | `Ownbox-2.3.5-armeabi-v7a-release.apk` | [**📥 点击直接下载**](https://github.com/Own716/OwnBoxForAndroid/releases/download/v2.3.5/Ownbox-2.3.5-armeabi-v7a-release.apk) |
-| **x86_64** | 电脑 64 位安卓模拟器、ChromeOS | `Ownbox-2.3.5-x86_64-release.apk` | [**📥 点击直接下载**](https://github.com/Own716/OwnBoxForAndroid/releases/download/v2.3.5/Ownbox-2.3.5-x86_64-release.apk) |
-| **x86** | 电脑 32 位安卓模拟器 | `Ownbox-2.3.5-x86-release.apk` | [**📥 点击直接下载**](https://github.com/Own716/OwnBoxForAndroid/releases/download/v2.3.5/Ownbox-2.3.5-x86-release.apk) |
+| **ARM64 (强力推荐)** | **绝大多数现代安卓手机 (一加、小米、华为、OPPO、vivo、三星、荣耀等)** | `Ownbox-2.3.6-arm64-v8a-release.apk` | [**📥 点击直接下载**](https://github.com/Own716/OwnBoxForAndroid/releases/download/v2.3.6/Ownbox-2.3.6-arm64-v8a-release.apk) |
+| **ARMv7** | 较老旧的 32 位安卓机型 | `Ownbox-2.3.6-armeabi-v7a-release.apk` | [**📥 点击直接下载**](https://github.com/Own716/OwnBoxForAndroid/releases/download/v2.3.6/Ownbox-2.3.6-armeabi-v7a-release.apk) |
+| **x86_64** | 电脑 64 位安卓模拟器、ChromeOS | `Ownbox-2.3.6-x86_64-release.apk` | [**📥 点击直接下载**](https://github.com/Own716/OwnBoxForAndroid/releases/download/v2.3.6/Ownbox-2.3.6-x86_64-release.apk) |
+| **x86** | 电脑 32 位安卓模拟器 | `Ownbox-2.3.6-x86-release.apk` | [**📥 点击直接下载**](https://github.com/Own716/OwnBoxForAndroid/releases/download/v2.3.6/Ownbox-2.3.6-x86-release.apk) |
 
 ---
 

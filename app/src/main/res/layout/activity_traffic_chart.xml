@@ -29,7 +29,59 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingBottom="32dp">
+            android:paddingBottom="40dp">
+
+            <!-- Disconnected Warning Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/card_not_connected"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="12dp"
+                android:layout_marginTop="12dp"
+                android:visibility="gone"
+                app:cardBackgroundColor="#FEF3C7"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="1dp"
+                app:strokeColor="#F59E0B"
+                app:strokeWidth="1dp"
+                tools:visibility="visible">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="⚠️ 代理服务未连接"
+                        android:textColor="#92400E"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="@string/traffic_chart_not_connected_hint"
+                        android:textColor="#B45309"
+                        android:textSize="13sp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_go_connect"
+                        style="@style/Widget.MaterialComponents.Button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:backgroundTint="#D97706"
+                        android:text="@string/traffic_chart_go_connect"
+                        android:textColor="#FFFFFF"
+                        android:textSize="13sp" />
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
 
             <!-- Real-time Speed & Chart Card -->
             <com.google.android.material.card.MaterialCardView
@@ -38,7 +90,9 @@
                 android:layout_marginHorizontal="12dp"
                 android:layout_marginTop="12dp"
                 app:cardCornerRadius="16dp"
-                app:cardElevation="2dp">
+                app:cardElevation="0dp"
+                app:strokeColor="@color/card_stroke"
+                app:strokeWidth="1dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -46,9 +100,30 @@
                     android:orientation="vertical"
                     android:padding="16dp">
 
+                    <!-- Live status row -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/tv_monitor_status"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/traffic_chart_monitor_active"
+                            android:textColor="?attr/colorPrimary"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+
+                    </LinearLayout>
+
+                    <!-- Speeds row -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
                         android:orientation="horizontal">
 
                         <!-- Up Speed -->
@@ -62,7 +137,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/traffic_current_up"
-                                android:textColor="#FFB74D"
+                                android:textColor="#E65100"
                                 android:textSize="12sp"
                                 android:textStyle="bold" />
 
@@ -72,8 +147,8 @@
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
                                 android:text="0.0 B/s"
-                                android:textColor="?attr/colorOnSurface"
-                                android:textSize="20sp"
+                                android:textColor="?android:attr/textColorPrimary"
+                                android:textSize="22sp"
                                 android:textStyle="bold" />
 
                             <TextView
@@ -98,7 +173,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/traffic_current_down"
-                                android:textColor="#4DD0E1"
+                                android:textColor="#00838F"
                                 android:textSize="12sp"
                                 android:textStyle="bold" />
 
@@ -108,8 +183,8 @@
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
                                 android:text="0.0 B/s"
-                                android:textColor="?attr/colorOnSurface"
-                                android:textSize="20sp"
+                                android:textColor="?android:attr/textColorPrimary"
+                                android:textSize="22sp"
                                 android:textStyle="bold" />
 
                             <TextView
@@ -131,7 +206,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="180dp"
                         android:layout_marginTop="16dp"
-                        android:background="#15000000" />
+                        android:background="#0A888888" />
 
                     <TextView
                         android:id="@+id/chart_status_hint"
@@ -153,7 +228,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="16dp"
-                android:layout_marginTop="18dp"
+                android:layout_marginTop="20dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
@@ -163,17 +238,38 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="活跃网络连接 (0)"
-                    android:textColor="?attr/colorOnSurface"
+                    android:textColor="?android:attr/textColorPrimary"
                     android:textSize="16sp"
                     android:textStyle="bold" />
 
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_close_all_connections"
-                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:id="@+id/btn_refresh_connections"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:paddingHorizontal="10dp"
+                    android:text="@string/traffic_chart_refresh"
+                    android:textColor="?attr/colorPrimary"
+                    android:textSize="12sp"
+                    app:icon="@drawable/ic_action_cached"
+                    app:iconSize="14dp"
+                    app:iconTint="?attr/colorPrimary"
+                    app:strokeColor="@color/card_stroke" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_close_all_connections"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:paddingHorizontal="10dp"
                     android:text="@string/traffic_close_all"
-                    android:textSize="12sp" />
+                    android:textColor="?attr/colorError"
+                    android:textSize="12sp"
+                    app:icon="@drawable/ic_action_delete"
+                    app:iconSize="14dp"
+                    app:iconTint="?attr/colorError"
+                    app:strokeColor="@color/card_stroke" />
 
             </LinearLayout>
 
@@ -183,7 +279,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="16dp"
-                android:layout_marginTop="2dp"
+                android:layout_marginTop="4dp"
                 android:text="总计上传: 0 B  |  总计下载: 0 B"
                 android:textColor="?android:attr/textColorSecondary"
                 android:textSize="12sp" />
@@ -194,7 +290,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_horizontal"
-                android:layout_marginTop="32dp"
+                android:layout_marginTop="28dp"
                 android:text="@string/traffic_no_connections"
                 android:textColor="?android:attr/textColorSecondary"
                 android:textSize="14sp"

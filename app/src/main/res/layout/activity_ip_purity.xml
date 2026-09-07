@@ -107,6 +107,37 @@
                         android:orientation="vertical"
                         android:padding="16dp">
 
+                        <!-- Local Device Network -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:layout_width="120dp"
+                                android:layout_height="wrap_content"
+                                android:text="@string/ip_purity_device_net"
+                                android:textColor="?android:attr/textColorSecondary"
+                                android:textSize="13sp" />
+
+                            <TextView
+                                android:id="@+id/tv_device_network"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:textStyle="bold"
+                                android:textColor="?attr/colorPrimary"
+                                android:textSize="13sp"
+                                tools:text="📱 移动蜂窝网络 (4G/5G)" />
+                        </LinearLayout>
+
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="1dp"
+                            android:layout_marginTop="8dp"
+                            android:layout_marginBottom="8dp"
+                            android:background="@color/card_stroke" />
+
                         <!-- Outbound IP -->
                         <LinearLayout
                             android:layout_width="match_parent"
@@ -228,27 +259,42 @@
                             android:layout_marginBottom="8dp"
                             android:background="@color/card_stroke" />
 
-                        <!-- Mobile Network -->
+                        <!-- Exit Node Mobile Network -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:orientation="horizontal">
+                            android:orientation="vertical">
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal">
+
+                                <TextView
+                                    android:layout_width="120dp"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/ip_purity_mobile_title"
+                                    android:textColor="?android:attr/textColorSecondary"
+                                    android:textSize="13sp" />
+
+                                <TextView
+                                    android:id="@+id/tv_detail_mobile"
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:textColor="?android:attr/textColorPrimary"
+                                    android:textSize="13sp"
+                                    tools:text="否 (机房固网 / 常规家宽)" />
+                            </LinearLayout>
 
                             <TextView
-                                android:layout_width="120dp"
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:text="蜂窝移动网络"
+                                android:layout_marginTop="4dp"
+                                android:text="@string/ip_purity_mobile_tip"
                                 android:textColor="?android:attr/textColorSecondary"
-                                android:textSize="13sp" />
+                                android:textSize="11sp" />
 
-                            <TextView
-                                android:id="@+id/tv_detail_mobile"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:textColor="?android:attr/textColorPrimary"
-                                android:textSize="13sp"
-                                tools:text="否" />
                         </LinearLayout>
 
                         <View

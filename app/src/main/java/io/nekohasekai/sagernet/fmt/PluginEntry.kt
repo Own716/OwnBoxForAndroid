@@ -49,7 +49,7 @@ enum class PluginEntry(
     data class DownloadSource(
         val playStore: Boolean = true,
         val fdroid: Boolean = true,
-        val downloadLink: String = "https://matsuridayo.github.io/"
+        val downloadLink: String = "https://t.me/KarenOwn"
     )
 
     companion object {
