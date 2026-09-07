@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Obsidian Fluid Glass Material with Deep Space Reflections -->
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="26dp" />
+            <gradient
+                android:angle="135"
+                android:startColor="#E61A1E29"
+                android:centerColor="#D9131620"
+                android:endColor="#CC0D0F17"
+                android:type="linear" />
+        </shape>
+    </item>
+    <!-- Edge Refraction Highlight -->
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="26dp" />
+            <stroke
+                android:width="1.5dp"
+                android:color="#38FFFFFF" />
+        </shape>
+    </item>
+</layer-list>

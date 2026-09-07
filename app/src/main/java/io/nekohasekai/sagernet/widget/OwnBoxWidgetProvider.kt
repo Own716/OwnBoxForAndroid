@@ -6,30 +6,29 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.widget.RemoteViews
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.bg.BaseService
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProfileManager
-import io.nekohasekai.sagernet.database.SagerDatabase
-import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
 import io.nekohasekai.sagernet.ui.MainActivity
+import io.nekohasekai.sagernet.ui.NodeSelectDialogActivity
 
 class OwnBoxWidgetProvider : AppWidgetProvider() {
 
     companion object {
-        const val ACTION_TOGGLE = "io.nekohasekai.sagernet.widget.ACTION_TOGGLE"
-        const val ACTION_SWITCH_NODE = "io.nekohasekai.sagernet.widget.ACTION_SWITCH_NODE"
+        const val ACTION_TOGGLE = "com.ownbox.app.widget.ACTION_TOGGLE"
 
         fun updateWidgets(context: Context) {
-            val appWidgetManager = AppWidgetManager.getInstance(context) ?: return
-            val componentName = ComponentName(context, OwnBoxWidgetProvider::class.java)
-            val appWidgetIds = appWidgetManager.getAppWidgetIds(componentName)
-            if (appWidgetIds.isNotEmpty()) {
+            val appWidgetManager = AppWidgetManager.getInstance(context)
+            val thisWidget = ComponentName(context, OwnBoxWidgetProvider::class.java)
+            val allWidgetIds = appWidgetManager.getAppWidgetIds(thisWidget)
+            if (allWidgetIds.isNotEmpty()) {
                 val intent = Intent(context, OwnBoxWidgetProvider::class.java).apply {
                     action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, appWidgetIds)
+                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, allWidgetIds)
                 }
                 context.sendBroadcast(intent)
             }
@@ -37,37 +36,14 @@ class OwnBoxWidgetProvider : AppWidgetProvider() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
-        when (intent.action) {
-            ACTION_TOGGLE -> {
-                if (DataStore.serviceState.canStop) {
-                    SagerNet.stopService()
-                } else {
-                    SagerNet.startService()
-                }
-                updateWidgets(context)
-                return
+        if (intent.action == ACTION_TOGGLE) {
+            if (DataStore.serviceState.canStop) {
+                SagerNet.stopService()
+            } else {
+                SagerNet.startService()
             }
-            ACTION_SWITCH_NODE -> {
-                runOnDefaultDispatcher {
-                    try {
-                        val allProxies = SagerDatabase.proxyDao.getAll()
-                        if (allProxies.isNotEmpty()) {
-                            val currentId = DataStore.selectedProxy
-                            val currentIndex = allProxies.indexOfFirst { it.id == currentId }
-                            val nextIndex = if (currentIndex in allProxies.indices) (currentIndex + 1) % allProxies.size else 0
-                            val nextProxy = allProxies[nextIndex]
-                            DataStore.selectedProxy = nextProxy.id
-                            DataStore.currentProfile = nextProxy.id
-                            if (DataStore.serviceState.started) {
-                                SagerNet.reloadService()
-                            }
-                        }
-                    } catch (_: Exception) {
-                    }
-                    updateWidgets(context)
-                }
-                return
-            }
+            updateWidgets(context)
+            return
         }
         super.onReceive(context, intent)
     }
@@ -87,12 +63,14 @@ class OwnBoxWidgetProvider : AppWidgetProvider() {
             else -> context.getString(R.string.not_connected)
         }
 
-        val buttonIcon = when {
-            isConnected -> R.drawable.ic_service_active
-            isConnecting -> R.drawable.ic_service_busy
-            else -> R.drawable.ic_service_idle
+        // 3号位四叶草：已连接通透翡翠绿，未连接冷灰
+        val cloverIcon = if (isConnected) {
+            R.drawable.ic_clover_connected
+        } else {
+            R.drawable.ic_clover_disconnected
         }
 
+        // 3号位点击：切换连接
         val toggleIntent = Intent(context, OwnBoxWidgetProvider::class.java).apply {
             action = ACTION_TOGGLE
         }
@@ -101,15 +79,19 @@ class OwnBoxWidgetProvider : AppWidgetProvider() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val switchIntent = Intent(context, OwnBoxWidgetProvider::class.java).apply {
-            action = ACTION_SWITCH_NODE
+        // 2号位点击：打开轻量流体玻璃节点选择弹窗浮层
+        val switchIntent = Intent(context, NodeSelectDialogActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
-        val switchPendingIntent = PendingIntent.getBroadcast(
+        val switchPendingIntent = PendingIntent.getActivity(
             context, 1002, switchIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val launchIntent = Intent(context, MainActivity::class.java)
+        // 点击小组件主体：呼出主应用
+        val launchIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
         val launchPendingIntent = PendingIntent.getActivity(
             context, 1000, launchIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -117,12 +99,18 @@ class OwnBoxWidgetProvider : AppWidgetProvider() {
 
         for (appWidgetId in appWidgetIds) {
             val views = RemoteViews(context.packageName, R.layout.layout_widget_ownbox).apply {
+                // 1号位品牌 Logo
+                setImageViewResource(R.id.widget_icon, R.drawable.ic_widget_brand_logo)
+                // 节点名与状态
                 setTextViewText(R.id.widget_title, profileTitle)
                 setTextViewText(R.id.widget_status, statusText)
-                setImageViewResource(R.id.widget_toggle_btn, buttonIcon)
+                // 3号位四叶草
+                setImageViewResource(R.id.widget_toggle_btn, cloverIcon)
+                // 交互绑定
                 setOnClickPendingIntent(R.id.widget_toggle_btn, togglePendingIntent)
                 setOnClickPendingIntent(R.id.widget_switch_btn, switchPendingIntent)
-                setOnClickPendingIntent(R.id.widget_root, launchPendingIntent)
+                setOnClickPendingIntent(R.id.widget_info_area, launchPendingIntent)
+                setOnClickPendingIntent(R.id.widget_icon, launchPendingIntent)
             }
             appWidgetManager.updateAppWidget(appWidgetId, views)
         }

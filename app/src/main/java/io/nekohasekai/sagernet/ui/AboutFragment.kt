@@ -41,6 +41,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.database.DataStore
 import moe.matsuri.nb4a.utils.Util
+import org.json.JSONArray
 import org.json.JSONObject
 
 class AboutFragment : ToolbarFragment(R.layout.layout_about) {
@@ -116,35 +117,16 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
                                 .build())
                         .addItem(
                             MaterialAboutActionItem.Builder()
-                                // Throne has no stable release yet: grey out the item
-                                .text(
-                                    SpannableString(getString(R.string.check_update_release)).apply {
-                                        setSpan(
-                                            ForegroundColorSpan(
-                                                ContextCompat.getColor(
-                                                    activityContext,
-                                                    android.R.color.darker_gray
-                                                )
-                                            ),
-                                            0,
-                                            length,
-                                            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-                                        )
-                                    }
-                                )
+                                .text(R.string.check_update_release)
                                 .setOnClickAction {
-                                    Toast.makeText(
-                                        app,
-                                        R.string.release_not_available,
-                                        Toast.LENGTH_SHORT
-                                    ).show()
+                                    checkUpdate(isPreview = false)
                                 }
                                 .build())
                         .addItem(
                             MaterialAboutActionItem.Builder()
                                 .text(R.string.check_update_preview)
                                 .setOnClickAction {
-                                    checkUpdate()
+                                    checkUpdate(isPreview = true)
                                 }
                                 .build())
                         .addItem(
@@ -297,23 +279,36 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
             }
         }
 
-        fun checkUpdate() {
+        fun checkUpdate(isPreview: Boolean = false) {
             runOnIoDispatcher {
                 try {
                     val client = Libcore.newHttpClient().apply {
                         modernTLS()
                         tryProxyOutbound()
                     }
+                    val url = if (isPreview) {
+                        "https://api.github.com/repos/Own716/OwnBoxForAndroid/releases"
+                    } else {
+                        "https://api.github.com/repos/Own716/OwnBoxForAndroid/releases/latest"
+                    }
                     val response = client.newRequest().apply {
-                        setURL("https://api.github.com/repos/Own716/OwnBoxForAndroid/releases/latest")
+                        setURL(url)
                     }.execute()
-                    val release = JSONObject(Util.getStringBox(response.contentString))
-                    val releaseName = release.getString("name")
-                    val releaseUrl = release.getString("html_url")
-                    // Release name is the git tag, e.g. "v1.4.2-m20-10".
+                    val responseStr = Util.getStringBox(response.contentString)
+                    val (releaseName, releaseUrl) = if (isPreview) {
+                        val arr = JSONArray(responseStr)
+                        if (arr.length() == 0) throw IllegalStateException("No releases found")
+                        val first = arr.getJSONObject(0)
+                        first.getString("name") to first.getString("html_url")
+                    } else {
+                        val release = JSONObject(responseStr)
+                        release.getString("name") to release.getString("html_url")
+                    }
+                    // Release name is the git tag, e.g. "v1.4.2-m20-10" or "Ownbox 2.3.5".
                     // Compare it with the local version name segment by segment.
-                    val haveUpdate = releaseName.isNotBlank() &&
-                            compareVersionNames(releaseName, BuildConfig.VERSION_NAME) > 0
+                    val cleanReleaseName = releaseName.replace(Regex("(?i)^Ownbox\\s*"), "")
+                    val haveUpdate = cleanReleaseName.isNotBlank() &&
+                            compareVersionNames(cleanReleaseName, BuildConfig.VERSION_NAME) > 0
                     runOnMainDispatcher {
                         if (haveUpdate) {
                             val context = requireContext()

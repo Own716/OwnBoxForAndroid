@@ -736,6 +736,16 @@
             android:exported="false"
             android:process=":bg" />
 
+    
+        <activity
+            android:name="io.nekohasekai.sagernet.ui.NodeSelectDialogActivity"
+            android:configChanges="uiMode"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleInstance"
+            android:taskAffinity=""
+            android:theme="@style/Theme.OwnBox.Dialog" />
+
     </application>
 
 </manifest>

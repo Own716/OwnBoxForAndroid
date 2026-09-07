@@ -3,23 +3,29 @@
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/bg_widget_card"
+    android:background="@drawable/bg_widget_glass"
     android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:padding="12dp">
+    android:paddingStart="14dp"
+    android:paddingEnd="14dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp">
 
+    <!-- 1号位：官方品牌 Logo (微立体流体金属质感) -->
     <ImageView
         android:id="@+id/widget_icon"
-        android:layout_width="44dp"
-        android:layout_height="44dp"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
         android:contentDescription="@string/app_name"
-        android:src="@drawable/ic_throne_tile" />
+        android:src="@drawable/ic_widget_brand_logo" />
 
+    <!-- 节点名称与连接状态 -->
     <LinearLayout
+        android:id="@+id/widget_info_area"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="12dp"
-        android:layout_marginEnd="8dp"
+        android:layout_marginEnd="6dp"
         android:layout_weight="1"
         android:orientation="vertical">
 
@@ -30,7 +36,7 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:text="@string/app_name"
-            android:textColor="#ffffff"
+            android:textColor="#F4F6FB"
             android:textSize="14sp"
             android:textStyle="bold" />
 
@@ -42,27 +48,49 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:text="@string/not_connected"
-            android:textColor="#b3ffffff"
+            android:textColor="#A2B0C7"
             android:textSize="12sp" />
 
     </LinearLayout>
 
-    <ImageView
+    <!-- 2号位：超椭圆胶囊形“切换节点”操作按钮 -->
+    <LinearLayout
         android:id="@+id/widget_switch_btn"
-        android:layout_width="36dp"
-        android:layout_height="36dp"
-        android:layout_marginEnd="6dp"
-        android:background="?android:attr/selectableItemBackgroundBorderless"
-        android:contentDescription="@string/switch_node"
-        android:padding="6dp"
-        android:src="@drawable/ic_widget_switch" />
+        android:layout_width="wrap_content"
+        android:layout_height="32dp"
+        android:layout_marginEnd="8dp"
+        android:background="@drawable/bg_widget_capsule"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp">
 
+        <ImageView
+            android:layout_width="14dp"
+            android:layout_height="14dp"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_widget_capsule_switch" />
+
+        <TextView
+            android:id="@+id/widget_switch_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:text="@string/switch_node"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+    </LinearLayout>
+
+    <!-- 3号位：四叶草状态指示与开关 (未连接冷灰 / 已连接通透翡翠绿) -->
     <ImageView
         android:id="@+id/widget_toggle_btn"
-        android:layout_width="36dp"
-        android:layout_height="36dp"
+        android:layout_width="38dp"
+        android:layout_height="38dp"
         android:background="?android:attr/selectableItemBackgroundBorderless"
         android:contentDescription="@string/widget_toggle"
-        android:src="@drawable/ic_service_idle" />
+        android:padding="3dp"
+        android:src="@drawable/ic_clover_disconnected" />
 
 </LinearLayout>

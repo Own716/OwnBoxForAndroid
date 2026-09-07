@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="16dp"
+    android:height="16dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Antenna/Routing Switching Indicator -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M16,3 L21,8 L16,13 M20,8 L9,8 C6.2,8 4,10.2 4,13 M8,21 L3,16 L8,11 M4,16 L15,16 C17.8,16 20,13.8 20,11"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="2.2" />
+</vector>
