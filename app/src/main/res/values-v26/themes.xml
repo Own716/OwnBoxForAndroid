@@ -15,6 +15,11 @@
 
         <item name="colorSurface">?android:attr/colorBackground</item>
         <item name="colorOnSurface">?android:attr/textColorPrimary</item>
+        <item name="colorOnSurfaceVariant">?android:attr/textColorSecondary</item>
+        <item name="colorSurfaceVariant">?android:attr/colorBackground</item>
+        <item name="textAppearanceBodyMedium">?attr/textAppearanceBody2</item>
+        <item name="textAppearanceBodyLarge">?attr/textAppearanceBody1</item>
+        <item name="textAppearanceBodySmall">?attr/textAppearanceCaption</item>
 
         <item name="cardElevatedSurfaceColor">@color/card_elevated_pink</item>
 

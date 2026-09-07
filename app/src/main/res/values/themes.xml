@@ -14,6 +14,11 @@
 
         <item name="colorSurface">?android:attr/colorBackground</item>
         <item name="colorOnSurface">?android:attr/textColorPrimary</item>
+        <item name="colorOnSurfaceVariant">?android:attr/textColorSecondary</item>
+        <item name="colorSurfaceVariant">?android:attr/colorBackground</item>
+        <item name="textAppearanceBodyMedium">?attr/textAppearanceBody2</item>
+        <item name="textAppearanceBodyLarge">?attr/textAppearanceBody1</item>
+        <item name="textAppearanceBodySmall">?attr/textAppearanceCaption</item>
 
         <!-- 立体卡片提升表面色，默认 = Pink；各配色变体在下方各自覆盖 -->
         <item name="cardElevatedSurfaceColor">@color/card_elevated_pink</item>
@@ -72,6 +77,14 @@
 
         <item name="colorMaterial100">@color/material_pink_100</item>
         <item name="colorMaterial300">@color/material_pink_300</item>
+
+        <item name="colorSurface">?android:attr/colorBackground</item>
+        <item name="colorOnSurface">?android:attr/textColorPrimary</item>
+        <item name="colorOnSurfaceVariant">?android:attr/textColorSecondary</item>
+        <item name="colorSurfaceVariant">?android:attr/colorBackground</item>
+        <item name="textAppearanceBodyMedium">?attr/textAppearanceBody2</item>
+        <item name="textAppearanceBodyLarge">?attr/textAppearanceBody1</item>
+        <item name="textAppearanceBodySmall">?attr/textAppearanceCaption</item>
 
         <!-- 立体卡片提升表面色，默认 = Pink；各配色变体在下方各自覆盖 -->
         <item name="cardElevatedSurfaceColor">@color/card_elevated_pink</item>
