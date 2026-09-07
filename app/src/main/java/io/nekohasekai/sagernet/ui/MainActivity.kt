@@ -590,7 +590,7 @@ class MainActivity : ThemedActivity(),
             ProfileManager.postUpdate(old, true)
             ProfileManager.postUpdate(id, true)
         }
-        stats.refreshLandingIp(forceRefresh = true)
+        binding.stats.refreshLandingIp(forceRefresh = true)
     }
 
     override fun onPreferenceDataStoreChanged(store: PreferenceDataStore, key: String) {
