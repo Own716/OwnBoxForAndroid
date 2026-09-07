@@ -29,6 +29,52 @@
         app:key="groupIsSelector"
         app:title="@string/use_selector" />
 
+    <SwitchPreference
+        app:icon="@drawable/ic_baseline_speed_24"
+        app:key="groupIsUrlTest"
+        app:summary="@string/group_is_url_test_sum"
+        app:title="@string/group_is_url_test" />
+
+    <PreferenceCategory
+        app:key="groupUrlTestCategory"
+        app:title="@string/urltest_settings">
+
+        <EditTextPreference
+            app:defaultValue="https://www.gstatic.com/generate_204"
+            app:icon="@drawable/ic_baseline_link_24"
+            app:key="groupUrlTestUrl"
+            app:title="@string/urltest_url"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:defaultValue="180"
+            app:icon="@drawable/ic_baseline_timelapse_24"
+            app:key="groupUrlTestInterval"
+            app:title="@string/urltest_interval"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:defaultValue="50"
+            app:icon="@drawable/ic_baseline_tune_24"
+            app:key="groupUrlTestTolerance"
+            app:title="@string/urltest_tolerance"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:defaultValue="30m"
+            app:icon="@drawable/ic_baseline_timelapse_24"
+            app:key="groupUrlTestIdleTimeout"
+            app:title="@string/urltest_idle_timeout"
+            app:useSimpleSummaryProvider="true" />
+
+        <SwitchPreference
+            app:defaultValue="false"
+            app:icon="@drawable/ic_baseline_compare_arrows_24"
+            app:key="groupUrlTestInterruptExist"
+            app:summary="@string/urltest_interrupt_exist_sum"
+            app:title="@string/urltest_interrupt_exist" />
+    </PreferenceCategory>
+
     <io.nekohasekai.sagernet.widget.OutboundPreference
         app:icon="@drawable/ic_hardware_router"
         app:key="groupFrontProxy"

@@ -405,6 +405,7 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     override fun onPrepareOptionsMenu(menu: Menu) {
         menu.findItem(R.id.action_global_mode)?.isChecked = DataStore.globalMode
+        menu.findItem(R.id.action_auto_lowest_latency)?.isChecked = DataStore.autoSelectLowestLatency
         super.onPrepareOptionsMenu(menu)
     }
 
@@ -548,7 +549,23 @@ class ConfigurationFragment @JvmOverloads constructor(
                                 snackbar(getString(R.string.no_proxies_found_in_clipboard)).show()
                             }
                         } else {
-                            import(proxies)
+                            onMainDispatcher {
+                                val previewList = proxies.take(8).joinToString("\n") {
+                                    val proto = it.javaClass.simpleName.removeSuffix("Bean")
+                                    "• [$proto] ${it.displayName()}"
+                                } + if (proxies.size > 8) "\n... (+${proxies.size - 8})" else ""
+
+                                com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+                                    .setTitle(getString(R.string.import_preview_title, proxies.size))
+                                    .setMessage(previewList)
+                                    .setPositiveButton(R.string.import_preview_confirm) { _, _ ->
+                                        runOnDefaultDispatcher {
+                                            import(proxies)
+                                        }
+                                    }
+                                    .setNegativeButton(android.R.string.cancel, null)
+                                    .show()
+                            }
                         }
                     } catch (e: SubscriptionFoundException) {
                         onMainDispatcher {
@@ -848,17 +865,25 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
 
             R.id.action_auto_lowest_latency -> {
-                item.isChecked = !item.isChecked
-                DataStore.autoSelectLowestLatency = item.isChecked
-                if (DataStore.serviceState.canStop) {
-                    runOnDefaultDispatcher {
-                        delay(200)
+                val newState = !DataStore.autoSelectLowestLatency
+                item.isChecked = newState
+                DataStore.autoSelectLowestLatency = newState
+                toolbar.menu.findItem(R.id.action_auto_lowest_latency)?.isChecked = newState
+                onMainDispatcher {
+                    val msg = if (newState) {
+                        getString(R.string.auto_lowest_latency_enabled)
+                    } else {
+                        getString(R.string.auto_lowest_latency_disabled)
+                    }
+                    if (DataStore.serviceState.canStop) {
                         snackbar(getString(R.string.need_reload)).setAction(R.string.apply) {
                             runOnDefaultDispatcher {
                                 delay(100)
                                 SagerNet.reloadService()
                             }
                         }.show()
+                    } else {
+                        snackbar(msg).show()
                     }
                 }
                 return true

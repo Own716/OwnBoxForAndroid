@@ -312,6 +312,58 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var groupType by profileCacheStore.stringToInt(Key.GROUP_TYPE)
     var groupOrder by profileCacheStore.stringToInt(Key.GROUP_ORDER)
     var groupIsSelector by profileCacheStore.boolean(Key.GROUP_IS_SELECTOR)
+    var groupIsUrlTest by profileCacheStore.boolean("groupIsUrlTest")
+    var groupUrlTestUrl by profileCacheStore.string("groupUrlTestUrl") { "https://www.gstatic.com/generate_204" }
+    var groupUrlTestInterval by profileCacheStore.stringToInt("groupUrlTestInterval") { 180 }
+    var groupUrlTestTolerance by profileCacheStore.stringToInt("groupUrlTestTolerance") { 50 }
+    var groupUrlTestIdleTimeout by profileCacheStore.string("groupUrlTestIdleTimeout") { "30m" }
+    var groupUrlTestInterruptExist by profileCacheStore.boolean("groupUrlTestInterruptExist")
+
+    fun isGroupDisabled(groupId: Long): Boolean =
+        configurationStore.getBoolean("group_${groupId}_disabled", false)
+    fun setGroupDisabled(groupId: Long, disabled: Boolean) {
+        configurationStore.putBoolean("group_${groupId}_disabled", disabled)
+    }
+
+    fun isGroupUrlTest(groupId: Long): Boolean =
+        configurationStore.getBoolean("group_${groupId}_isUrlTest", false)
+    fun setGroupUrlTest(groupId: Long, value: Boolean) {
+        configurationStore.putBoolean("group_${groupId}_isUrlTest", value)
+    }
+    fun groupIsUrlTest(groupId: Long): Boolean = isGroupUrlTest(groupId)
+    fun setGroupIsUrlTest(groupId: Long, value: Boolean) = setGroupUrlTest(groupId, value)
+
+    fun groupUrlTestUrl(groupId: Long): String =
+        configurationStore.getString("group_${groupId}_urlTestUrl", "")?.takeIf { it.isNotBlank() } ?: connectionTestURL
+    fun setGroupUrlTestUrl(groupId: Long, value: String) {
+        configurationStore.putString("group_${groupId}_urlTestUrl", value)
+    }
+
+    fun groupUrlTestInterval(groupId: Long): Long =
+        configurationStore.getString("group_${groupId}_urlTestInterval", "180")?.toLongOrNull() ?: 180L
+    fun setGroupUrlTestInterval(groupId: Long, value: Long) {
+        configurationStore.putString("group_${groupId}_urlTestInterval", value.toString())
+    }
+
+    fun groupUrlTestTolerance(groupId: Long): Int =
+        configurationStore.getString("group_${groupId}_urlTestTolerance", "50")?.toIntOrNull() ?: 50
+    fun setGroupUrlTestTolerance(groupId: Long, value: Int) {
+        configurationStore.putString("group_${groupId}_urlTestTolerance", value.toString())
+    }
+
+    fun groupUrlTestIdleTimeout(groupId: Long): String =
+        configurationStore.getString("group_${groupId}_urlTestIdleTimeout", "30m") ?: "30m"
+    fun setGroupUrlTestIdleTimeout(groupId: Long, value: String) {
+        configurationStore.putString("group_${groupId}_urlTestIdleTimeout", value)
+    }
+
+    fun groupUrlTestInterrupt(groupId: Long): Boolean =
+        configurationStore.getBoolean("group_${groupId}_urlTestInterrupt", false)
+    fun setGroupUrlTestInterrupt(groupId: Long, value: Boolean) {
+        configurationStore.putBoolean("group_${groupId}_urlTestInterrupt", value)
+    }
+    fun groupUrlTestInterruptExist(groupId: Long): Boolean = groupUrlTestInterrupt(groupId)
+    fun setGroupUrlTestInterruptExist(groupId: Long, value: Boolean) = setGroupUrlTestInterrupt(groupId, value)
 
     var subscriptionLink by profileCacheStore.string(Key.SUBSCRIPTION_LINK)
     var subscriptionForceResolve by profileCacheStore.boolean(Key.SUBSCRIPTION_FORCE_RESOLVE)

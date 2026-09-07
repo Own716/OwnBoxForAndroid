@@ -290,8 +290,16 @@
             app:useSimpleSummaryProvider="true" />
         <SwitchPreference
             app:defaultValue="true"
+            app:icon="@drawable/ic_baseline_security_24"
             app:key="strictRoute"
-            app:title="@string/strict_route" />
+            app:title="@string/strict_route"
+            app:summary="@string/strict_route_sum" />
+        <SwitchPreference
+            app:defaultValue="false"
+            app:icon="@drawable/ic_baseline_speed_24"
+            app:key="autoSelectLowestLatency"
+            app:title="@string/action_auto_lowest_latency"
+            app:summary="@string/auto_lowest_latency_summary" />
         <SwitchPreference
             app:icon="@drawable/ic_baseline_nat_24"
             app:key="allowAccess"

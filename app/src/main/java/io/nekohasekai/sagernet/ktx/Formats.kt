@@ -241,6 +241,13 @@ suspend fun parseProxies(text: String): List<AbstractBean> {
             }.onFailure {
                 Logs.w(it)
             }
+        } else if (startsWith("awg://") || startsWith("wireguard://")) {
+            Logs.d("Try parse WireGuard/AWG link: $this")
+            runCatching {
+                io.nekohasekai.sagernet.fmt.wireguard.parseWireGuardLink(this)?.let { entities.add(it) }
+            }.onFailure {
+                Logs.w(it)
+            }
         }
     }
 

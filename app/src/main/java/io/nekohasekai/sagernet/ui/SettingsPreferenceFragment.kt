@@ -291,6 +291,7 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
         val dualNetworkAcceleration = findPreference<SwitchPreference>(Key.DUAL_NETWORK_ACCELERATION)!!
         dualNetworkAcceleration.onPreferenceChangeListener = reloadListener
         findPreference<SwitchPreference>(Key.CONCURRENT_DIAL)?.onPreferenceChangeListener = reloadListener
+        findPreference<SwitchPreference>(Key.AUTO_SELECT_LOWEST_LATENCY)?.onPreferenceChangeListener = reloadListener
 
         enableFakeDns.onPreferenceChangeListener = reloadListener
         remoteDns.onPreferenceChangeListener = reloadListener

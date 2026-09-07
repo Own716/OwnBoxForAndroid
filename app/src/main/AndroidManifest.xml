@@ -353,6 +353,19 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name="io.nekohasekai.sagernet.widget.OwnBoxWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="io.nekohasekai.sagernet.widget.ACTION_TOGGLE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/ownbox_widget_info" />
+        </receiver>
+
         <service
             android:name="androidx.room.MultiInstanceInvalidationService"
             android:process=":bg" />

@@ -129,7 +129,14 @@ internal fun buildSelectorOutbound(defaultTag: String?, memberTags: List<String>
         outbounds = memberTags
     }
 
-internal fun buildUrlTestOutbound(memberTags: List<String>, testUrl: String? = null) =
+internal fun buildUrlTestOutbound(
+    memberTags: List<String>,
+    testUrl: String? = null,
+    intervalSec: Long? = null,
+    toleranceMs: Int? = null,
+    idleTimeoutStr: String? = null,
+    interruptExist: Boolean? = null
+) =
     Outbound_URLTestOptions().apply {
         type = "urltest"
         tag = TAG_PROXY
@@ -137,8 +144,13 @@ internal fun buildUrlTestOutbound(memberTags: List<String>, testUrl: String? = n
         url = testUrl?.takeIf { it.isNotBlank() }
             ?: DataStore.connectionTestURL.takeIf { it.isNotBlank() }
             ?: "https://www.gstatic.com/generate_204"
-        interval = 300L
-        tolerance = 50
+        val iv = intervalSec?.takeIf { it > 0 } ?: 300L
+        interval = "${iv}s"
+        tolerance = toleranceMs?.takeIf { it > 0 } ?: 50
+        idleTimeoutStr?.takeIf { it.isNotBlank() }?.let {
+            idle_timeout = if (it.all { c -> c.isDigit() }) "${it}s" else it
+        }
+        interrupt_exist_connections = interruptExist ?: false
     }
 
 private fun endpointTag(value: Any?): String? {
@@ -809,15 +821,38 @@ fun buildConfig(
             return chainTagOut
         }
 
-        val useAutoSelect = !forTest && !forExport && DataStore.autoSelectLowestLatency
+        val isGroupUrlTest = group?.let { DataStore.isGroupUrlTest(it.id) } == true
+        val useAutoSelect = !forTest && !forExport && (DataStore.autoSelectLowestLatency || isGroupUrlTest)
         // build outbounds
         if (buildSelector || useAutoSelect) {
-            val list = group?.id?.let { SagerDatabase.proxyDao.getByGroup(it) } ?: listOf(proxy)
+            val list = if (group != null && group.id != 0L) {
+                SagerDatabase.proxyDao.getByGroup(group.id)
+            } else {
+                val all = SagerDatabase.proxyDao.getAll()
+                if (all.size > 1) all else listOf(proxy)
+            }.filter { entity ->
+                !DataStore.isGroupDisabled(entity.groupId)
+            }.ifEmpty { listOf(proxy) }
+
             list.forEach {
                 tagMap[it.id] = buildChain(it.id, it)
             }
             if (useAutoSelect && tagMap.isNotEmpty()) {
-                outbounds.add(0, buildUrlTestOutbound(tagMap.values.toList()))
+                val testUrl = group?.let { DataStore.groupUrlTestUrl(it.id) }
+                val intervalVal = group?.let { DataStore.groupUrlTestInterval(it.id) }
+                val toleranceVal = group?.let { DataStore.groupUrlTestTolerance(it.id) }
+                val idleTimeoutVal = group?.let { DataStore.groupUrlTestIdleTimeout(it.id) }
+                val interruptVal = group?.let { DataStore.groupUrlTestInterrupt(it.id) }
+                outbounds.add(
+                    0, buildUrlTestOutbound(
+                        tagMap.values.toList(),
+                        testUrl = testUrl,
+                        intervalSec = intervalVal,
+                        toleranceMs = toleranceVal,
+                        idleTimeoutStr = idleTimeoutVal,
+                        interruptExist = interruptVal
+                    )
+                )
             } else {
                 outbounds.add(0, buildSelectorOutbound(tagMap[proxy.id], tagMap.values.toList()))
             }

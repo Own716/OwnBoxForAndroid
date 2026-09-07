@@ -811,10 +811,13 @@ object RawUpdater : GroupUpdater() {
                 Logs.w(e)
             }
         } else if (text.contains("[Interface]")) {
-            // wireguard
+            // wireguard / amneziawg
             try {
+                val isAwg = text.contains("Jc", ignoreCase = true) || text.contains("Jmin", ignoreCase = true) || text.contains("S1", ignoreCase = true) || text.contains("H1", ignoreCase = true)
                 proxies.addAll(parseWireGuardConfig(text).map {
-                    if (fileName.isNotBlank()) it.name = fileName.removeSuffix(".conf")
+                    val prefix = if (isAwg) "[AWG-Compat] " else ""
+                    if (fileName.isNotBlank()) it.name = prefix + fileName.removeSuffix(".conf")
+                    else if (isAwg && !it.name.startsWith("[AWG-Compat]")) it.name = prefix + (it.name.ifBlank { "WireGuard" })
                     it
                 })
                 return proxies

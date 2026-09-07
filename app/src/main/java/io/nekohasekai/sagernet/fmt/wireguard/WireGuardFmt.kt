@@ -6,6 +6,7 @@ import com.google.gson.JsonObject
 import io.nekohasekai.sagernet.ktx.applyDefaultValues
 import moe.matsuri.nb4a.SingBoxOptions
 import moe.matsuri.nb4a.utils.listByLineOrComma
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.ini4j.Ini
 import java.io.StringReader
 
@@ -18,6 +19,7 @@ fun parseWireGuardConfig(conf: String): List<WireGuardBean> {
         load(StringReader(conf))
     }
     val iface = ini["Interface"] ?: error("Missing 'Interface' selection")
+    val isAwg = iface["Jc"] != null || iface["S1"] != null || iface["H1"] != null || conf.contains("awg://", ignoreCase = true)
     val localAddresses = iface.getAll("Address")
         ?.flatMap { value -> value.split(',') }
         ?.map { it.trim() }
@@ -26,6 +28,7 @@ fun parseWireGuardConfig(conf: String): List<WireGuardBean> {
     if (localAddresses.isEmpty()) error("Empty address in 'Interface' selection")
 
     val baseBean = WireGuardBean().applyDefaultValues().apply {
+        name = if (isAwg) "[AWG-Compat]" else ""
         localAddress = localAddresses.joinToString("\n")
         privateKey = iface["PrivateKey"]?.trim().orEmpty()
         iface["MTU"]?.trim()?.toIntOrNull()?.let { mtu = it }
@@ -193,5 +196,63 @@ fun buildSingBoxEndpointWireGuardBean(bean: WireGuardBean): SingBoxOptions.Endpo
                 reserved = bean.reserved.takeIf { it.isNotBlank() }?.let(::genReserved)
             }
         )
+    }
+}
+
+fun parseWireGuardLink(link: String): WireGuardBean? {
+    val isAwg = link.startsWith("awg://", ignoreCase = true)
+    if (!isAwg && !link.startsWith("wireguard://", ignoreCase = true)) return null
+
+    val withoutScheme = link.substringAfter("://")
+    if (!withoutScheme.contains("@") && !withoutScheme.contains("?")) {
+        try {
+            val decoded = String(android.util.Base64.decode(withoutScheme, android.util.Base64.DEFAULT or android.util.Base64.URL_SAFE))
+            if (decoded.contains("[Interface]")) {
+                val list = parseWireGuardConfig(decoded)
+                if (list.isNotEmpty()) {
+                    val bean = list.first()
+                    if (isAwg && !bean.name.startsWith("[AWG-Compat]")) {
+                        bean.name = "[AWG-Compat] ${bean.name}".trim()
+                    }
+                    return bean
+                }
+            }
+        } catch (_: Exception) {
+        }
+    }
+
+    try {
+        val raw = if (link.startsWith("awg://", ignoreCase = true)) {
+            "https" + link.substring(3)
+        } else {
+            "https" + link.substring(9)
+        }
+        val uri = raw.toHttpUrlOrNull() ?: return null
+
+        val serverAddress = uri.host
+        val serverPort = uri.port
+        val privateKey = uri.username.takeIf { it.isNotBlank() } ?: uri.queryParameter("private_key") ?: uri.queryParameter("privatekey") ?: ""
+        val publicKey = uri.password?.takeIf { it.isNotBlank() } ?: uri.queryParameter("public_key") ?: uri.queryParameter("publickey") ?: uri.queryParameter("peer_public_key") ?: ""
+        val address = uri.queryParameter("address") ?: uri.queryParameter("ip") ?: ""
+        val psk = uri.queryParameter("preshared_key") ?: uri.queryParameter("presharedkey") ?: uri.queryParameter("psk") ?: ""
+        val mtu = uri.queryParameter("mtu")?.toIntOrNull() ?: 1420
+        val reserved = uri.queryParameter("reserved") ?: ""
+        val tag = uri.fragment?.takeIf { it.isNotBlank() } ?: "WireGuard"
+
+        val hasAwgParams = isAwg || uri.queryParameter("jc") != null || uri.queryParameter("jmin") != null || uri.queryParameter("s1") != null || uri.queryParameter("h1") != null
+
+        return WireGuardBean().apply {
+            name = if (hasAwgParams) "[AWG-Compat] $tag" else tag
+            this.serverAddress = serverAddress
+            this.serverPort = serverPort
+            this.localAddress = address.replace(",", "\n")
+            this.privateKey = privateKey
+            this.peerPublicKey = publicKey
+            this.peerPreSharedKey = psk
+            this.mtu = mtu
+            this.reserved = reserved
+        }.applyDefaultValues()
+    } catch (e: Exception) {
+        return null
     }
 }

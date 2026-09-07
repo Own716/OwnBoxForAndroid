@@ -25,7 +25,7 @@
         <EditTextPreference
             app:icon="@drawable/ic_maps_directions_boat"
             app:key="serverPorts"
-            app:title="@string/server_port"
+            app:title="@string/server_port_or_range"
             app:useSimpleSummaryProvider="true" />
         <EditTextPreference
             app:dialogLayout="@layout/layout_password_dialog"

@@ -368,6 +368,14 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
                     startFilesForResult(exportProfiles, "profiles_${proxyGroup.displayName()}.txt")
                 }
 
+                R.id.action_toggle_group_disabled -> {
+                    val currentDisabled = DataStore.isGroupDisabled(proxyGroup.id)
+                    DataStore.setGroupDisabled(proxyGroup.id, !currentDisabled)
+                    groupAdapter.notifyItemChanged(bindingAdapterPosition)
+                    val msg = if (!currentDisabled) R.string.subscription_disabled else R.string.subscription_enabled
+                    snackbar(msg).show()
+                }
+
                 R.id.action_clear -> {
                     MaterialAlertDialogBuilder(requireContext()).setTitle(R.string.confirm)
                         .setMessage(R.string.clear_profiles_message)
@@ -390,9 +398,11 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
 
             itemView.setOnClickListener { }
 
+            val isDisabled = DataStore.isGroupDisabled(proxyGroup.id)
             editButton.isGone = proxyGroup.ungrouped
             updateButton.isInvisible = proxyGroup.type != GroupType.SUBSCRIPTION
-            groupName.text = proxyGroup.displayName()
+            groupName.text = if (isDisabled) "${proxyGroup.displayName()} ${getString(R.string.group_disabled_status)}" else proxyGroup.displayName()
+            itemView.alpha = if (isDisabled) 0.6f else 1.0f
 
             editButton.setOnClickListener {
                 startActivity(Intent(it.context, GroupSettingsActivity::class.java).apply {
@@ -409,6 +419,10 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
 
                 val popup = PopupMenu(requireContext(), it)
                 popup.menuInflater.inflate(R.menu.group_action_menu, popup.menu)
+
+                val disabled = DataStore.isGroupDisabled(proxyGroup.id)
+                popup.menu.findItem(R.id.action_toggle_group_disabled)?.title =
+                    getString(if (disabled) R.string.group_enable else R.string.group_disable)
 
                 if (proxyGroup.type != GroupType.SUBSCRIPTION) {
                     popup.menu.removeItem(R.id.action_share_subscription)

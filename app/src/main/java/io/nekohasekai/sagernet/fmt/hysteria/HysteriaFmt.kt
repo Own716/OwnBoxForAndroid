@@ -357,10 +357,18 @@ fun buildSingBoxOutboundHysteriaBean(bean: HysteriaBean): SingBoxOptions.SingBox
 }
 
 fun hopPortsToSingboxList(s: String): List<String> {
-    return s.split(",").mapNotNull {
-        val pRange = it.replace("-", ":")
-        if (pRange.split(":").size == 2) {
-            pRange
+    return s.split(",").mapNotNull { item ->
+        val trimmed = item.trim().replace(":", "-")
+        if (trimmed.isEmpty()) return@mapNotNull null
+        if (trimmed.contains("-")) {
+            val parts = trimmed.split("-").map { it.trim() }
+            if (parts.size == 2 && parts[0].toIntOrNull() != null && parts[1].toIntOrNull() != null) {
+                "${parts[0]}-${parts[1]}"
+            } else {
+                null
+            }
+        } else if (trimmed.toIntOrNull() != null) {
+            trimmed
         } else {
             null
         }

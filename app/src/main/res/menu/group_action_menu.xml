@@ -25,6 +25,9 @@
         </menu>
     </item>
     <item
+        android:id="@+id/action_toggle_group_disabled"
+        android:title="@string/group_toggle_disabled" />
+    <item
         android:id="@+id/action_clear"
         android:title="@string/clear_profiles" />
 </menu>
