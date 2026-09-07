@@ -17,3 +17,11 @@ The version matches the speed-test dependency pinned by Throne commit
 gomobile binding, so the public checksum database verifies downloaded module
 content while the generated `go.sum` remains an intentionally ignored build
 artifact.
+
+## `libcore/protocol/snell/internal/singsnell`
+
+- Source: SagerNet official Snell implementation <https://github.com/SagerNet/sing-snell>
+- Commit: `bc5a12ac736f235b2de2926ecd2791cc925e6b8c`
+- License: GPL-3.0-or-later
+- Vendored internally to avoid interface skew against sing-box v1.13.16 and sing v0.8.12.
+

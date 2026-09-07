@@ -337,6 +337,12 @@
     <string name="update_when_connected_only">仅在连接时更新</string>
     <string name="update_when_connected_only_sum">防止 IP 地址泄漏</string>
     <string name="subscription_user_agent">用户代理</string>
+    <string name="default_subscription_user_agent">默认订阅 User-Agent</string>
+    <string name="select_ua_preset">预设 User-Agent</string>
+    <string name="custom_ua_hint">输入自定义 User-Agent</string>
+    <string name="update_existing_subscriptions_ua">同时更新所有已保存的订阅</string>
+    <string name="reset_to_default">恢复默认</string>
+    <string name="ua_updated_toast">已更新默认订阅 User-Agent</string>
     <string name="confirm">确认</string>
     <string name="missing_plugin">缺少插件</string>
     <string name="profile_requiring_plugin">配置 %s 需要插件 %s, 但找不到.</string>

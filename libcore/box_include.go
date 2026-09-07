@@ -41,6 +41,7 @@ import (
 
 	h2http "libcore/protocol/http"
 	"libcore/protocol/juicity"
+	"libcore/protocol/snell"
 	customVless "libcore/protocol/vless"
 
 	_ "github.com/sagernet/sing-box/experimental/clashapi"
@@ -81,9 +82,7 @@ func nekoboxAndroidOutboundRegistry() *outbound.Registry {
 	// 协商到 h2 时走 HTTP/2 CONNECT（兼容 h2-only HTTPS 代理节点）。
 	h2http.RegisterOutbound(registry)
 	shadowsocks.RegisterOutbound(registry)
-	// 官方内核无 shadowsocksr / snell（starifly fork 私有），按迁移方针先摘除；
-	// 配置中含这两类 outbound 时 box.New 会报 "unknown outbound type" 直接失败，
-	// 待有具体用户案例再评估替代实现。
+	snell.RegisterOutbound(registry)
 	vmess.RegisterOutbound(registry)
 	trojan.RegisterOutbound(registry)
 	tor.RegisterOutbound(registry)

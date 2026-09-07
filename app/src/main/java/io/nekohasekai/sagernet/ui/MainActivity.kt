@@ -258,9 +258,6 @@ class MainActivity : ThemedActivity(),
     }
 
     fun refreshNavMenu(clashApi: Boolean) {
-        if (::navigation.isInitialized) {
-            navigation.menu.findItem(R.id.nav_traffic)?.isVisible = true
-        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -508,10 +505,6 @@ class MainActivity : ThemedActivity(),
                 startActivity(Intent(this, MediaUnlockActivity::class.java))
                 return false
             }
-            R.id.nav_traffic -> {
-                startActivity(Intent(this, TrafficChartActivity::class.java))
-                return false
-            }
             R.id.nav_tools -> displayFragment(ToolsFragment())
             R.id.nav_logcat -> displayFragment(LogcatFragment())
             R.id.nav_faq -> {
@@ -597,6 +590,7 @@ class MainActivity : ThemedActivity(),
             ProfileManager.postUpdate(old, true)
             ProfileManager.postUpdate(id, true)
         }
+        stats.refreshLandingIp(forceRefresh = true)
     }
 
     override fun onPreferenceDataStoreChanged(store: PreferenceDataStore, key: String) {

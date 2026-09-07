@@ -44,6 +44,10 @@
             app:icon="@mipmap/ic_launcher"
             app:key="changeIcon"
             app:title="@string/change_icon" />
+        <io.nekohasekai.sagernet.widget.SubscriptionUserAgentPreference
+            app:icon="@drawable/ic_baseline_http_24"
+            app:key="defaultSubscriptionUserAgent"
+            app:title="@string/default_subscription_user_agent" />
 
         <moe.matsuri.nb4a.ui.SimpleMenuPreference
             app:defaultValue="vpn"

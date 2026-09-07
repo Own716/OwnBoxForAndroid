@@ -141,7 +141,8 @@ fun parseV2Ray(link: String): StandardV2RayBean {
                 }
             }
 
-            "xhttp" -> {
+            "splithttp", "xhttp" -> {
+                bean.type = "xhttp"
                 url.queryParameter("host")?.let {
                     bean.host = it
                 }
@@ -181,8 +182,14 @@ fun StandardV2RayBean.parseDuckSoft(url: HttpUrl) {
         path = url.pathSegments.joinToString("/")
     }
 
-    type = url.queryParameter("type") ?: "tcp"
-    if (type == "h2" || url.queryParameter("headerType") == "http") type = "http"
+    val rawType = url.queryParameter("type")
+        ?: url.queryParameter("transport")
+        ?: "tcp"
+    type = when (rawType.lowercase()) {
+        "splithttp", "xhttp" -> "xhttp"
+        "h2" -> "http"
+        else -> if (url.queryParameter("headerType") == "http") "http" else rawType
+    }
 
     security = url.queryParameter("security")
     if (security.isNullOrBlank()) {

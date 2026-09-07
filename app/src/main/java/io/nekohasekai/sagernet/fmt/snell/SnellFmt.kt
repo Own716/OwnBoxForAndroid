@@ -7,23 +7,61 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 // URI 格式: snell://base64(psk)@server:port?version=6&userkey=base64(userkey)&mode=default&reuse=true&network=tcp#name
 fun parseSnell(url: String): SnellBean {
     val link = url.replace("snell://", "https://").toHttpUrlOrNull()
-        ?: error("Invalid snell URL")
+    if (link != null) {
+        return SnellBean().apply {
+            serverAddress = link.host
+            serverPort = link.port
+            psk = (link.username.takeIf { it.isNotBlank() } ?: link.queryParameter("psk") ?: "").unUrlSafe()
+            name = (link.fragment ?: "").unUrlSafe()
+
+            (link.queryParameter("version") ?: link.queryParameter("v"))?.toIntOrNull()?.let {
+                version = it.coerceIn(1, 6)
+            }
+            link.queryParameter("userkey")?.let { userKey = it.unUrlSafe() }
+            (link.queryParameter("obfs-mode") ?: link.queryParameter("obfs"))?.let { obfsMode = it }
+            (link.queryParameter("obfs-host") ?: link.queryParameter("host"))?.let { obfsHost = it }
+            link.queryParameter("reuse")?.let { reuse = it.toBoolean() }
+            link.queryParameter("network")?.let { network = it }
+            link.queryParameter("mode")?.let { mode = it }
+        }
+    }
+
+    // Fallback regex parsing for raw/non-standard snell:// links
+    val regex = Regex("""^snell://(?:(?<psk>[^@]+)@)?(?<host>[^:/?#]+)(?::(?<port>\d+))?(?:[/?#](?<rest>.*))?$""")
+    val match = regex.find(url) ?: error("Invalid snell URL: $url")
+    val pskStr = match.groups["psk"]?.value?.unUrlSafe() ?: ""
+    val hostStr = match.groups["host"]?.value ?: ""
+    val portStr = match.groups["port"]?.value?.toIntOrNull() ?: 443
+    val rest = match.groups["rest"]?.value ?: ""
+
+    val queryPart = rest.substringBefore('#')
+    val fragment = if (rest.contains('#')) rest.substringAfter('#') else ""
+
+    val queryParams = mutableMapOf<String, String>()
+    if (queryPart.isNotBlank()) {
+        queryPart.trimStart('?').split('&').forEach { param ->
+            val parts = param.split('=', limit = 2)
+            if (parts.isNotEmpty()) {
+                queryParams[parts[0]] = if (parts.size > 1) parts[1].unUrlSafe() else ""
+            }
+        }
+    }
 
     return SnellBean().apply {
-        serverAddress = link.host
-        serverPort = link.port
-        psk = link.username.unUrlSafe()
-        name = link.fragment ?: ""
+        serverAddress = hostStr
+        serverPort = portStr
+        psk = (pskStr.takeIf { it.isNotBlank() } ?: queryParams["psk"] ?: "")
+        name = fragment.unUrlSafe()
 
-        link.queryParameter("version")?.toIntOrNull()?.let {
+        (queryParams["version"] ?: queryParams["v"])?.toIntOrNull()?.let {
             version = it.coerceIn(1, 6)
         }
-        link.queryParameter("userkey")?.let { userKey = it.unUrlSafe() }
-        link.queryParameter("obfs-mode")?.let { obfsMode = it }
-        link.queryParameter("obfs-host")?.let { obfsHost = it }
-        link.queryParameter("reuse")?.let { reuse = it.toBoolean() }
-        link.queryParameter("network")?.let { network = it }
-        link.queryParameter("mode")?.let { mode = it }
+        queryParams["userkey"]?.let { userKey = it }
+        (queryParams["obfs-mode"] ?: queryParams["obfs"])?.let { obfsMode = it }
+        (queryParams["obfs-host"] ?: queryParams["host"])?.let { obfsHost = it }
+        queryParams["reuse"]?.let { reuse = it.toBoolean() }
+        queryParams["network"]?.let { network = it }
+        queryParams["mode"]?.let { mode = it }
     }
 }
 

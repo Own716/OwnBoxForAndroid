@@ -167,10 +167,37 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     val mixedInboundUser: String get() = if (mixedInboundAuthed) mixedUsername else ""
     val mixedInboundPass: String get() = if (mixedInboundAuthed) mixedPassword else ""
 
+    var defaultSubscriptionUserAgent: String
+        get() = configurationStore.getString(Key.DEFAULT_SUBSCRIPTION_USER_AGENT, "")?.takeIf { it.isNotBlank() } ?: io.nekohasekai.sagernet.ktx.USER_AGENT
+        set(value) = configurationStore.putString(Key.DEFAULT_SUBSCRIPTION_USER_AGENT, value)
+
+    fun migrateSubscriptionUserAgents(targetUa: String? = null, forceAll: Boolean = false) {
+        val newUa = targetUa?.takeIf { it.isNotBlank() } ?: defaultSubscriptionUserAgent
+        try {
+            val groupDao = SagerDatabase.groupDao
+            val allGroups = groupDao.allGroups()
+            var changed = false
+            for (group in allGroups) {
+                val sub = group.subscription ?: continue
+                if (forceAll || sub.customUserAgent.isNullOrBlank() || sub.customUserAgent.startsWith("Throne/")) {
+                    sub.customUserAgent = newUa
+                    groupDao.updateGroup(group)
+                    changed = true
+                }
+            }
+            if (changed) {
+                Logs.d("Migrated subscription User-Agents to: $newUa")
+            }
+        } catch (e: Throwable) {
+            Logs.w(e)
+        }
+    }
+
     fun initGlobal() {
         if (configurationStore.getString(Key.MIXED_PORT) == null) {
             mixedPort = mixedPort
         }
+        migrateSubscriptionUserAgents()
     }
 
 

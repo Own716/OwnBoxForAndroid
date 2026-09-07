@@ -428,6 +428,12 @@
     <string name="update_when_connected_only">Update only when connected</string>
     <string name="update_when_connected_only_sum">Prevent IP address leakage</string>
     <string name="subscription_user_agent">UserAgent</string>
+    <string name="default_subscription_user_agent">Default Subscription User-Agent</string>
+    <string name="select_ua_preset">Preset User-Agent</string>
+    <string name="custom_ua_hint">Enter custom User-Agent</string>
+    <string name="update_existing_subscriptions_ua">Update all saved subscriptions</string>
+    <string name="reset_to_default">Reset to Default</string>
+    <string name="ua_updated_toast">Subscription User-Agent updated</string>
     <string name="confirm">Confirm</string>
     <string name="missing_plugin">Missing Plugin</string>
     <string name="profile_requiring_plugin">Profile %s requires the %s plugin to be installed, but

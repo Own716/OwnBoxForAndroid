@@ -106,6 +106,7 @@ class SagerNet : Application(),
             Theme.apply(this)
             Theme.applyNightTheme()
             AppLocale.apply()
+            DataStore.migrateSubscriptionUserAgents()
             runOnDefaultDispatcher {
                 DefaultNetworkListener.start(this) {
                     underlyingNetwork = it

@@ -75,7 +75,11 @@ object RawUpdater : GroupUpdater() {
                     allowInsecure()
                 }
                 setURL(subscription.link)
-                setUserAgent(subscription.customUserAgent.takeIf { it.isNotBlank() } ?: USER_AGENT)
+                val activeUa = when {
+                    !subscription.customUserAgent.isNullOrBlank() && !subscription.customUserAgent.startsWith("Throne/") -> subscription.customUserAgent
+                    else -> DataStore.defaultSubscriptionUserAgent
+                }
+                setUserAgent(activeUa)
             }.execute()
             proxies = parseRaw(Util.getStringBox(response.contentString))
                 ?: error(app.getString(R.string.no_proxies_found))
@@ -435,7 +439,7 @@ object RawUpdater : GroupUpdater() {
                                         when (opt.value) {
                                             "h2", "http" -> bean.type = "http"
                                             "ws", "grpc" -> bean.type = opt.value as String
-                                            "xhttp" -> if (bean.isVLESS) bean.type = "xhttp"
+                                            "xhttp", "splithttp" -> if (bean.isVLESS) bean.type = "xhttp"
                                         }
                                     }
 

@@ -320,6 +320,12 @@
     <string name="update_when_connected_only">僅在已連線時更新</string>
     <string name="update_when_connected_only_sum">防止 IP 位址洩漏</string>
     <string name="subscription_user_agent">使用者代理</string>
+    <string name="default_subscription_user_agent">預設訂閱 User-Agent</string>
+    <string name="select_ua_preset">預設 User-Agent</string>
+    <string name="custom_ua_hint">輸入自訂 User-Agent</string>
+    <string name="update_existing_subscriptions_ua">同時更新所有已儲存的訂閱</string>
+    <string name="reset_to_default">恢復預設</string>
+    <string name="ua_updated_toast">已更新預設訂閱 User-Agent</string>
     <string name="confirm">確認</string>
     <string name="missing_plugin">遺失外掛程式</string>
     <string name="profile_requiring_plugin">設定檔 %s 需要外掛程式 %s，但其未被安裝。</string>

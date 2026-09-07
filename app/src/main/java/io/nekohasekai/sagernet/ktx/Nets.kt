@@ -72,4 +72,4 @@ fun mkPort(): Int {
     return port
 }
 
-const val USER_AGENT = "Throne/Android/" + BuildConfig.VERSION_NAME
+const val USER_AGENT = "NekoBox/Android/1.3.1 (sing-box v1.13.16)"
