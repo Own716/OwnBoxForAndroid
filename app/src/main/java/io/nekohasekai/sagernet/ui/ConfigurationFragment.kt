@@ -869,22 +869,20 @@ class ConfigurationFragment @JvmOverloads constructor(
                 item.isChecked = newState
                 DataStore.autoSelectLowestLatency = newState
                 toolbar.menu.findItem(R.id.action_auto_lowest_latency)?.isChecked = newState
-                onMainDispatcher {
-                    val msg = if (newState) {
-                        getString(R.string.auto_lowest_latency_enabled)
-                    } else {
-                        getString(R.string.auto_lowest_latency_disabled)
-                    }
-                    if (DataStore.serviceState.canStop) {
-                        snackbar(getString(R.string.need_reload)).setAction(R.string.apply) {
-                            runOnDefaultDispatcher {
-                                delay(100)
-                                SagerNet.reloadService()
-                            }
-                        }.show()
-                    } else {
-                        snackbar(msg).show()
-                    }
+                val msg = if (newState) {
+                    getString(R.string.auto_lowest_latency_enabled)
+                } else {
+                    getString(R.string.auto_lowest_latency_disabled)
+                }
+                if (DataStore.serviceState.canStop) {
+                    snackbar(getString(R.string.need_reload)).setAction(R.string.apply) {
+                        runOnDefaultDispatcher {
+                            delay(100)
+                            SagerNet.reloadService()
+                        }
+                    }.show()
+                } else {
+                    snackbar(msg).show()
                 }
                 return true
             }

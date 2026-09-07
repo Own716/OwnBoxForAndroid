@@ -3,6 +3,7 @@ package io.nekohasekai.sagernet.ui
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
+import com.google.android.material.snackbar.Snackbar
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.databinding.LayoutNetworkBinding
 import io.nekohasekai.sagernet.ktx.app
@@ -99,7 +100,7 @@ class NetworkFragment : NamedFragment(R.layout.layout_network) {
             runOnDefaultDispatcher {
                 val success = BackupHelper.autoBackupLocal()
                 onMainDispatcher {
-                    snackbar(if (success) "本地备份成功 (已保存至应用备份目录)" else "备份失败").show()
+                    Snackbar.make(binding.root, if (success) "本地备份成功 (已保存至应用备份目录)" else "备份失败", Snackbar.LENGTH_SHORT).show()
                 }
             }
         }

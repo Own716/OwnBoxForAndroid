@@ -1,16 +1,29 @@
 package io.nekohasekai.sagernet.utils
 
+import android.os.Parcel
+import android.os.Parcelable
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.database.preference.PublicDatabase
 import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.app
 import io.nekohasekai.sagernet.ktx.toStringPretty
+import moe.matsuri.nb4a.utils.Util
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
+
+private fun Parcelable.toBase64Str(): String {
+    val parcel = Parcel.obtain()
+    writeToParcel(parcel, 0)
+    try {
+        return Util.b64EncodeUrlSafe(parcel.marshall())
+    } finally {
+        parcel.recycle()
+    }
+}
 
 object BackupHelper {
 
