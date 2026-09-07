@@ -12,9 +12,9 @@ import androidx.core.content.res.TypedArrayUtils
 import androidx.preference.Preference
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import io.nekohasekai.sagernet.Key
-import io.nekohasekai.sagernet.Logs
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.DataStore
+import io.nekohasekai.sagernet.ktx.Logs
 
 class SubscriptionUserAgentPreference @JvmOverloads constructor(
     context: Context,
