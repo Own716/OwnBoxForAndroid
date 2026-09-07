@@ -23,7 +23,7 @@ data class LandingIpInfo(
 ) {
     val briefText: String
         get() = if (durationMs > 0) {
-            "$countryFlag $countryCode $ip · ${durationMs}ms".trim()
+            "$countryFlag $countryCode $ip · HTTP 握手 ${durationMs} 毫秒".trim()
         } else {
             "$countryFlag $countryCode $ip".trim()
         }

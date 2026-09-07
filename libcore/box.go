@@ -484,7 +484,8 @@ func urlTest(instance *BoxInstance, tracker adapter.ConnectionTracker, link stri
 		DialContext:       dialer,
 		DisableKeepAlives: true,
 		TLSClientConfig: &tls.Config{
-			ServerName: hostname,
+			ServerName:         hostname,
+			InsecureSkipVerify: true,
 		},
 	}
 	client := &http.Client{

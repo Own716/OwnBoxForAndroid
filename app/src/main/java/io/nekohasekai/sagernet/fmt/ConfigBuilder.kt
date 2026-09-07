@@ -143,7 +143,7 @@ internal fun buildUrlTestOutbound(
         outbounds = memberTags
         url = testUrl?.takeIf { it.isNotBlank() }
             ?: DataStore.connectionTestURL.takeIf { it.isNotBlank() }
-            ?: "https://www.gstatic.com/generate_204"
+            ?: "http://cp.cloudflare.com/generate_204"
         val iv = intervalSec?.takeIf { it > 0 } ?: 300L
         interval = "${iv}s"
         tolerance = toleranceMs?.takeIf { it > 0 } ?: 50

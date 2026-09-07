@@ -40,7 +40,7 @@
         app:title="@string/urltest_settings">
 
         <EditTextPreference
-            app:defaultValue="https://www.gstatic.com/generate_204"
+            app:defaultValue="http://cp.cloudflare.com/generate_204"
             app:icon="@drawable/ic_baseline_link_24"
             app:key="groupUrlTestUrl"
             app:title="@string/urltest_url"

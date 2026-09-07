@@ -230,9 +230,24 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var httpProxyBypass by configurationStore.string(Key.HTTP_PROXY_BYPASS) { "" }
     var dnsHosts by configurationStore.string(Key.DNS_HOSTS) { "" }
     var strictRoute by configurationStore.boolean(Key.STRICT_ROUTE) { true }
-    var connectionTestURL by configurationStore.string(Key.CONNECTION_TEST_URL) {
+    private var rawConnectionTestURL by configurationStore.string(Key.CONNECTION_TEST_URL) {
         SagerNet.application.getString(R.string.default_connection_test_url)
     }
+    var connectionTestURL: String
+        get() {
+            val url = rawConnectionTestURL
+            if (url.isBlank() || url == "https://www.gstatic.com/generate_204" || url == "http://www.gstatic.com/generate_204") {
+                val newUrl = SagerNet.application.getString(R.string.default_connection_test_url)
+                if (url != newUrl) {
+                    rawConnectionTestURL = newUrl
+                }
+                return newUrl
+            }
+            return url
+        }
+        set(value) {
+            rawConnectionTestURL = value
+        }
     var connectionTestConcurrent by configurationStore.int(Key.CONNECTION_TEST_CONCURRENT) {
         SagerNet.application.getString(R.string.default_connection_test_concurrent).toInt()
     }
@@ -348,7 +363,22 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var groupOrder by profileCacheStore.stringToInt(Key.GROUP_ORDER)
     var groupIsSelector by profileCacheStore.boolean(Key.GROUP_IS_SELECTOR)
     var groupIsUrlTest by profileCacheStore.boolean("groupIsUrlTest")
-    var groupUrlTestUrl by profileCacheStore.string("groupUrlTestUrl") { "https://www.gstatic.com/generate_204" }
+    private var rawGroupUrlTestUrl by profileCacheStore.string("groupUrlTestUrl") { "http://cp.cloudflare.com/generate_204" }
+    var groupUrlTestUrl: String
+        get() {
+            val url = rawGroupUrlTestUrl
+            if (url.isBlank() || url == "https://www.gstatic.com/generate_204" || url == "http://www.gstatic.com/generate_204") {
+                val newUrl = "http://cp.cloudflare.com/generate_204"
+                if (url != newUrl) {
+                    rawGroupUrlTestUrl = newUrl
+                }
+                return newUrl
+            }
+            return url
+        }
+        set(value) {
+            rawGroupUrlTestUrl = value
+        }
     var groupUrlTestInterval by profileCacheStore.stringToInt("groupUrlTestInterval") { 180 }
     var groupUrlTestTolerance by profileCacheStore.stringToInt("groupUrlTestTolerance") { 50 }
     var groupUrlTestIdleTimeout by profileCacheStore.string("groupUrlTestIdleTimeout") { "30m" }
@@ -368,8 +398,13 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     fun groupIsUrlTest(groupId: Long): Boolean = isGroupUrlTest(groupId)
     fun setGroupIsUrlTest(groupId: Long, value: Boolean) = setGroupUrlTest(groupId, value)
 
-    fun groupUrlTestUrl(groupId: Long): String =
-        configurationStore.getString("group_${groupId}_urlTestUrl", "")?.takeIf { it.isNotBlank() } ?: connectionTestURL
+    fun groupUrlTestUrl(groupId: Long): String {
+        val stored = configurationStore.getString("group_${groupId}_urlTestUrl", "")?.takeIf { it.isNotBlank() }
+        if (stored == "https://www.gstatic.com/generate_204" || stored == "http://www.gstatic.com/generate_204") {
+            return connectionTestURL
+        }
+        return stored ?: connectionTestURL
+    }
     fun setGroupUrlTestUrl(groupId: Long, value: String) {
         configurationStore.putString("group_${groupId}_urlTestUrl", value)
     }
