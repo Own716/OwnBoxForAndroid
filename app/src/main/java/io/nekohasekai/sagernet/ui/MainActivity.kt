@@ -508,10 +508,6 @@ class MainActivity : ThemedActivity(),
                 startActivity(Intent(this, MediaUnlockActivity::class.java))
                 return false
             }
-            R.id.nav_port_test -> {
-                startActivity(Intent(this, PortTestActivity::class.java))
-                return false
-            }
             R.id.nav_traffic -> displayFragment(WebviewFragment())
             R.id.nav_tools -> displayFragment(ToolsFragment())
             R.id.nav_logcat -> displayFragment(LogcatFragment())

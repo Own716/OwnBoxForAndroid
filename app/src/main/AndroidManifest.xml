@@ -756,11 +756,6 @@
             android:configChanges="uiMode"
             android:label="@string/tool_media_unlock" />
 
-        <activity
-            android:name="io.nekohasekai.sagernet.ui.PortTestActivity"
-            android:configChanges="uiMode"
-            android:label="@string/tool_port_test" />
-
     </application>
 
 </manifest>

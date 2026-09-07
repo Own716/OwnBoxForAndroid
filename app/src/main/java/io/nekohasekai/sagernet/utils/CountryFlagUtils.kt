@@ -59,7 +59,6 @@ object CountryFlagUtils {
     }
 
     fun formatWithFlag(name: String): String {
-        val flag = getFlag(name) ?: return name
-        return "$flag $name"
+        return name
     }
 }

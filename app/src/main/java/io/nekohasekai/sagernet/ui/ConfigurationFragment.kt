@@ -2644,7 +2644,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                 entity = proxyEntity
                 val bean = proxyEntity.requireBean()
 
-                profileName.text = io.nekohasekai.sagernet.utils.CountryFlagUtils.formatWithFlag(bean.displayName())
+                profileName.text = bean.displayName()
                 profileType.text = proxyEntity.displayType()
                 profileType.setTextColor(requireContext().getProtocolColor(proxyEntity.type))
 

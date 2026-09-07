@@ -33,10 +33,6 @@
                 android:id="@+id/nav_media_unlock"
                 android:icon="@drawable/ic_tool_media_unlock"
                 android:title="@string/tool_media_unlock" />
-            <item
-                android:id="@+id/nav_port_test"
-                android:icon="@drawable/ic_tool_port_test"
-                android:title="@string/tool_port_test" />
         </menu>
     </item>
 
