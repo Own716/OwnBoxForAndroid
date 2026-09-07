@@ -63,7 +63,7 @@
         \n直连： %3$s↑ %4$s↓</string>
     <string name="speed">%s/s</string>
     <string name="connection_test_testing">测试中…</string>
-    <string name="connection_test_available">连接成功: HTTPS 握手耗时 %dms</string>
+    <string name="connection_test_available">连接成功: HTTPS 握手耗时 %d 毫秒</string>
     <string name="connection_test_error">失败: %s</string>
     <string name="connection_test_fail">网络不可用</string>
     <string name="connection_test_error_status_code">错误代码: #%d</string>
@@ -254,7 +254,7 @@
     <string name="transproxy_mode">透明代理模式</string>
     <string name="port_transproxy">透明代理端口</string>
     <string name="connection_test_url">延迟测试 URL</string>
-    <string name="connection_test_available_http">连接成功: HTTP 握手耗时 %dms</string>
+    <string name="connection_test_available_http">连接成功: HTTP 握手耗时 %d 毫秒</string>
     <string name="certificates">证书 (链)</string>
     <string name="bypass_lan_in_core">在核心中绕过 LAN</string>
     <string name="ignore_battery_optimizations">忽略电池优化</string>

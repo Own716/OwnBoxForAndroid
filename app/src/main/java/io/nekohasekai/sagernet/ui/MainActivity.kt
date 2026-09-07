@@ -102,7 +102,7 @@ class MainActivity : ThemedActivity(),
                 null
             )
         }
-        binding.stats.setOnClickListener { if (DataStore.serviceState.connected) binding.stats.onIpDetailClicked() }
+        binding.stats.setOnClickListener { if (DataStore.serviceState.connected) binding.stats.testConnection() }
         binding.stats.setOnLongClickListener {
             startActivity(Intent(this, TrafficChartActivity::class.java))
             true
