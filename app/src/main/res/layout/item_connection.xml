@@ -54,7 +54,7 @@
                 android:layout_height="28dp"
                 android:background="?android:attr/selectableItemBackgroundBorderless"
                 android:padding="4dp"
-                android:contentDescription="@string/action_delete"
+                android:contentDescription="@string/delete"
                 android:src="@drawable/ic_navigation_close" />
 
         </LinearLayout>
