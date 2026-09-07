@@ -23,6 +23,23 @@
             android:title="@string/settings" />
     </group>
 
+    <item android:title="@string/network_tools">
+        <menu>
+            <item
+                android:id="@+id/nav_ip_purity"
+                android:icon="@drawable/ic_tool_ip_purity"
+                android:title="@string/tool_ip_purity" />
+            <item
+                android:id="@+id/nav_media_unlock"
+                android:icon="@drawable/ic_tool_media_unlock"
+                android:title="@string/tool_media_unlock" />
+            <item
+                android:id="@+id/nav_port_test"
+                android:icon="@drawable/ic_tool_port_test"
+                android:title="@string/tool_port_test" />
+        </menu>
+    </item>
+
     <group
         android:id="@+id/misc"
         android:checkableBehavior="single">

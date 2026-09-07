@@ -17,6 +17,9 @@ import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.ui.MainActivity
 import kotlin.math.abs
+import android.app.Activity
+import io.nekohasekai.sagernet.utils.LandingIpManager
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -41,6 +44,7 @@ class StatsBar @JvmOverloads constructor(
     private lateinit var statusText: TextView
     private lateinit var txText: TextView
     private lateinit var rxText: TextView
+    private var btnIpDetail: View? = null
     @Suppress("unused")
     private lateinit var behavior: YourBehavior
     private var currentState = BaseService.State.Idle
@@ -115,14 +119,37 @@ class StatsBar @JvmOverloads constructor(
         }
     }
 
+    private fun initViews() {
+        if (!this::statusText.isInitialized) {
+            statusText = findViewById(R.id.status)
+            txText = findViewById(R.id.tx)
+            rxText = findViewById(R.id.rx)
+            btnIpDetail = findViewById(R.id.btn_ip_detail)
+            btnIpDetail?.setOnClickListener {
+                onIpDetailClicked()
+            }
+        }
+    }
+
+    fun onIpDetailClicked() {
+        val cached = LandingIpManager.getCachedInfo()
+        val activity = context as? Activity ?: return
+        if (cached != null) {
+            LandingIpBottomSheet.show(activity, cached) {
+                refreshLandingIp(forceRefresh = true)
+            }
+        } else {
+            refreshLandingIp(forceRefresh = true)
+        }
+    }
+
     override fun setOnClickListener(l: OnClickListener?) {
-        statusText = findViewById(R.id.status)
-        txText = findViewById(R.id.tx)
-        rxText = findViewById(R.id.rx)
+        initViews()
         super.setOnClickListener(l)
     }
 
     private fun setStatus(text: CharSequence) {
+        initViews()
         statusText.text = text
         TooltipCompat.setTooltipText(this, text)
     }
@@ -278,8 +305,10 @@ class StatsBar @JvmOverloads constructor(
         currentState = state
         updateHideOnScroll()
         if (state == BaseService.State.Connected) {
-            setStatus(app.getText(R.string.vpn_connected))
+            refreshLandingIp(forceRefresh = false)
         } else {
+            LandingIpManager.clearCache()
+            btnIpDetail?.visibility = View.GONE
             updateSpeed(0, 0)
             setStatus(
                 context.getText(
@@ -290,6 +319,35 @@ class StatsBar @JvmOverloads constructor(
                     }
                 )
             )
+        }
+    }
+
+    fun refreshLandingIp(forceRefresh: Boolean = false) {
+        val currentProfile = DataStore.selectedProxy
+        val cached = LandingIpManager.getCachedInfo()
+        if (!forceRefresh && cached != null) {
+            setStatus(cached.briefText)
+            btnIpDetail?.visibility = View.VISIBLE
+            return
+        }
+
+        setStatus(context.getString(R.string.landing_ip_querying))
+        btnIpDetail?.visibility = View.GONE
+
+        val activity = context as? MainActivity
+        val scope = activity?.lifecycleScope ?: CoroutineScope(Dispatchers.Main)
+        scope.launch {
+            val result = LandingIpManager.queryLandingIp(currentProfile, forceRefresh = forceRefresh)
+            if (currentState != BaseService.State.Connected) return@launch
+
+            result.onSuccess { info ->
+                setStatus(info.briefText)
+                btnIpDetail?.visibility = View.VISIBLE
+            }.onFailure { err ->
+                Logs.w(err)
+                setStatus(context.getString(R.string.landing_ip_failed))
+                btnIpDetail?.visibility = View.GONE
+            }
         }
     }
 

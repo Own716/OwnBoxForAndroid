@@ -102,7 +102,7 @@ class MainActivity : ThemedActivity(),
                 null
             )
         }
-        binding.stats.setOnClickListener { if (DataStore.serviceState.connected) binding.stats.testConnection() }
+        binding.stats.setOnClickListener { if (DataStore.serviceState.connected) binding.stats.onIpDetailClicked() }
         binding.stats.setOnLongClickListener {
             startActivity(Intent(this, TrafficChartActivity::class.java))
             true
@@ -500,6 +500,18 @@ class MainActivity : ThemedActivity(),
             R.id.nav_group -> displayFragment(GroupFragment())
             R.id.nav_route -> displayFragment(RouteFragment())
             R.id.nav_settings -> displayFragment(SettingsFragment())
+            R.id.nav_ip_purity -> {
+                startActivity(Intent(this, IpPurityActivity::class.java))
+                return false
+            }
+            R.id.nav_media_unlock -> {
+                startActivity(Intent(this, MediaUnlockActivity::class.java))
+                return false
+            }
+            R.id.nav_port_test -> {
+                startActivity(Intent(this, PortTestActivity::class.java))
+                return false
+            }
             R.id.nav_traffic -> displayFragment(WebviewFragment())
             R.id.nav_tools -> displayFragment(ToolsFragment())
             R.id.nav_logcat -> displayFragment(LogcatFragment())

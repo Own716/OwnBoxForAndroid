@@ -99,8 +99,8 @@ class OwnBoxWidgetProvider : AppWidgetProvider() {
 
         for (appWidgetId in appWidgetIds) {
             val views = RemoteViews(context.packageName, R.layout.layout_widget_ownbox).apply {
-                // 1号位品牌 Logo
-                setImageViewResource(R.id.widget_icon, R.drawable.ic_widget_brand_logo)
+                // 1号位官方可莉（红帽子小女孩）
+                setImageViewResource(R.id.widget_icon, R.drawable.ic_widget_klee)
                 // 节点名与状态
                 setTextViewText(R.id.widget_title, profileTitle)
                 setTextViewText(R.id.widget_status, statusText)

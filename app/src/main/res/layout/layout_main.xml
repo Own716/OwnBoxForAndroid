@@ -83,16 +83,35 @@
                     android:textColor="@color/white"
                     android:textSize="14sp" />
 
-                <TextView
-                    android:id="@+id/status"
-                    android:layout_width="wrap_content"
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_gravity="fill_horizontal"
-                    android:ellipsize="end"
-                    android:maxLines="1"
-                    android:textColor="@color/white"
-                    android:textSize="16sp"
-                    tools:text="@string/connection_test_available" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/status"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="@color/white"
+                        android:textSize="15sp"
+                        tools:text="🇺🇸 US 104.21.56.78" />
+
+                    <ImageView
+                        android:id="@+id/btn_ip_detail"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:background="?android:attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="@string/landing_ip_details_title"
+                        android:padding="4dp"
+                        android:src="@drawable/ic_more_horiz"
+                        android:visibility="gone"
+                        app:tint="@color/white" />
+
+                </LinearLayout>
 
             </LinearLayout>
 
