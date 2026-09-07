@@ -12,12 +12,15 @@ import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.bg.BaseService
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProfileManager
+import io.nekohasekai.sagernet.database.SagerDatabase
+import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
 import io.nekohasekai.sagernet.ui.MainActivity
 
 class OwnBoxWidgetProvider : AppWidgetProvider() {
 
     companion object {
         const val ACTION_TOGGLE = "io.nekohasekai.sagernet.widget.ACTION_TOGGLE"
+        const val ACTION_SWITCH_NODE = "io.nekohasekai.sagernet.widget.ACTION_SWITCH_NODE"
 
         fun updateWidgets(context: Context) {
             val appWidgetManager = AppWidgetManager.getInstance(context) ?: return
@@ -34,14 +37,37 @@ class OwnBoxWidgetProvider : AppWidgetProvider() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == ACTION_TOGGLE) {
-            if (DataStore.serviceState.canStop) {
-                SagerNet.stopService()
-            } else {
-                SagerNet.startService()
+        when (intent.action) {
+            ACTION_TOGGLE -> {
+                if (DataStore.serviceState.canStop) {
+                    SagerNet.stopService()
+                } else {
+                    SagerNet.startService()
+                }
+                updateWidgets(context)
+                return
             }
-            updateWidgets(context)
-            return
+            ACTION_SWITCH_NODE -> {
+                runOnDefaultDispatcher {
+                    try {
+                        val allProxies = SagerDatabase.proxyDao.allProxies()
+                        if (allProxies.isNotEmpty()) {
+                            val currentId = DataStore.selectedProxy
+                            val currentIndex = allProxies.indexOfFirst { it.id == currentId }
+                            val nextIndex = if (currentIndex in allProxies.indices) (currentIndex + 1) % allProxies.size else 0
+                            val nextProxy = allProxies[nextIndex]
+                            DataStore.selectedProxy = nextProxy.id
+                            DataStore.currentProfile = nextProxy.id
+                            if (DataStore.serviceState.started) {
+                                SagerNet.reloadService()
+                            }
+                        }
+                    } catch (_: Exception) {
+                    }
+                    updateWidgets(context)
+                }
+                return
+            }
         }
         super.onReceive(context, intent)
     }
@@ -71,13 +97,21 @@ class OwnBoxWidgetProvider : AppWidgetProvider() {
             action = ACTION_TOGGLE
         }
         val togglePendingIntent = PendingIntent.getBroadcast(
-            context, 0, toggleIntent,
+            context, 1001, toggleIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val switchIntent = Intent(context, OwnBoxWidgetProvider::class.java).apply {
+            action = ACTION_SWITCH_NODE
+        }
+        val switchPendingIntent = PendingIntent.getBroadcast(
+            context, 1002, switchIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         val launchIntent = Intent(context, MainActivity::class.java)
         val launchPendingIntent = PendingIntent.getActivity(
-            context, 0, launchIntent,
+            context, 1000, launchIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -87,6 +121,7 @@ class OwnBoxWidgetProvider : AppWidgetProvider() {
                 setTextViewText(R.id.widget_status, statusText)
                 setImageViewResource(R.id.widget_toggle_btn, buttonIcon)
                 setOnClickPendingIntent(R.id.widget_toggle_btn, togglePendingIntent)
+                setOnClickPendingIntent(R.id.widget_switch_btn, switchPendingIntent)
                 setOnClickPendingIntent(R.id.widget_root, launchPendingIntent)
             }
             appWidgetManager.updateAppWidget(appWidgetId, views)

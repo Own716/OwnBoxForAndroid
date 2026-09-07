@@ -48,6 +48,16 @@
     </LinearLayout>
 
     <ImageView
+        android:id="@+id/widget_switch_btn"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_marginEnd="6dp"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/switch_node"
+        android:padding="6dp"
+        android:src="@drawable/ic_widget_switch" />
+
+    <ImageView
         android:id="@+id/widget_toggle_btn"
         android:layout_width="36dp"
         android:layout_height="36dp"

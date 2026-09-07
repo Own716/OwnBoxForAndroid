@@ -739,4 +739,15 @@
         <string name="app_icon_furina">芙宁娜 (Furina)</string>
         <string name="app_icon_raiden">雷电将军 (Raiden Shogun)</string>
         <string name="app_icon_ganyu">甘雨 (Ganyu)</string>
+    <string name="switch_node">切换节点</string>
+    <string name="traffic_chart_title">实时流量与活跃连接</string>
+    <string name="traffic_chart_summary">查看实时上下行速率图表与管理当前活跃网络连接</string>
+    <string name="traffic_current_up">实时上传</string>
+    <string name="traffic_current_down">实时下载</string>
+    <string name="traffic_peak">峰值</string>
+    <string name="traffic_active_connections">活跃连接数</string>
+    <string name="traffic_close_all">断开全部</string>
+    <string name="traffic_close_all_confirm">确定断开当前所有网络连接吗？</string>
+    <string name="traffic_no_connections">暂无活跃连接</string>
+    <string name="traffic_waiting_clash">正在等待 Clash API 连接，请确保 VPN 已启动...</string>
 </resources>

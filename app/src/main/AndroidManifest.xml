@@ -626,6 +626,11 @@
             android:configChanges="uiMode"
             android:launchMode="singleTask"
             android:parentActivityName="io.nekohasekai.sagernet.ui.MainActivity" />
+        <activity
+            android:name="io.nekohasekai.sagernet.ui.TrafficChartActivity"
+            android:configChanges="uiMode"
+            android:label="@string/traffic_chart_title"
+            android:parentActivityName="io.nekohasekai.sagernet.ui.MainActivity" />
 
         <activity
             android:name="io.nekohasekai.sagernet.ui.SwitchActivity"
@@ -713,6 +718,7 @@
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="io.nekohasekai.sagernet.widget.ACTION_TOGGLE" />
+                <action android:name="io.nekohasekai.sagernet.widget.ACTION_SWITCH_NODE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"

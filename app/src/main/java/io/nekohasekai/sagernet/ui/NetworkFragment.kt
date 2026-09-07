@@ -25,6 +25,12 @@ class NetworkFragment : NamedFragment(R.layout.layout_network) {
         super.onViewCreated(view, savedInstanceState)
 
         val binding = LayoutNetworkBinding.bind(view)
+        val openTrafficChart = View.OnClickListener {
+            startActivity(Intent(requireContext(), TrafficChartActivity::class.java))
+        }
+        binding.trafficChartCard.setOnClickListener(openTrafficChart)
+        binding.trafficChartBtn.setOnClickListener(openTrafficChart)
+
         binding.stunTest.setOnClickListener {
             startActivity(Intent(requireContext(), StunActivity::class.java))
         }

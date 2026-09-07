@@ -103,6 +103,10 @@ class MainActivity : ThemedActivity(),
             )
         }
         binding.stats.setOnClickListener { if (DataStore.serviceState.connected) binding.stats.testConnection() }
+        binding.stats.setOnLongClickListener {
+            startActivity(Intent(this, TrafficChartActivity::class.java))
+            true
+        }
 
         setContentView(binding.root)
         currentMainFragment =
