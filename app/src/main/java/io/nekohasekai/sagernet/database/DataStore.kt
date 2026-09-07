@@ -169,7 +169,13 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     val mixedInboundPass: String get() = if (mixedInboundAuthed) mixedPassword else ""
 
     var defaultSubscriptionUserAgent: String
-        get() = configurationStore.getString(Key.DEFAULT_SUBSCRIPTION_USER_AGENT, "")?.takeIf { it.isNotBlank() } ?: io.nekohasekai.sagernet.ktx.USER_AGENT
+        get() {
+            val stored = configurationStore.getString(Key.DEFAULT_SUBSCRIPTION_USER_AGENT, "")
+            if (!stored.isNullOrBlank() && !stored.contains("sing-box") && !stored.contains("NekoBox")) {
+                return stored
+            }
+            return "clash-meta"
+        }
         set(value) = configurationStore.putString(Key.DEFAULT_SUBSCRIPTION_USER_AGENT, value)
 
     fun migrateSubscriptionUserAgents(targetUa: String? = null, forceAll: Boolean = false) {
@@ -180,7 +186,8 @@ object DataStore : OnPreferenceDataStoreChangeListener {
             var changed = false
             for (group in allGroups) {
                 val sub = group.subscription ?: continue
-                if (forceAll || sub.customUserAgent.isNullOrBlank() || sub.customUserAgent.startsWith("Throne/")) {
+                val ua = sub.customUserAgent
+                if (forceAll || ua.isNullOrBlank() || ua.startsWith("Throne/") || ua.contains("sing-box") || ua.contains("NekoBox")) {
                     sub.customUserAgent = newUa
                     groupDao.updateGroup(group)
                     changed = true

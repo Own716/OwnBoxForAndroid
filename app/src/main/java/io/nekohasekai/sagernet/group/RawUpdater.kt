@@ -64,42 +64,86 @@ object RawUpdater : GroupUpdater() {
                 ?: error(app.getString(R.string.no_proxies_found_in_subscription))
         } else {
 
-            val response = Libcore.newHttpClient().apply {
-                            tryProxyOutbound()
-                            tryH3Direct()
-                when (DataStore.appTLSVersion) {
-                    "1.3" -> restrictedTLS()
-                }
-            }.newRequest().apply {
-                if (DataStore.allowInsecureOnRequest) {
-                    allowInsecure()
-                }
-                setURL(subscription.link)
-                val activeUa = when {
-                    !subscription.customUserAgent.isNullOrBlank() && !subscription.customUserAgent.startsWith("Throne/") -> subscription.customUserAgent
-                    else -> DataStore.defaultSubscriptionUserAgent
-                }
-                setUserAgent(activeUa)
-            }.execute()
-            proxies = parseRaw(Util.getStringBox(response.contentString))
-                ?: error(app.getString(R.string.no_proxies_found))
+            val preferredUa = when {
+                !subscription.customUserAgent.isNullOrBlank() &&
+                        !subscription.customUserAgent.startsWith("Throne/") &&
+                        !subscription.customUserAgent.contains("NekoBox") -> subscription.customUserAgent
+                else -> DataStore.defaultSubscriptionUserAgent
+            }
 
-            val userInfo = response.getHeader("Subscription-Userinfo")
-                ?: response.getHeader("subscription-userinfo")
-                ?: response.getHeader("Subscription-UserInfo")
-            val userInfoStr = Util.getStringBox(userInfo)
-            if (userInfoStr.isNotBlank()) {
-                subscription.subscriptionUserinfo = userInfoStr
+            // Fallback UA candidates in order: user preferred UA -> clash-meta -> v2rayN/7.8.2 -> Throne/1.0.0 -> sing-box/1.14.0
+            val candidateUas = linkedSetOf(
+                preferredUa,
+                "clash-meta",
+                "v2rayN/7.8.2",
+                "Throne/1.0.0",
+                "sing-box/1.14.0"
+            )
+
+            var fetchedProxies: List<AbstractBean>? = null
+            var lastRespHeaderUserinfo: String? = null
+            var lastRespHeaderFilename: String? = null
+            var lastException: Throwable? = null
+
+            for (ua in candidateUas) {
+                try {
+                    val client = Libcore.newHttpClient().apply {
+                        tryProxyOutbound()
+                        when (DataStore.appTLSVersion) {
+                            "1.3" -> restrictedTLS()
+                        }
+                    }
+                    val request = client.newRequest().apply {
+                        if (DataStore.allowInsecureOnRequest) {
+                            allowInsecure()
+                        }
+                        setURL(subscription.link)
+                        setUserAgent(ua)
+                    }
+                    val response = request.execute()
+
+                    val userInfo = response.getHeader("Subscription-Userinfo")
+                        ?: response.getHeader("subscription-userinfo")
+                        ?: response.getHeader("Subscription-UserInfo")
+                    val userInfoStr = Util.getStringBox(userInfo)
+                    if (userInfoStr.isNotBlank()) {
+                        lastRespHeaderUserinfo = userInfoStr
+                    }
+                    val remoteName = Util.getStringBox(response.getHeader("content-disposition"))
+                    if (remoteName.isNotBlank()) {
+                        lastRespHeaderFilename = remoteName
+                    }
+
+                    val contentStr = Util.getStringBox(response.contentString)
+                    val parsed = parseRaw(contentStr)
+                    if (!parsed.isNullOrEmpty()) {
+                        fetchedProxies = parsed
+                        Logs.d("Subscription successfully parsed ${parsed.size} proxies with UA: $ua")
+                        break
+                    } else {
+                        Logs.w("Subscription returned 0 proxies with UA: $ua, trying next candidate...")
+                    }
+                } catch (e: Throwable) {
+                    Logs.w("Subscription download failed with UA: $ua: ${e.readableMessage}")
+                    lastException = e
+                }
+            }
+
+            if (fetchedProxies.isNullOrEmpty()) {
+                throw lastException ?: IllegalStateException(app.getString(R.string.no_proxies_found))
+            }
+
+            proxies = fetchedProxies
+
+            if (!lastRespHeaderUserinfo.isNullOrBlank()) {
+                subscription.subscriptionUserinfo = lastRespHeaderUserinfo
             }
 
             // 修改默认名字
-            if (proxyGroup.name?.startsWith("Subscription #") == true) {
-                var remoteName = Util.getStringBox(response.getHeader("content-disposition"))
-                if (remoteName.isNotBlank()) {
-                    remoteName = Util.decodeFilename(remoteName)
-                    if (remoteName.isNotBlank()) {
-                        proxyGroup.name = remoteName
-                    }
+            if (proxyGroup.name?.startsWith("Subscription #") == true && !lastRespHeaderFilename.isNullOrBlank()) {
+                val decoded = Util.decodeFilename(lastRespHeaderFilename)
+                if (decoded.isNotBlank()) {
+                    proxyGroup.name = decoded
                 }
             }
         }
@@ -272,9 +316,9 @@ object RawUpdater : GroupUpdater() {
                 for (proxy in (yaml["proxies"] as? (List<Map<String, Any?>>) ?: error(
                     app.getString(R.string.no_proxies_found_in_file)
                 ))) {
-                    // Note: YAML numbers parsed as "Long"
-
-                    when (proxy["type"] as String) {
+                    try {
+                        val proxyType = (proxy["type"] as? String)?.lowercase() ?: continue
+                        when (proxyType) {
                         "socks5" -> {
                             proxies.add(SOCKSBean().apply {
                                 serverAddress = proxy["server"] as String
@@ -793,7 +837,10 @@ object RawUpdater : GroupUpdater() {
                             proxies.add(bean)
                         }
                     }
+                } catch (e: Throwable) {
+                    Logs.w(e)
                 }
+            }
 
                 // Fix ent
                 proxies.forEach {
@@ -810,8 +857,10 @@ object RawUpdater : GroupUpdater() {
                         }
                     }
                 }
-                return proxies
-            } catch (e: YAMLException) {
+                if (proxies.isNotEmpty()) {
+                    return proxies
+                }
+            } catch (e: Exception) {
                 Logs.w(e)
             }
         } else if (text.contains("[Interface]")) {
@@ -824,7 +873,9 @@ object RawUpdater : GroupUpdater() {
                     else if (isAwg && !it.name.startsWith("[AWG-Compat]")) it.name = prefix + (it.name.ifBlank { "WireGuard" })
                     it
                 })
-                return proxies
+                if (proxies.isNotEmpty()) {
+                    return proxies
+                }
             } catch (e: Exception) {
                 Logs.w(e)
             }
@@ -832,7 +883,10 @@ object RawUpdater : GroupUpdater() {
 
         try {
             val json = JSONTokener(text).nextValue()
-            return parseJSON(json)
+            val jsonProxies = parseJSON(json)
+            if (!jsonProxies.isNullOrEmpty()) {
+                return jsonProxies
+            }
         } catch (ignored: Exception) {
         }
 
