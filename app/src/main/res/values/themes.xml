@@ -12,6 +12,9 @@
         <item name="colorMaterial100">@color/material_pink_100</item>
         <item name="colorMaterial300">@color/material_pink_300</item>
 
+        <item name="colorSurface">?android:attr/colorBackground</item>
+        <item name="colorOnSurface">?android:attr/textColorPrimary</item>
+
         <!-- 立体卡片提升表面色，默认 = Pink；各配色变体在下方各自覆盖 -->
         <item name="cardElevatedSurfaceColor">@color/card_elevated_pink</item>
 
@@ -160,7 +163,7 @@
         <item name="cardCornerRadius">@dimen/card_corner_radius</item>
         <item name="strokeColor">@color/card_stroke</item>
         <item name="strokeWidth">@dimen/card_stroke_width</item>
-        <item name="cardBackgroundColor">?attr/colorSurface</item>
+        <item name="cardBackgroundColor">?android:attr/colorBackground</item>
     </style>
 
     <!-- ElevatedCard: shadow + tonal surface, no stroke. -->

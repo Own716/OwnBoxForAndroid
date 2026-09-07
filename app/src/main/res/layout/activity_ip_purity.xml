@@ -88,7 +88,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
-                    app:cardBackgroundColor="?attr/colorSurface"
+                    app:cardBackgroundColor="?android:attr/colorBackground"
                     app:cardCornerRadius="12dp"
                     app:cardElevation="0dp"
                     app:strokeColor="@color/card_stroke"

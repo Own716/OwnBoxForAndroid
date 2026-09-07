@@ -405,6 +405,132 @@ fun buildConfig(
         }
     }
 
+    fun buildDnsServer(
+        address: String,
+        tag: String,
+        detour: String? = null,
+        domainResolver: String? = null,
+        domainStrategy: String? = null
+    ): DNSServerOptions {
+        val trimmed = address.trim()
+        if (trimmed == "local" || trimmed == "hosts") {
+            return DNSServerOptions().apply {
+                this.type = "local"
+                this.tag = tag
+                this.detour = detour
+            }
+        }
+        if (trimmed.startsWith("https://", ignoreCase = true) || trimmed.startsWith("http://", ignoreCase = true)) {
+            val uri = runCatching { java.net.URI(trimmed) }.getOrNull()
+            val host = uri?.host ?: trimmed.removePrefix("https://").removePrefix("http://").substringBefore("/").substringBefore(":")
+            val port = if (uri != null && uri.port != -1) uri.port else 443
+            val path = if (uri != null && !uri.rawPath.isNullOrEmpty()) uri.rawPath else "/dns-query"
+            return DNSServerOptions().apply {
+                this.type = "https"
+                this.tag = tag
+                this.server = host
+                this.server_port = port
+                this.path = path
+                this.detour = detour
+                if (!host.isIpAddress()) {
+                    this.domain_resolver = domainResolver
+                    this.domain_strategy = domainStrategy
+                }
+            }
+        }
+        if (trimmed.startsWith("h3://", ignoreCase = true)) {
+            val uri = runCatching { java.net.URI(trimmed) }.getOrNull()
+            val host = uri?.host ?: trimmed.removePrefix("h3://").substringBefore("/").substringBefore(":")
+            val port = if (uri != null && uri.port != -1) uri.port else 443
+            val path = if (uri != null && !uri.rawPath.isNullOrEmpty()) uri.rawPath else "/dns-query"
+            return DNSServerOptions().apply {
+                this.type = "h3"
+                this.tag = tag
+                this.server = host
+                this.server_port = port
+                this.path = path
+                this.detour = detour
+                if (!host.isIpAddress()) {
+                    this.domain_resolver = domainResolver
+                    this.domain_strategy = domainStrategy
+                }
+            }
+        }
+        if (trimmed.startsWith("tls://", ignoreCase = true)) {
+            val uri = runCatching { java.net.URI(trimmed) }.getOrNull()
+            val host = uri?.host ?: trimmed.removePrefix("tls://").substringBefore("/").substringBefore(":")
+            val port = if (uri != null && uri.port != -1) uri.port else 853
+            return DNSServerOptions().apply {
+                this.type = "tls"
+                this.tag = tag
+                this.server = host
+                this.server_port = port
+                this.detour = detour
+                if (!host.isIpAddress()) {
+                    this.domain_resolver = domainResolver
+                    this.domain_strategy = domainStrategy
+                }
+            }
+        }
+        if (trimmed.startsWith("quic://", ignoreCase = true)) {
+            val uri = runCatching { java.net.URI(trimmed) }.getOrNull()
+            val host = uri?.host ?: trimmed.removePrefix("quic://").substringBefore("/").substringBefore(":")
+            val port = if (uri != null && uri.port != -1) uri.port else 853
+            return DNSServerOptions().apply {
+                this.type = "quic"
+                this.tag = tag
+                this.server = host
+                this.server_port = port
+                this.detour = detour
+                if (!host.isIpAddress()) {
+                    this.domain_resolver = domainResolver
+                    this.domain_strategy = domainStrategy
+                }
+            }
+        }
+        if (trimmed.startsWith("tcp://", ignoreCase = true)) {
+            val uri = runCatching { java.net.URI(trimmed) }.getOrNull()
+            val host = uri?.host ?: trimmed.removePrefix("tcp://").substringBefore("/").substringBefore(":")
+            val port = if (uri != null && uri.port != -1) uri.port else 53
+            return DNSServerOptions().apply {
+                this.type = "tcp"
+                this.tag = tag
+                this.server = host
+                this.server_port = port
+                this.detour = detour
+                if (!host.isIpAddress()) {
+                    this.domain_resolver = domainResolver
+                    this.domain_strategy = domainStrategy
+                }
+            }
+        }
+        val raw = if (trimmed.startsWith("udp://", ignoreCase = true)) trimmed.removePrefix("udp://") else trimmed
+        val host: String
+        val port: Int
+        if (raw.startsWith("[") && raw.contains("]")) {
+            host = raw.substringAfter("[").substringBefore("]")
+            val after = raw.substringAfter("]")
+            port = if (after.startsWith(":") && after.length > 1) after.substring(1).toIntOrNull() ?: 53 else 53
+        } else if (raw.contains(":") && raw.indexOf(":") == raw.lastIndexOf(":")) {
+            host = raw.substringBefore(":")
+            port = raw.substringAfter(":").toIntOrNull() ?: 53
+        } else {
+            host = raw
+            port = 53
+        }
+        return DNSServerOptions().apply {
+            this.type = "udp"
+            this.tag = tag
+            this.server = host
+            this.server_port = port
+            this.detour = detour
+            if (!host.isIpAddress()) {
+                this.domain_resolver = domainResolver
+                this.domain_strategy = domainStrategy
+            }
+        }
+    }
+
     return MyOptions().apply {
         // forTest 不配 experimental：Go 侧 NewTestSingBoxInstance 不注册
         // PlatformLogWriter，官方内核据此不再强制创建 CacheFile/ClashServer
@@ -1067,8 +1193,7 @@ fun buildConfig(
                         -2L -> {
                             if (shouldAddDnsRule) {
                                 userDNSRuleList += makeDnsRuleObj().apply {
-                                    server = "dns-block"
-                                    disable_cache = true
+                                    action = "reject"
                                 }
                             }
 
@@ -1078,8 +1203,7 @@ fun buildConfig(
                                     if (tag.startsWith("ruleset-") && tagInfo != null && !tagInfo.second) {
                                         userDNSRuleList += DNSRule_DefaultOptions().apply {
                                             rule_set = mutableListOf(tag)
-                                            server = "dns-block"
-                                            disable_cache = true
+                                            action = "reject"
                                         }
                                     }
                                 }
@@ -1181,41 +1305,40 @@ fun buildConfig(
         }
 
         dns.servers.add(DNSServerOptions().apply {
-            address = "rcode://success"
-            tag = "dns-block"
-        })
-
-        dns.servers.add(DNSServerOptions().apply {
-            address = "local"
+            type = "local"
             tag = "dns-local"
             detour = TAG_DIRECT
         })
 
-        directDNS.firstOrNull().let {
-            dns.servers.add(DNSServerOptions().apply {
-                address = normalizeDnsAddress(it ?: throw Exception("No direct DNS, check your settings!"))
-                tag = "dns-direct"
-                detour = TAG_DIRECT
-                address_resolver = "dns-local"
-                strategy = autoDnsDomainStrategy(SingBoxOptionsUtil.domainStrategy(tag))
-            })
-        }
+        val directAddress = directDNS.firstOrNull()?.takeIf { it.isNotBlank() } ?: "https://223.5.5.5/dns-query"
+        val normalizedDirect = normalizeDnsAddress(directAddress)
+        dns.servers.add(
+            buildDnsServer(
+                address = normalizedDirect,
+                tag = "dns-direct",
+                detour = TAG_DIRECT,
+                domainResolver = "dns-local",
+                domainStrategy = autoDnsDomainStrategy(SingBoxOptionsUtil.domainStrategy("dns-direct"))
+            )
+        )
 
-        remoteDns.firstOrNull().let {
-            // Always use direct DNS for urlTest
-            if (!forTest) dns.servers.add(DNSServerOptions().apply {
-                address = normalizeRemoteDnsAddress(it ?: throw Exception("No remote DNS, check your settings!"))
-                tag = "dns-remote"
-                // 远程 DNS 交给当前节点代访问（对齐 Throne 桌面端 detour=proxy），本机直出即泄露。
-                detour = mainProxyTag
-                address_resolver = "dns-direct"
-                strategy = autoDnsDomainStrategy(SingBoxOptionsUtil.domainStrategy(tag))
-            })
+        if (!forTest) {
+            val remoteAddress = remoteDns.firstOrNull()?.takeIf { it.isNotBlank() } ?: "https://dns.google/dns-query"
+            val normalizedRemote = normalizeRemoteDnsAddress(remoteAddress)
+            dns.servers.add(
+                buildDnsServer(
+                    address = normalizedRemote,
+                    tag = "dns-remote",
+                    detour = mainProxyTag,
+                    domainResolver = "dns-direct",
+                    domainStrategy = autoDnsDomainStrategy(SingBoxOptionsUtil.domainStrategy("dns-remote"))
+                )
+            )
         }
         if (dnsHosts.isNotEmpty()) {
             dns.servers.add(DNSServerOptions().apply {
+                type = "hosts"
                 tag = TAG_DNS_HOSTS
-                _hack_config_map["type"] = "hosts"
                 _hack_config_map["predefined"] = dnsHosts
             })
         }
@@ -1225,6 +1348,10 @@ fun buildConfig(
         // dns object user rules
         if (enableDnsRouting) {
             userDNSRuleList.forEach {
+                if (it.server == "dns-block") {
+                    it.server = null
+                    it.action = "reject"
+                }
                 if (!it.checkEmpty()) dns.rules.add(it)
             }
         }
@@ -1261,17 +1388,13 @@ fun buildConfig(
                 source_ip_cidr = listOf("224.0.0.0/3", "ff00::/8")
                 action = "reject"
             })
-            // FakeDNS obj
+            // FakeDNS obj (sing-box 1.14: fakeip configured as a server in dns.servers)
             if (useFakeDns) {
-                dns.fakeip = DNSFakeIPOptions().apply {
-                    enabled = true
+                dns.servers.add(DNSServerOptions().apply {
+                    type = "fakeip"
+                    tag = "dns-fake"
                     inet4_range = "198.18.0.0/15"
                     inet6_range = "fc00::/18"
-                }
-                dns.servers.add(DNSServerOptions().apply {
-                    address = "fakeip"
-                    tag = "dns-fake"
-                    strategy = "ipv4_only"
                 })
                 dns.rules.add(DNSRule_DefaultOptions().apply {
                     inbound = listOf("tun-in")
@@ -1305,15 +1428,16 @@ fun buildConfig(
                 if (hosts.isNullOrEmpty()) return@forEach
 
                 val serverTag = "dns-sub-$gid"
-                dns.servers.add(DNSServerOptions().apply {
-                    address = normalizeDnsAddress(resolver)
-                    tag = serverTag
-                    detour = TAG_DIRECT
-                    if (!resolver.isIpAddress()) {
-                        address_resolver = "dns-direct"
-                    }
-                    strategy = autoDnsDomainStrategy(SingBoxOptionsUtil.domainStrategy("server"))
-                })
+                val address = normalizeDnsAddress(resolver)
+                dns.servers.add(
+                    buildDnsServer(
+                        address = address,
+                        tag = serverTag,
+                        detour = TAG_DIRECT,
+                        domainResolver = "dns-direct",
+                        domainStrategy = autoDnsDomainStrategy(SingBoxOptionsUtil.domainStrategy("server"))
+                    )
+                )
                 dns.rules.add(0, DNSRule_DefaultOptions().apply {
                     makeSingBoxRule(hosts)
                     server = serverTag

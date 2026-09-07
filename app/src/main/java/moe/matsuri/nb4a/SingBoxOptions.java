@@ -316,7 +316,8 @@ public class SingBoxOptions {
 
         public Boolean reverse_mapping;
 
-        public DNSFakeIPOptions fakeip;
+        // sing-box 1.14: fakeip is a server in dns.servers, top-level fakeip is deprecated/removed.
+        // public DNSFakeIPOptions fakeip;
 
         // Generate note: nested type DNSClientOptions
         public String strategy;
@@ -333,19 +334,25 @@ public class SingBoxOptions {
 
     public static class DNSServerOptions extends SingBoxOption {
 
+        public String type;
+
         public String tag;
 
-        public String address;
+        public String server;
 
-        public String address_resolver;
+        public Integer server_port;
 
-        public String address_strategy;
-
-        public Long address_fallback_delay;
-
-        public String strategy;
+        public String path;
 
         public String detour;
+
+        public String domain_resolver;
+
+        public String domain_strategy;
+
+        public String inet4_range;
+
+        public String inet6_range;
 
     }
 
@@ -4737,6 +4744,10 @@ public class SingBoxOptions {
         public Boolean disable_cache;
 
         public Integer rewrite_ttl;
+
+        public String action;
+
+        public String rcode;
 
     }
 

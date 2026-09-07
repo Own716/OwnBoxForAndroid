@@ -13,6 +13,9 @@
         <item name="colorMaterial100">@color/material_pink_100</item>
         <item name="colorMaterial300">@color/material_pink_300</item>
 
+        <item name="colorSurface">?android:attr/colorBackground</item>
+        <item name="colorOnSurface">?android:attr/textColorPrimary</item>
+
         <item name="cardElevatedSurfaceColor">@color/card_elevated_pink</item>
 
         <item name="accentOrTextSecondary">?colorAccent</item>
