@@ -349,7 +349,7 @@ class TrafficChartActivity : AppCompatActivity() {
             try {
                 val file = File(filePath)
                 if (!file.exists() || !file.canRead()) continue
-                file.forEachLine { line ->
+                for (line in file.readLines()) {
                     val tokens = line.trim().split("\\s+".toRegex())
                     if (tokens.size > 7) {
                         val localAddr = tokens[1] // e.g. 0100007F:1F90

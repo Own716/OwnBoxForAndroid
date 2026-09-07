@@ -289,7 +289,7 @@ class MediaUnlockActivity : ThemedActivity() {
         val resp = req.execute()
         val body = Util.getStringBox(resp.contentString)
 
-        if (!body.contains("not available in your region") && !body.contains("unsupported_location") && resp.statusCode in 200..399) {
+        if (!body.contains("not available in your region") && !body.contains("unsupported_location")) {
             item.copy(
                 state = TestState.UNLOCKED,
                 statusText = "支持",
@@ -316,7 +316,7 @@ class MediaUnlockActivity : ThemedActivity() {
         val resp = req.execute()
         val body = Util.getStringBox(resp.contentString)
 
-        if (resp.statusCode in 200..399 && !body.contains("georestricted") && !body.contains("not-available-in-your-country")) {
+        if (!body.contains("georestricted") && !body.contains("not-available-in-your-country")) {
             item.copy(
                 state = TestState.UNLOCKED,
                 statusText = "支持",
@@ -390,7 +390,7 @@ class MediaUnlockActivity : ThemedActivity() {
             region = matcher.group(1)?.uppercase() ?: ""
         }
 
-        if (resp.statusCode in 200..399 && !body.contains("tiktok-verify-page")) {
+        if (!body.contains("tiktok-verify-page")) {
             val flag = if (region.isNotBlank()) LandingIpManager.countryCodeToFlagEmoji(region) + " " + region else ""
             item.copy(
                 state = TestState.UNLOCKED,
@@ -419,7 +419,7 @@ class MediaUnlockActivity : ThemedActivity() {
         val resp = req.execute()
         val body = Util.getStringBox(resp.contentString)
 
-        if (resp.statusCode in 200..399 && !body.contains("not available in your country")) {
+        if (!body.contains("not available in your country")) {
             item.copy(
                 state = TestState.UNLOCKED,
                 statusText = "支持",
@@ -446,7 +446,7 @@ class MediaUnlockActivity : ThemedActivity() {
         val resp = req.execute()
         val body = Util.getStringBox(resp.contentString)
 
-        if (!body.contains("cf-mitigated") && !body.contains("Attention Required") && !body.contains("1020") && resp.statusCode in 200..399) {
+        if (!body.contains("cf-mitigated") && !body.contains("Attention Required") && !body.contains("1020")) {
             item.copy(
                 state = TestState.UNLOCKED,
                 statusText = "支持",
@@ -473,7 +473,7 @@ class MediaUnlockActivity : ThemedActivity() {
         val resp = req.execute()
         val body = Util.getStringBox(resp.contentString)
 
-        if (!body.contains("App unavailable in your region") && !body.contains("403 Forbidden") && resp.statusCode in 200..399) {
+        if (!body.contains("App unavailable in your region") && !body.contains("403 Forbidden")) {
             item.copy(
                 state = TestState.UNLOCKED,
                 statusText = "支持",
@@ -500,7 +500,7 @@ class MediaUnlockActivity : ThemedActivity() {
         val resp = req.execute()
         val body = Util.getStringBox(resp.contentString)
 
-        if (!body.contains("not supported in your country") && !body.contains("unavailable in your territory") && resp.statusCode in 200..399) {
+        if (!body.contains("not supported in your country") && !body.contains("unavailable in your territory")) {
             item.copy(
                 state = TestState.UNLOCKED,
                 statusText = "支持",
