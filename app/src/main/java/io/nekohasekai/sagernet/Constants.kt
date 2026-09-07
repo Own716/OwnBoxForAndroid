@@ -239,5 +239,5 @@ object Action {
     const val RELOAD = "io.nekohasekai.sagernet.RELOAD"
 
     // const val SWITCH_WAKE_LOCK = "io.nekohasekai.sagernet.SWITCH_WAKELOCK"
-    const val RESET_UPSTREAM_CONNECTIONS = "moe.nb4a.RESET_UPSTREAM_CONNECTIONS"
+    const val RESET_UPSTREAM_CONNECTIONS = "com.ownbox.app.RESET_UPSTREAM_CONNECTIONS"
 }

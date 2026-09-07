@@ -82,5 +82,26 @@ enum class AppIcon(
         "io.nekohasekai.sagernet.launcher.Text",
         R.string.app_icon_text,
         R.mipmap.ic_launcher_text,
+    ),
+    HU_TAO(
+        "io.nekohasekai.sagernet.launcher.HuTao",
+        R.string.app_icon_hutao,
+        R.mipmap.ic_launcher_hutao,
+    ),
+    FURINA(
+        "io.nekohasekai.sagernet.launcher.Furina",
+        R.string.app_icon_furina,
+        R.mipmap.ic_launcher_furina,
+    ),
+    RAIDEN(
+        "io.nekohasekai.sagernet.launcher.Raiden",
+        R.string.app_icon_raiden,
+        R.mipmap.ic_launcher_raiden,
+    ),
+    GANYU(
+        "io.nekohasekai.sagernet.launcher.Ganyu",
+        R.string.app_icon_ganyu,
+        R.mipmap.ic_launcher_ganyu,
     );
+
 }

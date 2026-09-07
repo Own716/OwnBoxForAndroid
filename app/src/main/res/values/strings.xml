@@ -818,4 +818,8 @@
         <string name="app_icon_russian">Russian</string>
         <string name="app_icon_text">Text</string>
         <string name="app_icon_selected">Selected</string>
+    <string name="app_icon_hutao">Hu Tao</string>
+        <string name="app_icon_furina">Furina</string>
+        <string name="app_icon_raiden">Raiden Shogun</string>
+        <string name="app_icon_ganyu">Ganyu</string>
 </resources>
