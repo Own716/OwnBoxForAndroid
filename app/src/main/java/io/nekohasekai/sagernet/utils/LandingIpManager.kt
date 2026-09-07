@@ -56,6 +56,10 @@ object LandingIpManager {
 
     fun getCachedInfo(): LandingIpInfo? = currentCache
 
+    fun updateCachedDuration(duration: Long) {
+        currentCache = currentCache?.copy(durationMs = duration)
+    }
+
     fun countryCodeToFlagEmoji(countryCode: String?): String {
         if (countryCode == null || countryCode.length != 2) return "🌐"
         val code = countryCode.uppercase()

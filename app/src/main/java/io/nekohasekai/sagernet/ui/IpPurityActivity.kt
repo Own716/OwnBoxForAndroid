@@ -1,12 +1,17 @@
 package io.nekohasekai.sagernet.ui
 
 import android.content.Context
+import android.content.Intent
 import android.graphics.Color
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.net.Uri
 import android.os.Bundle
 import android.view.MenuItem
 import android.widget.Toast
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
 import androidx.lifecycle.lifecycleScope
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.DataStore
@@ -24,6 +29,7 @@ import org.json.JSONObject
 class IpPurityActivity : ThemedActivity() {
 
     private lateinit var binding: ActivityIpPurityBinding
+    private var currentIpAddress: String = ""
 
     private val cloudKeywords = listOf(
         "Cloudflare" to "Cloudflare",
@@ -57,6 +63,14 @@ class IpPurityActivity : ThemedActivity() {
         binding = ActivityIpPurityBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
+            val statusBars = insets.getInsets(WindowInsetsCompat.Type.statusBars())
+            val navBars = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
+            binding.appbar.updatePadding(top = statusBars.top)
+            binding.root.updatePadding(bottom = navBars.bottom)
+            insets
+        }
+
         setSupportActionBar(binding.toolbar)
         supportActionBar?.apply {
             setDisplayHomeAsUpEnabled(true)
@@ -71,6 +85,18 @@ class IpPurityActivity : ThemedActivity() {
             startCheck()
         }
 
+        binding.btnScamalytics.setOnClickListener {
+            openExternalReport("https://scamalytics.com/ip/$currentIpAddress")
+        }
+
+        binding.btnIpinfo.setOnClickListener {
+            openExternalReport("https://ipinfo.io/$currentIpAddress")
+        }
+
+        binding.btnAbuseipdb.setOnClickListener {
+            openExternalReport("https://www.abuseipdb.com/check/$currentIpAddress")
+        }
+
         startCheck()
     }
 
@@ -80,6 +106,19 @@ class IpPurityActivity : ThemedActivity() {
             return true
         }
         return super.onOptionsItemSelected(item)
+    }
+
+    private fun openExternalReport(url: String) {
+        if (currentIpAddress.isBlank()) {
+            Toast.makeText(this, "尚未获取到有效 IP 地址", Toast.LENGTH_SHORT).show()
+            return
+        }
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            startActivity(intent)
+        } catch (_: Exception) {
+            Toast.makeText(this, "无法打开浏览器", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun startCheck() {
@@ -138,6 +177,7 @@ class IpPurityActivity : ThemedActivity() {
 
     private fun renderResult(json: JSONObject) {
         val ip = json.optString("query")
+        currentIpAddress = ip
         val country = json.optString("country")
         val countryCode = json.optString("countryCode")
         val city = json.optString("city")
@@ -153,9 +193,9 @@ class IpPurityActivity : ThemedActivity() {
         binding.tvDeviceNetwork.text = getLocalNetworkDescription()
         binding.tvDetailIp.text = ip
         binding.tvDetailLocation.text = "$flag $country · $city ($countryCode)"
-        binding.tvDetailHosting.text = if (isHosting) "是 (Hosting / Datacenter)" else "否 (Residential / Eyeball)"
-        binding.tvDetailProxy.text = if (isProxy) "是 (Proxy / VPN 标记)" else "否 (未标记)"
-        binding.tvDetailMobile.text = if (isMobile) "是 (移动运营商基站出口)" else "否 (机房固网 / 常规家宽出口)"
+        binding.tvDetailHosting.text = if (isHosting) "是 (Hosting / 机房数据中心)" else "否 (Residential / 原生家宽)"
+        binding.tvDetailProxy.text = if (isProxy) "是 (Proxy / VPN 出口标记)" else "否 (未标记为公共 VPN)"
+        binding.tvDetailMobile.text = if (isMobile) "是 (移动运营商基站出口)" else "否 (机房固网 / 常规固网宽带出口)"
         binding.tvDetailIsp.text = isp.ifBlank { "未知" }
         binding.tvDetailAsn.text = asn.ifBlank { "未知" }
         binding.tvDetailReverse.text = reverse.ifBlank { "无反向解析记录" }
@@ -173,22 +213,28 @@ class IpPurityActivity : ThemedActivity() {
         when {
             isHosting || isProxy || matchedCloud != null -> {
                 // Datacenter / Cloud / Proxy IP
-                binding.cardStatus.setCardBackgroundColor(Color.parseColor("#E11D48")) // Rose Red / Orange
+                binding.cardStatus.setCardBackgroundColor(Color.parseColor("#E11D48")) // Rose Red
                 binding.tvStatusTitle.text = getString(R.string.ip_purity_status_datacenter)
                 val cloudDesc = matchedCloud?.let { "；所属云商：$it" } ?: ""
                 binding.tvStatusDesc.text = "已被标记为托管机房、数据中心或公共代理出口$cloudDesc"
+                binding.tvDetailFraud.text = "中高风险 (数据中心机房 IP，易触发风控验证)"
+                binding.tvDetailFraud.setTextColor(Color.parseColor("#E11D48"))
             }
             json.has("hosting") && !isHosting && !isProxy -> {
                 // Pure Residential
                 binding.cardStatus.setCardBackgroundColor(Color.parseColor("#059669")) // Emerald Green
                 binding.tvStatusTitle.text = getString(R.string.ip_purity_status_pure)
-                binding.tvStatusDesc.text = "该 IP 属于住宅宽带或商业专线，原生度高，风控风险低"
+                binding.tvStatusDesc.text = "该 IP 属于原生住宅宽带，纯净度极高，风控风险低"
+                binding.tvDetailFraud.text = "极低风险 (原生住宅宽带，风控通过率极高)"
+                binding.tvDetailFraud.setTextColor(Color.parseColor("#059669"))
             }
             else -> {
                 // Unknown
                 binding.cardStatus.setCardBackgroundColor(Color.parseColor("#64748B")) // Slate Gray
                 binding.tvStatusTitle.text = getString(R.string.ip_purity_status_unknown)
                 binding.tvStatusDesc.text = "接口未返回确切的托管字段，建议结合实际网络使用情况评判"
+                binding.tvDetailFraud.text = "中等风险 (未明确标记托管属性)"
+                binding.tvDetailFraud.setTextColor(Color.parseColor("#F59E0B"))
             }
         }
     }
@@ -206,9 +252,9 @@ class IpPurityActivity : ThemedActivity() {
             val network = cm.activeNetwork ?: return "未联网"
             val caps = cm.getNetworkCapabilities(network) ?: return getString(R.string.unknown)
             when {
-                caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> getString(R.string.ip_purity_device_cellular)
-                caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> getString(R.string.ip_purity_device_wifi)
-                caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> getString(R.string.ip_purity_device_other)
+                caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> getString(R.string.ip_purity_device_cellular) + " (当前手机物理连接)"
+                caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> getString(R.string.ip_purity_device_wifi) + " (当前手机物理连接)"
+                caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> getString(R.string.ip_purity_device_other) + " (以太网)"
                 else -> getString(R.string.ip_purity_device_other)
             }
         } catch (_: Exception) {

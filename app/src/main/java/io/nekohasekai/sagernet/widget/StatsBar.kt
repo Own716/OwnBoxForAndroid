@@ -24,6 +24,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class StatsBar @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null,
@@ -131,15 +132,85 @@ class StatsBar @JvmOverloads constructor(
         }
     }
 
+    private var activeLatencyJob: Job? = null
+
     fun onIpDetailClicked() {
+        retestLatencyInPlace()
+    }
+
+    fun retestLatencyInPlace() {
+        if (currentState != BaseService.State.Connected) return
+
+        // 极速响应 / 防狂点：连续快速点击时，立即取消上一次的任务
+        activeLatencyJob?.cancel()
+
         val cached = LandingIpManager.getCachedInfo()
-        val activity = context as? Activity ?: return
-        if (cached != null) {
-            LandingIpBottomSheet.show(activity, cached) {
-                refreshLandingIp(forceRefresh = true)
-            }
+        val basePrefix = if (cached != null) {
+            "${cached.countryFlag} ${cached.countryCode} ${cached.ip}".trim()
         } else {
-            refreshLandingIp(forceRefresh = true)
+            null
+        }
+
+        // 原地立刻反馈
+        if (basePrefix != null) {
+            setStatus("$basePrefix · 测速中...")
+        } else {
+            setStatus("测速中...")
+        }
+
+        val activity = context as? MainActivity
+        val scope = activity?.lifecycleScope ?: CoroutineScope(Dispatchers.Main)
+
+        activeLatencyJob = scope.launch(Dispatchers.IO) {
+            try {
+                val elapsed = if (activity != null) {
+                    activity.urlTest()
+                } else {
+                    val start = System.currentTimeMillis()
+                    val client = libcore.Libcore.newHttpClient().apply {
+                        modernTLS()
+                        tryProxyOutbound()
+                    }
+                    val req = client.newRequest().apply {
+                        setURL(DataStore.connectionTestURL)
+                        setUserAgent(USER_AGENT)
+                    }
+                    val resp = req.execute()
+                    val took = (System.currentTimeMillis() - start).toInt()
+                    if (resp.statusCode in 200..399) took else -1
+                }
+
+                if (!isActive) return@launch
+                withContext(Dispatchers.Main) {
+                    if (currentState != BaseService.State.Connected) return@withContext
+                    if (elapsed > 0) {
+                        LandingIpManager.updateCachedDuration(elapsed.toLong())
+                        if (basePrefix != null) {
+                            setStatus("$basePrefix · ${elapsed}ms")
+                        } else {
+                            setStatus("${elapsed}ms")
+                        }
+                    } else {
+                        if (basePrefix != null) {
+                            setStatus("$basePrefix · 超时")
+                        } else {
+                            setStatus("测速超时")
+                        }
+                    }
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                // Ignore cancel from fast consecutive clicks
+            } catch (e: Exception) {
+                if (!isActive) return@launch
+                withContext(Dispatchers.Main) {
+                    if (currentState != BaseService.State.Connected) return@withContext
+                    if (basePrefix != null) {
+                        setStatus("$basePrefix · 超时")
+                    } else {
+                        setStatus("测速超时")
+                    }
+                }
+            }
         }
     }
 

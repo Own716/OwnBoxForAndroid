@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/sagernet/sing-box/adapter"
+	"github.com/sagernet/sing-box/adapter/certificate"
 	"github.com/sagernet/sing-box/adapter/endpoint"
 	C "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/adapter/inbound"
@@ -29,6 +30,7 @@ import (
 	"github.com/sagernet/sing-box/protocol/redirect"
 	"github.com/sagernet/sing-box/protocol/shadowsocks"
 	"github.com/sagernet/sing-box/protocol/shadowtls"
+	"github.com/sagernet/sing-box/protocol/snell"
 	"github.com/sagernet/sing-box/protocol/socks"
 	"github.com/sagernet/sing-box/protocol/ssh"
 	"github.com/sagernet/sing-box/protocol/tor"
@@ -41,7 +43,6 @@ import (
 
 	h2http "libcore/protocol/http"
 	"libcore/protocol/juicity"
-	"libcore/protocol/snell"
 	customVless "libcore/protocol/vless"
 
 	_ "github.com/sagernet/sing-box/experimental/clashapi"
@@ -146,3 +147,8 @@ func nekoboxAndroidServiceRegistry() *service.Registry {
 
 	return registry
 }
+
+func nekoboxAndroidCertificateProviderRegistry() *certificate.Registry {
+	return certificate.NewRegistry()
+}
+

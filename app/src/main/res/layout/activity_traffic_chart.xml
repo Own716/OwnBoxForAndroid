@@ -83,6 +83,59 @@
 
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- Error / Offline Hint Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/card_connection_error"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="12dp"
+                android:layout_marginTop="12dp"
+                android:visibility="gone"
+                app:cardBackgroundColor="#FEE2E2"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="1dp"
+                app:strokeColor="#EF4444"
+                app:strokeWidth="1dp"
+                tools:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="⚠️ 监控接口暂未就绪"
+                        android:textColor="#991B1B"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tv_error_detail"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="未能连接到本地内核监控端口 (127.0.0.1:9090)，可能正在初始化，可点击下方重试。"
+                        android:textColor="#B91C1C"
+                        android:textSize="13sp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_retry_monitor"
+                        style="@style/Widget.MaterialComponents.Button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:backgroundTint="#DC2626"
+                        android:text="重新连接监控"
+                        android:textColor="#FFFFFF"
+                        android:textSize="13sp" />
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
             <!-- Real-time Speed & Chart Card -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"

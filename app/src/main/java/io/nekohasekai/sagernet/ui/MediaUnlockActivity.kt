@@ -1,11 +1,24 @@
 package io.nekohasekai.sagernet.ui
 
+import android.annotation.SuppressLint
 import android.graphics.Color
 import android.os.Bundle
+import android.view.LayoutInflater
 import android.view.MenuItem
 import android.view.View
+import android.view.ViewGroup
+import android.widget.ImageView
+import android.widget.TextView
 import android.widget.Toast
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.ListAdapter
+import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.progressindicator.CircularProgressIndicator
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProfileManager
@@ -13,10 +26,7 @@ import io.nekohasekai.sagernet.databinding.ActivityMediaUnlockBinding
 import io.nekohasekai.sagernet.ktx.USER_AGENT
 import io.nekohasekai.sagernet.ktx.tryProxyOutbound
 import io.nekohasekai.sagernet.utils.LandingIpManager
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 import libcore.Libcore
 import moe.matsuri.nb4a.utils.Util
 import java.util.regex.Pattern
@@ -24,17 +34,51 @@ import java.util.regex.Pattern
 class MediaUnlockActivity : ThemedActivity() {
 
     private lateinit var binding: ActivityMediaUnlockBinding
+    private lateinit var adapter: MediaUnlockAdapter
+    private var testJob: Job? = null
+
+    enum class TestState {
+        TESTING,
+        UNLOCKED,
+        PARTIAL,
+        BLOCKED,
+        TIMEOUT,
+        NOT_CONNECTED
+    }
+
+    data class MediaItem(
+        val id: String,
+        val name: String,
+        val category: String,
+        val iconRes: Int,
+        var state: TestState = TestState.TESTING,
+        var statusText: String = "检测中...",
+        var description: String = "正在探测服务可用性...",
+        var region: String? = null,
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMediaUnlockBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
+            val statusBars = insets.getInsets(WindowInsetsCompat.Type.statusBars())
+            val navBars = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
+            binding.appbar.updatePadding(top = statusBars.top)
+            binding.root.updatePadding(bottom = navBars.bottom)
+            insets
+        }
+
         setSupportActionBar(binding.toolbar)
         supportActionBar?.apply {
             setDisplayHomeAsUpEnabled(true)
             setTitle(R.string.media_unlock_title)
         }
+
+        adapter = MediaUnlockAdapter()
+        binding.recyclerView.layoutManager = LinearLayoutManager(this)
+        binding.recyclerView.adapter = adapter
 
         binding.btnRetest.setOnClickListener {
             startAllTests()
@@ -51,7 +95,14 @@ class MediaUnlockActivity : ThemedActivity() {
         return super.onOptionsItemSelected(item)
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        testJob?.cancel()
+    }
+
     private fun startAllTests() {
+        testJob?.cancel()
+
         val currentProfile = ProfileManager.getProfile(DataStore.selectedProxy)
         binding.tvCurrentNode.text = currentProfile?.displayName() ?: getString(R.string.not_connected)
 
@@ -60,14 +111,15 @@ class MediaUnlockActivity : ThemedActivity() {
 
         if (!DataStore.serviceState.connected) {
             Toast.makeText(this, getString(R.string.vpn_not_connected_warning), Toast.LENGTH_LONG).show()
-            showAllNotConnected()
+            val initialList = createDefaultItems(TestState.NOT_CONNECTED)
+            adapter.submitList(initialList)
             return
         }
 
-        resetProgress()
+        val items = createDefaultItems(TestState.TESTING)
+        adapter.submitList(items)
 
-        lifecycleScope.launch {
-            // Update IP if not present
+        testJob = lifecycleScope.launch {
             if (cachedIp == null) {
                 val ipRes = LandingIpManager.queryLandingIp(DataStore.selectedProxy)
                 ipRes.onSuccess {
@@ -75,235 +127,461 @@ class MediaUnlockActivity : ThemedActivity() {
                 }
             }
 
-            val netflixDeferred = async { testNetflix() }
-            val disneyDeferred = async { testDisney() }
-            val chatgptDeferred = async { testChatGpt() }
-            val youtubeDeferred = async { testYouTube() }
-
-            val netflixRes = netflixDeferred.await()
-            renderNetflix(netflixRes)
-
-            val disneyRes = disneyDeferred.await()
-            renderDisney(disneyRes)
-
-            val chatgptRes = chatgptDeferred.await()
-            renderChatGpt(chatgptRes)
-
-            val youtubeRes = youtubeDeferred.await()
-            renderYouTube(youtubeRes)
+            // Launch detection concurrently
+            items.forEachIndexed { index, item ->
+                launch {
+                    val tested = runTestForItem(item)
+                    withContext(Dispatchers.Main) {
+                        items[index] = tested
+                        adapter.notifyItemChanged(index)
+                    }
+                }
+            }
         }
     }
 
-    private fun resetProgress() {
-        binding.progressNetflix.visibility = View.VISIBLE
-        binding.tvNetflixStatus.visibility = View.GONE
-        binding.tvNetflixDesc.text = "正在探测 Netflix 版权库与区域授权..."
+    private fun createDefaultItems(initialState: TestState): MutableList<MediaItem> {
+        val notConnected = initialState == TestState.NOT_CONNECTED
+        fun defDesc(name: String) = if (notConnected) "VPN 未连接，请先连接代理节点" else "正在探测 $name 区域授权与访问限制..."
+        fun defStatus() = if (notConnected) "未连接" else "检测中..."
 
-        binding.progressDisney.visibility = View.VISIBLE
-        binding.tvDisneyStatus.visibility = View.GONE
-        binding.tvDisneyDesc.text = "正在检测 Disney+ 访问连通性..."
-
-        binding.progressChatgpt.visibility = View.VISIBLE
-        binding.tvChatgptStatus.visibility = View.GONE
-        binding.tvChatgptDesc.text = "正在检测 OpenAI 接入与 Cloudflare 风控..."
-
-        binding.progressYoutube.visibility = View.VISIBLE
-        binding.tvYoutubeStatus.visibility = View.GONE
-        binding.tvYoutubeDesc.text = "正在检测 YouTube Premium 地区开放状态..."
+        return mutableListOf(
+            MediaItem("netflix", "Netflix", "流媒体服务", R.drawable.ic_platform_netflix, initialState, defStatus(), defDesc("Netflix")),
+            MediaItem("disney", "Disney+", "流媒体服务", R.drawable.ic_platform_disney, initialState, defStatus(), defDesc("Disney+")),
+            MediaItem("max", "Max (HBO)", "流媒体服务", R.drawable.ic_platform_max, initialState, defStatus(), defDesc("Max")),
+            MediaItem("prime", "Prime Video", "流媒体服务", R.drawable.ic_platform_prime, initialState, defStatus(), defDesc("Amazon Prime Video")),
+            MediaItem("youtube", "YouTube Premium", "流媒体服务", R.drawable.ic_platform_youtube, initialState, defStatus(), defDesc("YouTube Premium")),
+            MediaItem("tiktok", "TikTok", "流媒体服务", R.drawable.ic_platform_tiktok, initialState, defStatus(), defDesc("TikTok")),
+            MediaItem("spotify", "Spotify", "音乐音频服务", R.drawable.ic_platform_spotify, initialState, defStatus(), defDesc("Spotify")),
+            MediaItem("chatgpt", "ChatGPT (OpenAI)", "AI 智能服务", R.drawable.ic_platform_chatgpt, initialState, defStatus(), defDesc("ChatGPT")),
+            MediaItem("claude", "Claude (Anthropic)", "AI 智能服务", R.drawable.ic_platform_claude, initialState, defStatus(), defDesc("Claude")),
+            MediaItem("gemini", "Google Gemini", "AI 智能服务", R.drawable.ic_platform_gemini, initialState, defStatus(), defDesc("Gemini"))
+        )
     }
 
-    private fun showAllNotConnected() {
-        binding.progressNetflix.visibility = View.GONE
-        binding.tvNetflixStatus.visibility = View.VISIBLE
-        binding.tvNetflixStatus.text = "未连接"
-        binding.tvNetflixStatus.setTextColor(Color.parseColor("#94A3B8"))
-
-        binding.progressDisney.visibility = View.GONE
-        binding.tvDisneyStatus.visibility = View.VISIBLE
-        binding.tvDisneyStatus.text = "未连接"
-        binding.tvDisneyStatus.setTextColor(Color.parseColor("#94A3B8"))
-
-        binding.progressChatgpt.visibility = View.GONE
-        binding.tvChatgptStatus.visibility = View.VISIBLE
-        binding.tvChatgptStatus.text = "未连接"
-        binding.tvChatgptStatus.setTextColor(Color.parseColor("#94A3B8"))
-
-        binding.progressYoutube.visibility = View.GONE
-        binding.tvYoutubeStatus.visibility = View.VISIBLE
-        binding.tvYoutubeStatus.text = "未连接"
-        binding.tvYoutubeStatus.setTextColor(Color.parseColor("#94A3B8"))
-    }
-
-    // --- Netflix ---
-    private data class TestResult(val status: Int, val tag: String, val message: String)
-
-    private suspend fun testNetflix(): TestResult = withContext(Dispatchers.IO) {
+    private suspend fun runTestForItem(item: MediaItem): MediaItem = withContext(Dispatchers.IO) {
         try {
-            val client = Libcore.newHttpClient().apply {
-                modernTLS()
-                tryProxyOutbound()
+            when (item.id) {
+                "netflix" -> testNetflix(item)
+                "disney" -> testDisney(item)
+                "max" -> testMax(item)
+                "prime" -> testPrime(item)
+                "youtube" -> testYouTube(item)
+                "tiktok" -> testTikTok(item)
+                "spotify" -> testSpotify(item)
+                "chatgpt" -> testChatGpt(item)
+                "claude" -> testClaude(item)
+                "gemini" -> testGemini(item)
+                else -> item
             }
-            // 81280792 = Breaking Bad (licensed title)
+        } catch (e: CancellationException) {
+            item
+        } catch (e: Throwable) {
+            item.copy(
+                state = TestState.TIMEOUT,
+                statusText = "检测超时",
+                description = "连接超时或网络异常: ${e.message ?: "未知错误"}"
+            )
+        }
+    }
+
+    // --- Specific Tests ---
+
+    private suspend fun testNetflix(item: MediaItem): MediaItem = withContext(Dispatchers.IO) {
+        val client = Libcore.newHttpClient().apply {
+            modernTLS()
+            tryProxyOutbound()
+        }
+
+        // Test licensed non-original: 81280792 (Breaking Bad)
+        var body1 = ""
+        var region = ""
+        try {
             val req1 = client.newRequest().apply {
                 setURL("https://www.netflix.com/title/81280792")
                 setUserAgent(USER_AGENT)
             }
-            val body1 = try {
-                val resp1 = req1.execute()
-                Util.getStringBox(resp1.contentString)
-            } catch (e: Throwable) {
-                ""
-            }
+            val resp1 = req1.execute()
+            body1 = Util.getStringBox(resp1.contentString)
 
-            if (body1.isNotBlank() && !body1.contains("page-404") && (body1.contains("title/81280792") || body1.contains("watch") || body1.contains("Breaking Bad"))) {
-                return@withContext TestResult(1, "已原生解锁", "完整支持全部非自制原生版权剧集与自制剧")
+            // Extract region from body or url
+            val matcher = Pattern.compile("geolocation_country.*?([A-Za-z]{2})").matcher(body1)
+            if (matcher.find()) {
+                region = matcher.group(1)?.uppercase() ?: ""
             }
+        } catch (_: Throwable) {
+        }
 
-            // Fallback: 80018499 = House of Cards (Netflix original)
+        val flag = if (region.isNotBlank()) LandingIpManager.countryCodeToFlagEmoji(region) + " " + region else ""
+
+        if (body1.isNotBlank() && !body1.contains("page-404") && (body1.contains("title/81280792") || body1.contains("watch") || body1.contains("Breaking Bad"))) {
+            return@withContext item.copy(
+                state = TestState.UNLOCKED,
+                statusText = if (flag.isNotBlank()) "完整解锁 $flag" else "完整原生解锁",
+                description = "支持播放全部非自制版权剧集与 Netflix 原创自制剧",
+                region = region
+            )
+        }
+
+        // Test Netflix original: 80018499 (House of Cards)
+        var body2 = ""
+        try {
             val req2 = client.newRequest().apply {
                 setURL("https://www.netflix.com/title/80018499")
                 setUserAgent(USER_AGENT)
             }
-            val body2 = try {
-                val resp2 = req2.execute()
-                Util.getStringBox(resp2.contentString)
-            } catch (e: Throwable) {
-                ""
-            }
+            val resp2 = req2.execute()
+            body2 = Util.getStringBox(resp2.contentString)
+        } catch (_: Throwable) {
+        }
 
-            if (body2.isNotBlank() && (body2.contains("title/80018499") || body2.contains("watch"))) {
-                TestResult(2, "仅自制剧", "仅支持播放 Netflix 自制剧集，非自制版权剧受限")
-            } else {
-                TestResult(0, "未解锁", "当前节点 IP 无法正常访问 Netflix 或受区域限制")
-            }
-        } catch (e: Throwable) {
-            TestResult(-1, "检测超时", "连接超时或网络异常: ${e.message}")
+        if (body2.isNotBlank() && (body2.contains("title/80018499") || body2.contains("watch") || body2.contains("House of Cards"))) {
+            item.copy(
+                state = TestState.PARTIAL,
+                statusText = "仅自制剧",
+                description = "仅支持播放 Netflix 自制内容，非自制版权剧集受限"
+            )
+        } else {
+            item.copy(
+                state = TestState.BLOCKED,
+                statusText = "未解锁",
+                description = "当前节点 IP 无法正常播放 Netflix 内容或被识别为代理"
+            )
         }
     }
 
-    private fun renderNetflix(res: TestResult) {
-        binding.progressNetflix.visibility = View.GONE
-        binding.tvNetflixStatus.visibility = View.VISIBLE
-        binding.tvNetflixStatus.text = res.tag
-        binding.tvNetflixDesc.text = res.message
-        binding.tvNetflixStatus.setTextColor(statusColor(res.status))
-    }
+    private suspend fun testDisney(item: MediaItem): MediaItem = withContext(Dispatchers.IO) {
+        val client = Libcore.newHttpClient().apply {
+            modernTLS()
+            tryProxyOutbound()
+        }
+        val req = client.newRequest().apply {
+            setURL("https://www.disneyplus.com/")
+            setUserAgent(USER_AGENT)
+        }
+        val resp = req.execute()
+        val body = Util.getStringBox(resp.contentString)
 
-    // --- Disney+ ---
-    private suspend fun testDisney(): TestResult = withContext(Dispatchers.IO) {
-        try {
-            val client = Libcore.newHttpClient().apply {
-                modernTLS()
-                tryProxyOutbound()
-            }
-            val req = client.newRequest().apply {
-                setURL("https://www.disneyplus.com/")
-                setUserAgent(USER_AGENT)
-            }
-            val resp = req.execute()
-            val body = Util.getStringBox(resp.contentString)
-
-            if (!body.contains("not available in your region") && !body.contains("restricted")) {
-                TestResult(1, "已解锁", "支持正常访问与播放 Disney+ 流媒体内容")
-            } else {
-                TestResult(0, "未解锁", "地区不支持或服务受限")
-            }
-        } catch (e: Throwable) {
-            val msg = e.message ?: ""
-            if (msg.contains("403") || msg.contains("restricted") || msg.contains("not available")) {
-                TestResult(0, "未解锁", "地区不支持或服务受限")
-            } else {
-                TestResult(-1, "检测超时", "连接超时或节点网络异常: $msg")
-            }
+        if (!body.contains("not available in your region") && !body.contains("restricted") && !body.contains("disneyplus.com/unavailable")) {
+            item.copy(
+                state = TestState.UNLOCKED,
+                statusText = "支持",
+                description = "支持正常访问与播放 Disney+ 影视内容"
+            )
+        } else {
+            item.copy(
+                state = TestState.BLOCKED,
+                statusText = "地区限制",
+                description = "当前地区不在 Disney+ 官方服务范围内或已被限制"
+            )
         }
     }
 
-    private fun renderDisney(res: TestResult) {
-        binding.progressDisney.visibility = View.GONE
-        binding.tvDisneyStatus.visibility = View.VISIBLE
-        binding.tvDisneyStatus.text = res.tag
-        binding.tvDisneyDesc.text = res.message
-        binding.tvDisneyStatus.setTextColor(statusColor(res.status))
-    }
+    private suspend fun testMax(item: MediaItem): MediaItem = withContext(Dispatchers.IO) {
+        val client = Libcore.newHttpClient().apply {
+            modernTLS()
+            tryProxyOutbound()
+        }
+        val req = client.newRequest().apply {
+            setURL("https://auth.max.com/")
+            setUserAgent(USER_AGENT)
+        }
+        val resp = req.execute()
+        val body = Util.getStringBox(resp.contentString)
 
-    // --- ChatGPT ---
-    private suspend fun testChatGpt(): TestResult = withContext(Dispatchers.IO) {
-        try {
-            val client = Libcore.newHttpClient().apply {
-                modernTLS()
-                tryProxyOutbound()
-            }
-            val req = client.newRequest().apply {
-                setURL("https://chatgpt.com/")
-                setUserAgent(USER_AGENT)
-            }
-            val resp = req.execute()
-            val body = Util.getStringBox(resp.contentString)
-
-            if (!body.contains("cf-mitigated") && !body.contains("Attention Required")) {
-                TestResult(1, "已解锁", "支持网页端与 API 正常登录对话，无 Cloudflare 拦截")
-            } else {
-                TestResult(0, "未解锁 (CF 拦截)", "触发 Cloudflare 人机验证或 IP 限制")
-            }
-        } catch (e: Throwable) {
-            val msg = e.message ?: ""
-            if (msg.contains("403") || msg.contains("cf-mitigated") || msg.contains("Attention Required")) {
-                TestResult(0, "未解锁 (CF 拦截)", "触发 Cloudflare 人机验证或 IP 限制")
-            } else {
-                TestResult(-1, "检测超时", "连接超时或网络异常: $msg")
-            }
+        if (!body.contains("not available in your region") && !body.contains("unsupported_location") && resp.statusCode in 200..399) {
+            item.copy(
+                state = TestState.UNLOCKED,
+                statusText = "支持",
+                description = "支持访问 Max (HBO) 流媒体服务与内容授权"
+            )
+        } else {
+            item.copy(
+                state = TestState.BLOCKED,
+                statusText = "未解锁",
+                description = "当前节点不支持 Max (HBO) 服务地区"
+            )
         }
     }
 
-    private fun renderChatGpt(res: TestResult) {
-        binding.progressChatgpt.visibility = View.GONE
-        binding.tvChatgptStatus.visibility = View.VISIBLE
-        binding.tvChatgptStatus.text = res.tag
-        binding.tvChatgptDesc.text = res.message
-        binding.tvChatgptStatus.setTextColor(statusColor(res.status))
-    }
+    private suspend fun testPrime(item: MediaItem): MediaItem = withContext(Dispatchers.IO) {
+        val client = Libcore.newHttpClient().apply {
+            modernTLS()
+            tryProxyOutbound()
+        }
+        val req = client.newRequest().apply {
+            setURL("https://www.primevideo.com/")
+            setUserAgent(USER_AGENT)
+        }
+        val resp = req.execute()
+        val body = Util.getStringBox(resp.contentString)
 
-    // --- YouTube Premium ---
-    private suspend fun testYouTube(): TestResult = withContext(Dispatchers.IO) {
-        try {
-            val client = Libcore.newHttpClient().apply {
-                modernTLS()
-                tryProxyOutbound()
-            }
-            val req = client.newRequest().apply {
-                setURL("https://www.youtube.com/premium")
-                setUserAgent(USER_AGENT)
-            }
-            val resp = req.execute()
-            val body = Util.getStringBox(resp.contentString)
-
-            if (body.contains("Premium is not available in your country")) {
-                TestResult(0, "未解锁", "YouTube Premium 在当前节点所在地区暂未开放")
-            } else {
-                val matcher = Pattern.compile("\"countryCode\":\"([A-Z]{2})\"").matcher(body)
-                val country = if (matcher.find()) matcher.group(1) else ""
-                val extra = if (country.isNotBlank()) " ($country 地区)" else ""
-                TestResult(1, "已解锁$extra", "支持 YouTube Premium 订阅购买与后台画中画播放")
-            }
-        } catch (e: Throwable) {
-            TestResult(-1, "检测超时", "连接超时或网络异常: ${e.message}")
+        if (resp.statusCode in 200..399 && !body.contains("georestricted") && !body.contains("not-available-in-your-country")) {
+            item.copy(
+                state = TestState.UNLOCKED,
+                statusText = "支持",
+                description = "支持访问 Amazon Prime Video 流媒体版权库"
+            )
+        } else {
+            item.copy(
+                state = TestState.BLOCKED,
+                statusText = "未解锁",
+                description = "节点 IP 无法正常访问 Prime Video 或受地域限制"
+            )
         }
     }
 
-    private fun renderYouTube(res: TestResult) {
-        binding.progressYoutube.visibility = View.GONE
-        binding.tvYoutubeStatus.visibility = View.VISIBLE
-        binding.tvYoutubeStatus.text = res.tag
-        binding.tvYoutubeDesc.text = res.message
-        binding.tvYoutubeStatus.setTextColor(statusColor(res.status))
+    private suspend fun testYouTube(item: MediaItem): MediaItem = withContext(Dispatchers.IO) {
+        val client = Libcore.newHttpClient().apply {
+            modernTLS()
+            tryProxyOutbound()
+        }
+        val req = client.newRequest().apply {
+            setURL("https://www.youtube.com/premium")
+            setUserAgent(USER_AGENT)
+        }
+        val resp = req.execute()
+        val body = Util.getStringBox(resp.contentString)
+
+        val matcher = Pattern.compile("\"countryCode\"\\s*:\\s*\"([A-Za-z]{2})\"").matcher(body)
+        var countryCode = ""
+        if (matcher.find()) {
+            countryCode = matcher.group(1)?.uppercase() ?: ""
+        }
+
+        if (countryCode.isNotBlank()) {
+            val flag = LandingIpManager.countryCodeToFlagEmoji(countryCode)
+            item.copy(
+                state = TestState.UNLOCKED,
+                statusText = "支持 $flag $countryCode",
+                description = "支持开通与畅享 YouTube Premium 会员无广告服务",
+                region = countryCode
+            )
+        } else if (body.contains("Premium") && !body.contains("not available in your country")) {
+            item.copy(
+                state = TestState.UNLOCKED,
+                statusText = "支持",
+                description = "支持开通与畅享 YouTube Premium 会员服务"
+            )
+        } else {
+            item.copy(
+                state = TestState.BLOCKED,
+                statusText = "未解锁",
+                description = "该地区或出口 IP 不支持 YouTube Premium"
+            )
+        }
     }
 
-    private fun statusColor(status: Int): Int {
-        return when (status) {
-            1 -> Color.parseColor("#10B981") // Emerald Green (Unlocked)
-            2 -> Color.parseColor("#F59E0B") // Amber (Originals only)
-            0 -> Color.parseColor("#EF4444") // Rose Red (Locked)
-            else -> Color.parseColor("#94A3B8") // Gray (Timeout / error)
+    private suspend fun testTikTok(item: MediaItem): MediaItem = withContext(Dispatchers.IO) {
+        val client = Libcore.newHttpClient().apply {
+            modernTLS()
+            tryProxyOutbound()
+        }
+        val req = client.newRequest().apply {
+            setURL("https://www.tiktok.com/")
+            setUserAgent(USER_AGENT)
+        }
+        val resp = req.execute()
+        val body = Util.getStringBox(resp.contentString)
+
+        val matcher = Pattern.compile("\"region\"\\s*:\\s*\"([A-Za-z]{2})\"").matcher(body)
+        var region = ""
+        if (matcher.find()) {
+            region = matcher.group(1)?.uppercase() ?: ""
+        }
+
+        if (resp.statusCode in 200..399 && !body.contains("tiktok-verify-page")) {
+            val flag = if (region.isNotBlank()) LandingIpManager.countryCodeToFlagEmoji(region) + " " + region else ""
+            item.copy(
+                state = TestState.UNLOCKED,
+                statusText = if (flag.isNotBlank()) "支持 $flag" else "支持",
+                description = "支持正常浏览 TikTok 国际版短视频与直播内容",
+                region = region
+            )
+        } else {
+            item.copy(
+                state = TestState.BLOCKED,
+                statusText = "未解锁",
+                description = "无法正常访问 TikTok 或触发人机风控拦截"
+            )
+        }
+    }
+
+    private suspend fun testSpotify(item: MediaItem): MediaItem = withContext(Dispatchers.IO) {
+        val client = Libcore.newHttpClient().apply {
+            modernTLS()
+            tryProxyOutbound()
+        }
+        val req = client.newRequest().apply {
+            setURL("https://www.spotify.com/")
+            setUserAgent(USER_AGENT)
+        }
+        val resp = req.execute()
+        val body = Util.getStringBox(resp.contentString)
+
+        if (resp.statusCode in 200..399 && !body.contains("not available in your country")) {
+            item.copy(
+                state = TestState.UNLOCKED,
+                statusText = "支持",
+                description = "支持 Spotify 歌曲播放与客户端正常登录"
+            )
+        } else {
+            item.copy(
+                state = TestState.BLOCKED,
+                statusText = "未解锁",
+                description = "当前出口 IP 所在地区暂未开放 Spotify 服务"
+            )
+        }
+    }
+
+    private suspend fun testChatGpt(item: MediaItem): MediaItem = withContext(Dispatchers.IO) {
+        val client = Libcore.newHttpClient().apply {
+            modernTLS()
+            tryProxyOutbound()
+        }
+        val req = client.newRequest().apply {
+            setURL("https://chatgpt.com/")
+            setUserAgent(USER_AGENT)
+        }
+        val resp = req.execute()
+        val body = Util.getStringBox(resp.contentString)
+
+        if (!body.contains("cf-mitigated") && !body.contains("Attention Required") && !body.contains("1020") && resp.statusCode in 200..399) {
+            item.copy(
+                state = TestState.UNLOCKED,
+                statusText = "支持",
+                description = "无 Cloudflare 拦截，网页端与 API 可正常对话"
+            )
+        } else {
+            item.copy(
+                state = TestState.BLOCKED,
+                statusText = "CF 拦截",
+                description = "触发 Cloudflare 人机验证或 OpenAI IP 封禁策略"
+            )
+        }
+    }
+
+    private suspend fun testClaude(item: MediaItem): MediaItem = withContext(Dispatchers.IO) {
+        val client = Libcore.newHttpClient().apply {
+            modernTLS()
+            tryProxyOutbound()
+        }
+        val req = client.newRequest().apply {
+            setURL("https://claude.ai/login")
+            setUserAgent(USER_AGENT)
+        }
+        val resp = req.execute()
+        val body = Util.getStringBox(resp.contentString)
+
+        if (!body.contains("App unavailable in your region") && !body.contains("403 Forbidden") && resp.statusCode in 200..399) {
+            item.copy(
+                state = TestState.UNLOCKED,
+                statusText = "支持",
+                description = "支持访问 Anthropic Claude，区域授权正常开放"
+            )
+        } else {
+            item.copy(
+                state = TestState.BLOCKED,
+                statusText = "地区受限",
+                description = "当前节点所在地区尚未开放 Claude 访问服务"
+            )
+        }
+    }
+
+    private suspend fun testGemini(item: MediaItem): MediaItem = withContext(Dispatchers.IO) {
+        val client = Libcore.newHttpClient().apply {
+            modernTLS()
+            tryProxyOutbound()
+        }
+        val req = client.newRequest().apply {
+            setURL("https://gemini.google.com/")
+            setUserAgent(USER_AGENT)
+        }
+        val resp = req.execute()
+        val body = Util.getStringBox(resp.contentString)
+
+        if (!body.contains("not supported in your country") && !body.contains("unavailable in your territory") && resp.statusCode in 200..399) {
+            item.copy(
+                state = TestState.UNLOCKED,
+                statusText = "支持",
+                description = "支持全功能正常使用 Google Gemini AI 模型与对话"
+            )
+        } else {
+            item.copy(
+                state = TestState.BLOCKED,
+                statusText = "未开放",
+                description = "Google Gemini 暂未对该地区或机房 IP 开放服务"
+            )
+        }
+    }
+
+    // --- Adapter ---
+
+    class MediaUnlockAdapter : ListAdapter<MediaItem, MediaUnlockAdapter.VH>(DiffCallback) {
+
+        object DiffCallback : DiffUtil.ItemCallback<MediaItem>() {
+            override fun areItemsTheSame(oldItem: MediaItem, newItem: MediaItem) = oldItem.id == newItem.id
+            override fun areContentsTheSame(oldItem: MediaItem, newItem: MediaItem) = oldItem == newItem
+        }
+
+        class VH(view: View) : RecyclerView.ViewHolder(view) {
+            val icon: ImageView = view.findViewById(R.id.iv_platform_icon)
+            val name: TextView = view.findViewById(R.id.tv_platform_name)
+            val category: TextView = view.findViewById(R.id.tv_platform_category)
+            val progress: CircularProgressIndicator = view.findViewById(R.id.progress_indicator)
+            val badge: TextView = view.findViewById(R.id.tv_status_badge)
+            val desc: TextView = view.findViewById(R.id.tv_description)
+        }
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
+            val view = LayoutInflater.from(parent.context).inflate(R.layout.item_media_unlock, parent, false)
+            return VH(view)
+        }
+
+        @SuppressLint("SetTextI18n")
+        override fun onBindViewHolder(holder: VH, position: Int) {
+            val item = getItem(position)
+            holder.icon.setImageResource(item.iconRes)
+            holder.name.text = item.name
+            holder.category.text = item.category
+            holder.desc.text = item.description
+
+            when (item.state) {
+                TestState.TESTING -> {
+                    holder.progress.visibility = View.VISIBLE
+                    holder.badge.visibility = View.GONE
+                }
+                TestState.UNLOCKED -> {
+                    holder.progress.visibility = View.GONE
+                    holder.badge.visibility = View.VISIBLE
+                    holder.badge.text = item.statusText
+                    holder.badge.setTextColor(Color.parseColor("#10B981")) // Green
+                }
+                TestState.PARTIAL -> {
+                    holder.progress.visibility = View.GONE
+                    holder.badge.visibility = View.VISIBLE
+                    holder.badge.text = item.statusText
+                    holder.badge.setTextColor(Color.parseColor("#F59E0B")) // Amber
+                }
+                TestState.BLOCKED -> {
+                    holder.progress.visibility = View.GONE
+                    holder.badge.visibility = View.VISIBLE
+                    holder.badge.text = item.statusText
+                    holder.badge.setTextColor(Color.parseColor("#EF4444")) // Red
+                }
+                TestState.TIMEOUT -> {
+                    holder.progress.visibility = View.GONE
+                    holder.badge.visibility = View.VISIBLE
+                    holder.badge.text = item.statusText
+                    holder.badge.setTextColor(Color.parseColor("#F97316")) // Orange
+                }
+                TestState.NOT_CONNECTED -> {
+                    holder.progress.visibility = View.GONE
+                    holder.badge.visibility = View.VISIBLE
+                    holder.badge.text = item.statusText
+                    holder.badge.setTextColor(Color.parseColor("#94A3B8")) // Slate Gray
+                }
+            }
         }
     }
 }

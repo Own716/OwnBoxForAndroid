@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release Tag (e.g. v2.3.7)"
+        description: "Release Tag (e.g. v2.3.9)"
         required: true
-        default: "v2.3.7"
+        default: "v2.3.9"
 
 permissions:
   contents: write
@@ -146,5 +146,5 @@ jobs:
           files: apks/*.apk
           draft: false
           prerelease: false
-          generate_release_notes: true
+          generate_release_notes: false
 

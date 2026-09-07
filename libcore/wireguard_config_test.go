@@ -130,6 +130,7 @@ func checkConfig(config string) (*box.Box, error) {
 		nekoboxAndroidEndpointRegistry(),
 		nekoboxAndroidDNSTransportRegistry(nil),
 		nekoboxAndroidServiceRegistry(),
+		nekoboxAndroidCertificateProviderRegistry(),
 	)
 	ctx = service.ContextWithDefaultRegistry(ctx)
 	var options option.Options

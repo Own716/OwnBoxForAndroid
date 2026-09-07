@@ -26,7 +26,6 @@ import (
 	"github.com/sagernet/sing-box/log"
 	qtls "github.com/sagernet/sing-quic"
 	"github.com/sagernet/sing/common"
-	"github.com/sagernet/sing/common/bufio"
 	E "github.com/sagernet/sing/common/exceptions"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
@@ -402,7 +401,7 @@ func createHTTPClient(dest M.Socksaddr, dialer N.Dialer, options *V2RayXHTTPBase
 				if dErr != nil {
 					return nil, dErr
 				}
-				return qtls.Dial(ctx, bufio.NewUnbindPacketConn(udpConn), udpConn.RemoteAddr(), tlsConfig, cfg)
+				return qtls.Dial(ctx, udpConn, tlsConfig, cfg)
 			},
 		}
 	case "2":

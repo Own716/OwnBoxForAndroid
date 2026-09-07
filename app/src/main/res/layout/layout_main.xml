@@ -105,9 +105,9 @@
                         android:layout_width="32dp"
                         android:layout_height="32dp"
                         android:background="?android:attr/selectableItemBackgroundBorderless"
-                        android:contentDescription="@string/landing_ip_details_title"
+                        android:contentDescription="@string/retest"
                         android:padding="4dp"
-                        android:src="@drawable/ic_more_horiz"
+                        android:src="@drawable/ic_baseline_refresh_24"
                         android:visibility="gone"
                         app:tint="@color/white" />
 
