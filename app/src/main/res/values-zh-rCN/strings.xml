@@ -760,7 +760,6 @@
     <string name="landing_ip_querying">正在查询落地 IP...</string>
     <string name="landing_ip_failed">查询失败: 节点不可达</string>
     <string name="copy">复制</string>
-    <string name="copy_success">已复制到剪贴板</string>
     <string name="retest">重新检测</string>
     <string name="done">完成</string>
     <string name="unknown">未知</string>

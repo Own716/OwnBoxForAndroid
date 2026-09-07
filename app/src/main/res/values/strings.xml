@@ -843,7 +843,6 @@
     <string name="landing_ip_querying">Querying landing IP...</string>
     <string name="landing_ip_failed">Query failed: node unreachable</string>
     <string name="copy">Copy</string>
-    <string name="copy_success">Copied to clipboard</string>
     <string name="retest">Re-test</string>
     <string name="done">Done</string>
     <string name="unknown">Unknown</string>
