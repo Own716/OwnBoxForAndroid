@@ -171,10 +171,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var defaultSubscriptionUserAgent: String
         get() {
             val stored = configurationStore.getString(Key.DEFAULT_SUBSCRIPTION_USER_AGENT, "")
-            if (!stored.isNullOrBlank() && !stored.contains("sing-box") && !stored.contains("NekoBox")) {
-                return stored
-            }
-            return "clash-meta"
+            return if (!stored.isNullOrBlank()) stored else "Singbox/1.14"
         }
         set(value) = configurationStore.putString(Key.DEFAULT_SUBSCRIPTION_USER_AGENT, value)
 
@@ -187,14 +184,14 @@ object DataStore : OnPreferenceDataStoreChangeListener {
             for (group in allGroups) {
                 val sub = group.subscription ?: continue
                 val ua = sub.customUserAgent
-                if (forceAll || ua.isNullOrBlank() || ua.startsWith("Throne/") || ua.contains("sing-box") || ua.contains("NekoBox")) {
+                if (forceAll || ua.isNullOrBlank()) {
                     sub.customUserAgent = newUa
                     groupDao.updateGroup(group)
                     changed = true
                 }
             }
             if (changed) {
-                Logs.d("Migrated subscription User-Agents to: $newUa")
+                Logs.d("Updated subscription User-Agents to: $newUa")
             }
         } catch (e: Throwable) {
             Logs.w(e)
@@ -205,7 +202,6 @@ object DataStore : OnPreferenceDataStoreChangeListener {
         if (configurationStore.getString(Key.MIXED_PORT) == null) {
             mixedPort = mixedPort
         }
-        migrateSubscriptionUserAgents()
     }
 
 
@@ -363,6 +359,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var groupOrder by profileCacheStore.stringToInt(Key.GROUP_ORDER)
     var groupIsSelector by profileCacheStore.boolean(Key.GROUP_IS_SELECTOR)
     var groupIsUrlTest by profileCacheStore.boolean("groupIsUrlTest")
+    var groupIsLoadBalance by profileCacheStore.boolean("groupIsLoadBalance")
     private var rawGroupUrlTestUrl by profileCacheStore.string("groupUrlTestUrl") { "http://cp.cloudflare.com/generate_204" }
     var groupUrlTestUrl: String
         get() {
@@ -397,6 +394,14 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     }
     fun groupIsUrlTest(groupId: Long): Boolean = isGroupUrlTest(groupId)
     fun setGroupIsUrlTest(groupId: Long, value: Boolean) = setGroupUrlTest(groupId, value)
+
+    fun isGroupLoadBalance(groupId: Long): Boolean =
+        configurationStore.getBoolean("group_${groupId}_isLoadBalance", false)
+    fun setGroupLoadBalance(groupId: Long, value: Boolean) {
+        configurationStore.putBoolean("group_${groupId}_isLoadBalance", value)
+    }
+    fun groupIsLoadBalance(groupId: Long): Boolean = isGroupLoadBalance(groupId)
+    fun setGroupIsLoadBalance(groupId: Long, value: Boolean) = setGroupLoadBalance(groupId, value)
 
     fun groupUrlTestUrl(groupId: Long): String {
         val stored = configurationStore.getString("group_${groupId}_urlTestUrl", "")?.takeIf { it.isNotBlank() }

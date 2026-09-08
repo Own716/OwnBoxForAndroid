@@ -129,6 +129,13 @@ internal fun buildSelectorOutbound(defaultTag: String?, memberTags: List<String>
         outbounds = memberTags
     }
 
+internal fun buildLoadBalanceOutbound(memberTags: List<String>) =
+    Outbound_SelectorOptions().apply {
+        type = "loadbalance"
+        tag = TAG_PROXY
+        outbounds = memberTags
+    }
+
 internal fun buildUrlTestOutbound(
     memberTags: List<String>,
     testUrl: String? = null,
@@ -852,7 +859,16 @@ fun buildConfig(
                         val outboundMap = currentOutbound.asMap()
                         val tlsOptions = outboundMap["tls"] as? Map<*, *>
                         if (tlsOptions?.get("enabled") == true) {
-                            currentOutbound._hack_config_map["detour"] = TAG_FRAGMENT
+                            val delay = DataStore.fragmentInterval.let {
+                                val first = it.split("-").firstOrNull()?.trim()
+                                val num = first?.toLongOrNull() ?: 20L
+                                "${num}ms"
+                            }
+                            currentOutbound._hack_config_map["tls"] = mapOf(
+                                "fragment" to true,
+                                "record_fragment" to true,
+                                "fragment_fallback_delay" to delay
+                            )
                         }
                     }
                 }
@@ -920,14 +936,6 @@ fun buildConfig(
 
                             // no chain rule and not outbound, so need to set to direct
                             if (index == profileList.lastIndex) {
-                                if (DataStore.enableTLSFragment) {
-                                    route.rules.add(Rule_DefaultOptions().apply {
-                                        network = listOf("tcp")
-                                        inbound = listOf(tag)
-                                        outbound = TAG_FRAGMENT
-                                    })
-                                }
-
                                 route.rules.add(Rule_DefaultOptions().apply {
                                     inbound = listOf(tag)
                                     outbound = TAG_DIRECT
@@ -948,9 +956,11 @@ fun buildConfig(
         }
 
         val isGroupUrlTest = group?.let { DataStore.isGroupUrlTest(it.id) } == true
+        val isGroupLoadBalance = group?.let { DataStore.isGroupLoadBalance(it.id) } == true
         val useAutoSelect = !forTest && !forExport && isGroupUrlTest
+        val useLoadBalance = !forTest && !forExport && isGroupLoadBalance
         // build outbounds
-        if (buildSelector || useAutoSelect) {
+        if (buildSelector || useAutoSelect || useLoadBalance) {
             val list = if (group != null && group.id != 0L) {
                 SagerDatabase.proxyDao.getByGroup(group.id)
             } else {
@@ -979,6 +989,8 @@ fun buildConfig(
                         interruptExist = interruptVal
                     )
                 )
+            } else if (useLoadBalance && tagMap.isNotEmpty()) {
+                outbounds.add(0, buildLoadBalanceOutbound(tagMap.values.toList()))
             } else {
                 outbounds.add(0, buildSelectorOutbound(tagMap[proxy.id], tagMap.values.toList()))
             }
@@ -991,7 +1003,7 @@ fun buildConfig(
             tagMap[key] = buildChain(key, p)
         }
 
-        val mainProxyTag = (if (buildSelector || useAutoSelect) TAG_PROXY else tagMap[proxy.id]) ?: TAG_PROXY
+        val mainProxyTag = (if (buildSelector || useAutoSelect || useLoadBalance) TAG_PROXY else tagMap[proxy.id]) ?: TAG_PROXY
 
         // 在应用用户规则之前检查全局模式
         if (!forTest && DataStore.globalMode) {
@@ -1255,18 +1267,6 @@ fun buildConfig(
                     _hack_config_map["network_strategy"] = "default"
                 }
             })
-        }
-
-        if (DataStore.enableTLSFragment) {
-            val fragmentOutbound = Outbound().apply {
-                tag = TAG_FRAGMENT
-                type = "direct"
-                _hack_config_map["fragment"] = Fragment().apply {
-                    length = DataStore.fragmentLength
-                    interval = DataStore.fragmentInterval
-                }.asMap()
-            }
-            outbounds.add(fragmentOutbound)
         }
 
         fun isExclusiveCustomHost(host: String): Boolean {

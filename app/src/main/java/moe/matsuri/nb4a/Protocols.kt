@@ -21,7 +21,20 @@ object Protocols {
             if (bean is ConfigBean) {
                 return bean.config
             }
-            return bean.serverAddress + bean.serverPort + type
+            val extra = when (bean) {
+                is io.nekohasekai.sagernet.fmt.v2ray.StandardV2RayBean ->
+                    "${bean.uuid}/${bean.path}/${bean.sni}/${bean.realityPubKey}/${bean.security}/${bean.name}"
+                is io.nekohasekai.sagernet.fmt.shadowsocks.ShadowsocksBean ->
+                    "${bean.password}/${bean.method}/${bean.plugin}/${bean.name}"
+                is io.nekohasekai.sagernet.fmt.trojan.TrojanBean ->
+                    "${bean.password}/${bean.sni}/${bean.name}"
+                is io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean ->
+                    "${bean.authPayload}/${bean.sni}/${bean.name}"
+                is io.nekohasekai.sagernet.fmt.tuic.TuicBean ->
+                    "${bean.token}/${bean.uuid}/${bean.sni}/${bean.name}"
+                else -> bean.name
+            }
+            return "${bean.serverAddress}:${bean.serverPort}/$type/$extra"
         }
 
         override fun hashCode(): Int {

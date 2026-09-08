@@ -775,6 +775,8 @@
     <string name="hop_interval_sum">Randomly hop between ports in the range, default 30s</string>
     <string name="group_is_url_test">Auto-select (URLTest)</string>
     <string name="group_is_url_test_sum">Use urltest outbound to auto-pick the lowest latency node</string>
+    <string name="group_is_load_balance">Load Balance</string>
+    <string name="group_is_load_balance_sum">Distribute connections across all nodes in the group via round-robin</string>
     <string name="group_toggle_disabled">Toggle Enable/Disable</string>
     <string name="group_enable">Enable Group</string>
     <string name="group_disable">Disable Group</string>

@@ -107,15 +107,35 @@ fun String.decodeBase64UrlSafe(): String {
 class SubscriptionFoundException(val link: String) : RuntimeException()
 
 suspend fun parseProxies(text: String): List<AbstractBean> {
-    val links = text.split('\n').flatMap { it.trim().split(' ') }
-    val linksByLine = text.split('\n').map { it.trim() }
+    val rawLines = text.split('\n').map { it.trim() }.filter { it.isNotBlank() }
+    val isSingleLink = rawLines.size == 1
+
+    val schemes = listOf("ss://", "ssr://", "vmess://", "vless://", "trojan://", "trojan-go://", "socks://", "socks5://", "hysteria://", "hysteria2://", "hy2://", "tuic://", "juicity://", "snell://", "anytls://", "awg://", "wireguard://", "sn://")
+    fun splitLinks(line: String): List<String> {
+        var count = 0
+        for (s in schemes) {
+            var idx = line.indexOf(s)
+            while (idx >= 0) {
+                count++
+                idx = line.indexOf(s, idx + s.length)
+            }
+        }
+        return if (count > 1) line.split(' ').filter { it.isNotBlank() } else listOf(line)
+    }
+
+    val links = rawLines.flatMap { splitLinks(it) }
+    val linksByLine = rawLines
 
     val entities = ArrayList<AbstractBean>()
     val entitiesByLine = ArrayList<AbstractBean>()
 
     fun String.parseLink(entities: ArrayList<AbstractBean>) {
         if (startsWith("clash://install-config?") || startsWith("sn://subscription?")) {
-            throw SubscriptionFoundException(this)
+            if (isSingleLink) {
+                throw SubscriptionFoundException(this)
+            } else {
+                return
+            }
         }
 
         if (startsWith("sn://")) {
@@ -141,14 +161,16 @@ suspend fun parseProxies(text: String): List<AbstractBean> {
                 entities.add(parseHttp(this))
             }.onFailure {
                 Logs.w(it)
-                val clashUrl = HttpUrl.Builder()
-                    .scheme("https")
-                    .host("install-config")
-                    .addQueryParameter("url", this)
-                    .build()
-                    .toString()
-                    .replaceFirst("https://", "clash://")
-                throw (SubscriptionFoundException(clashUrl))
+                if (isSingleLink) {
+                    val clashUrl = HttpUrl.Builder()
+                        .scheme("https")
+                        .host("install-config")
+                        .addQueryParameter("url", this)
+                        .build()
+                        .toString()
+                        .replaceFirst("https://", "clash://")
+                    throw (SubscriptionFoundException(clashUrl))
+                }
             }
         } else if (startsWith("vmess://")) {
             Logs.d("Try parse v2ray link: $this")
@@ -267,7 +289,7 @@ suspend fun parseProxies(text: String): List<AbstractBean> {
             }
         }
     }
-    return if (entities.size > entitiesByLine.size) entities else entitiesByLine
+    return if (entitiesByLine.size >= entities.size) entitiesByLine else entities
 }
 
 fun <T : Serializable> T.applyDefaultValues(): T {

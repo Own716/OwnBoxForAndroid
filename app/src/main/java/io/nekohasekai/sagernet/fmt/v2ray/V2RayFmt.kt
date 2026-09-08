@@ -72,14 +72,21 @@ fun parseV2Ray(link: String): StandardV2RayBean {
 
     // "std" format
 
+    val rawFragment = if (link.contains("#")) link.substringAfter("#").trim() else ""
+    val linkWithoutFragment = if (link.contains("#")) link.substringBefore("#") else link
+    val nodeName = if (rawFragment.isNotBlank()) {
+        runCatching { java.net.URLDecoder.decode(rawFragment, "UTF-8") }.getOrDefault(rawFragment)
+    } else null
+
     val bean = VMessBean().apply { if (link.startsWith("vless://")) alterId = -1 }
-    val url = link.replace("vmess://", "https://").replace("vless://", "https://").toHttpUrl()
+    val url = (linkWithoutFragment.replace("vmess://", "https://").replace("vless://", "https://")).toHttpUrlOrNull()
+        ?: error("Invalid v2ray link: $link")
 
     if (url.password.isNotBlank()) {
         // https://github.com/v2fly/v2fly-github-io/issues/26 (rarely use)
         bean.serverAddress = url.host
         bean.serverPort = url.port
-        bean.name = url.fragment
+        bean.name = nodeName ?: url.fragment ?: ""
 
         var protocol = url.username
         bean.type = protocol
@@ -159,17 +166,17 @@ fun parseV2Ray(link: String): StandardV2RayBean {
         }
     } else {
         // also vless format
-        bean.parseDuckSoft(url)
+        bean.parseDuckSoft(url, nodeName)
     }
 
     return bean
 }
 
 // https://github.com/XTLS/Xray-core/issues/91
-fun StandardV2RayBean.parseDuckSoft(url: HttpUrl) {
+fun StandardV2RayBean.parseDuckSoft(url: HttpUrl, defaultName: String? = null) {
     serverAddress = url.host
     serverPort = url.port
-    name = url.fragment
+    name = defaultName?.takeIf { it.isNotBlank() } ?: url.fragment ?: ""
 
     if (this is TrojanBean) {
         password = url.username
@@ -373,7 +380,7 @@ private fun tryResolveVmess4Kitsunebi(server: String): VMessBean {
         encryption = arr21[0]
         if (indexSplit < 0) return@apply
 
-        val url = ("https://localhost/path?" + server.substringAfter("?")).toHttpUrl()
+        val url = ("https://localhost/path?" + server.substringAfter("?")).toHttpUrlOrNull() ?: return@apply
         url.queryParameter("remarks")?.apply { name = this }
         url.queryParameter("alterId")?.apply { alterId = this.toInt() }
         url.queryParameter("path")?.apply { path = this }

@@ -64,16 +64,13 @@ object RawUpdater : GroupUpdater() {
                 ?: error(app.getString(R.string.no_proxies_found_in_subscription))
         } else {
 
-            val preferredUa = when {
-                !subscription.customUserAgent.isNullOrBlank() &&
-                        !subscription.customUserAgent.startsWith("Throne/") &&
-                        !subscription.customUserAgent.contains("NekoBox") -> subscription.customUserAgent
-                else -> DataStore.defaultSubscriptionUserAgent
-            }
+            val preferredUa = subscription.customUserAgent?.takeIf { it.isNotBlank() }
+                ?: DataStore.defaultSubscriptionUserAgent
 
-            // Fallback UA candidates in order: user preferred UA -> clash-meta -> v2rayN/7.8.2 -> Throne/1.0.0 -> sing-box/1.14.0
+            // Fallback UA candidates in order: user preferred UA -> Singbox/1.14 -> clash-meta -> v2rayN/7.8.2 -> Throne/1.0.0 -> sing-box/1.14.0
             val candidateUas = linkedSetOf(
                 preferredUa,
+                "Singbox/1.14",
                 "clash-meta",
                 "v2rayN/7.8.2",
                 "Throne/1.0.0",
@@ -891,14 +888,19 @@ object RawUpdater : GroupUpdater() {
         }
 
         try {
-            return parseProxies(text.decodeBase64UrlSafe()).takeIf { it.isNotEmpty() }
-                ?: error("Not found")
-        } catch (e: Exception) {
-            Logs.w(e)
+            val base64Decoded = text.decodeBase64UrlSafe()
+            val parsed = parseProxies(base64Decoded)
+            if (!parsed.isNullOrEmpty()) {
+                return parsed
+            }
+        } catch (ignored: Exception) {
         }
 
         try {
-            return parseProxies(text).takeIf { it.isNotEmpty() } ?: error("Not found")
+            val parsed = parseProxies(text)
+            if (!parsed.isNullOrEmpty()) {
+                return parsed
+            }
         } catch (e: SubscriptionFoundException) {
             throw e
         } catch (ignored: Exception) {

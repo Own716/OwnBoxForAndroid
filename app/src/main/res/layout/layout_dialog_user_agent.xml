@@ -9,22 +9,19 @@
     android:paddingEnd="24dp"
     android:paddingBottom="8dp">
 
-    <com.google.android.material.textfield.TextInputLayout
-        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+    <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginBottom="6dp"
+        android:text="@string/select_ua_preset"
+        android:textAppearance="?attr/textAppearanceCaption" />
+
+    <androidx.appcompat.widget.AppCompatSpinner
+        android:id="@+id/spinner_ua_presets"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
         android:layout_marginBottom="16dp"
-        android:hint="@string/select_ua_preset">
-
-        <AutoCompleteTextView
-            android:id="@+id/spinner_ua_presets"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:inputType="none"
-            android:paddingTop="12dp"
-            android:paddingBottom="12dp" />
-
-    </com.google.android.material.textfield.TextInputLayout>
+        android:background="@drawable/bg_spinner_dropdown" />
 
     <com.google.android.material.textfield.TextInputLayout
         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
@@ -47,7 +44,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
-        android:checked="true"
+        android:checked="false"
         android:text="@string/update_existing_subscriptions_ua" />
 
 </LinearLayout>

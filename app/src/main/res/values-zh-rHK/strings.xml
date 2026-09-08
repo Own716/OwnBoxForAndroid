@@ -173,6 +173,8 @@
     <string name="hop_interval_sum">每隔指定秒数随机切换到范围内的端口，默认 30 秒</string>
     <string name="group_is_url_test">自動選優 (URLTest)</string>
     <string name="group_is_url_test_sum">將本組作為 URLTest 出站，自動測速並走最低延遲節點</string>
+    <string name="group_is_load_balance">負載均衡 (Load Balance)</string>
+    <string name="group_is_load_balance_sum">將本組作為負載均衡出站，輪詢分發連線至組內節點並自動故障轉移</string>
     <string name="group_toggle_disabled">啟用 / 停用此分組</string>
     <string name="group_enable">啟用分組</string>
     <string name="group_disable">停用分組</string>

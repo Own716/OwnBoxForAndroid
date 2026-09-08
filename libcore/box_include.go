@@ -43,6 +43,7 @@ import (
 
 	h2http "libcore/protocol/http"
 	"libcore/protocol/juicity"
+	"libcore/protocol/loadbalance"
 	customVless "libcore/protocol/vless"
 
 	_ "github.com/sagernet/sing-box/experimental/clashapi"
@@ -76,6 +77,7 @@ func nekoboxAndroidOutboundRegistry() *outbound.Registry {
 
 	group.RegisterSelector(registry)
 	group.RegisterURLTest(registry)
+	loadbalance.RegisterLoadBalance(registry)
 
 	socks.RegisterOutbound(registry)
 	http.RegisterOutbound(registry)

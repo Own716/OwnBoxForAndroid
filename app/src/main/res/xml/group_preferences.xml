@@ -35,6 +35,12 @@
         app:summary="@string/group_is_url_test_sum"
         app:title="@string/group_is_url_test" />
 
+    <SwitchPreference
+        app:icon="@drawable/ic_baseline_compare_arrows_24"
+        app:key="groupIsLoadBalance"
+        app:summary="@string/group_is_load_balance_sum"
+        app:title="@string/group_is_load_balance" />
+
     <PreferenceCategory
         app:key="groupUrlTestCategory"
         app:title="@string/urltest_settings">
