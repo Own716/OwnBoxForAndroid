@@ -22,9 +22,6 @@
 
 如果这个项目对你有帮助,欢迎请我喝杯奶茶
 
-<img src="https://raw.githubusercontent.com/Own716/OwnBoxForAndroid/main/.github/89d82fef44150ee3f8f3b179bc96bfe6.png" width="150">
-
-</div>
 
 ---
 ## 📖 项目介绍 / Introduction
