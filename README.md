@@ -9,14 +9,18 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Own716/OwnBoxForAndroid/releases"><img src="https://img.shields.io/badge/Release-v2.3.7-blue.svg?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/Own716/OwnBoxForAndroid/releases"><img src="https://img.shields.io/badge/Release-v2.4.0-blue.svg?style=flat-square" alt="Version"></a>
   <a href="https://android-arsenal.com/api?level=21"><img src="https://img.shields.io/badge/Android-5.0%2B%20(API%2021%2B)-brightgreen.svg?style=flat-square" alt="API"></a>
   <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/License-GPL--3.0-orange.svg?style=flat-square" alt="License"></a>
   <a href="https://t.me/KarenOwn"><img src="https://img.shields.io/badge/Telegram-@KarenOwn-2CA5E0.svg?logo=telegram&style=flat-square" alt="Telegram"></a>
 </p>
 
 ---
+## 支持本项目
 
+如果这个项目对你有帮助,欢迎请我喝杯奶茶
+
+![微信赞赏码](https://raw.githubusercontent.com/Own716/OwnBoxForAndroid/main/.github/89d82fef44150ee3f8f3b179bc96bfe6.png)
 ## 📖 项目介绍 / Introduction
 
 **OwnBox for Android** 是一款基于 Sing-box 官方原生核心深度定制打造的 Android 通用网络代理客户端。集合全协议栈支持、自定义桌面图标切换 (19 款质感图标，含 4 款原神角色图标)、TCP Ping 极速真连测试、常用应用分流一键预设、单节点独立测速、并发拨号、双网络加速、WebDAV 云备份同步、控制中心四叶草快捷磁贴与桌面小组件等丰富功能，兼具极速连接、低耗电量与优雅简洁的用户界面。
