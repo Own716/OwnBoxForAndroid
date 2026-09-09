@@ -16,11 +16,16 @@
 </p>
 
 ---
+<div align="center">
+
 ## 支持本项目
 
 如果这个项目对你有帮助,欢迎请我喝杯奶茶
 
-<img src="https://raw.githubusercontent.com/Own716/OwnBoxForAndroid/main/.github/89d82fef44150ee3f8f3b179bc96bfe6.png" width="300">
+<img src="https://raw.githubusercontent.com/Own716/OwnBoxForAndroid/main/.github/89d82fef44150ee3f8f3b179bc96bfe6.png" width="150">
+
+</div>
+---
 ## 📖 项目介绍 / Introduction
 
 **OwnBox for Android** 是一款基于 Sing-box 官方原生核心深度定制打造的 Android 通用网络代理客户端。集合全协议栈支持、自定义桌面图标切换 (19 款质感图标，含 4 款原神角色图标)、TCP Ping 极速真连测试、常用应用分流一键预设、单节点独立测速、并发拨号、双网络加速、WebDAV 云备份同步、控制中心四叶草快捷磁贴与桌面小组件等丰富功能，兼具极速连接、低耗电量与优雅简洁的用户界面。
