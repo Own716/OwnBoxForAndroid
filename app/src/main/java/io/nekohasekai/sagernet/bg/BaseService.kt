@@ -160,6 +160,20 @@ class BaseService {
             }
         }
 
+        override fun urlTestCustomUrl(url: String, timeoutMs: Int): Int {
+            if (data?.proxy?.box == null) {
+                error("core not started")
+            }
+            try {
+                // urlTestFull 直接经 default outbound 拨号，完全绕过路由规则，杜绝 geosite:cn 等分流劫持
+                return Libcore.urlTestFull(
+                    data!!.proxy!!.box, url, timeoutMs
+                )
+            } catch (e: Exception) {
+                error(Protocols.genFriendlyMsg(e.readableMessage))
+            }
+        }
+
         fun stateChanged(s: State, msg: String?) = launch {
             val profileName = profileName
             broadcast { it.stateChanged(s.ordinal, profileName, msg) }

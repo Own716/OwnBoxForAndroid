@@ -11,4 +11,5 @@ interface ISagerNetService {
   oneway void resetTraffic(in long[] profileIds);
 
   int urlTest();
+  int urlTestCustomUrl(String url, int timeoutMs);
 }

@@ -19,6 +19,9 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.progressindicator.CircularProgressIndicator
 import io.nekohasekai.sagernet.R
+import io.nekohasekai.sagernet.aidl.ISagerNetService
+import io.nekohasekai.sagernet.bg.BaseService
+import io.nekohasekai.sagernet.bg.SagerConnection
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProfileManager
 import io.nekohasekai.sagernet.database.ProxyEntity
@@ -30,18 +33,27 @@ import io.nekohasekai.sagernet.ktx.tryProxyOutbound
 import kotlinx.coroutines.*
 import libcore.Libcore
 import java.io.ByteArrayOutputStream
+import java.net.HttpURLConnection
 import java.net.InetSocketAddress
+import java.net.Proxy
 import java.net.Socket
 import java.net.SocketException
 import java.net.SocketTimeoutException
+import java.net.URL
 import java.net.UnknownHostException
 import java.util.Random
 
-class ConnectivityTestActivity : ThemedActivity() {
+class ConnectivityTestActivity : ThemedActivity(), SagerConnection.Callback {
 
     private lateinit var binding: ActivityConnectivityTestBinding
     private lateinit var adapter: ConnectivityAdapter
     private var testJob: Job? = null
+
+    // AIDL service connection for urlTestFull via running VPN core (bypasses routing rules)
+    private val connection = SagerConnection(SagerConnection.CONNECTION_ID_CONNECTIVITY_TEST)
+
+    @Volatile
+    private var sagerService: ISagerNetService? = null
 
     enum class TestState {
         TESTING,
@@ -60,6 +72,20 @@ class ConnectivityTestActivity : ThemedActivity() {
         var statusText: String = "检测中...",
         var description: String = "正在执行网络连通性探测...",
     )
+
+    // --- SagerConnection.Callback ---
+
+    override fun stateChanged(state: BaseService.State, profileName: String?, msg: String?) {}
+
+    override fun onServiceConnected(service: ISagerNetService) {
+        sagerService = service
+    }
+
+    override fun onServiceDisconnected() {
+        sagerService = null
+    }
+
+    // --- Lifecycle ---
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -88,6 +114,8 @@ class ConnectivityTestActivity : ThemedActivity() {
             startAllTests()
         }
 
+        // Bind to running VPN service so we can call urlTestCustomUrl via AIDL
+        connection.connect(this, this)
         startAllTests()
     }
 
@@ -102,7 +130,10 @@ class ConnectivityTestActivity : ThemedActivity() {
     override fun onDestroy() {
         super.onDestroy()
         testJob?.cancel()
+        connection.disconnect(this)
     }
+
+    // --- Test Orchestration ---
 
     private fun getCurrentTargetProxy(): ProxyEntity? {
         val selectedId = DataStore.selectedProxy
@@ -157,6 +188,15 @@ class ConnectivityTestActivity : ThemedActivity() {
                 state = TestState.TESTING,
                 statusText = "测速中...",
                 description = "正在通过 sing-box 核心代理链路探测出站 HTTP 延迟..."
+            ),
+            DimensionItem(
+                id = "google_cn_check",
+                name = "Google 送中检测",
+                category = "出口质量检测",
+                iconRes = R.drawable.baseline_public_24,
+                state = TestState.TESTING,
+                statusText = "检测中...",
+                description = "正在检测 Google 流量是否被导向中国大陆服务器（送中）..."
             )
         )
 
@@ -165,22 +205,25 @@ class ConnectivityTestActivity : ThemedActivity() {
         testJob = lifecycleScope.launch {
             val currentList = items.map { it.copy() }.toMutableList()
 
-            // Test Dimension 1: Direct TCP handshake
             val item1 = testDirectTcp(currentList[0], host, port)
             currentList[0] = item1
             adapter.submitList(currentList.toList())
 
-            // Test Dimension 2: TCP RST probe
             val item2 = testTcpRst(currentList[1], host, port, bean as? StandardV2RayBean)
             currentList[1] = item2
             adapter.submitList(currentList.toList())
 
-            // Test Dimension 3: Outbound HTTP test
             val item3 = testHttpOutbound(currentList[2])
             currentList[2] = item3
             adapter.submitList(currentList.toList())
+
+            val item4 = testGoogleCnCheck(currentList[3])
+            currentList[3] = item4
+            adapter.submitList(currentList.toList())
         }
     }
+
+    // --- Test: Direct TCP ---
 
     private suspend fun testDirectTcp(
         item: DimensionItem,
@@ -204,7 +247,7 @@ class ConnectivityTestActivity : ThemedActivity() {
 
             item.copy(
                 state = TestState.SUCCESS,
-                statusText = "$rtt ms",
+                statusText = "${rtt} ms",
                 description = "直连握手成功，服务器入口节点物理网络畅通"
             )
         } catch (e: SocketTimeoutException) {
@@ -217,7 +260,7 @@ class ConnectivityTestActivity : ThemedActivity() {
             item.copy(
                 state = TestState.FAILED,
                 statusText = "域名无法解析",
-                description = "本地 DNS 无法解析域名: $host"
+                description = "本地 DNS 无法解析域名: ${host}"
             )
         } catch (e: Throwable) {
             val msg = e.message.orEmpty()
@@ -225,17 +268,19 @@ class ConnectivityTestActivity : ThemedActivity() {
                 item.copy(
                     state = TestState.FAILED,
                     statusText = "连接被拒绝",
-                    description = "目标服务器端口 ($port) 未处于监听状态或被防火墙拦截"
+                    description = "目标服务器端口 (${port}) 未处于监听状态或被防火墙拦截"
                 )
             } else {
                 item.copy(
                     state = TestState.FAILED,
                     statusText = "连接失败",
-                    description = "直连 TCP 失败: ${msg.ifEmpty { "未知异常" }}"
+                    description = "直连 TCP 失败: ${if (msg.isEmpty()) "未知异常" else msg}"
                 )
             }
         }
     }
+
+    // --- Test: TCP RST ---
 
     private suspend fun testTcpRst(
         item: DimensionItem,
@@ -266,7 +311,7 @@ class ConnectivityTestActivity : ThemedActivity() {
             try {
                 socket.getInputStream().read(buf)
             } catch (_: SocketTimeoutException) {
-                // Timeout on read is normal (server may ignore unknown ClientHello without RST)
+                // Read timeout is normal
             }
             socket.close()
 
@@ -296,7 +341,7 @@ class ConnectivityTestActivity : ThemedActivity() {
                 item.copy(
                     state = TestState.WARNING,
                     statusText = "连接异常",
-                    description = "探测过程网络异常: $msg"
+                    description = "探测过程网络异常: ${msg}"
                 )
             }
         } catch (e: Throwable) {
@@ -308,10 +353,43 @@ class ConnectivityTestActivity : ThemedActivity() {
         }
     }
 
+    // --- Test: HTTP Outbound ---
+    // Fix 1: Primary path uses ISagerNetService.urlTestCustomUrl() via AIDL.
+    //         Calls Libcore.urlTestFull() which dials directly through default outbound,
+    //         bypassing sing-box routing rules. Accepts any HTTP status < 400 (incl. 204).
+    // Fix 2: Fallback uses libcore httpClient with 2xx error message detection.
+
     private suspend fun testHttpOutbound(item: DimensionItem): DimensionItem = withContext(Dispatchers.IO) {
         val testUrl = DataStore.connectionTestURL.takeIf { it.isNotBlank() }
             ?: "https://cp.cloudflare.com/generate_204"
 
+        val service = sagerService
+
+        if (service != null) {
+            // Path A: AIDL urlTestCustomUrl -> urlTestFull (bypasses routing, accepts 204)
+            try {
+                val rtt = service.urlTestCustomUrl(testUrl, 10_000)
+                return@withContext item.copy(
+                    state = TestState.SUCCESS,
+                    statusText = "${rtt} ms",
+                    description = "经代理核心 default outbound 出站成功（已绕过路由规则），HTTP 链路通畅"
+                )
+            } catch (e: Throwable) {
+                val msg = e.message.orEmpty()
+                if (msg.contains("core not started", ignoreCase = true) ||
+                    msg.contains("not started", ignoreCase = true)
+                ) {
+                    return@withContext item.copy(
+                        state = TestState.NOT_CONNECTED,
+                        statusText = "核心未启动",
+                        description = "VPN 代理服务核心未就绪，请在主界面连接后再测试出站延迟"
+                    )
+                }
+                Logs.w("urlTestCustomUrl via AIDL failed, fallback to libcore httpClient: ${msg}")
+            }
+        }
+
+        // Path B: libcore httpClient fallback with 2xx compatibility
         try {
             val client = Libcore.newHttpClient().apply {
                 modernTLS()
@@ -319,23 +397,38 @@ class ConnectivityTestActivity : ThemedActivity() {
             }
             val req = client.newRequest().apply {
                 setURL(testUrl)
-                setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+                setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
             }
 
             val start = SystemClock.elapsedRealtime()
-            val resp = req.execute()
-            val rtt = SystemClock.elapsedRealtime() - start
-
-            item.copy(
-                state = TestState.SUCCESS,
-                statusText = "$rtt ms",
-                description = "经代理核心出站成功，HTTP 链路整体通畅"
-            )
+            try {
+                req.execute()
+                val rtt = SystemClock.elapsedRealtime() - start
+                item.copy(
+                    state = TestState.SUCCESS,
+                    statusText = "${rtt} ms",
+                    description = "经代理核心出站成功，HTTP 链路整体通畅"
+                )
+            } catch (ex: Throwable) {
+                val rtt = SystemClock.elapsedRealtime() - start
+                val exMsg = ex.message.orEmpty()
+                if (isHttpSuccessErrorMessage(exMsg)) {
+                    val status = extractHttpStatus(exMsg)
+                    item.copy(
+                        state = TestState.SUCCESS,
+                        statusText = "${rtt} ms",
+                        description = "经代理核心出站成功（HTTP ${status} 响应），链路通畅"
+                    )
+                } else {
+                    throw ex
+                }
+            }
         } catch (e: Throwable) {
             val msg = e.message.orEmpty()
             if (msg.contains("box not running", ignoreCase = true) ||
                 msg.contains("fail connect socks5", ignoreCase = true) ||
-                msg.contains("no default outbound", ignoreCase = true)
+                msg.contains("no default outbound", ignoreCase = true) ||
+                (service == null && msg.contains("not started", ignoreCase = true))
             ) {
                 item.copy(
                     state = TestState.NOT_CONNECTED,
@@ -346,11 +439,118 @@ class ConnectivityTestActivity : ThemedActivity() {
                 item.copy(
                     state = TestState.FAILED,
                     statusText = "出站失败",
-                    description = "代理链路出站异常: ${msg.ifEmpty { "连接超时" }}"
+                    description = "代理链路出站异常: ${if (msg.isEmpty()) "连接超时" else msg}"
                 )
             }
         }
     }
+
+    // libcore Execute() errorString() format: "HTTP <code> <reason>: <body>"
+    // Returns true for 2xx/3xx which are network successes.
+    private fun isHttpSuccessErrorMessage(msg: String): Boolean {
+        val m = Regex("""^HTTP\s+(\d{3})""").find(msg) ?: return false
+        val code = m.groupValues[1].toIntOrNull() ?: return false
+        return code in 200..399
+    }
+
+    private fun extractHttpStatus(msg: String): String {
+        return Regex("""^HTTP\s+(\d{3}\s+\S+)""").find(msg)?.groupValues?.get(1)
+            ?: Regex("""^HTTP\s+(\d{3})""").find(msg)?.groupValues?.get(1)
+            ?: "2xx"
+    }
+
+    // --- Test: Google China Routing Detection ---
+    // Uses SOCKS5 via local mixed inbound. Redirect-following disabled to catch 301->google.cn.
+
+    private suspend fun testGoogleCnCheck(item: DimensionItem): DimensionItem = withContext(Dispatchers.IO) {
+        val testUrl = "https://www.google.com/generate_204"
+        val mixedPort = DataStore.mixedPort
+
+        if (!DataStore.serviceState.connected) {
+            return@withContext item.copy(
+                state = TestState.NOT_CONNECTED,
+                statusText = "未连接",
+                description = "VPN 代理服务未开启，送中检测需要代理服务运行才能执行"
+            )
+        }
+
+        if (mixedPort <= 0) {
+            return@withContext item.copy(
+                state = TestState.WARNING,
+                statusText = "混合端口未配置",
+                description = "未找到有效的本地混合代理端口，无法通过代理执行送中检测"
+            )
+        }
+
+        try {
+            val socks5Proxy = Proxy(Proxy.Type.SOCKS, InetSocketAddress.createUnresolved("127.0.0.1", mixedPort))
+            val url = URL(testUrl)
+            val conn = url.openConnection(socks5Proxy) as HttpURLConnection
+            conn.instanceFollowRedirects = false
+            conn.connectTimeout = 10_000
+            conn.readTimeout = 10_000
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36")
+
+            try {
+                conn.connect()
+                val code = conn.responseCode
+                val location = conn.getHeaderField("Location").orEmpty()
+
+                when {
+                    code == 204 -> item.copy(
+                        state = TestState.SUCCESS,
+                        statusText = "未送中 ✓",
+                        description = "出口正常，Google 返回 204 No Content，未被导向中国大陆服务器"
+                    )
+                    (code == 301 || code == 302) && location.contains("google.cn", ignoreCase = true) -> item.copy(
+                        state = TestState.FAILED,
+                        statusText = "已送中 ✗",
+                        description = "警告：出口将 Google 重定向至 ${location.substringBefore("?")}，流量已被送往中国大陆"
+                    )
+                    (code == 301 || code == 302) -> item.copy(
+                        state = TestState.WARNING,
+                        statusText = "重定向 ${code}",
+                        description = "Google 响应 ${code} 重定向至: ${location.take(80)}（非 google.cn，但需确认）"
+                    )
+                    code in 200..299 -> item.copy(
+                        state = TestState.SUCCESS,
+                        statusText = "未送中 ✓",
+                        description = "出口正常，Google 返回 ${code}，未被导向中国大陆服务器"
+                    )
+                    else -> item.copy(
+                        state = TestState.WARNING,
+                        statusText = "HTTP ${code}",
+                        description = "Google 返回异常状态码 ${code}，无法确认送中状态"
+                    )
+                }
+            } finally {
+                try { conn.disconnect() } catch (_: Exception) {}
+            }
+        } catch (e: SocketTimeoutException) {
+            item.copy(
+                state = TestState.FAILED,
+                statusText = "检测超时",
+                description = "通过代理访问 Google 超时（>10s），可能为代理连接问题或 Google 不可达"
+            )
+        } catch (e: Throwable) {
+            val msg = e.message.orEmpty()
+            if (msg.contains("SOCKS", ignoreCase = true) || msg.contains("127.0.0.1", ignoreCase = true)) {
+                item.copy(
+                    state = TestState.NOT_CONNECTED,
+                    statusText = "代理未就绪",
+                    description = "无法连接到本地代理端口 ${mixedPort}，请确认 VPN 服务已正常运行"
+                )
+            } else {
+                item.copy(
+                    state = TestState.FAILED,
+                    statusText = "检测失败",
+                    description = "送中检测异常: ${if (msg.isEmpty()) "未知错误" else msg}"
+                )
+            }
+        }
+    }
+
+    // --- Helper: Build TLS ClientHello probe packet ---
 
     private fun buildTlsClientHelloProbe(serverName: String): ByteArray {
         val sniBytes = serverName.toByteArray(Charsets.UTF_8)
@@ -370,13 +570,13 @@ class ConnectivityTestActivity : ThemedActivity() {
         }
 
         val handshake = ByteArrayOutputStream().apply {
-            write(0x01) // ClientHello
+            write(0x01)
             val body = ByteArrayOutputStream().apply {
-                write(byteArrayOf(0x03, 0x03)) // TLS 1.2
+                write(byteArrayOf(0x03, 0x03))
                 val random = ByteArray(32)
                 Random().nextBytes(random)
                 write(random)
-                write(0x00) // Session ID length 0
+                write(0x00)
                 write(byteArrayOf(0x00, 0x04, 0x13.toByte(), 0x01, 0xc0.toByte(), 0x2f))
                 write(0x01)
                 write(0x00)
@@ -390,13 +590,15 @@ class ConnectivityTestActivity : ThemedActivity() {
         }.toByteArray()
 
         return ByteArrayOutputStream().apply {
-            write(0x16) // Handshake
-            write(byteArrayOf(0x03, 0x01)) // TLS 1.0 record layer
+            write(0x16)
+            write(byteArrayOf(0x03, 0x01))
             val len = handshake.size
             write(byteArrayOf((len shr 8).toByte(), (len and 0xFF).toByte()))
             write(handshake)
         }.toByteArray()
     }
+
+    // --- RecyclerView Adapter ---
 
     class ConnectivityAdapter : ListAdapter<DimensionItem, ConnectivityAdapter.VH>(DiffCallback) {
 
@@ -438,25 +640,25 @@ class ConnectivityTestActivity : ThemedActivity() {
                     holder.progress.visibility = View.GONE
                     holder.statusBadge.visibility = View.VISIBLE
                     holder.statusBadge.text = item.statusText
-                    holder.statusBadge.setTextColor(Color.parseColor("#10B981")) // Green
+                    holder.statusBadge.setTextColor(Color.parseColor("#10B981"))
                 }
                 TestState.WARNING -> {
                     holder.progress.visibility = View.GONE
                     holder.statusBadge.visibility = View.VISIBLE
                     holder.statusBadge.text = item.statusText
-                    holder.statusBadge.setTextColor(Color.parseColor("#F59E0B")) // Amber
+                    holder.statusBadge.setTextColor(Color.parseColor("#F59E0B"))
                 }
                 TestState.FAILED -> {
                     holder.progress.visibility = View.GONE
                     holder.statusBadge.visibility = View.VISIBLE
                     holder.statusBadge.text = item.statusText
-                    holder.statusBadge.setTextColor(Color.parseColor("#EF4444")) // Red
+                    holder.statusBadge.setTextColor(Color.parseColor("#EF4444"))
                 }
                 TestState.NOT_CONNECTED -> {
                     holder.progress.visibility = View.GONE
                     holder.statusBadge.visibility = View.VISIBLE
                     holder.statusBadge.text = item.statusText
-                    holder.statusBadge.setTextColor(Color.parseColor("#6B7280")) // Gray
+                    holder.statusBadge.setTextColor(Color.parseColor("#6B7280"))
                 }
             }
         }

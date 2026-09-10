@@ -1,3 +1,19 @@
+### OwnBox v2.4.4 (Pre-release)
+
+1. [Bug Fix] 修复出站测试误报“出站失败”与路由分流错误：
+   - 彻底修复“经核心出站 HTTP 延迟”将 HTTP 204 No Content 误判为出站失败的问题，全面兼容 2xx/3xx 正常状态码响应。
+   - 优化核心出站探测链路：通过 AIDL 接口直接调用底层的 `urlTestFull`，流量直接经当前节点的 default outbound 拨号出站，完全绕过核心分流路由规则，彻底杜绝探测流量被 `geosite:cn` 规则劫持分流至 bypass/direct 的现象。
+   - libcore 底层 HTTP 客户端同步放宽状态码校验，非错误状态不再抛出虚假异常。
+
+2. [New Feature] 节点连通性测试新增“Google 送中检测”第四维度：
+   - 在入口可达性、GFW RST 干扰、经核心出站延迟之后，新增第四项维度：“Google 送中检测”（出口质量检测）。
+   - 通过本地混合代理入口（SOCKS5）探测 Google 服务端点，禁止跟随自动重定向以精确捕获 301/302 响应。
+   - 若检测到 Location 头包含 `google.cn`，即时发出“已送中 ✗”告警，标红提示流量被 Google 导向中国大陆服务器；若返回 204 则显示“未送中 ✓”。
+
+3. [Stability & Performance] 全工程质量保证与构建优化：
+   - 完善 SagerConnection 独立连接通道（CONNECTION_ID_CONNECTIVITY_TEST），保障测试进程与主服务通信解耦与线程安全。
+   - 本地编译严格验证通过，保证 GitHub Actions 一次性构建与全 ABI 预发行版打包。
+
 ### OwnBox v2.4.3 (Pre-release)
 
 1. [Bug Fix] 订阅导入自动识别机场名并修改分组名称：

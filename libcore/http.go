@@ -245,7 +245,7 @@ func (r *httpRequest) Execute() (HTTPResponse, error) {
 		return nil, err
 	}
 	httpResp := &httpResponse{Response: response}
-	if response.StatusCode != http.StatusOK {
+	if response.StatusCode >= 400 {
 		return nil, errors.New(httpResp.errorString())
 	}
 	return httpResp, nil
@@ -342,7 +342,7 @@ func (r *httpRequest) doH3Direct() (HTTPResponse, error) {
 			}
 
 			// 处理 HTTP 状态码
-			if rsp.StatusCode != http.StatusOK {
+			if rsp.StatusCode >= 400 {
 				hr := &httpResponse{Response: rsp}
 				err = fmt.Errorf("%s: %s", t, hr.errorString())
 				mu.Lock()
