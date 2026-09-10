@@ -600,6 +600,8 @@
     <string name="please_update_force">Your APP is too old (%s). And has been stopped working at %s.
         Please update!</string>
     <string name="connection_test_delete_unavailable">Clear unavailable</string>
+    <string name="hide_unavailable_profiles">Hide unavailable profiles</string>
+    <string name="hide_unavailable_profiles_sum">Automatically soft-hide profiles that failed connection test; restore when re-tested reachable</string>
     <string name="move">Move</string>
     <string name="exe_prefer_provider">Plugin Preferred Provider</string>
     <string name="create_shortcut">Create Shortcut</string>

@@ -72,4 +72,5 @@ fun mkPort(): Int {
     return port
 }
 
-const val USER_AGENT = "NekoBox/Android/1.3.1 (sing-box v1.13.16)"
+val USER_AGENT: String
+    get() = io.nekohasekai.sagernet.database.DataStore.defaultSubscriptionUserAgent

@@ -485,6 +485,8 @@
     <string name="please_update">您的 APP (%s) 太舊了喵，%s 再不更新就沒的用了喵～</string>
     <string name="please_update_force">您的 APP (%s) 版本過舊，已於 %s 停止工作，請立即升級。</string>
     <string name="connection_test_delete_unavailable">清理不可用配置</string>
+    <string name="hide_unavailable_profiles">自動隱藏失效節點</string>
+    <string name="hide_unavailable_profiles_sum">延遲測試失敗或超時的節點將在列表中自動軟隱藏，重新測試聯通後自動恢復</string>
     <string name="move">移動</string>
     <string name="exe_prefer_provider">首選外掛提供者</string>
     <string name="create_shortcut">建立快捷方式</string>

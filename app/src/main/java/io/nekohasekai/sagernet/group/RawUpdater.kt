@@ -155,12 +155,7 @@ object RawUpdater : GroupUpdater() {
             )
             if (!extractedName.isNullOrBlank()) {
                 val currentName = proxyGroup.name.orEmpty().trim()
-                if (currentName.isEmpty() ||
-                    currentName.startsWith("Subscription #") ||
-                    currentName.startsWith("订阅 #") ||
-                    currentName.startsWith("Group #") ||
-                    currentName == app.getString(R.string.subscription)
-                ) {
+                if (isDefaultGroupName(currentName)) {
                     proxyGroup.name = extractedName
                     Logs.i("RawUpdater: Auto-extracted airport name for group: $extractedName")
                 }
@@ -308,6 +303,7 @@ object RawUpdater : GroupUpdater() {
 
         subscription.lastUpdated = (System.currentTimeMillis() / 1000).toInt()
         SagerDatabase.groupDao.updateGroup(proxyGroup)
+        GroupManager.postUpdate(proxyGroup)
         finishUpdate(proxyGroup)
 
         userInterface?.onUpdateSuccess(
@@ -1016,11 +1012,35 @@ object RawUpdater : GroupUpdater() {
         return proxies
     }
 
-    private fun extractAirportName(
+    fun isDefaultGroupName(name: String?): Boolean {
+        val currentName = name.orEmpty().trim()
+        if (currentName.isEmpty()) return true
+        val defaultKeywords = listOf(
+            "My group",
+            "我的分组",
+            "Group",
+            "分组",
+            "Subscription",
+            "订阅",
+            "Default",
+            "默认",
+            "Ungrouped",
+            "未分组"
+        )
+        if (defaultKeywords.any { currentName.equals(it, ignoreCase = true) }) return true
+        if (currentName.startsWith("Subscription #") ||
+            currentName.startsWith("订阅 #") ||
+            currentName.startsWith("Group #") ||
+            currentName.startsWith("分组 #")
+        ) return true
+        return false
+    }
+
+    fun extractAirportName(
         subscriptionLink: String,
-        filenameHeader: String?,
-        profileTitleHeader: String?,
-        proxies: List<AbstractBean>
+        filenameHeader: String? = null,
+        profileTitleHeader: String? = null,
+        proxies: List<AbstractBean> = emptyList()
     ): String? {
         // 1. HTTP 响应头
         // 1.1 content-disposition 中的 filename

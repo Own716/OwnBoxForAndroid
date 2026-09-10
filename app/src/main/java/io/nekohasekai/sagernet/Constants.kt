@@ -186,6 +186,7 @@ object Key {
     const val SUBSCRIPTION_FILTER_MODE = "subscriptionFilterMode"
     const val SUBSCRIPTION_FILTER_REGEX = "subscriptionFilterRegex"
     const val SUBSCRIPTION_SERVER_DNS = "subscriptionServerDns"
+    const val HIDE_UNAVAILABLE_PROFILES = "hideUnavailableProfiles"
 
     //
 

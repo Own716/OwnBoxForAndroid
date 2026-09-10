@@ -401,10 +401,12 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
 
         DataStore.profileCacheStore.registerChangeListener(this)
+        DataStore.configurationStore.registerChangeListener(this)
     }
 
     override fun onPrepareOptionsMenu(menu: Menu) {
         menu.findItem(R.id.action_global_mode)?.isChecked = DataStore.globalMode
+        menu.findItem(R.id.action_hide_unavailable)?.isChecked = DataStore.hideUnavailableProfiles
         super.onPrepareOptionsMenu(menu)
     }
 
@@ -422,6 +424,8 @@ class ConfigurationFragment @JvmOverloads constructor(
                         adapter.reload()
                     }
                 }
+            } else if (key == Key.HIDE_UNAVAILABLE_PROFILES) {
+                adapter.groupFragments.values.forEach { it.adapter?.reloadProfiles() }
             }
         }
     }
@@ -440,6 +444,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             DataStore.runningTest = false
         }
         DataStore.profileCacheStore.unregisterChangeListener(this)
+        DataStore.configurationStore.unregisterChangeListener(this)
 
         if (::adapter.isInitialized) {
             GroupManager.removeListener(adapter)
@@ -832,6 +837,13 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             R.id.action_connection_tcp_ping -> {
                 tcpPingTest()
+            }
+
+            R.id.action_hide_unavailable -> {
+                item.isChecked = !item.isChecked
+                DataStore.hideUnavailableProfiles = item.isChecked
+                adapter.groupFragments.values.forEach { it.adapter?.reloadProfiles() }
+                return true
             }
 
             R.id.action_global_mode -> {
@@ -1541,11 +1553,20 @@ class ConfigurationFragment @JvmOverloads constructor(
             if (index == -1) return
 
             tabLayout.post {
+                groupList[index] = group
                 tabLayout.getTabAt(index)?.text = group.displayName()
             }
         }
 
-        override suspend fun groupUpdated(groupId: Long) = Unit
+        override suspend fun groupUpdated(groupId: Long) {
+            val index = groupList.indexOfFirst { it.id == groupId }
+            if (index == -1) return
+            val group = SagerDatabase.groupDao.getById(groupId) ?: return
+            tabLayout.post {
+                groupList[index] = group
+                tabLayout.getTabAt(index)?.text = group.displayName()
+            }
+        }
 
         override suspend fun onAdd(profile: ProxyEntity) {
             if (groupList.find { it.id == profile.groupId } == null) {
@@ -1717,6 +1738,7 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             val pf = requireParentFragment() as? ToolbarFragment ?: return
             val menu = pf.toolbar.menu
+            menu.findItem(R.id.action_hide_unavailable)?.isChecked = DataStore.hideUnavailableProfiles
             val origin = menu.findItem(R.id.action_order_origin)
             val byName = menu.findItem(R.id.action_order_by_name)
             val byDelay = menu.findItem(R.id.action_order_by_delay)
@@ -2176,15 +2198,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
 
             fun clearTestResults() {
-                for (profile in configurationList.values) {
-                    profile.status = 0
-                    profile.ping = 0
-                    profile.error = null
-                    profile.speedTestMode = ""
-                    profile.speedTestDownloadBitsPerSecond = 0
-                    profile.speedTestUploadBitsPerSecond = 0
-                }
-                notifyDataSetChanged()
+                reloadProfiles()
             }
 
             fun updateSpeedTestResult(profileId: Long, outcome: SpeedTestOutcome) {
@@ -2337,6 +2351,15 @@ class ConfigurationFragment @JvmOverloads constructor(
                     GroupOrder.BY_DELAY -> {
                         newProfiles =
                             newProfiles.sortedBy { if (it.status == 1) it.ping else 114514 }
+                    }
+                }
+
+                if (DataStore.hideUnavailableProfiles) {
+                    val selectedProxy = selectedItem?.id ?: DataStore.selectedProxy
+                    val available = newProfiles.filter { it.status == 0 || it.status == 1 || it.id == selectedProxy }
+                    // 兜底策略：若某个分组内所有节点均测试不通，需有合理的空状态或全部展示兜底逻辑，避免列表直接变成空白界面。
+                    if (available.isNotEmpty()) {
+                        newProfiles = available
                     }
                 }
 

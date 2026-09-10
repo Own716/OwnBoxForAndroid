@@ -176,6 +176,8 @@ object DataStore : OnPreferenceDataStoreChangeListener {
         }
         set(value) = configurationStore.putString(Key.DEFAULT_SUBSCRIPTION_USER_AGENT, value)
 
+    var hideUnavailableProfiles by configurationStore.boolean(Key.HIDE_UNAVAILABLE_PROFILES) { false }
+
     fun migrateSubscriptionUserAgents(targetUa: String? = null, forceAll: Boolean = false) {
         val newUa = targetUa?.takeIf { it.isNotBlank() } ?: defaultSubscriptionUserAgent
         try {

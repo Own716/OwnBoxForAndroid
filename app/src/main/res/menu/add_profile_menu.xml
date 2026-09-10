@@ -123,6 +123,12 @@
                 android:id="@+id/action_connection_test_delete_unavailable"
                 android:title="@string/connection_test_delete_unavailable" />
             <item
+                android:id="@+id/action_hide_unavailable"
+                android:title="@string/hide_unavailable_profiles"
+                android:checkable="true"
+                android:checked="false"
+                app:showAsAction="never" />
+            <item
                 android:id="@+id/action_global_mode"
                 android:title="@string/global_mode"
                 android:checkable="true"

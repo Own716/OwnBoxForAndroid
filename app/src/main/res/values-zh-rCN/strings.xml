@@ -469,6 +469,8 @@
     <string name="please_update">您的 APP (%s) 太旧了喵，%s 再不更新就没的用了喵～</string>
     <string name="please_update_force">您的 APP (%s) 版本过旧，已于 %s 停止工作，请立即升级。</string>
     <string name="connection_test_delete_unavailable">清理不可用配置</string>
+    <string name="hide_unavailable_profiles">自动隐藏失效节点</string>
+    <string name="hide_unavailable_profiles_sum">延迟测试失败或超时的节点将在列表中自动软隐藏，重新测试联通后自动恢复</string>
     <string name="packet_encoding">包编码</string>
     <string name="action_switch">切换</string>
     <string name="acquire_wake_lock">获取唤醒锁</string>

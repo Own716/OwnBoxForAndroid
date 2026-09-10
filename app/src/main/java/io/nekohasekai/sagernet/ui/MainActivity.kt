@@ -314,8 +314,12 @@ class MainActivity : ThemedActivity(),
         ?: group.subscription?.token
         if (name.isNullOrBlank()) return
 
-        group.name = group.name.takeIf { !it.isNullOrBlank() }
-            ?: ("Subscription #" + System.currentTimeMillis())
+        if (group.name.isNullOrBlank()) {
+            val candidate = group.subscription?.link?.takeIf { it.isNotBlank() }?.let {
+                io.nekohasekai.sagernet.group.RawUpdater.extractAirportName(it)
+            }
+            group.name = candidate ?: ("Subscription #" + System.currentTimeMillis())
+        }
 
         onMainDispatcher {
 

@@ -25,6 +25,7 @@ import io.nekohasekai.sagernet.SubscriptionFilterMode
 import io.nekohasekai.sagernet.database.*
 import io.nekohasekai.sagernet.database.preference.OnPreferenceDataStoreChangeListener
 import io.nekohasekai.sagernet.group.GroupUpdater
+import io.nekohasekai.sagernet.group.RawUpdater
 import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.applyDefaultValues
 import io.nekohasekai.sagernet.ktx.onMainDispatcher
@@ -79,7 +80,17 @@ class GroupSettingsActivity(
     }
 
     fun ProxyGroup.serialize() {
-        name = DataStore.groupName.takeIf { it.isNotBlank() } ?: "My group"
+        val rawName = DataStore.groupName.trim()
+        name = if (rawName.isNotBlank()) {
+            rawName
+        } else if (type == GroupType.SUBSCRIPTION) {
+            val candidate = DataStore.subscriptionLink.takeIf { it.isNotBlank() }?.let { link: String ->
+                RawUpdater.extractAirportName(link)
+            }
+            candidate ?: ("Subscription #" + System.currentTimeMillis())
+        } else {
+            "My group"
+        }
         type = DataStore.groupType
         order = DataStore.groupOrder
         isSelector = DataStore.groupIsSelector
@@ -341,6 +352,10 @@ class GroupSettingsActivity(
                     if (!subscriptionLink.isNullOrEmpty()) {
                         DataStore.groupType = GroupType.SUBSCRIPTION
                         DataStore.subscriptionLink = subscriptionLink
+                        val candidate = RawUpdater.extractAirportName(subscriptionLink)
+                        if (!candidate.isNullOrBlank()) {
+                            DataStore.groupName = candidate
+                        }
                         DataStore.dirty = true
                     }
                 } else {

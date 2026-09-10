@@ -4,13 +4,12 @@ import android.content.Context
 import android.util.AttributeSet
 import androidx.core.content.res.TypedArrayUtils
 import androidx.preference.EditTextPreference
-import io.nekohasekai.sagernet.R
-import io.nekohasekai.sagernet.ktx.USER_AGENT
+import io.nekohasekai.sagernet.database.DataStore
 
 class UserAgentPreference
 @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null, defStyle: Int = TypedArrayUtils.getAttr(
-        context, R.attr.editTextPreferenceStyle, android.R.attr.editTextPreferenceStyle
+        context, androidx.preference.R.attr.editTextPreferenceStyle, android.R.attr.editTextPreferenceStyle
     )
 ) : EditTextPreference(context, attrs, defStyle) {
 
@@ -19,10 +18,11 @@ class UserAgentPreference
     }
 
     override fun getSummary(): CharSequence? {
-        if (text.isNullOrBlank()) {
-            return USER_AGENT
+        val custom = text?.trim()
+        if (custom.isNullOrBlank()) {
+            return DataStore.defaultSubscriptionUserAgent
         }
-        return super.getSummary()
+        return custom
     }
 
 }
