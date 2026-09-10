@@ -6,6 +6,7 @@ import android.content.res.Resources
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
+import android.graphics.drawable.GradientDrawable
 import android.text.Editable
 import android.text.InputFilter
 import android.text.TextWatcher
@@ -55,13 +56,13 @@ class ColorPickerPreference
             context.getColorAttr(R.attr.colorPrimary)
         }
 
-        widgetFrame.addView(
-            getNekoImageViewAtColor(
-                displayColor,
-                48,
-                0
-            )
-        )
+        val factor = context.resources.displayMetrics.density
+        val size = (48 * factor).roundToInt()
+        val widgetIv = ImageView(context).apply {
+            layoutParams = ViewGroup.LayoutParams(size, size)
+            setImageDrawable(getBorderedColorDrawable(context.resources, displayColor))
+        }
+        widgetFrame.addView(widgetIv)
         widgetFrame.visibility = View.VISIBLE
     }
 
@@ -85,6 +86,20 @@ class ColorPickerPreference
         )!!
         DrawableCompat.setTint(neko.mutate(), color)
         return neko
+    }
+
+    fun getBorderedColorDrawable(res: Resources, color: Int): Drawable {
+        val isWhite = (color and 0x00FFFFFF) == 0x00FFFFFF
+        return if (isWhite) {
+            val factor = res.displayMetrics.density
+            GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.WHITE)
+                setStroke((1 * factor).roundToInt().coerceAtLeast(1), Color.parseColor("#E0E0E0"))
+            }
+        } else {
+            getNekoAtColor(res, color)
+        }
     }
 
     override fun onClick() {
@@ -182,13 +197,26 @@ class ColorPickerPreference
             setPadding(0, 0, 0, dp2px(10))
         }
 
-        val originalImage = getNekoImageViewAtColor(curColor, 40, 2)
+        val factor = context.resources.displayMetrics.density
+        val originalImage = ImageView(context).apply {
+            val size = (40 * factor).roundToInt()
+            val paddingSize = (2 * factor).roundToInt()
+            layoutParams = ViewGroup.LayoutParams(size, size)
+            setPadding(paddingSize)
+            setImageDrawable(getBorderedColorDrawable(context.resources, curColor))
+        }
         val arrowText = TextView(context).apply {
             text = " → "
             textSize = 16f
             setPadding(dp2px(4), 0, dp2px(4), 0)
         }
-        val previewImage = getNekoImageViewAtColor(curColor, 44, 2)
+        val previewImage = ImageView(context).apply {
+            val size = (44 * factor).roundToInt()
+            val paddingSize = (2 * factor).roundToInt()
+            layoutParams = ViewGroup.LayoutParams(size, size)
+            setPadding(paddingSize)
+            setImageDrawable(getBorderedColorDrawable(context.resources, curColor))
+        }
         previewRow.addView(originalImage)
         previewRow.addView(arrowText)
         previewRow.addView(previewImage)
@@ -248,7 +276,7 @@ class ColorPickerPreference
                 curB = Color.blue(curColor)
             }
 
-            previewImage.setImageDrawable(getNekoAtColor(context.resources, curColor))
+            previewImage.setImageDrawable(getBorderedColorDrawable(context.resources, curColor))
             hLabel.text = "色相 (Hue): ${curH.roundToInt()}°"
             sLabel.text = "饱和度 (Saturation): ${(curS * 100f).roundToInt()}%"
             vLabel.text = "明度 (Brightness): ${(curV * 100f).roundToInt()}%"
@@ -270,7 +298,12 @@ class ColorPickerPreference
         }
 
         for (qColor in quickPresetColors) {
-            val qView = getNekoImageViewAtColor(qColor, 34, 3).apply {
+            val size = (34 * factor).roundToInt()
+            val paddingSize = (3 * factor).roundToInt()
+            val qView = ImageView(context).apply {
+                layoutParams = ViewGroup.LayoutParams(size, size)
+                setPadding(paddingSize)
+                setImageDrawable(getBorderedColorDrawable(context.resources, qColor))
                 setOnClickListener {
                     curR = Color.red(qColor)
                     curG = Color.green(qColor)

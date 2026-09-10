@@ -27,10 +27,12 @@ import androidx.appcompat.widget.PopupMenu
 import androidx.appcompat.widget.SearchView
 import androidx.appcompat.widget.Toolbar
 import androidx.core.graphics.ColorUtils
+import androidx.core.graphics.drawable.DrawableCompat
 import androidx.core.net.toUri
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
 import androidx.core.view.size
+import io.nekohasekai.sagernet.utils.Theme
 import kotlinx.coroutines.delay
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -317,6 +319,32 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     override fun onQueryTextSubmit(query: String): Boolean = false
 
+    private fun showGroupSettingsConfirmDialog(group: ProxyGroup) {
+        if (!isAdded || isDetached) return
+        val ctx = context ?: return
+        MaterialAlertDialogBuilder(ctx)
+            .setTitle(R.string.enter_group_settings_title)
+            .setMessage(getString(R.string.enter_group_settings_message, group.displayName()))
+            .setPositiveButton(R.string.enter) { _, _ ->
+                startActivity(Intent(ctx, GroupSettingsActivity::class.java).apply {
+                    putExtra(GroupSettingsActivity.EXTRA_GROUP_ID, group.id)
+                })
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun tintMenuIcons(menu: Menu, color: Int) {
+        for (i in 0 until menu.size()) {
+            val item = menu.getItem(i)
+            item.icon?.let {
+                val tinted = it.mutate()
+                DrawableCompat.setTint(tinted, color)
+                item.icon = tinted
+            }
+        }
+    }
+
     @SuppressLint("DetachAndAttachSameFragment")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -348,6 +376,25 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
         }
 
+        if (Theme.isWhiteTheme()) {
+            toolbar.setBackgroundColor(Color.WHITE)
+            toolbar.setTitleTextColor(Color.parseColor("#212121"))
+            tabLayout.setBackgroundColor(Color.WHITE)
+            tabLayout.setSelectedTabIndicatorColor(Color.parseColor("#212121"))
+            tabLayout.setTabTextColors(Color.parseColor("#8A000000"), Color.parseColor("#212121"))
+            toolbar.navigationIcon?.let {
+                val tinted = it.mutate()
+                DrawableCompat.setTint(tinted, Color.parseColor("#212121"))
+                toolbar.navigationIcon = tinted
+            }
+            toolbar.overflowIcon?.let {
+                val tinted = it.mutate()
+                DrawableCompat.setTint(tinted, Color.parseColor("#212121"))
+                toolbar.overflowIcon = tinted
+            }
+            tintMenuIcons(toolbar.menu, Color.parseColor("#212121"))
+        }
+
         val searchView = toolbar.findViewById<SearchView>(R.id.action_search)
         if (searchView != null) {
             searchView.setOnQueryTextListener(this)
@@ -369,12 +416,54 @@ class ConfigurationFragment @JvmOverloads constructor(
         groupPager.adapter = adapter
         groupPager.offscreenPageLimit = 2
 
+        val touchSlop = ViewConfiguration.get(requireContext()).scaledTouchSlop
         TabLayoutMediator(tabLayout, groupPager) { tab, position ->
             if (adapter.groupList.size > position) {
                 tab.text = adapter.groupList[position].displayName()
             }
             tab.view.setOnLongClickListener { // clear toast
                 true
+            }
+
+            var downX = 0f
+            var downY = 0f
+            var longPressRunnable: Runnable? = null
+
+            tab.view.setOnTouchListener { v, event ->
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        downX = event.rawX
+                        downY = event.rawY
+                        longPressRunnable?.let { v.removeCallbacks(it) }
+
+                        val runnable = Runnable {
+                            if (!isAdded || isDetached) return@Runnable
+                            val pos = tab.position
+                            if (pos in 0 until adapter.groupList.size) {
+                                val group = adapter.groupList[pos]
+                                if (!group.ungrouped) {
+                                    v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                                    showGroupSettingsConfirmDialog(group)
+                                }
+                            }
+                        }
+                        longPressRunnable = runnable
+                        v.postDelayed(runnable, 900L) // 800ms ~ 1000ms 黄金时阈
+                    }
+                    MotionEvent.ACTION_MOVE -> {
+                        val dx = Math.abs(event.rawX - downX)
+                        val dy = Math.abs(event.rawY - downY)
+                        if (dx > touchSlop || dy > touchSlop) {
+                            longPressRunnable?.let { v.removeCallbacks(it) }
+                            longPressRunnable = null
+                        }
+                    }
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                        longPressRunnable?.let { v.removeCallbacks(it) }
+                        longPressRunnable = null
+                    }
+                }
+                false
             }
         }.attach()
 
@@ -1940,9 +2029,12 @@ class ConfigurationFragment @JvmOverloads constructor(
             // 补充节点文本回退提取机制（正则匹配 套餐到期 与 剩余流量 回填卡片）
             var fallbackExpireStr: String? = null
             var fallbackTrafficStr: String? = null
+            var fallbackUsedStr: String? = null
+            var isUnlimited = false
             if (expireMillis <= 0L || totalBytes <= 0L) {
                 val expireRegex = Regex(".*(?:套餐到期|到期时间|过期时间|到期)[：:]\\s*([0-9]{4}[-/][0-9]{2}[-/][0-9]{2})", RegexOption.IGNORE_CASE)
-                val trafficRegex = Regex(".*(?:剩余流量|可用流量|剩余)[：:]\\s*([0-9.]+\\s*[KMGT]?B)", RegexOption.IGNORE_CASE)
+                val trafficRegex = Regex(".*(?:剩余流量|可用流量|剩余)[：:]\\s*([0-9.]+\\s*[KMGT]?B|无限|不限|不限量)", RegexOption.IGNORE_CASE)
+                val usedRegex = Regex(".*(?:已用流量|已用|已使用)[：:]\\s*([0-9.]+\\s*[KMGT]?B)", RegexOption.IGNORE_CASE)
                 val allGroupProfiles = SagerDatabase.proxyDao.getByGroup(proxyGroup.id)
                 for (p in allGroupProfiles) {
                     val name = p.displayName()
@@ -1956,10 +2048,21 @@ class ConfigurationFragment @JvmOverloads constructor(
                             } catch (_: Throwable) {}
                         }
                     }
-                    if (totalBytes <= 0L && fallbackTrafficStr == null) {
+                    if (fallbackTrafficStr == null) {
                         val m = trafficRegex.find(name)
                         if (m != null) {
-                            fallbackTrafficStr = m.groupValues[1]
+                            val candidate = m.groupValues[1].trim()
+                            if (candidate.contains("无限") || candidate.contains("不限")) {
+                                isUnlimited = true
+                            } else {
+                                fallbackTrafficStr = candidate
+                            }
+                        }
+                    }
+                    if (fallbackUsedStr == null) {
+                        val m = usedRegex.find(name)
+                        if (m != null) {
+                            fallbackUsedStr = m.groupValues[1].trim()
                         }
                     }
                 }
@@ -1969,26 +2072,41 @@ class ConfigurationFragment @JvmOverloads constructor(
             if (totalBytes > 0L) {
                 val remainBytes = (totalBytes - usedBytes).coerceAtLeast(0L)
                 val usedStr = Formatter.formatFileSize(ctx, usedBytes)
-                val totalStr = Formatter.formatFileSize(ctx, totalBytes)
                 val remainStr = Formatter.formatFileSize(ctx, remainBytes)
-                tvTrafficStat?.text = "$usedStr / $totalStr"
-                tvTrafficRemaining?.text = "剩余 $remainStr"
+                tvTrafficStat?.text = getString(R.string.traffic_available, remainStr)
+                tvTrafficRemaining?.text = getString(R.string.traffic_used, usedStr)
                 tvTrafficRemaining?.isVisible = true
                 progress?.isVisible = true
                 val percent = ((usedBytes.toDouble() / totalBytes.toDouble()) * 100).toInt().coerceIn(0, 100)
                 progress?.progress = percent
             } else if (fallbackTrafficStr != null) {
-                tvTrafficStat?.text = "可用流量: $fallbackTrafficStr"
-                tvTrafficRemaining?.text = "剩余 $fallbackTrafficStr"
-                tvTrafficRemaining?.isVisible = true
+                tvTrafficStat?.text = getString(R.string.traffic_available, fallbackTrafficStr)
+                if (usedBytes > 0L) {
+                    val usedStr = Formatter.formatFileSize(ctx, usedBytes)
+                    tvTrafficRemaining?.text = getString(R.string.traffic_used, usedStr)
+                    tvTrafficRemaining?.isVisible = true
+                } else if (fallbackUsedStr != null) {
+                    tvTrafficRemaining?.text = getString(R.string.traffic_used, fallbackUsedStr)
+                    tvTrafficRemaining?.isVisible = true
+                } else {
+                    tvTrafficRemaining?.isGone = true
+                }
                 progress?.isGone = true
-            } else if (usedBytes > 0L) {
-                val usedStr = Formatter.formatFileSize(ctx, usedBytes)
-                tvTrafficStat?.text = "已用: $usedStr"
-                tvTrafficRemaining?.isGone = true
+            } else if (isUnlimited || totalBytes == 0L) {
+                tvTrafficStat?.text = getString(R.string.traffic_available, getString(R.string.traffic_unlimited))
+                if (usedBytes > 0L) {
+                    val usedStr = Formatter.formatFileSize(ctx, usedBytes)
+                    tvTrafficRemaining?.text = getString(R.string.traffic_used, usedStr)
+                    tvTrafficRemaining?.isVisible = true
+                } else if (fallbackUsedStr != null) {
+                    tvTrafficRemaining?.text = getString(R.string.traffic_used, fallbackUsedStr)
+                    tvTrafficRemaining?.isVisible = true
+                } else {
+                    tvTrafficRemaining?.isGone = true
+                }
                 progress?.isGone = true
             } else {
-                tvTrafficStat?.text = "未限制 / 流量不限量"
+                tvTrafficStat?.text = getString(R.string.traffic_available, getString(R.string.traffic_unlimited))
                 tvTrafficRemaining?.isGone = true
                 progress?.isGone = true
             }
@@ -2627,11 +2745,18 @@ class ConfigurationFragment @JvmOverloads constructor(
                 profileStatus.isFocusable = false
                 editButton.setOnClickListener {
                     val proxyEntity = entity
-                    it.context.startActivity(
-                        proxyEntity.settingIntent(
-                            it.context, proxyGroup.type == GroupType.SUBSCRIPTION
+                    val pf = parentFragment as? ConfigurationFragment
+                    val isSelected = pf?.isSelectedProfile(proxyEntity.id) == true
+                    val isConnected = DataStore.serviceState.started && (proxyEntity.id == DataStore.currentProfile || (isSelected && pf?.isCurrentProfile(proxyEntity.id) == true))
+                    if (isConnected) {
+                        android.widget.Toast.makeText(it.context, R.string.cannot_edit_active_profile, android.widget.Toast.LENGTH_SHORT).show()
+                    } else {
+                        it.context.startActivity(
+                            proxyEntity.settingIntent(
+                                it.context, proxyGroup.type == GroupType.SUBSCRIPTION
+                            )
                         )
-                    )
+                    }
                 }
                 removeButton.setOnClickListener {
                     removeProfile(entity)
@@ -2673,15 +2798,23 @@ class ConfigurationFragment @JvmOverloads constructor(
 
                 val pf = parentFragment as? ConfigurationFragment
                 val isSelected = pf?.isSelectedProfile(proxyEntity.id) == true
-                val isStarted = isSelected && DataStore.serviceState.started && (pf?.isCurrentProfile(proxyEntity.id) == true)
+                val isConnected = DataStore.serviceState.started && (proxyEntity.id == DataStore.currentProfile || (isSelected && pf?.isCurrentProfile(proxyEntity.id) == true))
 
-                btnEdit.setOnClickListener {
-                    dialog.dismiss()
-                    context.startActivity(
-                        proxyEntity.settingIntent(
-                            context, proxyGroup.type == GroupType.SUBSCRIPTION
+                if (isConnected) {
+                    btnEdit.alpha = 0.4f
+                    btnEdit.setOnClickListener {
+                        android.widget.Toast.makeText(context, R.string.cannot_edit_active_profile, android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    btnEdit.alpha = 1.0f
+                    btnEdit.setOnClickListener {
+                        dialog.dismiss()
+                        context.startActivity(
+                            proxyEntity.settingIntent(
+                                context, proxyGroup.type == GroupType.SUBSCRIPTION
+                            )
                         )
-                    )
+                    }
                 }
 
                 if (proxyEntity.type == ProxyEntity.TYPE_CHAIN || proxyEntity.type == ProxyEntity.TYPE_BALANCER) {
@@ -2695,7 +2828,7 @@ class ConfigurationFragment @JvmOverloads constructor(
 
                 btnDelete.setOnClickListener {
                     dialog.dismiss()
-                    if (isStarted) {
+                    if (isConnected) {
                         alert(getString(R.string.cannot_delete_active_profile)).tryToShow()
                     } else {
                         MaterialAlertDialogBuilder(context)

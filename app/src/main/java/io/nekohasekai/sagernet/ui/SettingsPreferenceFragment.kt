@@ -9,6 +9,7 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import androidx.core.app.ActivityCompat
+import androidx.core.graphics.drawable.DrawableCompat
 import androidx.preference.*
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import io.nekohasekai.sagernet.Key
@@ -32,6 +33,20 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
 
     private lateinit var globalCustomConfig: EditConfigPreference
 
+    private fun tintPreferenceIcons(group: PreferenceGroup, color: Int) {
+        for (i in 0 until group.preferenceCount) {
+            val pref = group.getPreference(i)
+            if (pref is PreferenceGroup) {
+                tintPreferenceIcons(pref, color)
+            } else {
+                pref.icon?.let { icon ->
+                    val tinted = icon.mutate()
+                    DrawableCompat.setTint(tinted, color)
+                    pref.icon = tinted
+                }
+            }
+        }
+    }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -48,6 +63,9 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
         preferenceManager.preferenceDataStore = DataStore.configurationStore
         DataStore.initGlobal()
         addPreferencesFromResource(R.xml.global_preferences)
+
+        val iconColor = Theme.getPrimaryColor(requireContext())
+        tintPreferenceIcons(preferenceScreen, iconColor)
 
         findPreference<Preference>("changeIcon")?.setOnPreferenceClickListener {
             AppIconDialog.show(requireContext())

@@ -915,4 +915,11 @@
     <string name="custom_color_hex_hint">e.g. #00E676</string>
     <string name="lock_user_agent">Lock User-Agent</string>
     <string name="lock_user_agent_sum">Prevent global sync or batch operations from overwriting this group\'s User-Agent</string>
+    <string name="enter_group_settings_title">Enter Group Settings</string>
+    <string name="enter_group_settings_message">Enter independent settings for group \"%s\"?</string>
+    <string name="enter">Enter</string>
+    <string name="cannot_edit_active_profile">The profile is currently active. Please disconnect before editing.</string>
+    <string name="traffic_unlimited">Unlimited</string>
+    <string name="traffic_available">Available: %s</string>
+    <string name="traffic_used">Used: %s</string>
 </resources>

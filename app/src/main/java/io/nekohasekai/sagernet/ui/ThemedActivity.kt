@@ -50,10 +50,19 @@ abstract class ThemedActivity : AppCompatActivity {
             WindowCompat.setDecorFitsSystemWindows(window, false)
             
             val insetController = WindowCompat.getInsetsController(window, window.decorView)
-            // 三大金刚（系统导航栏）按钮固定为白色（深色款），底色仍为主题 colorPrimaryDark
-            insetController.isAppearanceLightNavigationBars = false
-            insetController.isAppearanceLightStatusBars = 
-                if (DataStore.appTheme == Theme.BLACK) !Theme.usingNightMode() else false
+            val isWhiteTheme = Theme.isWhiteTheme()
+            val isBlackTheme = DataStore.appTheme == Theme.BLACK
+
+            if (isWhiteTheme) {
+                insetController.isAppearanceLightStatusBars = true
+                insetController.isAppearanceLightNavigationBars = true
+            } else if (isBlackTheme) {
+                insetController.isAppearanceLightStatusBars = !Theme.usingNightMode()
+                insetController.isAppearanceLightNavigationBars = false
+            } else {
+                insetController.isAppearanceLightStatusBars = false
+                insetController.isAppearanceLightNavigationBars = false
+            }
         }
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content)) { _, insets ->

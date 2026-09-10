@@ -1,12 +1,15 @@
 package io.nekohasekai.sagernet.ui
 
+import android.graphics.Color
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
 import androidx.appcompat.widget.Toolbar
+import androidx.core.graphics.drawable.DrawableCompat
 import androidx.core.view.GravityCompat
 import androidx.fragment.app.Fragment
 import io.nekohasekai.sagernet.R
+import io.nekohasekai.sagernet.utils.Theme
 
 open class ToolbarFragment : Fragment {
 
@@ -21,6 +24,20 @@ open class ToolbarFragment : Fragment {
         toolbar.setNavigationIcon(R.drawable.ic_navigation_menu)
         toolbar.setNavigationOnClickListener {
             (activity as MainActivity).binding.drawerLayout.openDrawer(GravityCompat.START)
+        }
+        if (Theme.isWhiteTheme()) {
+            toolbar.setBackgroundColor(Color.WHITE)
+            toolbar.setTitleTextColor(Color.parseColor("#212121"))
+            toolbar.navigationIcon?.let {
+                val tinted = it.mutate()
+                DrawableCompat.setTint(tinted, Color.parseColor("#212121"))
+                toolbar.navigationIcon = tinted
+            }
+            toolbar.overflowIcon?.let {
+                val tinted = it.mutate()
+                DrawableCompat.setTint(tinted, Color.parseColor("#212121"))
+                toolbar.overflowIcon = tinted
+            }
         }
     }
 

@@ -832,4 +832,11 @@
     <string name="custom_color_hex_hint">如 #00E676</string>
     <string name="lock_user_agent">锁定独立 User-Agent</string>
     <string name="lock_user_agent_sum">防止全局同步或批量操作覆盖此分组的 User-Agent</string>
+    <string name="enter_group_settings_title">进入分组设置</string>
+    <string name="enter_group_settings_message">是否进入当前分组“%s”的独立设置？</string>
+    <string name="enter">进入</string>
+    <string name="cannot_edit_active_profile">当前节点正在连接，请断开后再编辑</string>
+    <string name="traffic_unlimited">无限</string>
+    <string name="traffic_available">可用流量: %s</string>
+    <string name="traffic_used">已用流量: %s</string>
 </resources>

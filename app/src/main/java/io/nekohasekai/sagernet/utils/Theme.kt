@@ -8,6 +8,7 @@ import androidx.appcompat.app.AppCompatDelegate
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.ktx.app
+import io.nekohasekai.sagernet.ktx.getColorAttr
 
 object Theme {
 
@@ -34,6 +35,7 @@ object Theme {
     const val BLUE_GREY = 20
     const val BLACK = 21
     const val VERDANT_MINT = 22
+    const val WHITE = 23
     const val CUSTOM = 99
 
     private fun defaultTheme() = GREEN
@@ -48,7 +50,7 @@ object Theme {
         // 1. 无色相/极端灰阶处理 (White, Gray, Black)
         if (sat < 0.18f) {
             return when {
-                value >= 0.80f -> GREY // 亮白/浅灰，映射到纯净高质感灰色主题
+                value >= 0.80f -> WHITE // 纯白极简黑白高对比反色模式
                 value <= 0.25f -> BLACK // 纯黑/暗夜黑
                 else -> GREY // 纯中性灰
             }
@@ -145,7 +147,11 @@ object Theme {
             BLUE_GREY -> R.style.Theme_SagerNet_BlueGrey
             BLACK -> R.style.Theme_SagerNet_Black
             VERDANT_MINT -> R.style.Theme_SagerNet_VerdantMint
-            CUSTOM -> getTheme(getClosestThemeForColor(DataStore.customThemeColor))
+            WHITE -> R.style.Theme_SagerNet_White
+            CUSTOM -> {
+                val closest = getClosestThemeForColor(DataStore.customThemeColor)
+                if (closest == WHITE) R.style.Theme_SagerNet_White else getTheme(closest)
+            }
             else -> getTheme(defaultTheme())
         }
     }
@@ -175,8 +181,32 @@ object Theme {
             BLUE_GREY -> R.style.Theme_SagerNet_Dialog_BlueGrey
             BLACK -> R.style.Theme_SagerNet_Dialog_Black
             VERDANT_MINT -> R.style.Theme_SagerNet_Dialog_VerdantMint
-            CUSTOM -> getDialogTheme(getClosestThemeForColor(DataStore.customThemeColor))
+            WHITE -> R.style.Theme_SagerNet_Dialog_White
+            CUSTOM -> {
+                val closest = getClosestThemeForColor(DataStore.customThemeColor)
+                if (closest == WHITE) R.style.Theme_SagerNet_Dialog_White else getDialogTheme(closest)
+            }
             else -> getDialogTheme(defaultTheme())
+        }
+    }
+
+    fun isWhiteTheme(): Boolean {
+        if (DataStore.appTheme == WHITE) return true
+        if (DataStore.appTheme == CUSTOM) {
+            val hsv = FloatArray(3)
+            Color.colorToHSV(DataStore.customThemeColor, hsv)
+            return hsv[1] < 0.18f && hsv[2] >= 0.80f
+        }
+        return false
+    }
+
+    fun getPrimaryColor(context: Context): Int {
+        return if (isWhiteTheme()) {
+            Color.parseColor("#212121")
+        } else if (DataStore.appTheme == CUSTOM) {
+            DataStore.customThemeColor or 0xFF000000.toInt()
+        } else {
+            context.getColorAttr(R.attr.colorPrimary)
         }
     }
 
