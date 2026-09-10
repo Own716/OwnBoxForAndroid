@@ -28,8 +28,7 @@
             android:layout_gravity="bottom|center_horizontal"
             android:layout_marginBottom="8dp"
             android:contentDescription="@null"
-            android:src="@drawable/ic_baseline_fiber_manual_record_24"
-            android:tint="#94A3B8" />
+            android:src="@drawable/ic_baseline_fiber_manual_record_24" />
 
     </FrameLayout>
 

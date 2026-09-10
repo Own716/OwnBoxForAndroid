@@ -19,6 +19,7 @@ public class SubscriptionBean extends Serializable {
     public Boolean deduplication;
     public Boolean updateWhenConnectedOnly;
     public String customUserAgent;
+    public Boolean lockUserAgent;
     public Boolean autoUpdate;
     public Integer autoUpdateDelay;
     public Integer lastUpdated;
@@ -47,7 +48,7 @@ public class SubscriptionBean extends Serializable {
 
     @Override
     public void serializeToBuffer(ByteBufferOutput output) {
-        output.writeInt(3);
+        output.writeInt(4);
 
         output.writeInt(type);
 
@@ -69,6 +70,9 @@ public class SubscriptionBean extends Serializable {
 
         // v3
         output.writeString(serverDnsResolver);
+
+        // v4
+        output.writeBoolean(lockUserAgent != null && lockUserAgent);
     }
 
     public void serializeForShare(ByteBufferOutput output) {
@@ -108,6 +112,12 @@ public class SubscriptionBean extends Serializable {
         if (version >= 3) {
             serverDnsResolver = input.readString();
         }
+
+        if (version >= 4) {
+            lockUserAgent = input.readBoolean();
+        } else {
+            lockUserAgent = false;
+        }
     }
 
     public void deserializeFromShare(ByteBufferInput input) {
@@ -130,6 +140,7 @@ public class SubscriptionBean extends Serializable {
         if (deduplication == null) deduplication = false;
         if (updateWhenConnectedOnly == null) updateWhenConnectedOnly = false;
         if (customUserAgent == null) customUserAgent = "";
+        if (lockUserAgent == null) lockUserAgent = false;
         if (autoUpdate == null) autoUpdate = false;
         if (autoUpdateDelay == null) autoUpdateDelay = 1440;
         if (lastUpdated == null) lastUpdated = 0;

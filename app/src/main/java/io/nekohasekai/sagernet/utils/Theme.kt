@@ -2,6 +2,7 @@ package io.nekohasekai.sagernet.utils
 
 import android.content.Context
 import android.content.res.Configuration
+import android.graphics.Color
 import android.os.Build
 import androidx.appcompat.app.AppCompatDelegate
 import io.nekohasekai.sagernet.R
@@ -38,18 +39,46 @@ object Theme {
     private fun defaultTheme() = GREEN
 
     fun getClosestThemeForColor(color: Int): Int {
+        val hsv = FloatArray(3)
+        Color.colorToHSV(color, hsv)
+        val hue = hsv[0]
+        val sat = hsv[1]
+        val value = hsv[2]
+
+        // 1. 无色相/极端灰阶处理 (White, Gray, Black)
+        if (sat < 0.18f) {
+            return when {
+                value >= 0.80f -> GREY // 亮白/浅灰，映射到纯净高质感灰色主题
+                value <= 0.25f -> BLACK // 纯黑/暗夜黑
+                else -> GREY // 纯中性灰
+            }
+        }
+
+        // 2. 有彩色处理：在 HSV 色相环空间上匹配真实色相，彻底解决黄色/琥珀色退回问题
         val colors = app.resources.getIntArray(R.array.material_colors)
-        val r = (color shr 16) and 0xFF
-        val g = (color shr 8) and 0xFF
-        val b = color and 0xFF
         var minDistance = Double.MAX_VALUE
         var closestTheme = GREEN
+        val targetHsv = FloatArray(3)
+
         for (i in colors.indices) {
             val c = colors[i]
-            val cr = (c shr 16) and 0xFF
-            val cg = (c shr 8) and 0xFF
-            val cb = c and 0xFF
-            val dist = (r - cr) * (r - cr) * 0.30 + (g - cg) * (g - cg) * 0.59 + (b - cb) * (b - cb) * 0.11
+            Color.colorToHSV(c, targetHsv)
+            val tHue = targetHsv[0]
+            val tSat = targetHsv[1]
+            val tVal = targetHsv[2]
+
+            // 跳过灰黑等无色相预设，专注于色相匹配
+            if (tSat < 0.18f) continue
+
+            // 环形色相距离 (0 ~ 180 度)
+            val hueDiff = kotlin.math.abs(hue - tHue)
+            val circularHueDiff = kotlin.math.min(hueDiff, 360f - hueDiff)
+
+            // 色相权重最大，辅以饱和度与明度微调
+            val dist = circularHueDiff * circularHueDiff * 3.0 +
+                    (sat - tSat) * (sat - tSat) * 10000.0 +
+                    (value - tVal) * (value - tVal) * 5000.0
+
             if (dist < minDistance) {
                 minDistance = dist
                 closestTheme = i + 1

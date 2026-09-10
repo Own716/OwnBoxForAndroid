@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Pure Liquid Glass Base - Translucent Luminous Droplet -->
+    <!-- Pure Liquid Glass Base - Translucent 18%~28% Luminous Droplet -->
     <item>
         <shape android:shape="rectangle">
             <corners android:radius="26dp" />
             <gradient
                 android:angle="135"
-                android:startColor="#F6FFFFFF"
-                android:centerColor="#EDF8FAFC"
-                android:endColor="#E2F1F5F9"
+                android:startColor="#35FFFFFF"
+                android:centerColor="#28FFFFFF"
+                android:endColor="#1EFFFFFF"
                 android:type="linear" />
         </shape>
     </item>
@@ -23,8 +23,8 @@
             <corners android:radius="25dp" />
             <gradient
                 android:angle="270"
-                android:startColor="#B0FFFFFF"
-                android:centerColor="#20FFFFFF"
+                android:startColor="#60FFFFFF"
+                android:centerColor="#18FFFFFF"
                 android:endColor="#00FFFFFF"
                 android:type="linear" />
         </shape>
@@ -36,7 +36,7 @@
             <corners android:radius="26dp" />
             <stroke
                 android:width="1.5dp"
-                android:color="#E0FFFFFF" />
+                android:color="#80FFFFFF" />
         </shape>
     </item>
 </layer-list>

@@ -830,4 +830,6 @@
     <string name="custom_color_title">自定义主题色 (HEX / RGB)</string>
     <string name="custom_color_apply">保存并应用</string>
     <string name="custom_color_hex_hint">如 #00E676</string>
+    <string name="lock_user_agent">锁定独立 User-Agent</string>
+    <string name="lock_user_agent_sum">防止全局同步或批量操作覆盖此分组的 User-Agent</string>
 </resources>

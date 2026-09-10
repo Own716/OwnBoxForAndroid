@@ -10,6 +10,7 @@ import android.text.SpannableStringBuilder
 import android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
 import android.text.format.Formatter
 import android.text.style.ForegroundColorSpan
+import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.Menu
@@ -1912,13 +1913,14 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             var usedBytes = 0L
             var totalBytes = 0L
-            var expireSec = 0L
+            var expireMillis = 0L
 
             if (sub.bytesUsed != null && sub.bytesRemaining != null) {
                 usedBytes = sub.bytesUsed
                 totalBytes = sub.bytesUsed + sub.bytesRemaining
-                if (sub.expiryDate != null) {
-                    expireSec = sub.expiryDate.toLong()
+                if (sub.expiryDate != null && sub.expiryDate > 0) {
+                    val exp = sub.expiryDate.toLong()
+                    expireMillis = if (exp > 100_000_000_000L) exp else exp * 1000L
                 }
             } else if (!sub.subscriptionUserinfo.isNullOrBlank()) {
                 val info = sub.subscriptionUserinfo
@@ -1929,7 +1931,38 @@ class ConfigurationFragment @JvmOverloads constructor(
                 val down = extract("download=([0-9]+)")
                 usedBytes = up + down
                 totalBytes = extract("total=([0-9]+)")
-                expireSec = extract("expire=([0-9]+)")
+                val exp = extract("expire=([0-9]+)")
+                if (exp > 0L) {
+                    expireMillis = if (exp > 100_000_000_000L) exp else exp * 1000L
+                }
+            }
+
+            // 补充节点文本回退提取机制（正则匹配 套餐到期 与 剩余流量 回填卡片）
+            var fallbackExpireStr: String? = null
+            var fallbackTrafficStr: String? = null
+            if (expireMillis <= 0L || totalBytes <= 0L) {
+                val expireRegex = Regex(".*(?:套餐到期|到期时间|过期时间|到期)[：:]\\s*([0-9]{4}[-/][0-9]{2}[-/][0-9]{2})", RegexOption.IGNORE_CASE)
+                val trafficRegex = Regex(".*(?:剩余流量|可用流量|剩余)[：:]\\s*([0-9.]+\\s*[KMGT]?B)", RegexOption.IGNORE_CASE)
+                val allGroupProfiles = SagerDatabase.proxyDao.getByGroup(proxyGroup.id)
+                for (p in allGroupProfiles) {
+                    val name = p.displayName()
+                    if (expireMillis <= 0L && fallbackExpireStr == null) {
+                        val m = expireRegex.find(name)
+                        if (m != null) {
+                            fallbackExpireStr = m.groupValues[1]
+                            try {
+                                val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                                expireMillis = sdf.parse(fallbackExpireStr.replace('/', '-'))?.time ?: 0L
+                            } catch (_: Throwable) {}
+                        }
+                    }
+                    if (totalBytes <= 0L && fallbackTrafficStr == null) {
+                        val m = trafficRegex.find(name)
+                        if (m != null) {
+                            fallbackTrafficStr = m.groupValues[1]
+                        }
+                    }
+                }
             }
 
             val ctx = root.context
@@ -1944,6 +1977,11 @@ class ConfigurationFragment @JvmOverloads constructor(
                 progress?.isVisible = true
                 val percent = ((usedBytes.toDouble() / totalBytes.toDouble()) * 100).toInt().coerceIn(0, 100)
                 progress?.progress = percent
+            } else if (fallbackTrafficStr != null) {
+                tvTrafficStat?.text = "可用流量: $fallbackTrafficStr"
+                tvTrafficRemaining?.text = "剩余 $fallbackTrafficStr"
+                tvTrafficRemaining?.isVisible = true
+                progress?.isGone = true
             } else if (usedBytes > 0L) {
                 val usedStr = Formatter.formatFileSize(ctx, usedBytes)
                 tvTrafficStat?.text = "已用: $usedStr"
@@ -1955,9 +1993,12 @@ class ConfigurationFragment @JvmOverloads constructor(
                 progress?.isGone = true
             }
 
-            if (expireSec > 0L) {
-                val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(expireSec * 1000L))
+            if (expireMillis > 0L) {
+                val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(expireMillis))
                 tvExpire?.text = "到期: $dateStr"
+                tvExpire?.isVisible = true
+            } else if (fallbackExpireStr != null) {
+                tvExpire?.text = "到期: $fallbackExpireStr"
                 tvExpire?.isVisible = true
             } else {
                 tvExpire?.text = "长期有效"
@@ -2472,6 +2513,21 @@ class ConfigurationFragment @JvmOverloads constructor(
                     }
                 }
 
+                // 智能过滤纯提示型虚拟节点（包含“套餐到期”、“剩余流量”、“官网地址”等纯提示节点）
+                fun isVirtualInfoNode(name: String): Boolean {
+                    val trimmed = name.trim()
+                    val patterns = listOf(
+                        Regex(".*(?:套餐到期|到期时间|过期时间|账号到期|服务到期)[：:].*", RegexOption.IGNORE_CASE),
+                        Regex(".*(?:剩余流量|可用流量|已用流量|总计流量|流量剩余)[：:].*", RegexOption.IGNORE_CASE),
+                        Regex(".*(?:官网地址|官方网站|最新网址|TG频道|电报群)[：:].*", RegexOption.IGNORE_CASE)
+                    )
+                    return patterns.any { it.matches(trimmed) }
+                }
+                val realProfiles = newProfiles.filter { !isVirtualInfoNode(it.displayName()) }
+                if (realProfiles.isNotEmpty()) {
+                    newProfiles = realProfiles
+                }
+
                 val newProfileMap = newProfiles.associateBy { it.id }
                 val newProfileIds = newProfiles.map { it.id }.distinct()
 
@@ -2589,24 +2645,28 @@ class ConfigurationFragment @JvmOverloads constructor(
                         showShareMenu(it, proxyEntity)
                     }
                 }
+                view.isLongClickable = true
                 view.setOnLongClickListener {
                     val proxyEntity = entity
-                    showNodeActionBottomSheet(proxyEntity)
+                    view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                    showNodeActionDialog(proxyEntity)
                     true
                 }
             }
 
-            private fun showNodeActionBottomSheet(proxyEntity: ProxyEntity) {
+            private fun showNodeActionDialog(proxyEntity: ProxyEntity) {
                 if (select) return
                 val context = requireContext()
-                val dialog = BottomSheetDialog(context)
-                val sheetView = LayoutInflater.from(context).inflate(R.layout.dialog_profile_actions, null)
+                val dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_profile_actions, null)
+                val dialog = MaterialAlertDialogBuilder(context)
+                    .setView(dialogView)
+                    .create()
 
-                val tvName = sheetView.findViewById<TextView>(R.id.dialog_profile_name)
-                val tvType = sheetView.findViewById<TextView>(R.id.dialog_profile_type)
-                val btnEdit = sheetView.findViewById<View>(R.id.action_edit_node)
-                val btnMore = sheetView.findViewById<View>(R.id.action_more_node)
-                val btnDelete = sheetView.findViewById<View>(R.id.action_delete_node)
+                val tvName = dialogView.findViewById<TextView>(R.id.dialog_profile_name)
+                val tvType = dialogView.findViewById<TextView>(R.id.dialog_profile_type)
+                val btnEdit = dialogView.findViewById<View>(R.id.action_edit_node)
+                val btnMore = dialogView.findViewById<View>(R.id.action_more_node)
+                val btnDelete = dialogView.findViewById<View>(R.id.action_delete_node)
 
                 tvName.text = proxyEntity.displayName()
                 tvType.text = proxyEntity.displayType()
@@ -2638,11 +2698,17 @@ class ConfigurationFragment @JvmOverloads constructor(
                     if (isStarted) {
                         alert(getString(R.string.cannot_delete_active_profile)).tryToShow()
                     } else {
-                        removeProfile(proxyEntity)
+                        MaterialAlertDialogBuilder(context)
+                            .setTitle(R.string.delete)
+                            .setMessage(getString(R.string.delete_confirm_prompt))
+                            .setPositiveButton(R.string.yes) { _, _ ->
+                                removeProfile(proxyEntity)
+                            }
+                            .setNegativeButton(R.string.no, null)
+                            .show()
                     }
                 }
 
-                dialog.setContentView(sheetView)
                 dialog.show()
             }
 

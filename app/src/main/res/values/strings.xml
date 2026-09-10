@@ -913,4 +913,6 @@
     <string name="custom_color_title">Custom Theme Color (HEX / RGB)</string>
     <string name="custom_color_apply">Save &amp; Apply</string>
     <string name="custom_color_hex_hint">e.g. #00E676</string>
+    <string name="lock_user_agent">Lock User-Agent</string>
+    <string name="lock_user_agent_sum">Prevent global sync or batch operations from overwriting this group\'s User-Agent</string>
 </resources>

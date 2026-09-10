@@ -188,6 +188,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
             var changed = false
             for (group in allGroups) {
                 val sub = group.subscription ?: continue
+                if (sub.lockUserAgent == true) continue
                 val ua = sub.customUserAgent
                 if (forceAll || ua.isNullOrBlank()) {
                     sub.customUserAgent = newUa
@@ -452,6 +453,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var subscriptionDeduplication by profileCacheStore.boolean(Key.SUBSCRIPTION_DEDUPLICATION)
     var subscriptionUpdateWhenConnectedOnly by profileCacheStore.boolean(Key.SUBSCRIPTION_UPDATE_WHEN_CONNECTED_ONLY)
     var subscriptionUserAgent by profileCacheStore.string(Key.SUBSCRIPTION_USER_AGENT)
+    var subscriptionLockUserAgent by profileCacheStore.boolean(Key.SUBSCRIPTION_LOCK_USER_AGENT) { false }
     var subscriptionAutoUpdate by profileCacheStore.boolean(Key.SUBSCRIPTION_AUTO_UPDATE)
     var subscriptionAutoUpdateDelay by profileCacheStore.stringToInt(Key.SUBSCRIPTION_AUTO_UPDATE_DELAY) { 360 }
     var subscriptionFilterMode by profileCacheStore.stringToInt(Key.SUBSCRIPTION_FILTER_MODE) { 0 }

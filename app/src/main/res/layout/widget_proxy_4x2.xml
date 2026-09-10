@@ -26,8 +26,12 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
+            android:shadowColor="#80000000"
+            android:shadowDx="0"
+            android:shadowDy="1"
+            android:shadowRadius="2"
             android:text="@string/app_name"
-            android:textColor="#0F172A"
+            android:textColor="#FFFFFFFF"
             android:textSize="14sp"
             android:textStyle="bold" />
 
@@ -41,8 +45,12 @@
             android:paddingTop="2dp"
             android:paddingEnd="8dp"
             android:paddingBottom="2dp"
+            android:shadowColor="#80000000"
+            android:shadowDx="0"
+            android:shadowDy="1"
+            android:shadowRadius="2"
             android:text="@string/not_connected"
-            android:textColor="#475569"
+            android:textColor="#E2E8F0"
             android:textSize="11sp"
             android:textStyle="bold" />
 
@@ -55,8 +63,12 @@
             android:id="@+id/widget_latency"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:shadowColor="#80000000"
+            android:shadowDx="0"
+            android:shadowDy="1"
+            android:shadowRadius="2"
             android:text="-- ms"
-            android:textColor="#64748B"
+            android:textColor="#CBD5E1"
             android:textSize="11sp" />
     </LinearLayout>
 
@@ -76,8 +88,12 @@
             android:layout_weight="1"
             android:ellipsize="end"
             android:maxLines="1"
+            android:shadowColor="#99000000"
+            android:shadowDx="0"
+            android:shadowDy="1.2"
+            android:shadowRadius="3"
             android:text="@string/app_name"
-            android:textColor="#0F172A"
+            android:textColor="#FFFFFFFF"
             android:textSize="16sp"
             android:textStyle="bold" />
 
@@ -86,7 +102,11 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
-            android:textColor="#0284C7"
+            android:shadowColor="#80000000"
+            android:shadowDx="0"
+            android:shadowDy="1"
+            android:shadowRadius="2"
+            android:textColor="#38BDF8"
             android:textSize="11sp"
             android:textStyle="bold" />
     </LinearLayout>
@@ -108,8 +128,12 @@
             android:layout_weight="1"
             android:ellipsize="end"
             android:maxLines="1"
+            android:shadowColor="#80000000"
+            android:shadowDx="0"
+            android:shadowDy="1"
+            android:shadowRadius="2"
             android:text="↑ 0 KB/s  ↓ 0 KB/s"
-            android:textColor="#334155"
+            android:textColor="#E2E8F0"
             android:textSize="12sp"
             android:textStyle="bold" />
 
@@ -119,8 +143,12 @@
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:maxLines="1"
+            android:shadowColor="#80000000"
+            android:shadowDx="0"
+            android:shadowDy="1"
+            android:shadowRadius="2"
             android:text="总流量: 0 B"
-            android:textColor="#64748B"
+            android:textColor="#CBD5E1"
             android:textSize="11sp" />
     </LinearLayout>
 
@@ -146,16 +174,19 @@
                 android:layout_width="14dp"
                 android:layout_height="14dp"
                 android:contentDescription="@null"
-                android:src="@drawable/ic_widget_capsule_switch"
-                android:tint="#1E293B" />
+                android:src="@drawable/ic_widget_capsule_switch" />
 
             <TextView
                 android:id="@+id/widget_switch_text"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="4dp"
+                android:shadowColor="#80000000"
+                android:shadowDx="0"
+                android:shadowDy="1"
+                android:shadowRadius="2"
                 android:text="@string/switch_node"
-                android:textColor="#1E293B"
+                android:textColor="#FFFFFFFF"
                 android:textSize="11sp"
                 android:textStyle="bold" />
         </LinearLayout>

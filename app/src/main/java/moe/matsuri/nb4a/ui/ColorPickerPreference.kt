@@ -146,20 +146,51 @@ class ColorPickerPreference
         }
         rootLayout.addView(customTitle)
 
+        // Quick Preset Chips (White, Dark, Emerald, Cyan, Blue, Purple, Amber, Red)
+        val quickPresetColors = intArrayOf(
+            0xFFFFFFFF.toInt(), // Pure White
+            0xFF1E293B.toInt(), // Dark Slate
+            0xFF00E676.toInt(), // Emerald Mint
+            0xFF00BCD4.toInt(), // Cyan
+            0xFF2196F3.toInt(), // Material Blue
+            0xFF9C27B0.toInt(), // Purple
+            0xFFFFC107.toInt(), // Amber
+            0xFFF44336.toInt()  // Red
+        )
+        val quickRow = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, dp2px(12))
+        }
+        rootLayout.addView(quickRow)
+
         // Initial custom color
         var curColor = DataStore.customThemeColor or 0xFF000000.toInt()
         var curR = Color.red(curColor)
         var curG = Color.green(curColor)
         var curB = Color.blue(curColor)
+        val initialHsv = FloatArray(3)
+        Color.colorToHSV(curColor, initialHsv)
+        var curH = initialHsv[0]
+        var curS = initialHsv[1]
+        var curV = initialHsv[2]
 
-        // Preview & Hex row
+        // Preview & Hex row (Current vs New preview)
         val previewRow = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, 0, 0, dp2px(8))
+            setPadding(0, 0, 0, dp2px(10))
         }
 
+        val originalImage = getNekoImageViewAtColor(curColor, 40, 2)
+        val arrowText = TextView(context).apply {
+            text = " → "
+            textSize = 16f
+            setPadding(dp2px(4), 0, dp2px(4), 0)
+        }
         val previewImage = getNekoImageViewAtColor(curColor, 44, 2)
+        previewRow.addView(originalImage)
+        previewRow.addView(arrowText)
         previewRow.addView(previewImage)
 
         var updatingFromCode = false
@@ -176,15 +207,15 @@ class ColorPickerPreference
         previewRow.addView(hexInput)
         rootLayout.addView(previewRow)
 
-        // RGB Sliders
-        fun createSlider(label: String, initialValue: Int): Pair<TextView, SeekBar> {
+        // Sliders
+        fun createSlider(label: String, maxVal: Int, initialValue: Int): Pair<TextView, SeekBar> {
             val labelView = TextView(context).apply {
                 text = "$label: $initialValue"
                 textSize = 12f
-                setPadding(0, dp2px(4), 0, 0)
+                setPadding(0, dp2px(3), 0, 0)
             }
             val seekBar = SeekBar(context).apply {
-                max = 255
+                max = maxVal
                 progress = initialValue
             }
             rootLayout.addView(labelView)
@@ -192,38 +223,95 @@ class ColorPickerPreference
             return Pair(labelView, seekBar)
         }
 
-        val (rLabel, rSeek) = createSlider("R", curR)
-        val (gLabel, gSeek) = createSlider("G", curG)
-        val (bLabel, bSeek) = createSlider("B", curB)
+        // HSV Sliders
+        val (hLabel, hSeek) = createSlider("色相 (Hue)", 360, curH.roundToInt())
+        val (sLabel, sSeek) = createSlider("饱和度 (Saturation)", 100, (curS * 100f).roundToInt())
+        val (vLabel, vSeek) = createSlider("明度 (Brightness)", 100, (curV * 100f).roundToInt())
 
-        fun updateColorFromRgb(r: Int, g: Int, b: Int) {
-            curR = r
-            curG = g
-            curB = b
-            curColor = Color.rgb(r, g, b)
+        // RGB Sliders
+        val (rLabel, rSeek) = createSlider("R (红)", 255, curR)
+        val (gLabel, gSeek) = createSlider("G (绿)", 255, curG)
+        val (bLabel, bSeek) = createSlider("B (蓝)", 255, curB)
+
+        fun syncAllUI(fromRgb: Boolean) {
+            if (fromRgb) {
+                curColor = Color.rgb(curR, curG, curB)
+                val hsv = FloatArray(3)
+                Color.colorToHSV(curColor, hsv)
+                curH = hsv[0]
+                curS = hsv[1]
+                curV = hsv[2]
+            } else {
+                curColor = Color.HSVToColor(floatArrayOf(curH, curS, curV))
+                curR = Color.red(curColor)
+                curG = Color.green(curColor)
+                curB = Color.blue(curColor)
+            }
+
             previewImage.setImageDrawable(getNekoAtColor(context.resources, curColor))
-            rLabel.text = "R: $r"
-            gLabel.text = "G: $g"
-            bLabel.text = "B: $b"
+            hLabel.text = "色相 (Hue): ${curH.roundToInt()}°"
+            sLabel.text = "饱和度 (Saturation): ${(curS * 100f).roundToInt()}%"
+            vLabel.text = "明度 (Brightness): ${(curV * 100f).roundToInt()}%"
+            rLabel.text = "R (红): $curR"
+            gLabel.text = "G (绿): $curG"
+            bLabel.text = "B (蓝): $curB"
+
             if (!updatingFromCode) {
                 updatingFromCode = true
-                hexInput.setText(String.format("#%02X%02X%02X", r, g, b))
+                hSeek.progress = curH.roundToInt()
+                sSeek.progress = (curS * 100f).roundToInt()
+                vSeek.progress = (curV * 100f).roundToInt()
+                rSeek.progress = curR
+                gSeek.progress = curG
+                bSeek.progress = curB
+                hexInput.setText(String.format("#%02X%02X%02X", curR, curG, curB))
                 updatingFromCode = false
             }
         }
 
-        val seekChangeListener = object : SeekBar.OnSeekBarChangeListener {
+        for (qColor in quickPresetColors) {
+            val qView = getNekoImageViewAtColor(qColor, 34, 3).apply {
+                setOnClickListener {
+                    curR = Color.red(qColor)
+                    curG = Color.green(qColor)
+                    curB = Color.blue(qColor)
+                    syncAllUI(true)
+                }
+            }
+            quickRow.addView(qView)
+        }
+
+        val hsvSeekListener = object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (fromUser) {
-                    updateColorFromRgb(rSeek.progress, gSeek.progress, bSeek.progress)
+                if (fromUser && !updatingFromCode) {
+                    curH = hSeek.progress.toFloat()
+                    curS = sSeek.progress / 100f
+                    curV = vSeek.progress / 100f
+                    syncAllUI(false)
                 }
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
         }
-        rSeek.setOnSeekBarChangeListener(seekChangeListener)
-        gSeek.setOnSeekBarChangeListener(seekChangeListener)
-        bSeek.setOnSeekBarChangeListener(seekChangeListener)
+        hSeek.setOnSeekBarChangeListener(hsvSeekListener)
+        sSeek.setOnSeekBarChangeListener(hsvSeekListener)
+        vSeek.setOnSeekBarChangeListener(hsvSeekListener)
+
+        val rgbSeekListener = object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (fromUser && !updatingFromCode) {
+                    curR = rSeek.progress
+                    curG = gSeek.progress
+                    curB = bSeek.progress
+                    syncAllUI(true)
+                }
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        }
+        rSeek.setOnSeekBarChangeListener(rgbSeekListener)
+        gSeek.setOnSeekBarChangeListener(rgbSeekListener)
+        bSeek.setOnSeekBarChangeListener(rgbSeekListener)
 
         hexInput.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -234,12 +322,10 @@ class ColorPickerPreference
                 if (str.matches(Regex("^#[0-9a-fA-F]{6}$"))) {
                     try {
                         val parsed = Color.parseColor(str)
-                        updatingFromCode = true
-                        rSeek.progress = Color.red(parsed)
-                        gSeek.progress = Color.green(parsed)
-                        bSeek.progress = Color.blue(parsed)
-                        updatingFromCode = false
-                        updateColorFromRgb(Color.red(parsed), Color.green(parsed), Color.blue(parsed))
+                        curR = Color.red(parsed)
+                        curG = Color.green(parsed)
+                        curB = Color.blue(parsed)
+                        syncAllUI(true)
                     } catch (_: Throwable) {}
                 }
             }

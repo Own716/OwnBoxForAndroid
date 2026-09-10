@@ -15,6 +15,7 @@ import io.nekohasekai.sagernet.aidl.SpeedDisplayData
 import io.nekohasekai.sagernet.bg.BaseService
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProfileManager
+import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ui.MainActivity
 import io.nekohasekai.sagernet.ui.NodeSelectDialogActivity
 
@@ -140,106 +141,126 @@ object OwnBoxWidgetHelper {
     )
 
     private fun update1x1(context: Context, manager: AppWidgetManager) {
-        val ids = manager.getAppWidgetIds(ComponentName(context, OwnBoxWidget1x1::class.java))
-        if (ids.isEmpty()) return
-        val (togglePending, _, launchPending) = getPendingIntents(context)
-        val data = getCommonData(context)
+        try {
+            val ids = manager.getAppWidgetIds(ComponentName(context, OwnBoxWidget1x1::class.java))
+            if (ids.isEmpty()) return
+            val (togglePending, _, _) = getPendingIntents(context)
+            val data = getCommonData(context)
 
-        for (id in ids) {
-            val views = RemoteViews(context.packageName, R.layout.widget_proxy_1x1).apply {
-                setImageViewResource(R.id.widget_icon, data.cloverIcon)
-                setInt(R.id.widget_status_dot, "setColorFilter", data.dotColor)
-                setOnClickPendingIntent(R.id.widget_toggle_btn, togglePending)
+            for (id in ids) {
+                val views = RemoteViews(context.packageName, R.layout.widget_proxy_1x1).apply {
+                    setImageViewResource(R.id.widget_icon, data.cloverIcon)
+                    setInt(R.id.widget_status_dot, "setColorFilter", data.dotColor)
+                    setOnClickPendingIntent(R.id.widget_toggle_btn, togglePending)
+                }
+                manager.updateAppWidget(id, views)
             }
-            manager.updateAppWidget(id, views)
+        } catch (e: Throwable) {
+            Logs.w("Failed to update 1x1 widget: ${e.message}")
         }
     }
 
     private fun update2x2(context: Context, manager: AppWidgetManager) {
-        val ids = manager.getAppWidgetIds(ComponentName(context, OwnBoxWidget2x2::class.java))
-        if (ids.isEmpty()) return
-        val (togglePending, switchPending, launchPending) = getPendingIntents(context)
-        val data = getCommonData(context)
+        try {
+            val ids = manager.getAppWidgetIds(ComponentName(context, OwnBoxWidget2x2::class.java))
+            if (ids.isEmpty()) return
+            val (togglePending, switchPending, launchPending) = getPendingIntents(context)
+            val data = getCommonData(context)
 
-        for (id in ids) {
-            val views = RemoteViews(context.packageName, R.layout.widget_proxy_2x2).apply {
-                setTextViewText(R.id.widget_title, data.title)
-                setTextViewText(R.id.widget_status, data.statusText)
-                setTextViewText(R.id.widget_latency, data.latencyText)
-                setTextViewText(R.id.widget_speed, data.speedText)
-                setImageViewResource(R.id.widget_toggle_btn, data.cloverIcon)
-                setOnClickPendingIntent(R.id.widget_toggle_btn, togglePending)
-                setOnClickPendingIntent(R.id.widget_switch_btn, switchPending)
-                setOnClickPendingIntent(R.id.widget_info_area, launchPending)
-                setOnClickPendingIntent(R.id.widget_header_area, launchPending)
+            for (id in ids) {
+                val views = RemoteViews(context.packageName, R.layout.widget_proxy_2x2).apply {
+                    setTextViewText(R.id.widget_title, data.title)
+                    setTextViewText(R.id.widget_status, data.statusText)
+                    setTextViewText(R.id.widget_latency, data.latencyText)
+                    setTextViewText(R.id.widget_speed, data.speedText)
+                    setImageViewResource(R.id.widget_toggle_btn, data.cloverIcon)
+                    setOnClickPendingIntent(R.id.widget_toggle_btn, togglePending)
+                    setOnClickPendingIntent(R.id.widget_switch_btn, switchPending)
+                    setOnClickPendingIntent(R.id.widget_info_area, launchPending)
+                    setOnClickPendingIntent(R.id.widget_header_area, launchPending)
+                }
+                manager.updateAppWidget(id, views)
             }
-            manager.updateAppWidget(id, views)
+        } catch (e: Throwable) {
+            Logs.w("Failed to update 2x2 widget: ${e.message}")
         }
     }
 
     private fun update4x1(context: Context, manager: AppWidgetManager) {
-        val ids = manager.getAppWidgetIds(ComponentName(context, OwnBoxWidget4x1::class.java))
-        if (ids.isEmpty()) return
-        val (togglePending, switchPending, launchPending) = getPendingIntents(context)
-        val data = getCommonData(context)
+        try {
+            val ids = manager.getAppWidgetIds(ComponentName(context, OwnBoxWidget4x1::class.java))
+            if (ids.isEmpty()) return
+            val (togglePending, switchPending, launchPending) = getPendingIntents(context)
+            val data = getCommonData(context)
 
-        for (id in ids) {
-            val views = RemoteViews(context.packageName, R.layout.widget_proxy_4x1).apply {
-                setTextViewText(R.id.widget_title, data.title)
-                setTextViewText(R.id.widget_status, data.statusText)
-                setInt(R.id.widget_status_dot, "setColorFilter", data.dotColor)
-                setImageViewResource(R.id.widget_toggle_btn, data.cloverIcon)
-                setOnClickPendingIntent(R.id.widget_toggle_btn, togglePending)
-                setOnClickPendingIntent(R.id.widget_switch_btn, switchPending)
-                setOnClickPendingIntent(R.id.widget_info_area, launchPending)
-                setOnClickPendingIntent(R.id.widget_icon, launchPending)
+            for (id in ids) {
+                val views = RemoteViews(context.packageName, R.layout.widget_proxy_4x1).apply {
+                    setTextViewText(R.id.widget_title, data.title)
+                    setTextViewText(R.id.widget_status, data.statusText)
+                    setInt(R.id.widget_status_dot, "setColorFilter", data.dotColor)
+                    setImageViewResource(R.id.widget_toggle_btn, data.cloverIcon)
+                    setOnClickPendingIntent(R.id.widget_toggle_btn, togglePending)
+                    setOnClickPendingIntent(R.id.widget_switch_btn, switchPending)
+                    setOnClickPendingIntent(R.id.widget_info_area, launchPending)
+                    setOnClickPendingIntent(R.id.widget_icon, launchPending)
+                }
+                manager.updateAppWidget(id, views)
             }
-            manager.updateAppWidget(id, views)
+        } catch (e: Throwable) {
+            Logs.w("Failed to update 4x1 widget: ${e.message}")
         }
     }
 
     private fun update4x2(context: Context, manager: AppWidgetManager) {
-        val ids = manager.getAppWidgetIds(ComponentName(context, OwnBoxWidget4x2::class.java))
-        if (ids.isEmpty()) return
-        val (togglePending, switchPending, launchPending) = getPendingIntents(context)
-        val data = getCommonData(context)
+        try {
+            val ids = manager.getAppWidgetIds(ComponentName(context, OwnBoxWidget4x2::class.java))
+            if (ids.isEmpty()) return
+            val (togglePending, switchPending, launchPending) = getPendingIntents(context)
+            val data = getCommonData(context)
 
-        for (id in ids) {
-            val views = RemoteViews(context.packageName, R.layout.widget_proxy_4x2).apply {
-                setTextViewText(R.id.widget_title, data.title)
-                setTextViewText(R.id.widget_status, data.statusText)
-                setTextViewText(R.id.widget_type, data.type)
-                setTextViewText(R.id.widget_latency, data.latencyText)
-                setTextViewText(R.id.widget_speed, data.speedText)
-                setTextViewText(R.id.widget_traffic_total, data.trafficTotalText)
-                setImageViewResource(R.id.widget_toggle_btn, data.cloverIcon)
-                setOnClickPendingIntent(R.id.widget_toggle_btn, togglePending)
-                setOnClickPendingIntent(R.id.widget_switch_btn, switchPending)
-                setOnClickPendingIntent(R.id.widget_info_area, launchPending)
-                setOnClickPendingIntent(R.id.widget_header_area, launchPending)
+            for (id in ids) {
+                val views = RemoteViews(context.packageName, R.layout.widget_proxy_4x2).apply {
+                    setTextViewText(R.id.widget_title, data.title)
+                    setTextViewText(R.id.widget_status, data.statusText)
+                    setTextViewText(R.id.widget_type, data.type)
+                    setTextViewText(R.id.widget_latency, data.latencyText)
+                    setTextViewText(R.id.widget_speed, data.speedText)
+                    setTextViewText(R.id.widget_traffic_total, data.trafficTotalText)
+                    setImageViewResource(R.id.widget_toggle_btn, data.cloverIcon)
+                    setOnClickPendingIntent(R.id.widget_toggle_btn, togglePending)
+                    setOnClickPendingIntent(R.id.widget_switch_btn, switchPending)
+                    setOnClickPendingIntent(R.id.widget_info_area, launchPending)
+                    setOnClickPendingIntent(R.id.widget_header_area, launchPending)
+                }
+                manager.updateAppWidget(id, views)
             }
-            manager.updateAppWidget(id, views)
+        } catch (e: Throwable) {
+            Logs.w("Failed to update 4x2 widget: ${e.message}")
         }
     }
 
     private fun updateClassic(context: Context, manager: AppWidgetManager) {
-        val ids = manager.getAppWidgetIds(ComponentName(context, OwnBoxWidgetProvider::class.java))
-        if (ids.isEmpty()) return
-        val (togglePending, switchPending, launchPending) = getPendingIntents(context)
-        val data = getCommonData(context)
+        try {
+            val ids = manager.getAppWidgetIds(ComponentName(context, OwnBoxWidgetProvider::class.java))
+            if (ids.isEmpty()) return
+            val (togglePending, switchPending, launchPending) = getPendingIntents(context)
+            val data = getCommonData(context)
 
-        for (id in ids) {
-            val views = RemoteViews(context.packageName, R.layout.layout_widget_ownbox).apply {
-                setImageViewResource(R.id.widget_icon, R.drawable.ic_widget_klee)
-                setTextViewText(R.id.widget_title, data.title)
-                setTextViewText(R.id.widget_status, data.statusText)
-                setImageViewResource(R.id.widget_toggle_btn, data.cloverIcon)
-                setOnClickPendingIntent(R.id.widget_toggle_btn, togglePending)
-                setOnClickPendingIntent(R.id.widget_switch_btn, switchPending)
-                setOnClickPendingIntent(R.id.widget_info_area, launchPending)
-                setOnClickPendingIntent(R.id.widget_icon, launchPending)
+            for (id in ids) {
+                val views = RemoteViews(context.packageName, R.layout.layout_widget_ownbox).apply {
+                    setImageViewResource(R.id.widget_icon, R.drawable.ic_widget_klee)
+                    setTextViewText(R.id.widget_title, data.title)
+                    setTextViewText(R.id.widget_status, data.statusText)
+                    setImageViewResource(R.id.widget_toggle_btn, data.cloverIcon)
+                    setOnClickPendingIntent(R.id.widget_toggle_btn, togglePending)
+                    setOnClickPendingIntent(R.id.widget_switch_btn, switchPending)
+                    setOnClickPendingIntent(R.id.widget_info_area, launchPending)
+                    setOnClickPendingIntent(R.id.widget_icon, launchPending)
+                }
+                manager.updateAppWidget(id, views)
             }
-            manager.updateAppWidget(id, views)
+        } catch (e: Throwable) {
+            Logs.w("Failed to update classic widget: ${e.message}")
         }
     }
 }
