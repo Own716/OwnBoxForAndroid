@@ -41,13 +41,6 @@ Please visit the official Releases page to download officially signed APK packag
 
 👉 **[前往 GitHub Releases 官方发布页面 / Go to the Official GitHub Releases Page](https://github.com/Own716/OwnBoxForAndroid/releases)**
 
-| 架构 / 平台<br>Architecture / Platform | 适用设备<br>Compatible Devices | 文件名<br>File Name | 官方下载直链<br>Official Direct Download |
-| :--- | :--- | :--- | :--- |
-| **ARM64 (强力推荐)**<br>**ARM64 (Strongly Recommended)** | **绝大多数现代安卓手机 (一加、小米、华为、OPPO、vivo、三星、荣耀等)**<br>**The vast majority of modern Android phones (OnePlus, Xiaomi, Huawei, OPPO, vivo, Samsung, Honor, etc.)** | `Ownbox-2.3.7-arm64-v8a-release.apk` | [**📥 点击直接下载 / Click to Download**](https://github.com/Own716/OwnBoxForAndroid/releases/download/v2.3.7/Ownbox-2.3.7-arm64-v8a-release.apk) |
-| **ARMv7** | 较老旧的 32 位安卓机型<br>Older 32-bit Android devices | `Ownbox-2.3.7-armeabi-v7a-release.apk` | [**📥 点击直接下载 / Click to Download**](https://github.com/Own716/OwnBoxForAndroid/releases/download/v2.3.7/Ownbox-2.3.7-armeabi-v7a-release.apk) |
-| **x86_64** | 电脑 64 位安卓模拟器、ChromeOS<br>64-bit Android emulators on PC, ChromeOS | `Ownbox-2.3.7-x86_64-release.apk` | [**📥 点击直接下载 / Click to Download**](https://github.com/Own716/OwnBoxForAndroid/releases/download/v2.3.7/Ownbox-2.3.7-x86_64-release.apk) |
-| **x86** | 电脑 32 位安卓模拟器<br>32-bit Android emulators on PC | `Ownbox-2.3.7-x86-release.apk` | [**📥 点击直接下载 / Click to Download**](https://github.com/Own716/OwnBoxForAndroid/releases/download/v2.3.7/Ownbox-2.3.7-x86-release.apk) |
-
 ---
 
 ### 📦 安装包架构说明 / Architecture Notes
