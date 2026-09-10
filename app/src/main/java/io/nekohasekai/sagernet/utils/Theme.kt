@@ -91,7 +91,7 @@ object Theme {
 
     fun apply(context: Context) {
         context.setTheme(getTheme())
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && DataStore.useSystemTheme && context is android.app.Activity) {
+        if (!isWhiteTheme() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && DataStore.useSystemTheme && context is android.app.Activity) {
             com.google.android.material.color.DynamicColors.applyIfAvailable(context)
         }
         if (DataStore.amoledTheme && usingNightMode()) {
@@ -228,6 +228,7 @@ object Theme {
     }
 
     fun usingNightMode(): Boolean {
+        if (isWhiteTheme()) return false
         return when (DataStore.nightTheme) {
             1 -> true
             2 -> false
@@ -236,6 +237,10 @@ object Theme {
     }
 
     fun applyNightTheme() {
+        if (isWhiteTheme()) {
+            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+            return
+        }
         AppCompatDelegate.setDefaultNightMode(getNightMode())
     }
 

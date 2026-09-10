@@ -364,6 +364,15 @@ class ConfigurationFragment @JvmOverloads constructor(
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        groupPager = view.findViewById(R.id.group_pager)
+        tabLayout = view.findViewById(R.id.group_tab)
+        adapter = GroupPagerAdapter()
+        ProfileManager.addListener(adapter)
+        GroupManager.addListener(adapter)
+
+        groupPager.adapter = adapter
+        groupPager.offscreenPageLimit = 2
+
         if (!select) {
             toolbar.inflateMenu(R.menu.add_profile_menu)
             toolbar.menu.findItem(R.id.action_global_mode)?.isChecked = DataStore.globalMode
@@ -377,6 +386,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
 
         if (Theme.isWhiteTheme()) {
+            view.findViewById<View>(R.id.appbar)?.setBackgroundColor(Color.WHITE)
             toolbar.setBackgroundColor(Color.WHITE)
             toolbar.setTitleTextColor(Color.parseColor("#212121"))
             tabLayout.setBackgroundColor(Color.WHITE)
@@ -406,15 +416,6 @@ class ConfigurationFragment @JvmOverloads constructor(
                 }
             }
         }
-
-        groupPager = view.findViewById(R.id.group_pager)
-        tabLayout = view.findViewById(R.id.group_tab)
-        adapter = GroupPagerAdapter()
-        ProfileManager.addListener(adapter)
-        GroupManager.addListener(adapter)
-
-        groupPager.adapter = adapter
-        groupPager.offscreenPageLimit = 2
 
         val touchSlop = ViewConfiguration.get(requireContext()).scaledTouchSlop
         TabLayoutMediator(tabLayout, groupPager) { tab, position ->

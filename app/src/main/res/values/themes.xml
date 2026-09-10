@@ -620,21 +620,27 @@
     </style>
 
     <style name="Theme.SagerNet.White" parent="Theme.SagerNet">
-        <item name="colorPrimary">@color/white</item>
-        <item name="colorPrimaryDark">#EAEAEA</item>
-        <item name="colorAccent">#212121</item>
-        <item name="colorMaterial100">#F5F5F5</item>
-        <item name="colorMaterial300">#E0E0E0</item>
-        <item name="cardElevatedSurfaceColor">#FFFFFF</item>
+        <item name="colorPrimary">@color/color_white_theme_primary</item>
+        <item name="colorPrimaryDark">@color/color_white_theme_primary_dark</item>
+        <item name="colorAccent">@color/color_white_theme_accent</item>
+        <item name="colorMaterial100">@color/color_white_theme_material_100</item>
+        <item name="colorMaterial300">@color/color_white_theme_material_300</item>
+        <item name="cardElevatedSurfaceColor">@color/color_white_theme_surface</item>
+        <item name="colorSurface">@color/color_white_theme_surface</item>
+        <item name="colorOnSurface">@color/color_white_theme_text_primary</item>
+        <item name="colorOnSurfaceVariant">@color/color_white_theme_text_secondary</item>
+        <item name="android:textColorPrimary">@color/color_white_theme_text_primary</item>
+        <item name="android:textColorSecondary">@color/color_white_theme_text_secondary</item>
+        <item name="android:colorBackground">@color/color_white_theme_bg</item>
         <item name="actionBarTheme">@style/ThemeOverlay.AppCompat.ActionBar</item>
-        <item name="tabTextColor">#8A000000</item>
-        <item name="tabSelectedTextColor">#000000</item>
-        <item name="tabIndicatorColor">#000000</item>
-        <item name="tabRippleColor">#1F000000</item>
-        <item name="whiteOrTextPrimary">#000000</item>
-        <item name="fabColorBackground">#212121</item>
-        <item name="selectedColorPrimary">#212121</item>
-        <item name="itemShapeFillColor">#E0E0E0</item>
+        <item name="tabTextColor">@color/color_white_theme_tab_unselected</item>
+        <item name="tabSelectedTextColor">@color/color_white_theme_tab_selected</item>
+        <item name="tabIndicatorColor">@color/color_white_theme_tab_selected</item>
+        <item name="tabRippleColor">@color/color_white_theme_ripple</item>
+        <item name="whiteOrTextPrimary">@color/color_white_theme_text_primary</item>
+        <item name="fabColorBackground">@color/color_white_theme_accent</item>
+        <item name="selectedColorPrimary">@color/color_white_theme_accent</item>
+        <item name="itemShapeFillColor">@color/color_white_theme_material_300</item>
         <item name="accentOrTextSecondary">?android:textColorSecondary</item>
         <item name="accentOrTextPrimary">?android:textColorPrimary</item>
         <item name="primaryOrTextSecondary">?android:textColorSecondary</item>
@@ -669,14 +675,18 @@
     </style>
 
     <style name="Theme.SagerNet.Dialog.White" parent="Theme.SagerNet.Dialog">
-        <item name="colorPrimary">@color/white</item>
-        <item name="colorPrimaryDark">#EAEAEA</item>
-        <item name="colorAccent">#212121</item>
-        <item name="colorMaterial100">#F5F5F5</item>
-        <item name="colorMaterial300">#E0E0E0</item>
-        <item name="cardElevatedSurfaceColor">#FFFFFF</item>
-        <item name="fabColorBackground">#212121</item>
-        <item name="selectedColorPrimary">#212121</item>
+        <item name="colorPrimary">@color/color_white_theme_primary</item>
+        <item name="colorPrimaryDark">@color/color_white_theme_primary_dark</item>
+        <item name="colorAccent">@color/color_white_theme_accent</item>
+        <item name="colorMaterial100">@color/color_white_theme_material_100</item>
+        <item name="colorMaterial300">@color/color_white_theme_material_300</item>
+        <item name="cardElevatedSurfaceColor">@color/color_white_theme_surface</item>
+        <item name="colorSurface">@color/color_white_theme_surface</item>
+        <item name="colorOnSurface">@color/color_white_theme_text_primary</item>
+        <item name="android:textColorPrimary">@color/color_white_theme_text_primary</item>
+        <item name="android:textColorSecondary">@color/color_white_theme_text_secondary</item>
+        <item name="fabColorBackground">@color/color_white_theme_accent</item>
+        <item name="selectedColorPrimary">@color/color_white_theme_accent</item>
     </style>
 
     <style name="Theme.SagerNet.Monet" parent="Theme.SagerNet" />

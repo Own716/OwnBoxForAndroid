@@ -11,6 +11,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.res.Resources
+import android.graphics.Color
 import android.os.Build
 import android.system.Os
 import android.system.OsConstants
@@ -284,9 +285,20 @@ fun Context.getColour(@ColorRes colorRes: Int): Int {
 }
 
 fun Context.getColorAttr(@AttrRes resId: Int): Int {
-    return ContextCompat.getColor(this, TypedValue().also {
-        theme.resolveAttribute(resId, it, true)
-    }.resourceId)
+    return try {
+        val typedValue = TypedValue()
+        if (theme.resolveAttribute(resId, typedValue, true)) {
+            if (typedValue.resourceId != 0) {
+                ContextCompat.getColor(this, typedValue.resourceId)
+            } else {
+                typedValue.data
+            }
+        } else {
+            Color.TRANSPARENT
+        }
+    } catch (_: Throwable) {
+        Color.TRANSPARENT
+    }
 }
 
 val isExpert: Boolean by lazy { BuildConfig.DEBUG || DataStore.isExpert }

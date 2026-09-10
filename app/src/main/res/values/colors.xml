@@ -26,6 +26,7 @@
         <item>@color/material_blue_grey_500</item>
         <item>@color/material_light_black</item>
         <item>@color/color_verdant_mint</item>
+        <item>@color/white</item>
     </integer-array>
 
     <color name="material_amber_100">#FFECB3</color>
@@ -330,4 +331,18 @@
     <color name="card_elevated_verdant_mint">#EBF9F3</color>
 
     <color name="app_icon_red_background">#BC0000</color>
+
+    <!-- 纯白主题专用调色盘 -->
+    <color name="color_white_theme_primary">#FFFFFF</color>
+    <color name="color_white_theme_primary_dark">#EAEAEA</color>
+    <color name="color_white_theme_accent">#212121</color>
+    <color name="color_white_theme_material_100">#F5F5F5</color>
+    <color name="color_white_theme_material_300">#E0E0E0</color>
+    <color name="color_white_theme_surface">#FFFFFF</color>
+    <color name="color_white_theme_bg">#F8F9FA</color>
+    <color name="color_white_theme_text_primary">#212121</color>
+    <color name="color_white_theme_text_secondary">#757575</color>
+    <color name="color_white_theme_tab_unselected">#8A000000</color>
+    <color name="color_white_theme_tab_selected">#000000</color>
+    <color name="color_white_theme_ripple">#1F000000</color>
 </resources>

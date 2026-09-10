@@ -131,6 +131,14 @@ class StatsBar @JvmOverloads constructor(
             btnIpDetail?.setOnClickListener {
                 onIpDetailClicked()
             }
+            if (io.nekohasekai.sagernet.utils.Theme.isWhiteTheme()) {
+                backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.WHITE)
+                txText.setTextColor(android.graphics.Color.parseColor("#757575"))
+                rxText.setTextColor(android.graphics.Color.parseColor("#757575"))
+                statusText.setTextColor(android.graphics.Color.parseColor("#212121"))
+                (btnIpDetail as? android.widget.ImageView)?.imageTintList =
+                    android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#212121"))
+            }
         }
     }
 

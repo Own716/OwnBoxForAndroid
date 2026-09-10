@@ -20,23 +20,26 @@ open class ToolbarFragment : Fragment {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        toolbar = view.findViewById(R.id.toolbar)
-        toolbar.setNavigationIcon(R.drawable.ic_navigation_menu)
-        toolbar.setNavigationOnClickListener {
-            (activity as MainActivity).binding.drawerLayout.openDrawer(GravityCompat.START)
-        }
-        if (Theme.isWhiteTheme()) {
-            toolbar.setBackgroundColor(Color.WHITE)
-            toolbar.setTitleTextColor(Color.parseColor("#212121"))
-            toolbar.navigationIcon?.let {
-                val tinted = it.mutate()
-                DrawableCompat.setTint(tinted, Color.parseColor("#212121"))
-                toolbar.navigationIcon = tinted
+        val tb = view.findViewById<Toolbar?>(R.id.toolbar)
+        if (tb != null) {
+            toolbar = tb
+            toolbar.setNavigationIcon(R.drawable.ic_navigation_menu)
+            toolbar.setNavigationOnClickListener {
+                (activity as? MainActivity)?.binding?.drawerLayout?.openDrawer(GravityCompat.START)
             }
-            toolbar.overflowIcon?.let {
-                val tinted = it.mutate()
-                DrawableCompat.setTint(tinted, Color.parseColor("#212121"))
-                toolbar.overflowIcon = tinted
+            if (Theme.isWhiteTheme()) {
+                toolbar.setBackgroundColor(Color.WHITE)
+                toolbar.setTitleTextColor(Color.parseColor("#212121"))
+                toolbar.navigationIcon?.let {
+                    val tinted = it.mutate()
+                    DrawableCompat.setTint(tinted, Color.parseColor("#212121"))
+                    toolbar.navigationIcon = tinted
+                }
+                toolbar.overflowIcon?.let {
+                    val tinted = it.mutate()
+                    DrawableCompat.setTint(tinted, Color.parseColor("#212121"))
+                    toolbar.overflowIcon = tinted
+                }
             }
         }
     }
