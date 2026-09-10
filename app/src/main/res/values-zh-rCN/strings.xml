@@ -817,8 +817,4 @@
     <string name="balancer_interval">观测间隔</string>
     <string name="balancer_interval_sum">%1$s 秒</string>
     <string name="balancer_select_group">选择分组</string>
-    <string name="balancer">负载均衡</string>
-    <string name="balancer_settings">负载均衡设置</string>
-    <string name="balancer_type">类型</string>
-    <string name="balancer_strategy">策略</string>
 </resources>

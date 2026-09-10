@@ -900,8 +900,4 @@
     <string name="balancer_interval">Probe Interval</string>
     <string name="balancer_interval_sum">%1$s seconds</string>
     <string name="balancer_select_group">Select Group</string>
-    <string name="balancer">Balancer</string>
-    <string name="balancer_settings">Balancer Settings</string>
-    <string name="balancer_type">Type</string>
-    <string name="balancer_strategy">Strategy</string>
 </resources>
