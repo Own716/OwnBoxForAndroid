@@ -1,3 +1,22 @@
+### OwnBox v2.4.5 (Pre-release)
+
+1. [Bug Fix] 流媒体与 AI 解锁检测判定逻辑重构：
+   - 彻底修复 Claude 假解锁问题：严格过滤 Anthropic 官方明确不支持且高风险封号的地区（香港 HK、中国大陆 CN、澳门 MO、俄罗斯 RU、白俄罗斯 BY、伊朗 IR、朝鲜 KP、叙利亚 SY、古巴 CU 等），杜绝香港等不支持 IP 误标为“支持”。
+   - 完善真实桌面现代浏览器指纹：全面升级请求头至 Chrome 126 最新规范（Sec-Ch-Ua, Accept, Accept-Language, Sec-Fetch-* 等），大幅降低 Cloudflare WAF 对爬虫特征拦截 403 误判风控（如新加坡等原生支持节点）。
+   - ChatGPT 新增官方移动端端点（`ios.chat.openai.com`）双链路兜底探测：当网页端触发 Cloudflare 验证时，自动回落探测移动端 API 链路，精确识别“支持 (App/API)”真实可用状态。
+   - 规范全平台端点与检测逻辑：
+     - Netflix：严格区分非自制版权剧（Breaking Bad 81280792）与原创自制剧（House of Cards 80018499），精确区分“完整原生解锁”、“仅自制剧”与“未解锁”。
+     - YouTube Premium：规范请求并解析国家代码与开通可用性。
+     - Disney+、Max (HBO)、Prime Video、TikTok、Spotify、Gemini：统一补齐完整现代浏览器请求头与严格风控特征过滤。
+
+2. [Bug Fix] 订阅导入与更新导致节点全量重复翻倍修复：
+   - 重构订阅更新事务机制（`RawUpdater.doUpdate`）：使用精确配对匹配池替代旧覆盖逻辑，确保更新过程为全量替换（Replace）而非追加（Append），并将多余、孤立或上游已删除的旧节点执行彻底删除，彻底解决每次更新节点翻倍的缺陷。
+   - 解析层去重强保证：在 `RawUpdater.parseRaw`、`Formats.parseProxies`、`ConfigurationFragment.import`、剪贴板导入及二维码扫描各入口全部增加深度特征去重（`distinctBy`）。
+   - 列表刷新防抖与防重：`ConfigurationAdapter.onAdd` 增加已存在判断，防止并发回调导致节点重复挂载；`reloadProfiles()` 确保 ID 列表全局去重。
+
+3. [Stability & Build] 全项目优化与预发行构建保证：
+   - 全工程代码严格清理与本地编译通过，无任何资源与语法错误，确保 GitHub Actions 一次性全绿打包成功并发布为 Pre-release 预发行版。
+
 ### OwnBox v2.4.4 (Pre-release)
 
 1. [Bug Fix] 修复出站测试误报“出站失败”与路由分流错误：

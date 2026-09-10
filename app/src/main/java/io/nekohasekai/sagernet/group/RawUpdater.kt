@@ -219,34 +219,19 @@ object RawUpdater : GroupUpdater() {
 
         Logs.d("New profiles: ${proxies.size}")
 
-        val nameMap = proxies.associateBy { bean ->
-            bean.displayName()
-        }
-
-        Logs.d("Unique profiles: ${nameMap.size}")
-
-        val toDelete = ArrayList<ProxyEntity>()
-        val toReplace = exists.mapNotNull { entity ->
-            val name = entity.displayName()
-            if (nameMap.contains(name)) name to entity else let {
-                toDelete.add(entity)
-                null
-            }
-        }.toMap()
-
-        Logs.d("toDelete profiles: ${toDelete.size}")
-        Logs.d("toReplace profiles: ${toReplace.size}")
-
-        val toUpdate = ArrayList<ProxyEntity>()
+        val remainingExists = exists.toMutableList()
+        val toInsert = mutableListOf<ProxyEntity>()
+        val toUpdate = mutableListOf<ProxyEntity>()
         val added = mutableListOf<String>()
         val updated = mutableMapOf<String, String>()
-        val deleted = toDelete.map { it.displayName() }
-
         var userOrder = 1L
-        var changed = toDelete.size
-        for ((name, bean) in nameMap.entries) {
-            if (toReplace.contains(name)) {
-                val entity = toReplace[name]!!
+        var changed = 0
+
+        for (bean in proxies) {
+            val name = bean.displayName()
+            val existingIndex = remainingExists.indexOfFirst { it.displayName() == name }
+            if (existingIndex >= 0) {
+                val entity = remainingExists.removeAt(existingIndex)
                 val existsBean = entity.requireBean()
                 // 更新订阅，保留自定义覆写设置
                 bean.customOutboundJson = existsBean.customOutboundJson
@@ -255,44 +240,58 @@ object RawUpdater : GroupUpdater() {
                     existsBean != bean -> {
                         changed++
                         entity.putBean(bean)
+                        entity.userOrder = userOrder
                         toUpdate.add(entity)
                         updated[entity.displayName()] = name
-
                         Logs.d("Updated profile: $name")
                     }
-
                     entity.userOrder != userOrder -> {
+                        changed++
                         entity.putBean(bean)
-                        toUpdate.add(entity)
                         entity.userOrder = userOrder
-
+                        toUpdate.add(entity)
                         Logs.d("Reordered profile: $name")
                     }
-
                     else -> {
                         Logs.d("Ignored profile: $name")
                     }
                 }
             } else {
                 changed++
-                SagerDatabase.proxyDao.addProxy(
+                toInsert.add(
                     ProxyEntity(
-                        groupId = proxyGroup.id, userOrder = userOrder
+                        groupId = proxyGroup.id,
+                        userOrder = userOrder
                     ).apply {
                         putBean(bean)
-                    })
+                    }
+                )
                 added.add(name)
                 Logs.d("Inserted profile: $name")
             }
             userOrder++
         }
 
-        SagerDatabase.proxyDao.updateProxy(toUpdate).also {
-            Logs.d("Updated profiles: $it")
-        }
+        val toDelete = remainingExists
+        changed += toDelete.size
+        val deleted = toDelete.map { it.displayName() }
 
-        SagerDatabase.proxyDao.deleteProxy(toDelete).also {
-            Logs.d("Deleted profiles: $it")
+        Logs.d("toDelete profiles (orphans/removed/duplicates): ${toDelete.size}")
+        Logs.d("toInsert profiles: ${toInsert.size}")
+        Logs.d("toUpdate profiles: ${toUpdate.size}")
+
+        toInsert.forEach {
+            SagerDatabase.proxyDao.addProxy(it)
+        }
+        if (toUpdate.isNotEmpty()) {
+            SagerDatabase.proxyDao.updateProxy(toUpdate).also {
+                Logs.d("Updated profiles: $it")
+            }
+        }
+        if (toDelete.isNotEmpty()) {
+            SagerDatabase.proxyDao.deleteProxy(toDelete).also {
+                Logs.d("Deleted profiles: $it")
+            }
         }
 
         val existCount = SagerDatabase.proxyDao.countByGroup(proxyGroup.id).toInt()
@@ -312,6 +311,7 @@ object RawUpdater : GroupUpdater() {
     }
 
     @Suppress("UNCHECKED_CAST")
+
     suspend fun parseRaw(text: String, fileName: String = ""): List<AbstractBean>? {
 
         val proxies = mutableListOf<AbstractBean>()
@@ -878,7 +878,7 @@ object RawUpdater : GroupUpdater() {
                     }
                 }
                 if (proxies.isNotEmpty()) {
-                    return proxies
+                    return proxies.deduplicateProxies()
                 }
             } catch (e: Exception) {
                 Logs.w(e)
@@ -894,7 +894,7 @@ object RawUpdater : GroupUpdater() {
                     it
                 })
                 if (proxies.isNotEmpty()) {
-                    return proxies
+                    return proxies.deduplicateProxies()
                 }
             } catch (e: Exception) {
                 Logs.w(e)
@@ -905,7 +905,7 @@ object RawUpdater : GroupUpdater() {
             val json = JSONTokener(text).nextValue()
             val jsonProxies = parseJSON(json)
             if (!jsonProxies.isNullOrEmpty()) {
-                return jsonProxies
+                return jsonProxies.deduplicateProxies()
             }
         } catch (ignored: Exception) {
         }
@@ -914,7 +914,7 @@ object RawUpdater : GroupUpdater() {
             val base64Decoded = text.decodeBase64UrlSafe()
             val parsed = parseProxies(base64Decoded)
             if (!parsed.isNullOrEmpty()) {
-                return parsed
+                return parsed.deduplicateProxies()
             }
         } catch (ignored: Exception) {
         }
@@ -922,7 +922,7 @@ object RawUpdater : GroupUpdater() {
         try {
             val parsed = parseProxies(text)
             if (!parsed.isNullOrEmpty()) {
-                return parsed
+                return parsed.deduplicateProxies()
             }
         } catch (e: SubscriptionFoundException) {
             throw e

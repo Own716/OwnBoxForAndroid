@@ -298,10 +298,22 @@ suspend fun parseProxies(text: String): List<AbstractBean> {
             }
         }
     }
-    return if (entitiesByLine.size >= entities.size) entitiesByLine else entities
+    val chosen = if (entitiesByLine.size >= entities.size) entitiesByLine else entities
+    return chosen.deduplicateProxies()
 }
 
 fun <T : Serializable> T.applyDefaultValues(): T {
     initializeDefaultValues()
     return this
+}
+
+
+fun AbstractBean.dedupKey(): String {
+    return runCatching {
+        moe.matsuri.nb4a.Protocols.Deduplication(this, javaClass.simpleName).hash()
+    }.getOrNull() ?: "${javaClass.simpleName}:${serverAddress}:${serverPort}:${displayName()}"
+}
+
+fun <T : AbstractBean> List<T>.deduplicateProxies(): List<T> {
+    return distinctBy { it.dedupKey() }
 }

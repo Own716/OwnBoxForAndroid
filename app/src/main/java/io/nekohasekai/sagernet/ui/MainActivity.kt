@@ -43,15 +43,24 @@ import io.nekohasekai.sagernet.fmt.KryoConverters
 import io.nekohasekai.sagernet.fmt.PluginEntry
 import io.nekohasekai.sagernet.group.GroupInterfaceAdapter
 import io.nekohasekai.sagernet.group.GroupUpdater
+import io.nekohasekai.sagernet.ktx.deduplicateProxies
 import io.nekohasekai.sagernet.ktx.alert
+import io.nekohasekai.sagernet.ktx.deduplicateProxies
 import io.nekohasekai.sagernet.ktx.isPlay
+import io.nekohasekai.sagernet.ktx.deduplicateProxies
 import io.nekohasekai.sagernet.ktx.isPreview
+import io.nekohasekai.sagernet.ktx.deduplicateProxies
 import io.nekohasekai.sagernet.ktx.launchCustomTab
+import io.nekohasekai.sagernet.ktx.deduplicateProxies
 import io.nekohasekai.sagernet.ktx.onMainDispatcher
+import io.nekohasekai.sagernet.ktx.deduplicateProxies
 import io.nekohasekai.sagernet.ktx.parseProxies
+import io.nekohasekai.sagernet.ktx.deduplicateProxies
 import io.nekohasekai.sagernet.ktx.readableMessage
+import io.nekohasekai.sagernet.ktx.deduplicateProxies
 import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
 import io.nekohasekai.sagernet.ui.MessageStore
+import io.nekohasekai.sagernet.ktx.deduplicateProxies
 import io.nekohasekai.sagernet.ktx.Logs
 import moe.matsuri.nb4a.utils.Util
 
@@ -193,7 +202,8 @@ class MainActivity : ThemedActivity(),
                 .setPositiveButton(R.string.action_import) { _, _ ->
                     runOnDefaultDispatcher {
                         try {
-                            val proxies = io.nekohasekai.sagernet.group.RawUpdater.parseRaw(text)
+                            val rawProxies = io.nekohasekai.sagernet.group.RawUpdater.parseRaw(text)
+                            val proxies = rawProxies?.deduplicateProxies()
                             if (!proxies.isNullOrEmpty()) {
                                 val targetId = DataStore.selectedGroupForImport()
                                 proxies.forEach { profile ->

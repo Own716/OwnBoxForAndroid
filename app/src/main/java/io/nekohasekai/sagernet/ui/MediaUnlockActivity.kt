@@ -161,13 +161,17 @@ class MediaUnlockActivity : ThemedActivity() {
 
     companion object {
         private const val BROWSER_USER_AGENT =
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+
+        private val CLAUDE_UNSUPPORTED_REGIONS = setOf(
+            "HK", "MO", "CN", "RU", "BY", "IR", "KP", "SY", "CU"
+        )
 
         private fun libcore.HTTPRequest.applyBrowserHeaders(host: String? = null) {
             setUserAgent(BROWSER_USER_AGENT)
             setHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
             setHeader("Accept-Language", "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7")
-            setHeader("sec-ch-ua", "\"Chromium\";v=\"124\", \"Google Chrome\";v=\"124\", \"Not-A.Brand\";v=\"99\"")
+            setHeader("sec-ch-ua", "\"Not/A)Brand\";v=\"8\", \"Chromium\";v=\"126\", \"Google Chrome\";v=\"126\"")
             setHeader("sec-ch-ua-mobile", "?0")
             setHeader("sec-ch-ua-platform", "\"Windows\"")
             setHeader("sec-fetch-dest", "document")
@@ -233,7 +237,7 @@ class MediaUnlockActivity : ThemedActivity() {
         try {
             val req1 = client.newRequest().apply {
                 setURL("https://www.netflix.com/title/81280792")
-                setUserAgent(USER_AGENT)
+                applyBrowserHeaders("www.netflix.com")
             }
             val resp1 = req1.execute()
             body1 = Util.getStringBox(resp1.contentString)
@@ -262,7 +266,7 @@ class MediaUnlockActivity : ThemedActivity() {
         try {
             val req2 = client.newRequest().apply {
                 setURL("https://www.netflix.com/title/80018499")
-                setUserAgent(USER_AGENT)
+                applyBrowserHeaders("www.netflix.com")
             }
             val resp2 = req2.execute()
             body2 = Util.getStringBox(resp2.contentString)
@@ -291,12 +295,17 @@ class MediaUnlockActivity : ThemedActivity() {
         }
         val req = client.newRequest().apply {
             setURL("https://www.disneyplus.com/")
-            setUserAgent(USER_AGENT)
+            applyBrowserHeaders("www.disneyplus.com")
         }
         val resp = req.execute()
         val body = Util.getStringBox(resp.contentString)
 
-        if (!body.contains("not available in your region") && !body.contains("restricted") && !body.contains("disneyplus.com/unavailable")) {
+        val isBlocked = body.contains("not available in your region", ignoreCase = true) ||
+                body.contains("is not available in your area", ignoreCase = true) ||
+                body.contains("disneyplus.com/unavailable", ignoreCase = true) ||
+                body.contains("restricted", ignoreCase = true)
+
+        if (!isBlocked) {
             item.copy(
                 state = TestState.UNLOCKED,
                 statusText = "支持",
@@ -318,12 +327,14 @@ class MediaUnlockActivity : ThemedActivity() {
         }
         val req = client.newRequest().apply {
             setURL("https://auth.max.com/")
-            setUserAgent(USER_AGENT)
+            applyBrowserHeaders("auth.max.com")
         }
         val resp = req.execute()
         val body = Util.getStringBox(resp.contentString)
 
-        if (!body.contains("not available in your region") && !body.contains("unsupported_location")) {
+        if (!body.contains("not available in your region", ignoreCase = true) &&
+            !body.contains("unsupported_location", ignoreCase = true)
+        ) {
             item.copy(
                 state = TestState.UNLOCKED,
                 statusText = "支持",
@@ -345,12 +356,14 @@ class MediaUnlockActivity : ThemedActivity() {
         }
         val req = client.newRequest().apply {
             setURL("https://www.primevideo.com/")
-            setUserAgent(USER_AGENT)
+            applyBrowserHeaders("www.primevideo.com")
         }
         val resp = req.execute()
         val body = Util.getStringBox(resp.contentString)
 
-        if (!body.contains("georestricted") && !body.contains("not-available-in-your-country")) {
+        if (!body.contains("georestricted", ignoreCase = true) &&
+            !body.contains("not-available-in-your-country", ignoreCase = true)
+        ) {
             item.copy(
                 state = TestState.UNLOCKED,
                 statusText = "支持",
@@ -372,18 +385,27 @@ class MediaUnlockActivity : ThemedActivity() {
         }
         val req = client.newRequest().apply {
             setURL("https://www.youtube.com/premium")
-            setUserAgent(USER_AGENT)
+            applyBrowserHeaders("www.youtube.com")
         }
         val resp = req.execute()
         val body = Util.getStringBox(resp.contentString)
 
-        val matcher = Pattern.compile("\"countryCode\"\\s*:\\s*\"([A-Za-z]{2})\"").matcher(body)
         var countryCode = ""
-        if (matcher.find()) {
-            countryCode = matcher.group(1)?.uppercase() ?: ""
+        val matcher1 = Pattern.compile("\"countryCode\"\\s*:\\s*\"([A-Za-z]{2})\"").matcher(body)
+        if (matcher1.find()) {
+            countryCode = matcher1.group(1)?.uppercase() ?: ""
+        }
+        if (countryCode.isBlank()) {
+            val matcher2 = Pattern.compile("\"INNERTUBE_CONTEXT_GL\"\\s*:\\s*\"([A-Za-z]{2})\"").matcher(body)
+            if (matcher2.find()) {
+                countryCode = matcher2.group(1)?.uppercase() ?: ""
+            }
         }
 
-        if (countryCode.isNotBlank()) {
+        val isNotAvailable = body.contains("not available in your country", ignoreCase = true) ||
+                body.contains("Premium is not available", ignoreCase = true)
+
+        if (countryCode.isNotBlank() && !isNotAvailable) {
             val flag = LandingIpManager.countryCodeToFlagEmoji(countryCode)
             item.copy(
                 state = TestState.UNLOCKED,
@@ -391,7 +413,7 @@ class MediaUnlockActivity : ThemedActivity() {
                 description = "支持开通与畅享 YouTube Premium 会员无广告服务",
                 region = countryCode
             )
-        } else if (body.contains("Premium") && !body.contains("not available in your country")) {
+        } else if (body.contains("Premium") && !isNotAvailable) {
             item.copy(
                 state = TestState.UNLOCKED,
                 statusText = "支持",
@@ -413,7 +435,7 @@ class MediaUnlockActivity : ThemedActivity() {
         }
         val req = client.newRequest().apply {
             setURL("https://www.tiktok.com/")
-            setUserAgent(USER_AGENT)
+            applyBrowserHeaders("www.tiktok.com")
         }
         val resp = req.execute()
         val body = Util.getStringBox(resp.contentString)
@@ -424,7 +446,7 @@ class MediaUnlockActivity : ThemedActivity() {
             region = matcher.group(1)?.uppercase() ?: ""
         }
 
-        if (!body.contains("tiktok-verify-page")) {
+        if (!body.contains("tiktok-verify-page", ignoreCase = true)) {
             val flag = if (region.isNotBlank()) LandingIpManager.countryCodeToFlagEmoji(region) + " " + region else ""
             item.copy(
                 state = TestState.UNLOCKED,
@@ -448,12 +470,12 @@ class MediaUnlockActivity : ThemedActivity() {
         }
         val req = client.newRequest().apply {
             setURL("https://www.spotify.com/")
-            setUserAgent(USER_AGENT)
+            applyBrowserHeaders("www.spotify.com")
         }
         val resp = req.execute()
         val body = Util.getStringBox(resp.contentString)
 
-        if (!body.contains("not available in your country")) {
+        if (!body.contains("not available in your country", ignoreCase = true)) {
             item.copy(
                 state = TestState.UNLOCKED,
                 statusText = "支持",
@@ -473,6 +495,10 @@ class MediaUnlockActivity : ThemedActivity() {
             modernTLS()
             tryProxyOutbound()
         }
+
+        // 1. 优先尝试 Web 网页端
+        var webSuccess = false
+        var cfChallenge = false
         try {
             val req = client.newRequest().apply {
                 setURL("https://chatgpt.com/")
@@ -481,18 +507,14 @@ class MediaUnlockActivity : ThemedActivity() {
             val resp = req.execute()
             val body = Util.getStringBox(resp.contentString)
 
-            if (!body.contains("cf-mitigated") && !body.contains("Attention Required") && !body.contains("1020")) {
-                item.copy(
-                    state = TestState.UNLOCKED,
-                    statusText = "支持",
-                    description = "无 Cloudflare 拦截，网页端与 API 可正常对话"
-                )
+            if (!body.contains("cf-mitigated") &&
+                !body.contains("Attention Required") &&
+                !body.contains("1020") &&
+                !body.contains("Just a moment")
+            ) {
+                webSuccess = true
             } else {
-                item.copy(
-                    state = TestState.BLOCKED,
-                    statusText = "CF 拦截",
-                    description = "触发 Cloudflare 人机验证或 OpenAI IP 封禁策略"
-                )
+                cfChallenge = true
             }
         } catch (e: Throwable) {
             val msg = e.message.orEmpty()
@@ -500,18 +522,64 @@ class MediaUnlockActivity : ThemedActivity() {
                 msg.contains("cf-mitigated", ignoreCase = true) || msg.contains("Just a moment", ignoreCase = true) ||
                 msg.contains("1020")
             ) {
-                item.copy(
-                    state = TestState.BLOCKED,
-                    statusText = "受限/触发风控",
-                    description = "HTTP 403 触发 Cloudflare/OpenAI 平台风控拦截"
-                )
-            } else {
-                throw e
+                cfChallenge = true
             }
+        }
+
+        if (webSuccess) {
+            return@withContext item.copy(
+                state = TestState.UNLOCKED,
+                statusText = "支持",
+                description = "无 Cloudflare 拦截，网页端与 API 可正常对话"
+            )
+        }
+
+        // 2. 若 Web 端遇到 Cloudflare 拦截/403，探测移动端端点双链路兜底
+        try {
+            val mobileReq = client.newRequest().apply {
+                setURL("https://ios.chat.openai.com/public-api/mobile/server_status/v1")
+                setUserAgent("ChatGPT/1.2024.135 (iOS 17.5.1; iPhone15,2)")
+                setHeader("Accept", "application/json")
+            }
+            val mobileResp = mobileReq.execute()
+            val mobileBody = Util.getStringBox(mobileResp.contentString)
+            if (mobileBody.contains("status") || mobileBody.contains("ok") || mobileBody.contains("normal") || mobileBody.contains("maintenance")) {
+                return@withContext item.copy(
+                    state = TestState.UNLOCKED,
+                    statusText = "支持 (App/API)",
+                    description = "网页端触发 Cloudflare 验证，但官方 App / API 链路可用"
+                )
+            }
+        } catch (_: Throwable) {
+        }
+
+        if (cfChallenge) {
+            item.copy(
+                state = TestState.BLOCKED,
+                statusText = "受限/触发风控",
+                description = "HTTP 403 触发 Cloudflare/OpenAI 平台风控拦截"
+            )
+        } else {
+            item.copy(
+                state = TestState.BLOCKED,
+                statusText = "未解锁",
+                description = "节点 IP 无法正常连接 ChatGPT 官方服务"
+            )
         }
     }
 
     private suspend fun testClaude(item: MediaItem): MediaItem = withContext(Dispatchers.IO) {
+        // 1. 先行对 Anthropic 明确不支持的地区（如香港 HK、中国大陆 CN、澳门 MO、俄罗斯 RU 等）进行过滤，杜绝虚假解锁
+        val currentCountry = LandingIpManager.getCachedInfo()?.countryCode?.uppercase()
+        if (currentCountry != null && currentCountry in CLAUDE_UNSUPPORTED_REGIONS) {
+            val flag = LandingIpManager.countryCodeToFlagEmoji(currentCountry)
+            return@withContext item.copy(
+                state = TestState.BLOCKED,
+                statusText = "地区受限 $flag $currentCountry",
+                description = "Anthropic 官方未在该地区开放 Claude 访问服务"
+            )
+        }
+
         val client = Libcore.newHttpClient().apply {
             modernTLS()
             tryProxyOutbound()
@@ -524,16 +592,25 @@ class MediaUnlockActivity : ThemedActivity() {
             val resp = req.execute()
             val body = Util.getStringBox(resp.contentString)
 
-            if (!body.contains("App unavailable in your region") && !body.contains("403 Forbidden")) {
+            val isBlocked = body.contains("App unavailable in your region", ignoreCase = true) ||
+                    body.contains("not available in your country", ignoreCase = true) ||
+                    body.contains("not available in your region", ignoreCase = true) ||
+                    body.contains("claude.ai/unavailable", ignoreCase = true) ||
+                    body.contains("unsupported_location", ignoreCase = true) ||
+                    body.contains("403 Forbidden", ignoreCase = true)
+
+            if (!isBlocked && (body.contains("Continue with Google") || body.contains("email") || body.contains("Claude") || body.contains("login"))) {
+                val flag = if (!currentCountry.isNullOrBlank()) " " + LandingIpManager.countryCodeToFlagEmoji(currentCountry) + " " + currentCountry else ""
                 item.copy(
                     state = TestState.UNLOCKED,
-                    statusText = "支持",
+                    statusText = "支持$flag",
                     description = "支持访问 Anthropic Claude，区域授权正常开放"
                 )
             } else {
+                val flag = if (!currentCountry.isNullOrBlank()) " " + LandingIpManager.countryCodeToFlagEmoji(currentCountry) + " " + currentCountry else ""
                 item.copy(
                     state = TestState.BLOCKED,
-                    statusText = "地区受限",
+                    statusText = "地区受限$flag",
                     description = "当前节点所在地区尚未开放 Claude 访问服务"
                 )
             }
@@ -566,7 +643,9 @@ class MediaUnlockActivity : ThemedActivity() {
             val resp = req.execute()
             val body = Util.getStringBox(resp.contentString)
 
-            if (!body.contains("not supported in your country") && !body.contains("unavailable in your territory")) {
+            if (!body.contains("not supported in your country", ignoreCase = true) &&
+                !body.contains("unavailable in your territory", ignoreCase = true)
+            ) {
                 item.copy(
                     state = TestState.UNLOCKED,
                     statusText = "支持",

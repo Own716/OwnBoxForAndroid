@@ -76,6 +76,7 @@ import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.SubscriptionFoundException
 import io.nekohasekai.sagernet.ktx.alert
 import io.nekohasekai.sagernet.ktx.app
+import io.nekohasekai.sagernet.ktx.deduplicateProxies
 import io.nekohasekai.sagernet.ktx.dp2px
 import io.nekohasekai.sagernet.ktx.getColorAttr
 import io.nekohasekai.sagernet.ktx.getColour
@@ -521,14 +522,15 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     suspend fun import(proxies: List<AbstractBean>) {
         val targetId = DataStore.selectedGroupForImport()
-        for (proxy in proxies) {
+        val distinctProxies = proxies.deduplicateProxies()
+        for (proxy in distinctProxies) {
             ProfileManager.createProfile(targetId, proxy)
         }
         onMainDispatcher {
             DataStore.editingGroup = targetId
             snackbar(
                 requireContext().resources.getQuantityString(
-                    R.plurals.added, proxies.size, proxies.size
+                    R.plurals.added, distinctProxies.size, distinctProxies.size
                 )
             ).show()
         }
@@ -547,7 +549,8 @@ class ConfigurationFragment @JvmOverloads constructor(
                     snackbar(getString(R.string.clipboard_empty)).show()
                 } else runOnDefaultDispatcher {
                     try {
-                        val proxies = RawUpdater.parseRaw(text)
+                        val rawProxies = RawUpdater.parseRaw(text)
+                        val proxies = rawProxies?.deduplicateProxies()
                         if (proxies.isNullOrEmpty()) {
                             onMainDispatcher {
                                 snackbar(getString(R.string.no_proxies_found_in_clipboard)).show()
@@ -2244,6 +2247,12 @@ class ConfigurationFragment @JvmOverloads constructor(
                     if (::undoManager.isInitialized) {
                         undoManager.flush()
                     }
+                    if (configurationIdList.contains(profile.id)) {
+                        configurationList[profile.id] = profile
+                        val index = configurationIdList.indexOf(profile.id)
+                        notifyItemChanged(index)
+                        return@post
+                    }
                     val pos = itemCount
                     configurationList[profile.id] = profile
                     configurationIdList.add(profile.id)
@@ -2364,7 +2373,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                 }
 
                 val newProfileMap = newProfiles.associateBy { it.id }
-                val newProfileIds = newProfiles.map { it.id }
+                val newProfileIds = newProfiles.map { it.id }.distinct()
 
                 var selectedProfileIndex = -1
 
