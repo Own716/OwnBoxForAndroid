@@ -56,6 +56,8 @@ object Protocols {
 
     fun Context.getProtocolColor(type: Int): Int {
         return when (type) {
+            ProxyEntity.TYPE_BALANCER -> android.graphics.Color.parseColor("#FF6F00")
+            ProxyEntity.TYPE_CHAIN -> android.graphics.Color.parseColor("#7E57C2")
             TYPE_NEKO -> getColorAttr(android.R.attr.textColorPrimary)
             else -> getColorAttr(R.attr.accentOrTextSecondary)
         }

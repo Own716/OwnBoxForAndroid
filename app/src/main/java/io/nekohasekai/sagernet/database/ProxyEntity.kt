@@ -10,6 +10,7 @@ import io.nekohasekai.sagernet.fmt.*
 import io.nekohasekai.sagernet.fmt.http.HttpBean
 import io.nekohasekai.sagernet.fmt.http.toUri
 import io.nekohasekai.sagernet.fmt.hysteria.*
+import io.nekohasekai.sagernet.fmt.internal.BalancerBean
 import io.nekohasekai.sagernet.fmt.internal.ChainBean
 import io.nekohasekai.sagernet.fmt.mieru.MieruBean
 import io.nekohasekai.sagernet.fmt.mieru.buildMieruConfig
@@ -84,6 +85,7 @@ data class ProxyEntity(
     var nekoBean: NekoBean? = null,
     var configBean: ConfigBean? = null,
     @ColumnInfo(defaultValue = "NULL") var snellBean: SnellBean? = null,
+    @ColumnInfo(defaultValue = "NULL") var balancerBean: BalancerBean? = null,
 ) : Serializable() {
 
     companion object {
@@ -106,6 +108,7 @@ data class ProxyEntity(
         const val TYPE_ANYTLS = 22
         const val TYPE_JUICITY = 23
         const val TYPE_SNELL = 24
+        const val TYPE_BALANCER = 25
 
         const val TYPE_CONFIG = 998
         const val TYPE_NEKO = 999
@@ -113,6 +116,7 @@ data class ProxyEntity(
         const val TYPE_CHAIN = 8
 
         val chainName by lazy { app.getString(R.string.proxy_chain) }
+        val balancerName by lazy { app.getString(R.string.balancer) }
 
         @JvmField
         val CREATOR = object : CREATOR<ProxyEntity>() {
@@ -204,6 +208,7 @@ data class ProxyEntity(
             TYPE_NEKO -> nekoBean = KryoConverters.nekoDeserialize(byteArray)
             TYPE_CONFIG -> configBean = KryoConverters.configDeserialize(byteArray)
             TYPE_SNELL -> snellBean = KryoConverters.snellDeserialize(byteArray)
+            TYPE_BALANCER -> balancerBean = KryoConverters.balancerDeserialize(byteArray)
         }
     }
 
@@ -225,6 +230,7 @@ data class ProxyEntity(
         TYPE_SHADOWTLS -> "ShadowTLS"
         TYPE_ANYTLS -> "AnyTLS"
         TYPE_CHAIN -> chainName
+        TYPE_BALANCER -> balancerName
         TYPE_NEKO -> nekoBean!!.displayType()
         TYPE_CONFIG -> configBean!!.displayType()
         TYPE_SNELL -> "Snell"
@@ -253,6 +259,7 @@ data class ProxyEntity(
             TYPE_SHADOWTLS -> shadowTLSBean
             TYPE_ANYTLS -> anyTLSBean
             TYPE_CHAIN -> chainBean
+            TYPE_BALANCER -> balancerBean
             TYPE_NEKO -> nekoBean
             TYPE_CONFIG -> configBean
             TYPE_SNELL -> snellBean
@@ -262,7 +269,7 @@ data class ProxyEntity(
 
     fun haveLink(): Boolean {
         return when (type) {
-            TYPE_CHAIN -> false
+            TYPE_CHAIN, TYPE_BALANCER -> false
             else -> true
         }
     }
@@ -448,6 +455,7 @@ data class ProxyEntity(
         chainBean = null
         configBean = null
         nekoBean = null
+        balancerBean = null
 
         when (bean) {
             is SOCKSBean -> {
@@ -540,6 +548,11 @@ data class ProxyEntity(
                 chainBean = bean
             }
 
+            is BalancerBean -> {
+                type = TYPE_BALANCER
+                balancerBean = bean
+            }
+
             is NekoBean -> {
                 type = TYPE_NEKO
                 nekoBean = bean
@@ -575,6 +588,7 @@ data class ProxyEntity(
                 TYPE_SHADOWTLS -> ShadowTLSSettingsActivity::class.java
                 TYPE_ANYTLS -> AnyTLSSettingsActivity::class.java
                 TYPE_CHAIN -> ChainSettingsActivity::class.java
+                TYPE_BALANCER -> BalancerSettingsActivity::class.java
                 TYPE_CONFIG -> ConfigSettingActivity::class.java
                 TYPE_SNELL -> SnellSettingsActivity::class.java
                 else -> throw IllegalArgumentException()
@@ -596,6 +610,9 @@ data class ProxyEntity(
 
         @Query("SELECT * FROM proxy_entities WHERE groupId = :groupId ORDER BY userOrder")
         fun getByGroup(groupId: Long): List<ProxyEntity>
+
+        @Query("SELECT * FROM proxy_entities WHERE type = :type")
+        fun getByType(type: Int): List<ProxyEntity>
 
         @Query("SELECT * FROM proxy_entities WHERE id in (:proxyIds)")
         fun getEntities(proxyIds: List<Long>): List<ProxyEntity>

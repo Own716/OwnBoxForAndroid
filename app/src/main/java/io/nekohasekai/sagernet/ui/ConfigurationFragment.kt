@@ -91,6 +91,7 @@ import io.nekohasekai.sagernet.ktx.startFilesForResult
 import io.nekohasekai.sagernet.ktx.tryToShow
 import io.nekohasekai.sagernet.plugin.PluginManager
 import io.nekohasekai.sagernet.ui.profile.ChainSettingsActivity
+import io.nekohasekai.sagernet.ui.profile.BalancerSettingsActivity
 import io.nekohasekai.sagernet.ui.profile.HttpSettingsActivity
 import io.nekohasekai.sagernet.ui.profile.HysteriaSettingsActivity
 import io.nekohasekai.sagernet.ui.profile.JuicitySettingsActivity
@@ -677,6 +678,10 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             R.id.action_new_chain -> {
                 startActivity(Intent(requireActivity(), ChainSettingsActivity::class.java))
+            }
+
+            R.id.action_new_balancer -> {
+                startActivity(Intent(requireActivity(), BalancerSettingsActivity::class.java))
             }
 
             R.id.action_update_subscription -> {
@@ -2446,13 +2451,13 @@ class ConfigurationFragment @JvmOverloads constructor(
                 }
                 shareLayout.setOnClickListener {
                     val proxyEntity = entity
-                    if (!select && proxyEntity.type != ProxyEntity.TYPE_CHAIN) {
+                    if (!select && proxyEntity.type != ProxyEntity.TYPE_CHAIN && proxyEntity.type != ProxyEntity.TYPE_BALANCER) {
                         showShareMenu(it, proxyEntity)
                     }
                 }
                 view.setOnLongClickListener {
                     val proxyEntity = entity
-                    if (!select && proxyEntity.type != ProxyEntity.TYPE_CHAIN) {
+                    if (!select && proxyEntity.type != ProxyEntity.TYPE_CHAIN && proxyEntity.type != ProxyEntity.TYPE_BALANCER) {
                         showShareMenu(shareLayout, proxyEntity)
                         true
                     } else false
@@ -2681,7 +2686,7 @@ class ConfigurationFragment @JvmOverloads constructor(
 
                 bindTestResult(proxyEntity, showTraffic, speedTestText)
 
-                val selectOrChain = select || proxyEntity.type == ProxyEntity.TYPE_CHAIN
+                val selectOrChain = select || proxyEntity.type == ProxyEntity.TYPE_CHAIN || proxyEntity.type == ProxyEntity.TYPE_BALANCER
                 val isDoubleColumn = layoutManager is FixedGridLayoutManager
                 
                 if (isDoubleColumn) {
@@ -2709,7 +2714,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                 removeButton.isEnabled = !started
                 applySelected(selected)
 
-                if (!(select || proxyEntity.type == ProxyEntity.TYPE_CHAIN)) {
+                if (!(select || proxyEntity.type == ProxyEntity.TYPE_CHAIN || proxyEntity.type == ProxyEntity.TYPE_BALANCER)) {
                     shareLayer.setBackgroundColor(Color.TRANSPARENT)
                     shareButton.setImageResource(R.drawable.ic_baseline_more_vert_24)
                     shareButton.setColorFilter(Color.GRAY)

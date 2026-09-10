@@ -21,6 +21,7 @@ import io.nekohasekai.sagernet.ktx.parsePort
 import io.nekohasekai.sagernet.ktx.string
 import io.nekohasekai.sagernet.ktx.stringToInt
 import io.nekohasekai.sagernet.ktx.stringToIntIfExists
+import io.nekohasekai.sagernet.ktx.stringToLong
 import io.nekohasekai.sagernet.utils.Theme
 import moe.matsuri.nb4a.TempDatabase
 
@@ -220,6 +221,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var bypass by configurationStore.boolean(Key.BYPASS_MODE) { true }
     var individual by configurationStore.string(Key.INDIVIDUAL)
     var showDirectSpeed by configurationStore.boolean(Key.SHOW_DIRECT_SPEED) { true }
+    var showLandingIp by configurationStore.boolean(Key.SHOW_LANDING_IP) { true }
 
     val persistAcrossReboot by configurationStore.boolean(Key.PERSIST_ACROSS_REBOOT) { false }
 
@@ -231,18 +233,16 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     }
     var connectionTestURL: String
         get() {
-            val url = rawConnectionTestURL
-            if (url.isBlank() || url == "https://www.gstatic.com/generate_204" || url == "http://www.gstatic.com/generate_204") {
+            val url = rawConnectionTestURL.trim()
+            if (url.isBlank()) {
                 val newUrl = SagerNet.application.getString(R.string.default_connection_test_url)
-                if (url != newUrl) {
-                    rawConnectionTestURL = newUrl
-                }
+                rawConnectionTestURL = newUrl
                 return newUrl
             }
             return url
         }
         set(value) {
-            rawConnectionTestURL = value
+            rawConnectionTestURL = value.trim()
         }
     var connectionTestConcurrent by configurationStore.int(Key.CONNECTION_TEST_CONCURRENT) {
         SagerNet.application.getString(R.string.default_connection_test_concurrent).toInt()
@@ -354,27 +354,33 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var serverCustom by profileCacheStore.string(Key.SERVER_CUSTOM)
     var serverCustomOutbound by profileCacheStore.string(Key.SERVER_CUSTOM_OUTBOUND)
 
+    var balancerType by profileCacheStore.stringToInt("balancerType") { 0 }
+    var balancerTargetGroup by profileCacheStore.stringToLong("balancerTargetGroup") { 0L }
+    var balancerStrategy by profileCacheStore.string("balancerStrategy") { "random" }
+    var balancerTestUrl by profileCacheStore.string("balancerTestUrl") { "" }
+    var balancerInterval by profileCacheStore.stringToInt("balancerInterval") { 300 }
+
     var groupName by profileCacheStore.string(Key.GROUP_NAME)
     var groupType by profileCacheStore.stringToInt(Key.GROUP_TYPE)
     var groupOrder by profileCacheStore.stringToInt(Key.GROUP_ORDER)
     var groupIsSelector by profileCacheStore.boolean(Key.GROUP_IS_SELECTOR)
     var groupIsUrlTest by profileCacheStore.boolean("groupIsUrlTest")
     var groupIsLoadBalance by profileCacheStore.boolean("groupIsLoadBalance")
-    private var rawGroupUrlTestUrl by profileCacheStore.string("groupUrlTestUrl") { "http://cp.cloudflare.com/generate_204" }
+    private var rawGroupUrlTestUrl by profileCacheStore.string("groupUrlTestUrl") {
+        SagerNet.application.getString(R.string.default_connection_test_url)
+    }
     var groupUrlTestUrl: String
         get() {
-            val url = rawGroupUrlTestUrl
-            if (url.isBlank() || url == "https://www.gstatic.com/generate_204" || url == "http://www.gstatic.com/generate_204") {
-                val newUrl = "http://cp.cloudflare.com/generate_204"
-                if (url != newUrl) {
-                    rawGroupUrlTestUrl = newUrl
-                }
+            val url = rawGroupUrlTestUrl.trim()
+            if (url.isBlank()) {
+                val newUrl = SagerNet.application.getString(R.string.default_connection_test_url)
+                rawGroupUrlTestUrl = newUrl
                 return newUrl
             }
             return url
         }
         set(value) {
-            rawGroupUrlTestUrl = value
+            rawGroupUrlTestUrl = value.trim()
         }
     var groupUrlTestInterval by profileCacheStore.stringToInt("groupUrlTestInterval") { 180 }
     var groupUrlTestTolerance by profileCacheStore.stringToInt("groupUrlTestTolerance") { 50 }
@@ -404,10 +410,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     fun setGroupIsLoadBalance(groupId: Long, value: Boolean) = setGroupLoadBalance(groupId, value)
 
     fun groupUrlTestUrl(groupId: Long): String {
-        val stored = configurationStore.getString("group_${groupId}_urlTestUrl", "")?.takeIf { it.isNotBlank() }
-        if (stored == "https://www.gstatic.com/generate_204" || stored == "http://www.gstatic.com/generate_204") {
-            return connectionTestURL
-        }
+        val stored = configurationStore.getString("group_${groupId}_urlTestUrl", "")?.trim()?.takeIf { it.isNotBlank() }
         return stored ?: connectionTestURL
     }
     fun setGroupUrlTestUrl(groupId: Long, value: String) {

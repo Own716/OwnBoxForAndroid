@@ -729,4 +729,24 @@
         <item>unsafe-raw</item>
     </string-array>
 
+    <string-array name="balancer_type_entries">
+        <item>@string/balancer_type_list</item>
+        <item>@string/balancer_type_group</item>
+    </string-array>
+    <string-array name="balancer_type_values" translatable="false">
+        <item>0</item>
+        <item>1</item>
+    </string-array>
+
+    <string-array name="balancer_strategy_entries">
+        <item>@string/balancer_strategy_random</item>
+        <item>@string/balancer_strategy_least_ping</item>
+        <item>@string/balancer_strategy_least_load</item>
+    </string-array>
+    <string-array name="balancer_strategy_values" translatable="false">
+        <item>random</item>
+        <item>leastPing</item>
+        <item>leastLoad</item>
+    </string-array>
+
 </resources>

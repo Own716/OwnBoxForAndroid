@@ -888,4 +888,20 @@
     <string name="traffic_chart_refresh">Refresh</string>
     <string name="traffic_total_upload">Total Up</string>
     <string name="traffic_total_download">Total Down</string>
+    <string name="show_landing_ip">Show Landing IP</string>
+    <string name="show_landing_ip_sum">Display the egress landing IP and country flag on the home status bar</string>
+    <string name="balancer_type_list">List</string>
+    <string name="balancer_type_group">Group</string>
+    <string name="balancer_strategy_random">Random (random)</string>
+    <string name="balancer_strategy_least_ping">Lowest Latency (leastPing)</string>
+    <string name="balancer_strategy_least_load">Lowest Load (leastLoad)</string>
+    <string name="balancer_custom_url">Custom Test URL</string>
+    <string name="balancer_custom_url_sum">Custom probe URL for this Balancer (leave blank to use global default)</string>
+    <string name="balancer_interval">Probe Interval</string>
+    <string name="balancer_interval_sum">%1$s seconds</string>
+    <string name="balancer_select_group">Select Group</string>
+    <string name="balancer">Balancer</string>
+    <string name="balancer_settings">Balancer Settings</string>
+    <string name="balancer_type">Type</string>
+    <string name="balancer_strategy">Strategy</string>
 </resources>

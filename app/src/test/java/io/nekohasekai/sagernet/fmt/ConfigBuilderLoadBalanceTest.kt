@@ -16,4 +16,16 @@ class ConfigBuilderLoadBalanceTest {
         assertEquals(TAG_PROXY, lb.tag)
         assertEquals(members, lb.outbounds)
     }
+
+    @Test
+    fun buildLoadBalanceOutboundWithStrategy() {
+        val members = listOf("node1", "node2")
+        val lbRandom = buildLoadBalanceOutbound(members, "random")
+        assertEquals("loadbalance", lbRandom.type)
+        assertEquals("random", lbRandom.strategy)
+
+        val lbLeastLoad = buildLoadBalanceOutbound(members, "leastLoad")
+        assertEquals("loadbalance", lbLeastLoad.type)
+        assertEquals("leastLoad", lbLeastLoad.strategy)
+    }
 }

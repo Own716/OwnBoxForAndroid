@@ -438,6 +438,11 @@ class MainActivity : ThemedActivity(),
         return true
     }
 
+    override fun onResume() {
+        super.onResume()
+        binding.stats.refreshDisplay()
+    }
+
 
     @SuppressLint("CommitTransaction")
     fun displayFragment(fragment: ToolbarFragment) {

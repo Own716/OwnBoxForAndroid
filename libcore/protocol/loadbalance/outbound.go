@@ -2,6 +2,7 @@ package loadbalance
 
 import (
 	"context"
+	"math/rand"
 	"net"
 	"sync/atomic"
 
@@ -19,8 +20,13 @@ import (
 
 const TypeLoadBalance = "loadbalance"
 
+type LoadBalanceOptions struct {
+	option.SelectorOutboundOptions
+	Strategy string `json:"strategy,omitempty"`
+}
+
 func RegisterLoadBalance(registry *outbound.Registry) {
-	outbound.Register[option.SelectorOutboundOptions](registry, TypeLoadBalance, NewLoadBalance)
+	outbound.Register[LoadBalanceOptions](registry, TypeLoadBalance, NewLoadBalance)
 }
 
 var (
@@ -36,12 +42,13 @@ type LoadBalance struct {
 	connection     adapter.ConnectionManager
 	logger         logger.ContextLogger
 	tags           []string
+	strategy       string
 	outbounds      []adapter.Outbound
 	counter        uint64
 	interruptGroup *interrupt.Group
 }
 
-func NewLoadBalance(ctx context.Context, router adapter.Router, logger log.ContextLogger, tag string, options option.SelectorOutboundOptions) (adapter.Outbound, error) {
+func NewLoadBalance(ctx context.Context, router adapter.Router, logger log.ContextLogger, tag string, options LoadBalanceOptions) (adapter.Outbound, error) {
 	lb := &LoadBalance{
 		Adapter:        outbound.NewAdapter(TypeLoadBalance, tag, []string{N.NetworkTCP, N.NetworkUDP}, options.Outbounds),
 		ctx:            ctx,
@@ -49,6 +56,7 @@ func NewLoadBalance(ctx context.Context, router adapter.Router, logger log.Conte
 		connection:     service.FromContext[adapter.ConnectionManager](ctx),
 		logger:         logger,
 		tags:           options.Outbounds,
+		strategy:       options.Strategy,
 		interruptGroup: interrupt.NewGroup(),
 	}
 	if len(lb.tags) == 0 {
@@ -74,6 +82,9 @@ func (s *LoadBalance) pick() adapter.Outbound {
 	if n == 0 {
 		return nil
 	}
+	if s.strategy == "random" {
+		return s.outbounds[rand.Intn(n)]
+	}
 	idx := atomic.AddUint64(&s.counter, 1) % uint64(n)
 	return s.outbounds[idx]
 }
@@ -83,7 +94,12 @@ func (s *LoadBalance) DialContext(ctx context.Context, network string, destinati
 	if n == 0 {
 		return nil, E.New("no outbounds available")
 	}
-	startIdx := int(atomic.AddUint64(&s.counter, 1) % uint64(n))
+	var startIdx int
+	if s.strategy == "random" {
+		startIdx = rand.Intn(n)
+	} else {
+		startIdx = int(atomic.AddUint64(&s.counter, 1) % uint64(n))
+	}
 	var lastErr error
 	for i := 0; i < n; i++ {
 		candidate := s.outbounds[(startIdx+i)%n]
@@ -101,7 +117,12 @@ func (s *LoadBalance) ListenPacket(ctx context.Context, destination M.Socksaddr)
 	if n == 0 {
 		return nil, E.New("no outbounds available")
 	}
-	startIdx := int(atomic.AddUint64(&s.counter, 1) % uint64(n))
+	var startIdx int
+	if s.strategy == "random" {
+		startIdx = rand.Intn(n)
+	} else {
+		startIdx = int(atomic.AddUint64(&s.counter, 1) % uint64(n))
+	}
 	var lastErr error
 	for i := 0; i < n; i++ {
 		candidate := s.outbounds[(startIdx+i)%n]

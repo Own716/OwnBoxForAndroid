@@ -328,7 +328,7 @@ class StatsBar @JvmOverloads constructor(
         val isHttps = DataStore.connectionTestURL.startsWith("https://")
         val handshakeType = if (isHttps) "HTTPS" else "HTTP"
 
-        return if (cached != null && cached.ip.isNotBlank()) {
+        return if (DataStore.showLandingIp && cached != null && cached.ip.isNotBlank()) {
             if (latency > 0) {
                 "${cached.countryFlag} ${cached.countryCode} ${cached.ip} · $handshakeType 握手 $latency 毫秒"
             } else {
@@ -343,13 +343,25 @@ class StatsBar @JvmOverloads constructor(
         }
     }
 
+    fun refreshDisplay() {
+        if (currentState == BaseService.State.Connected) {
+            btnIpDetail?.visibility = if (DataStore.showLandingIp) View.VISIBLE else View.GONE
+            setStatus(formatStatus())
+            if (DataStore.showLandingIp && LandingIpManager.getCachedInfo() == null) {
+                refreshLandingIp(forceRefresh = false)
+            }
+        }
+    }
+
     fun changeState(state: BaseService.State) {
         currentState = state
         updateHideOnScroll()
         if (state == BaseService.State.Connected) {
-            btnIpDetail?.visibility = View.VISIBLE
+            btnIpDetail?.visibility = if (DataStore.showLandingIp) View.VISIBLE else View.GONE
             setStatus(formatStatus())
-            refreshLandingIp(forceRefresh = false)
+            if (DataStore.showLandingIp) {
+                refreshLandingIp(forceRefresh = false)
+            }
             testConnection(silent = true)
         } else {
             btnIpDetail?.visibility = View.GONE
@@ -370,6 +382,11 @@ class StatsBar @JvmOverloads constructor(
 
     fun refreshLandingIp(forceRefresh: Boolean = false) {
         if (currentState != BaseService.State.Connected) return
+        if (!DataStore.showLandingIp) {
+            btnIpDetail?.visibility = View.GONE
+            setStatus(formatStatus())
+            return
+        }
         val currentProfile = DataStore.selectedProxy
         val cached = LandingIpManager.getCachedInfo()
         if (!forceRefresh && cached != null) {
@@ -388,6 +405,11 @@ class StatsBar @JvmOverloads constructor(
         scope.launch {
             val result = LandingIpManager.queryLandingIp(currentProfile, forceRefresh = forceRefresh)
             if (currentState != BaseService.State.Connected) return@launch
+            if (!DataStore.showLandingIp) {
+                btnIpDetail?.visibility = View.GONE
+                setStatus(formatStatus())
+                return@launch
+            }
 
             result.onSuccess { info ->
                 if (lastMeasuredLatency <= 0 && info.durationMs > 0) {

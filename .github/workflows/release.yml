@@ -146,6 +146,6 @@ jobs:
           body_path: RELEASE_NOTES.md
           files: apks/*.apk
           draft: false
-          prerelease: false
+          prerelease: true
           generate_release_notes: false
 

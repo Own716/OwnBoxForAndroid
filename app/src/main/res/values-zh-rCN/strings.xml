@@ -805,4 +805,20 @@
     <string name="traffic_chart_refresh">刷新连接</string>
     <string name="traffic_total_upload">总上传</string>
     <string name="traffic_total_download">总下载</string>
+    <string name="show_landing_ip">显示落地 IP</string>
+    <string name="show_landing_ip_sum">在主页状态栏显示连接节点的出网落地 IP 及归属地</string>
+    <string name="balancer_type_list">列表</string>
+    <string name="balancer_type_group">分组</string>
+    <string name="balancer_strategy_random">随机选择 (random)</string>
+    <string name="balancer_strategy_least_ping">最低延迟优先 (leastPing)</string>
+    <string name="balancer_strategy_least_load">最低负载轮询 (leastLoad)</string>
+    <string name="balancer_custom_url">自定义测试 URL</string>
+    <string name="balancer_custom_url_sum">针对此负载均衡节点的独立探测地址（留空使用全局默认）</string>
+    <string name="balancer_interval">观测间隔</string>
+    <string name="balancer_interval_sum">%1$s 秒</string>
+    <string name="balancer_select_group">选择分组</string>
+    <string name="balancer">负载均衡</string>
+    <string name="balancer_settings">负载均衡设置</string>
+    <string name="balancer_type">类型</string>
+    <string name="balancer_strategy">策略</string>
 </resources>

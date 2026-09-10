@@ -1,32 +1,46 @@
-<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <EditTextPreference
-        app:icon="@drawable/ic_social_emoji_symbols"
-        app:key="profileName"
-        app:title="@string/profile_name"
-        app:useSimpleSummaryProvider="true" />
+    <PreferenceCategory app:title="@string/balancer_settings">
 
-    <moe.matsuri.nb4a.ui.SimpleMenuPreference
-        app:defaultValue="0"
-        app:entries="@array/balancer_type"
-        app:entryValues="@array/int_array_2"
-        app:icon="@drawable/ic_baseline_nfc_24"
-        app:key="balancerType"
-        app:title="@string/balancer_type"
-        app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:key="profileName"
+            app:title="@string/profile_name"
+            app:useSimpleSummaryProvider="true" />
 
-    <moe.matsuri.nb4a.ui.SimpleMenuPreference
-        app:entries="@array/balancer_strategy_entry"
-        app:entryValues="@array/balancer_strategy_value"
-        app:icon="@drawable/ic_baseline_compare_arrows_24"
-        app:key="balancerStrategy"
-        app:title="@string/balancer_strategy"
-        app:useSimpleSummaryProvider="true" />
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:defaultValue="0"
+            app:entries="@array/balancer_type_entries"
+            app:entryValues="@array/balancer_type_values"
+            app:key="balancerType"
+            app:title="@string/balancer_type"
+            app:useSimpleSummaryProvider="true" />
 
-    <io.nekohasekai.sagernet.widget.GroupPreference
-        app:icon="@drawable/ic_baseline_view_list_24"
-        app:key="balancerGroup"
-        app:title="@string/menu_group"
-        app:useSimpleSummaryProvider="true" />
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:key="balancerTargetGroup"
+            app:title="@string/balancer_select_group"
+            app:useSimpleSummaryProvider="true" />
+
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:defaultValue="random"
+            app:entries="@array/balancer_strategy_entries"
+            app:entryValues="@array/balancer_strategy_values"
+            app:key="balancerStrategy"
+            app:title="@string/balancer_strategy"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:key="balancerTestUrl"
+            app:summary="@string/balancer_custom_url_sum"
+            app:title="@string/balancer_custom_url" />
+
+        <EditTextPreference
+            app:defaultValue="300"
+            app:key="balancerInterval"
+            app:title="@string/balancer_interval"
+            app:useSimpleSummaryProvider="true" />
+
+    </PreferenceCategory>
 
 </PreferenceScreen>

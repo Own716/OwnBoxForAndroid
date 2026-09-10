@@ -4571,6 +4571,8 @@ public class SingBoxOptions {
         @SerializedName("default")
         public String default_;
 
+        public String strategy;
+
     }
 
     public static class Outbound_URLTestOptions extends Outbound {

@@ -12,6 +12,7 @@ import io.nekohasekai.sagernet.fmt.ConfigBuildResult.IndexEntity
 import io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean
 import io.nekohasekai.sagernet.fmt.hysteria.buildSingBoxOutboundHysteriaBean
 import io.nekohasekai.sagernet.fmt.internal.ChainBean
+import io.nekohasekai.sagernet.fmt.internal.BalancerBean
 import io.nekohasekai.sagernet.fmt.shadowsocks.ShadowsocksBean
 import io.nekohasekai.sagernet.fmt.shadowsocks.buildSingBoxOutboundShadowsocksBean
 import io.nekohasekai.sagernet.fmt.socks.SOCKSBean
@@ -129,11 +130,12 @@ internal fun buildSelectorOutbound(defaultTag: String?, memberTags: List<String>
         outbounds = memberTags
     }
 
-internal fun buildLoadBalanceOutbound(memberTags: List<String>) =
+internal fun buildLoadBalanceOutbound(memberTags: List<String>, strategy: String? = null) =
     Outbound_SelectorOptions().apply {
         type = "loadbalance"
         tag = TAG_PROXY
         outbounds = memberTags
+        this.strategy = strategy
     }
 
 internal fun buildUrlTestOutbound(
@@ -150,7 +152,7 @@ internal fun buildUrlTestOutbound(
         outbounds = memberTags
         url = testUrl?.takeIf { it.isNotBlank() }
             ?: DataStore.connectionTestURL.takeIf { it.isNotBlank() }
-            ?: "http://cp.cloudflare.com/generate_204"
+            ?: "https://cp.cloudflare.com/generate_204"
         val iv = intervalSec?.takeIf { it > 0 } ?: 300L
         interval = "${iv}s"
         tolerance = toleranceMs?.takeIf { it > 0 } ?: 50
@@ -658,6 +660,40 @@ fun buildConfig(
         fun buildChain(
             chainId: Long, entity: ProxyEntity
         ): String {
+            if (entity.type == ProxyEntity.TYPE_BALANCER) {
+                val balancerBean = entity.balancerBean ?: (entity.requireBean() as? BalancerBean) ?: BalancerBean()
+                val memberEntities = (if (balancerBean.balancerType == BalancerBean.TYPE_GROUP) {
+                    SagerDatabase.proxyDao.getByGroup(balancerBean.targetGroupId)
+                } else {
+                    val rawEntities = SagerDatabase.proxyDao.getEntities(balancerBean.proxies).associateBy { it.id }
+                    balancerBean.proxies.mapNotNull { rawEntities[it] }
+                }).filter { it.id != entity.id && it.type != ProxyEntity.TYPE_BALANCER && !DataStore.isGroupDisabled(it.groupId) }
+
+                val memberTags = memberEntities.mapNotNull { member ->
+                    tagMap[member.id] ?: buildChain(member.id, member).also { tagMap[member.id] = it }
+                }.ifEmpty { listOf(TAG_DIRECT) }
+
+                val balancerTag = readableTag(entity.displayName())
+
+                val balancerOutbound: SingBoxOption = if (balancerBean.strategy == "leastPing") {
+                    buildUrlTestOutbound(
+                        memberTags = memberTags,
+                        testUrl = balancerBean.testUrl,
+                        intervalSec = balancerBean.interval.toLong()
+                    ).apply {
+                        tag = balancerTag
+                    }
+                } else {
+                    buildLoadBalanceOutbound(memberTags, balancerBean.strategy).apply {
+                        tag = balancerTag
+                    }
+                }
+
+                outbounds.add(balancerOutbound)
+                trafficMap[balancerTag] = memberEntities + entity
+                return balancerTag
+            }
+
             val profileList = entity.resolveChain()
             // profileList 的顺序即应用流量经过各 outbound 的顺序：前一跳通过
             // detour 交给后一跳拨号，最后一项直接连接物理网络。

@@ -49,6 +49,7 @@ object Key {
     const val ALLOW_ACCESS = "allowAccess"
     const val SPEED_INTERVAL = "speedInterval"
     const val SHOW_DIRECT_SPEED = "showDirectSpeed"
+    const val SHOW_LANDING_IP = "showLandingIp"
 
     const val HTTP_PROXY_BYPASS = "httpProxyBypass"
     const val DNS_HOSTS = "dnsHosts"
