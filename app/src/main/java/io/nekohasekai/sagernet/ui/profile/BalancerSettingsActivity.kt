@@ -7,8 +7,6 @@ import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
-import androidx.activity.result.component1
-import androidx.activity.result.component2
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.isVisible
 import androidx.preference.PreferenceFragmentCompat
@@ -235,12 +233,12 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
     var replacing = 0
 
     val selectProfileForAdd =
-        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { (resultCode, data) ->
-            if (resultCode == Activity.RESULT_OK) runOnDefaultDispatcher {
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == Activity.RESULT_OK) runOnDefaultDispatcher {
                 DataStore.dirty = true
 
                 val profile = ProfileManager.getProfile(
-                    data!!.getLongExtra(
+                    result.data!!.getLongExtra(
                         ProfileSelectActivity.EXTRA_PROFILE_ID, 0
                     )
                 )!!
@@ -282,16 +280,16 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
     inner class ProfileHolder(val binding: LayoutProfileBinding) :
         RecyclerView.ViewHolder(binding.root) {
 
-        fun bind(proxyEntity: ProxyEntity) = binding.run {
+        fun bind(proxyEntity: ProxyEntity) {
             val profile = proxyEntity.requireBean()
 
-            profileName.text = profile.displayName()
-            profileType.text = proxyEntity.displayType()
-            profileType.setTextColor(getProtocolColor(proxyEntity.type))
-            profileAddress.text = profile.displayAddress()
+            binding.profileName.text = profile.displayName()
+            binding.profileType.text = proxyEntity.displayType()
+            binding.profileType.setTextColor(getProtocolColor(proxyEntity.type))
+            binding.profileAddress.text = profile.displayAddress()
 
-            editButton.setImageResource(R.drawable.ic_image_edit)
-            editButton.setOnClickListener {
+            binding.edit.setImageResource(R.drawable.ic_image_edit)
+            binding.edit.setOnClickListener {
                 replacing = bindingAdapterPosition
                 selectProfileForAdd.launch(
                     Intent(
@@ -299,9 +297,15 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
                     )
                 )
             }
-            removeButton.setOnClickListener {
-                configurationAdapter.remove(bindingAdapterPosition)
+            binding.remove.isVisible = true
+            binding.remove.setOnClickListener {
+                val pos = bindingAdapterPosition
+                if (pos > 0 && pos <= proxyList.size) {
+                    proxyList.removeAt(pos - 1)
+                    configurationAdapter.notifyItemRemoved(pos)
+                }
             }
+            binding.share.isVisible = false
         }
     }
 }

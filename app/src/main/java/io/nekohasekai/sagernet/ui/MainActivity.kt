@@ -163,6 +163,7 @@ class MainActivity : ThemedActivity(),
         }
 
         checkClipboardOnResume()
+        binding.stats.refreshDisplay()
     }
 
     private var lastPromptedClipboard: String = ""
@@ -436,11 +437,6 @@ class MainActivity : ThemedActivity(),
             return displayFragmentWithId(item.itemId)
         }
         return true
-    }
-
-    override fun onResume() {
-        super.onResume()
-        binding.stats.refreshDisplay()
     }
 
 
