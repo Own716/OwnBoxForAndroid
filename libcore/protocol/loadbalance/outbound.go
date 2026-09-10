@@ -144,7 +144,7 @@ func (s *LoadBalance) NewPacketConnection(ctx context.Context, conn N.PacketConn
 
 func (s *LoadBalance) Close() error {
 	if s.interruptGroup != nil {
-		return s.interruptGroup.Close()
+		s.interruptGroup.Interrupt(true)
 	}
 	return nil
 }
