@@ -39,8 +39,8 @@ import org.json.JSONObject
 import org.json.JSONTokener
 import org.yaml.snakeyaml.TypeDescription
 import org.yaml.snakeyaml.Yaml
-import org.yaml.snakeyaml.error.YAMLException
 import androidx.core.net.toUri
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 @Suppress("EXPERIMENTAL_API_USAGE")
 object RawUpdater : GroupUpdater() {
@@ -80,6 +80,7 @@ object RawUpdater : GroupUpdater() {
             var fetchedProxies: List<AbstractBean>? = null
             var lastRespHeaderUserinfo: String? = null
             var lastRespHeaderFilename: String? = null
+            var lastRespHeaderProfileTitle: String? = null
             var lastException: Throwable? = null
 
             for (ua in candidateUas) {
@@ -110,6 +111,15 @@ object RawUpdater : GroupUpdater() {
                     if (remoteName.isNotBlank()) {
                         lastRespHeaderFilename = remoteName
                     }
+                    val profileTitle = Util.getStringBox(
+                        response.getHeader("Profile-Title")
+                            ?: response.getHeader("profile-title")
+                            ?: response.getHeader("X-Profile-Title")
+                            ?: response.getHeader("x-profile-title")
+                    )
+                    if (profileTitle.isNotBlank()) {
+                        lastRespHeaderProfileTitle = profileTitle
+                    }
 
                     val contentStr = Util.getStringBox(response.contentString)
                     val parsed = parseRaw(contentStr)
@@ -136,11 +146,23 @@ object RawUpdater : GroupUpdater() {
                 subscription.subscriptionUserinfo = lastRespHeaderUserinfo
             }
 
-            // 修改默认名字
-            if (proxyGroup.name?.startsWith("Subscription #") == true && !lastRespHeaderFilename.isNullOrBlank()) {
-                val decoded = Util.decodeFilename(lastRespHeaderFilename)
-                if (decoded.isNotBlank()) {
-                    proxyGroup.name = decoded
+            // 自动提取机场名称（依次从 HTTP 响应头、URL query、二级域名、节点公共前缀提取）
+            val extractedName = extractAirportName(
+                subscription.link,
+                lastRespHeaderFilename,
+                lastRespHeaderProfileTitle,
+                proxies
+            )
+            if (!extractedName.isNullOrBlank()) {
+                val currentName = proxyGroup.name.orEmpty().trim()
+                if (currentName.isEmpty() ||
+                    currentName.startsWith("Subscription #") ||
+                    currentName.startsWith("订阅 #") ||
+                    currentName.startsWith("Group #") ||
+                    currentName == app.getString(R.string.subscription)
+                ) {
+                    proxyGroup.name = extractedName
+                    Logs.i("RawUpdater: Auto-extracted airport name for group: $extractedName")
                 }
             }
         }
@@ -393,14 +415,18 @@ object RawUpdater : GroupUpdater() {
                             })
                         }
 
-                        "vmess", "vless", "trojan" -> {
-                            val bean = when (proxy["type"] as String) {
+                        "vmess", "vless", "trojan", "xhttp", "splithttp" -> {
+                            val bean = when (proxyType) {
                                 "vmess" -> VMessBean()
                                 "vless" -> VMessBean().apply {
                                     alterId = -1 // make it VLESS
                                     packetEncoding = 2 // clash meta default XUDP
                                 }
-
+                                "xhttp", "splithttp" -> VMessBean().apply {
+                                    alterId = -1
+                                    type = "xhttp"
+                                    packetEncoding = 2
+                                }
                                 "trojan" -> TrojanBean().apply {
                                     security = "tls"
                                 }
@@ -480,7 +506,7 @@ object RawUpdater : GroupUpdater() {
                                         when (opt.value) {
                                             "h2", "http" -> bean.type = "http"
                                             "ws", "grpc" -> bean.type = opt.value as String
-                                            "xhttp", "splithttp" -> if (bean.isVLESS) bean.type = "xhttp"
+                                            "xhttp", "splithttp" -> bean.type = "xhttp"
                                         }
                                     }
 
@@ -557,7 +583,8 @@ object RawUpdater : GroupUpdater() {
                                         }
                                     }
 
-                                    "xhttp-opts" -> if (bean.isVLESS && bean.type == "xhttp") {
+                                    "xhttp-opts", "splithttp-opts" -> {
+                                        bean.type = "xhttp"
                                         (opt.value as? Map<String, Any?>)?.also { xhttpOpts ->
                                             xhttpOpts["host"]?.toString()?.let {
                                                 bean.host = it
@@ -987,6 +1014,108 @@ object RawUpdater : GroupUpdater() {
 
         proxies.forEach { it.initializeDefaultValues() }
         return proxies
+    }
+
+    private fun extractAirportName(
+        subscriptionLink: String,
+        filenameHeader: String?,
+        profileTitleHeader: String?,
+        proxies: List<AbstractBean>
+    ): String? {
+        // 1. HTTP 响应头
+        // 1.1 content-disposition 中的 filename
+        if (!filenameHeader.isNullOrBlank()) {
+            val decoded = Util.decodeFilename(filenameHeader).trim()
+            val cleanName = decoded.replace(Regex("\\.(ya?ml|txt|json|conf|sub)$", RegexOption.IGNORE_CASE), "").trim()
+            if (cleanName.isNotBlank() && !cleanName.equals("subscription", ignoreCase = true) && !cleanName.equals("clash", ignoreCase = true)) {
+                return cleanName
+            }
+        }
+
+        // 1.2 profile-title / x-profile-title
+        if (!profileTitleHeader.isNullOrBlank()) {
+            var title = profileTitleHeader.trim()
+            if (title.startsWith("base64:", ignoreCase = true)) {
+                try {
+                    val decodedBytes = android.util.Base64.decode(title.substring(7), android.util.Base64.DEFAULT)
+                    title = String(decodedBytes, Charsets.UTF_8).trim()
+                } catch (_: Throwable) {
+                }
+            } else {
+                try {
+                    title = java.net.URLDecoder.decode(title, "UTF-8").trim()
+                } catch (_: Throwable) {
+                }
+            }
+            if (title.isNotBlank()) {
+                return title
+            }
+        }
+
+        // 2. URL Query 参数: name 或 title
+        try {
+            val httpUrl = subscriptionLink.toHttpUrlOrNull()
+            if (httpUrl != null) {
+                val nameParam = httpUrl.queryParameter("name")?.trim()
+                if (!nameParam.isNullOrBlank()) return nameParam
+                val titleParam = httpUrl.queryParameter("title")?.trim()
+                if (!titleParam.isNullOrBlank()) return titleParam
+            }
+        } catch (_: Throwable) {
+        }
+
+        // 3. 订阅链接二级域名（过滤常用 CDN/OSS/平台域名）
+        try {
+            val httpUrl = subscriptionLink.toHttpUrlOrNull()
+            val host = httpUrl?.host?.trim()
+            if (!host.isNullOrBlank() && !host.isIpAddress() && host != "localhost") {
+                val commonDomains = setOf(
+                    "github.com", "raw.githubusercontent.com", "github.io", "gitlab.com", "gitlab.io",
+                    "workers.dev", "pages.dev", "cloudflare.com", "cloudfront.net", "fastly.net",
+                    "vercel.app", "netlify.app", "render.com", "herokuapp.com", "jsdelivr.net",
+                    "aliyuncs.com", "myqcloud.com", "amazonaws.com", "azure.com", "google.com"
+                )
+                val isCommon = commonDomains.any { host.equals(it, ignoreCase = true) || host.endsWith(".$it", ignoreCase = true) }
+                if (!isCommon) {
+                    val parts = host.split(".")
+                    if (parts.size >= 2) {
+                        val candidate = if (parts.size >= 3) parts[parts.size - 2] else parts[0]
+                        val genericNames = setOf("sub", "subscribe", "subscription", "api", "node", "link", "app", "v2", "clash")
+                        if (!genericNames.contains(candidate.lowercase()) && candidate.length >= 2) {
+                            return candidate
+                        }
+                    }
+                }
+            }
+        } catch (_: Throwable) {
+        }
+
+        // 4. 提取全部节点共有的前缀标识（例如 [极速云] 或 【极速云】）
+        if (proxies.isNotEmpty()) {
+            val names = proxies.map { it.displayName().trim() }.filter { it.isNotBlank() }
+            if (names.isNotEmpty()) {
+                val bracketPattern = Regex("^\\[([^\\]]+)\\]|^【([^】]+)】|^\\(([^\\)]+)\\)")
+                val firstMatch = bracketPattern.find(names.first())
+                if (firstMatch != null) {
+                    val tag = (firstMatch.groups[1] ?: firstMatch.groups[2] ?: firstMatch.groups[3])?.value?.trim()
+                    if (!tag.isNullOrBlank() && names.all { it.startsWith("[${tag}]") || it.startsWith("【${tag}】") || it.startsWith("(${tag})") }) {
+                        return tag
+                    }
+                }
+
+                val first = names.first()
+                for (sep in listOf(" - ", " | ", "-", "|", "_")) {
+                    if (first.contains(sep)) {
+                        val candidatePrefix = first.substringBefore(sep).trim()
+                        if (candidatePrefix.length in 2..20 && names.all { it.startsWith(candidatePrefix) }) {
+                            return candidatePrefix
+                        }
+                    }
+                }
+            }
+        }
+
+        return null
     }
 
 }

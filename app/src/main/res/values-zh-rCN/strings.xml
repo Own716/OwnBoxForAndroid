@@ -774,6 +774,8 @@
     <string name="network_tools">网络工具</string>
     <string name="tool_ip_purity">IP 纯净度检测</string>
     <string name="tool_media_unlock">流媒体解锁检测</string>
+    <string name="tool_connectivity_test">连通性测试</string>
+    <string name="connectivity_test_title">节点连通性测试</string>
     <string name="tool_port_test">端口连通性测试</string>
     <string name="ip_purity_title">IP 纯净度与机房检测</string>
     <string name="ip_purity_status_pure">纯净（极大概率为住宅/宽带 IP）</string>

@@ -112,15 +112,24 @@ suspend fun parseProxies(text: String): List<AbstractBean> {
 
     val schemes = listOf("ss://", "ssr://", "vmess://", "vless://", "trojan://", "trojan-go://", "socks://", "socks5://", "hysteria://", "hysteria2://", "hy2://", "tuic://", "juicity://", "snell://", "anytls://", "awg://", "wireguard://", "sn://")
     fun splitLinks(line: String): List<String> {
-        var count = 0
+        val indices = mutableListOf<Int>()
         for (s in schemes) {
             var idx = line.indexOf(s)
             while (idx >= 0) {
-                count++
+                indices.add(idx)
                 idx = line.indexOf(s, idx + s.length)
             }
         }
-        return if (count > 1) line.split(' ').filter { it.isNotBlank() } else listOf(line)
+        if (indices.size <= 1) return listOf(line)
+        indices.sort()
+        val result = mutableListOf<String>()
+        for (i in indices.indices) {
+            val start = indices[i]
+            val end = if (i + 1 < indices.size) indices[i + 1] else line.length
+            val sub = line.substring(start, end).trim()
+            if (sub.isNotBlank()) result.add(sub)
+        }
+        return result
     }
 
     val links = rawLines.flatMap { splitLinks(it) }

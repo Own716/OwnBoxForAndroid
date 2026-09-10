@@ -857,6 +857,8 @@
     <string name="network_tools">Network Tools</string>
     <string name="tool_ip_purity">IP Purity Check</string>
     <string name="tool_media_unlock">Streaming Unlock</string>
+    <string name="tool_connectivity_test">Connectivity Test</string>
+    <string name="connectivity_test_title">Node Connectivity Test</string>
     <string name="tool_port_test">Port Test</string>
     <string name="ip_purity_title">IP Purity &amp; Hosting Check</string>
     <string name="ip_purity_status_pure">Pure (Residential / Broadband IP)</string>

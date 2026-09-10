@@ -120,20 +120,20 @@ internal fun RouteOptions.ensureMainRouteFinal(mainProxyTag: String) {
     if (final_.isNullOrBlank()) final_ = mainProxyTag
 }
 
-internal fun buildSelectorOutbound(defaultTag: String?, memberTags: List<String>) =
+internal fun buildSelectorOutbound(defaultTag: String?, memberTags: List<String>, customTag: String? = null) =
     Outbound_SelectorOptions().apply {
         type = "selector"
-        tag = TAG_PROXY
+        tag = customTag?.takeIf { it.isNotBlank() } ?: TAG_PROXY
         default_ = defaultTag
         // Endpoint tags are valid outbound references in sing-box 1.13; keep them as direct
         // group members instead of wrapping WireGuard in a removed outbound.
         outbounds = memberTags
     }
 
-internal fun buildLoadBalanceOutbound(memberTags: List<String>, strategy: String? = null) =
+internal fun buildLoadBalanceOutbound(memberTags: List<String>, strategy: String? = null, customTag: String? = null) =
     Outbound_SelectorOptions().apply {
         type = "loadbalance"
-        tag = TAG_PROXY
+        tag = customTag?.takeIf { it.isNotBlank() } ?: TAG_PROXY
         outbounds = memberTags
         this.strategy = strategy
     }
@@ -144,11 +144,12 @@ internal fun buildUrlTestOutbound(
     intervalSec: Long? = null,
     toleranceMs: Int? = null,
     idleTimeoutStr: String? = null,
-    interruptExist: Boolean? = null
+    interruptExist: Boolean? = null,
+    customTag: String? = null
 ) =
     Outbound_URLTestOptions().apply {
         type = "urltest"
-        tag = TAG_PROXY
+        tag = customTag?.takeIf { it.isNotBlank() } ?: TAG_PROXY
         outbounds = memberTags
         url = testUrl?.takeIf { it.isNotBlank() }
             ?: DataStore.connectionTestURL.takeIf { it.isNotBlank() }
@@ -306,6 +307,8 @@ fun buildConfig(
     val globalOutbounds = HashMap<Long, String>()
     val readableNames = mutableSetOf(TAG_DIRECT, TAG_BYPASS, TAG_BLOCK, TAG_FRAGMENT, TAG_MIXED, TAG_PROXY)
     val group = SagerDatabase.groupDao.getById(proxy.groupId)
+    val groupTag = group?.name?.trim()?.takeIf { it.isNotBlank() } ?: TAG_PROXY
+    readableNames.add(groupTag)
 
     fun ProxyEntity.resolveChainInternal(): MutableList<ProxyEntity> {
         val bean = requireBean()
@@ -1022,13 +1025,14 @@ fun buildConfig(
                         intervalSec = intervalVal,
                         toleranceMs = toleranceVal,
                         idleTimeoutStr = idleTimeoutVal,
-                        interruptExist = interruptVal
+                        interruptExist = interruptVal,
+                        customTag = groupTag
                     )
                 )
             } else if (useLoadBalance && tagMap.isNotEmpty()) {
-                outbounds.add(0, buildLoadBalanceOutbound(tagMap.values.toList()))
+                outbounds.add(0, buildLoadBalanceOutbound(tagMap.values.toList(), customTag = groupTag))
             } else {
-                outbounds.add(0, buildSelectorOutbound(tagMap[proxy.id], tagMap.values.toList()))
+                outbounds.add(0, buildSelectorOutbound(tagMap[proxy.id], tagMap.values.toList(), customTag = groupTag))
             }
         } else {
             val mainTag = buildChain(0, proxy)
@@ -1039,7 +1043,7 @@ fun buildConfig(
             tagMap[key] = buildChain(key, p)
         }
 
-        val mainProxyTag = (if (buildSelector || useAutoSelect || useLoadBalance) TAG_PROXY else tagMap[proxy.id]) ?: TAG_PROXY
+        val mainProxyTag = (if (buildSelector || useAutoSelect || useLoadBalance) groupTag else tagMap[proxy.id]) ?: groupTag
 
         // 在应用用户规则之前检查全局模式
         if (!forTest && DataStore.globalMode) {
@@ -1479,6 +1483,27 @@ fun buildConfig(
                     server = serverTag
                 })
             }
+        }
+
+        // Synchronize route.rules and route.final_ against available outbound tags to avoid "tag not found"
+        val availableOutboundTags = outbounds.mapNotNull { it.asMap()["tag"]?.toString() }.toSet()
+        route.rules.filterIsInstance<Rule_DefaultOptions>().forEach { r ->
+            val out = r.outbound
+            if (!out.isNullOrBlank() && out !in availableOutboundTags) {
+                if (out == TAG_PROXY && availableOutboundTags.contains(groupTag)) {
+                    r.outbound = groupTag
+                } else if (out == groupTag && availableOutboundTags.contains(TAG_PROXY)) {
+                    r.outbound = TAG_PROXY
+                } else if (group?.name?.isNotBlank() == true && out == group.name && availableOutboundTags.contains(groupTag)) {
+                    r.outbound = groupTag
+                } else {
+                    Logs.w("ConfigBuilder: rule outbound tag '$out' not found in outbounds, fallback to '$mainProxyTag'")
+                    r.outbound = mainProxyTag
+                }
+            }
+        }
+        if (!route.final_.isNullOrBlank() && route.final_ !in availableOutboundTags) {
+            route.final_ = mainProxyTag
         }
 
         // Legacy outbounds implicitly used their first item as the default route. Endpoints are

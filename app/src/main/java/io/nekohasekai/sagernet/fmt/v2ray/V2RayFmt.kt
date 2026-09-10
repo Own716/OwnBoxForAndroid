@@ -79,8 +79,29 @@ fun parseV2Ray(link: String): StandardV2RayBean {
     } else null
 
     val bean = VMessBean().apply { if (link.startsWith("vless://")) alterId = -1 }
-    val url = (linkWithoutFragment.replace("vmess://", "https://").replace("vless://", "https://")).toHttpUrlOrNull()
-        ?: error("Invalid v2ray link: $link")
+    val rawUrlStr = linkWithoutFragment.replace("vmess://", "https://").replace("vless://", "https://")
+    var url = rawUrlStr.toHttpUrlOrNull()
+    if (url == null) {
+        val base = rawUrlStr.substringBefore("?")
+        val query = if (rawUrlStr.contains("?")) rawUrlStr.substringAfter("?") else null
+        val sanitizedQuery = query?.replace("{", "%7B")
+            ?.replace("}", "%7D")
+            ?.replace("\"", "%22")
+            ?.replace(" ", "%20")
+            ?.replace("|", "%7C")
+            ?.replace("\\", "%5C")
+            ?.replace("^", "%5E")
+            ?.replace("<", "%3C")
+            ?.replace(">", "%3E")
+        val sanitizedUrlStr = if (sanitizedQuery != null) "$base?$sanitizedQuery" else base
+        url = sanitizedUrlStr.toHttpUrlOrNull()
+    }
+    if (url == null) {
+        url = runCatching {
+            val uri = java.net.URI(rawUrlStr)
+            uri.toString().toHttpUrlOrNull()
+        }.getOrNull() ?: error("Invalid v2ray link: $link")
+    }
 
     if (url.password.isNotBlank()) {
         // https://github.com/v2fly/v2fly-github-io/issues/26 (rarely use)
@@ -191,6 +212,7 @@ fun StandardV2RayBean.parseDuckSoft(url: HttpUrl, defaultName: String? = null) {
 
     val rawType = url.queryParameter("type")
         ?: url.queryParameter("transport")
+        ?: url.queryParameter("net")
         ?: "tcp"
     type = when (rawType.lowercase()) {
         "splithttp", "xhttp" -> "xhttp"
@@ -257,8 +279,7 @@ fun StandardV2RayBean.parseDuckSoft(url: HttpUrl, defaultName: String? = null) {
             }
             url.queryParameter("headerType")?.let {
                 if (it.isNotBlank()) {
-                    if (it !in supportedKcpHeaderType) error("unsupported headerType")
-                    headerType = it
+                    headerType = if (it in supportedKcpHeaderType) it else "none"
                 }
             }
             url.queryParameter("mtu")?.let {
@@ -314,7 +335,7 @@ fun StandardV2RayBean.parseDuckSoft(url: HttpUrl, defaultName: String? = null) {
                 xhttpMode = normalizeXhttpMode(it)
             }
             url.queryParameter("extra")?.let {
-                xhttpExtra = XhttpExtraConverter.xrayToSingBox(it)
+                xhttpExtra = runCatching { XhttpExtraConverter.xrayToSingBox(it) }.getOrDefault(it)
             }
         }
     }

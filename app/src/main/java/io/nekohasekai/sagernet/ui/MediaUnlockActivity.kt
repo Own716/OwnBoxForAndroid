@@ -159,6 +159,28 @@ class MediaUnlockActivity : ThemedActivity() {
         )
     }
 
+    companion object {
+        private const val BROWSER_USER_AGENT =
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+
+        private fun libcore.HTTPRequest.applyBrowserHeaders(host: String? = null) {
+            setUserAgent(BROWSER_USER_AGENT)
+            setHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
+            setHeader("Accept-Language", "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7")
+            setHeader("sec-ch-ua", "\"Chromium\";v=\"124\", \"Google Chrome\";v=\"124\", \"Not-A.Brand\";v=\"99\"")
+            setHeader("sec-ch-ua-mobile", "?0")
+            setHeader("sec-ch-ua-platform", "\"Windows\"")
+            setHeader("sec-fetch-dest", "document")
+            setHeader("sec-fetch-mode", "navigate")
+            setHeader("sec-fetch-site", "none")
+            setHeader("sec-fetch-user", "?1")
+            setHeader("upgrade-insecure-requests", "1")
+            if (host != null) {
+                setHeader("Host", host)
+            }
+        }
+    }
+
     private suspend fun runTestForItem(item: MediaItem): MediaItem = withContext(Dispatchers.IO) {
         try {
             when (item.id) {
@@ -177,11 +199,23 @@ class MediaUnlockActivity : ThemedActivity() {
         } catch (e: CancellationException) {
             item
         } catch (e: Throwable) {
-            item.copy(
-                state = TestState.TIMEOUT,
-                statusText = "检测超时",
-                description = "连接超时或网络异常: ${e.message ?: "未知错误"}"
-            )
+            val msg = e.message.orEmpty()
+            if (msg.contains("403") || msg.contains("Forbidden", ignoreCase = true) ||
+                msg.contains("cf-mitigated", ignoreCase = true) || msg.contains("Just a moment", ignoreCase = true) ||
+                msg.contains("Attention Required", ignoreCase = true) || msg.contains("Cloudflare", ignoreCase = true)
+            ) {
+                item.copy(
+                    state = TestState.BLOCKED,
+                    statusText = "受限/触发风控",
+                    description = "HTTP 403 触发平台或 Cloudflare 安全风控拦截"
+                )
+            } else {
+                item.copy(
+                    state = TestState.TIMEOUT,
+                    statusText = "检测超时",
+                    description = "连接超时或网络异常: ${msg.ifEmpty { "未知错误" }}"
+                )
+            }
         }
     }
 
@@ -439,25 +473,41 @@ class MediaUnlockActivity : ThemedActivity() {
             modernTLS()
             tryProxyOutbound()
         }
-        val req = client.newRequest().apply {
-            setURL("https://chatgpt.com/")
-            setUserAgent(USER_AGENT)
-        }
-        val resp = req.execute()
-        val body = Util.getStringBox(resp.contentString)
+        try {
+            val req = client.newRequest().apply {
+                setURL("https://chatgpt.com/")
+                applyBrowserHeaders("chatgpt.com")
+            }
+            val resp = req.execute()
+            val body = Util.getStringBox(resp.contentString)
 
-        if (!body.contains("cf-mitigated") && !body.contains("Attention Required") && !body.contains("1020")) {
-            item.copy(
-                state = TestState.UNLOCKED,
-                statusText = "支持",
-                description = "无 Cloudflare 拦截，网页端与 API 可正常对话"
-            )
-        } else {
-            item.copy(
-                state = TestState.BLOCKED,
-                statusText = "CF 拦截",
-                description = "触发 Cloudflare 人机验证或 OpenAI IP 封禁策略"
-            )
+            if (!body.contains("cf-mitigated") && !body.contains("Attention Required") && !body.contains("1020")) {
+                item.copy(
+                    state = TestState.UNLOCKED,
+                    statusText = "支持",
+                    description = "无 Cloudflare 拦截，网页端与 API 可正常对话"
+                )
+            } else {
+                item.copy(
+                    state = TestState.BLOCKED,
+                    statusText = "CF 拦截",
+                    description = "触发 Cloudflare 人机验证或 OpenAI IP 封禁策略"
+                )
+            }
+        } catch (e: Throwable) {
+            val msg = e.message.orEmpty()
+            if (msg.contains("403") || msg.contains("Forbidden", ignoreCase = true) ||
+                msg.contains("cf-mitigated", ignoreCase = true) || msg.contains("Just a moment", ignoreCase = true) ||
+                msg.contains("1020")
+            ) {
+                item.copy(
+                    state = TestState.BLOCKED,
+                    statusText = "受限/触发风控",
+                    description = "HTTP 403 触发 Cloudflare/OpenAI 平台风控拦截"
+                )
+            } else {
+                throw e
+            }
         }
     }
 
@@ -466,25 +516,40 @@ class MediaUnlockActivity : ThemedActivity() {
             modernTLS()
             tryProxyOutbound()
         }
-        val req = client.newRequest().apply {
-            setURL("https://claude.ai/login")
-            setUserAgent(USER_AGENT)
-        }
-        val resp = req.execute()
-        val body = Util.getStringBox(resp.contentString)
+        try {
+            val req = client.newRequest().apply {
+                setURL("https://claude.ai/login")
+                applyBrowserHeaders("claude.ai")
+            }
+            val resp = req.execute()
+            val body = Util.getStringBox(resp.contentString)
 
-        if (!body.contains("App unavailable in your region") && !body.contains("403 Forbidden")) {
-            item.copy(
-                state = TestState.UNLOCKED,
-                statusText = "支持",
-                description = "支持访问 Anthropic Claude，区域授权正常开放"
-            )
-        } else {
-            item.copy(
-                state = TestState.BLOCKED,
-                statusText = "地区受限",
-                description = "当前节点所在地区尚未开放 Claude 访问服务"
-            )
+            if (!body.contains("App unavailable in your region") && !body.contains("403 Forbidden")) {
+                item.copy(
+                    state = TestState.UNLOCKED,
+                    statusText = "支持",
+                    description = "支持访问 Anthropic Claude，区域授权正常开放"
+                )
+            } else {
+                item.copy(
+                    state = TestState.BLOCKED,
+                    statusText = "地区受限",
+                    description = "当前节点所在地区尚未开放 Claude 访问服务"
+                )
+            }
+        } catch (e: Throwable) {
+            val msg = e.message.orEmpty()
+            if (msg.contains("403") || msg.contains("Forbidden", ignoreCase = true) ||
+                msg.contains("cf-mitigated", ignoreCase = true) || msg.contains("Just a moment", ignoreCase = true)
+            ) {
+                item.copy(
+                    state = TestState.BLOCKED,
+                    statusText = "受限/触发风控",
+                    description = "HTTP 403 触发 Cloudflare/Claude 平台风控拦截"
+                )
+            } else {
+                throw e
+            }
         }
     }
 
@@ -493,25 +558,38 @@ class MediaUnlockActivity : ThemedActivity() {
             modernTLS()
             tryProxyOutbound()
         }
-        val req = client.newRequest().apply {
-            setURL("https://gemini.google.com/")
-            setUserAgent(USER_AGENT)
-        }
-        val resp = req.execute()
-        val body = Util.getStringBox(resp.contentString)
+        try {
+            val req = client.newRequest().apply {
+                setURL("https://gemini.google.com/")
+                applyBrowserHeaders("gemini.google.com")
+            }
+            val resp = req.execute()
+            val body = Util.getStringBox(resp.contentString)
 
-        if (!body.contains("not supported in your country") && !body.contains("unavailable in your territory")) {
-            item.copy(
-                state = TestState.UNLOCKED,
-                statusText = "支持",
-                description = "支持全功能正常使用 Google Gemini AI 模型与对话"
-            )
-        } else {
-            item.copy(
-                state = TestState.BLOCKED,
-                statusText = "未开放",
-                description = "Google Gemini 暂未对该地区或机房 IP 开放服务"
-            )
+            if (!body.contains("not supported in your country") && !body.contains("unavailable in your territory")) {
+                item.copy(
+                    state = TestState.UNLOCKED,
+                    statusText = "支持",
+                    description = "支持全功能正常使用 Google Gemini AI 模型与对话"
+                )
+            } else {
+                item.copy(
+                    state = TestState.BLOCKED,
+                    statusText = "未开放",
+                    description = "Google Gemini 暂未对该地区或机房 IP 开放服务"
+                )
+            }
+        } catch (e: Throwable) {
+            val msg = e.message.orEmpty()
+            if (msg.contains("403") || msg.contains("Forbidden", ignoreCase = true)) {
+                item.copy(
+                    state = TestState.BLOCKED,
+                    statusText = "受限/触发风控",
+                    description = "HTTP 403 触发 Google 平台风控拦截"
+                )
+            } else {
+                throw e
+            }
         }
     }
 

@@ -1260,10 +1260,11 @@ class ConfigurationFragment @JvmOverloads constructor(
         val dialog = test.builder.show()
         val testJobs = mutableListOf<Job>()
         val group = DataStore.currentGroup()
+        val targetUrl = DataStore.groupUrlTestUrl(group.id)
         Logs.d(
             "URLTestTrace batch=start groupId=${group.id} group=${group.name} " +
                     "concurrent=${DataStore.connectionTestConcurrent} timeout=${DataStore.connectionTestTimeout}ms " +
-                    "link=${DataStore.connectionTestURL} serviceState=${DataStore.serviceState} " +
+                    "link=$targetUrl serviceState=${DataStore.serviceState} " +
                     "currentProfile=${DataStore.currentProfile} network=${SagerNet.underlyingNetwork}"
         )
 
@@ -1274,7 +1275,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             Logs.d("URLTestTrace batch=loaded profiles=${profilesList.size}")
             repeat(DataStore.connectionTestConcurrent) { workerId ->
                 testJobs.add(launch(Dispatchers.IO) {
-                    val urlTest = UrlTest() // note: this is NOT in bg process
+                    val urlTest = UrlTest(targetUrl) // note: this is NOT in bg process
                     while (isActive) {
                         val profile = profiles.poll() ?: break
                         profile.status = 0

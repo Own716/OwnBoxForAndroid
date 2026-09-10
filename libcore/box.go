@@ -443,9 +443,16 @@ func UrlTest(i *BoxInstance, link string, timeout int32) (latency int32, err err
 		}
 		latency, err = urlTest(i, connectionTracker, link, timeout)
 		if err != nil {
+			primaryErr := err
 			fallback := getFallbackLink(link)
 			boxPlatformLogWriter.WriteMessage(sblog.LevelDebug, fmt.Sprintf("box.UrlTest primary failed: %v, trying fallback: %s", err, fallback))
-			latency, err = urlTest(i, connectionTracker, fallback, timeout)
+			var fbErr error
+			latency, fbErr = urlTest(i, connectionTracker, fallback, timeout)
+			if fbErr != nil {
+				err = primaryErr
+			} else {
+				err = nil
+			}
 		}
 	}
 	boxPlatformLogWriter.WriteMessage(sblog.LevelDebug, fmt.Sprintf("box.UrlTest result latency=%dms err=%v", latency, err))
@@ -476,9 +483,16 @@ func UrlTestFull(i *BoxInstance, link string, timeout int32) (latency int32, err
 		}
 		latency, err = urlTestFull(i, connectionTracker, link, timeout)
 		if err != nil {
+			primaryErr := err
 			fallback := getFallbackLink(link)
 			boxPlatformLogWriter.WriteMessage(sblog.LevelDebug, fmt.Sprintf("box.UrlTestFull primary failed: %v, trying fallback: %s", err, fallback))
-			latency, err = urlTestFull(i, connectionTracker, fallback, timeout)
+			var fbErr error
+			latency, fbErr = urlTestFull(i, connectionTracker, fallback, timeout)
+			if fbErr != nil {
+				err = primaryErr
+			} else {
+				err = nil
+			}
 		}
 	}
 	boxPlatformLogWriter.WriteMessage(sblog.LevelDebug, fmt.Sprintf("box.UrlTestFull result latency=%dms err=%v", latency, err))

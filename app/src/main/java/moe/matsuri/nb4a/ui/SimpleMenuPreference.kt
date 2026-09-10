@@ -59,7 +59,8 @@ open class SimpleMenuPreference
     override fun setValue(value: String?) {
         super.setValue(value)
         if (::mAdapter.isInitialized) {
-            mAdapter.currentPosition = entryValues.indexOf(value)
+            val values = entryValues
+            mAdapter.currentPosition = if (values != null && value != null) values.indexOf(value) else -1
             mAdapter.notifyDataSetChanged()
         }
     }

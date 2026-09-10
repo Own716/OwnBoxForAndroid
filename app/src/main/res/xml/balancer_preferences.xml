@@ -18,6 +18,8 @@
             app:useSimpleSummaryProvider="true" />
 
         <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:entries="@array/empty_array"
+            app:entryValues="@array/empty_array"
             app:key="balancerTargetGroup"
             app:title="@string/balancer_select_group"
             app:useSimpleSummaryProvider="true" />

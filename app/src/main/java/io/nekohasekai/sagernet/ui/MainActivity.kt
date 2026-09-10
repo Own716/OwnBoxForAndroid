@@ -506,6 +506,10 @@ class MainActivity : ThemedActivity(),
                 startActivity(Intent(this, MediaUnlockActivity::class.java))
                 return false
             }
+            R.id.nav_connectivity_test -> {
+                startActivity(Intent(this, ConnectivityTestActivity::class.java))
+                return false
+            }
             R.id.nav_tools -> displayFragment(ToolsFragment())
             R.id.nav_logcat -> displayFragment(LogcatFragment())
             R.id.nav_faq -> {
