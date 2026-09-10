@@ -1,6 +1,7 @@
 package io.nekohasekai.sagernet.ui
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.text.InputType
@@ -50,6 +51,32 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
 
         findPreference<Preference>("changeIcon")?.setOnPreferenceClickListener {
             AppIconDialog.show(requireContext())
+            true
+        }
+
+        findPreference<Preference>("ignoreBatteryOptimizations")?.setOnPreferenceClickListener {
+            val pm = requireContext().getSystemService(android.content.Context.POWER_SERVICE) as? android.os.PowerManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && pm != null) {
+                if (!pm.isIgnoringBatteryOptimizations(requireContext().packageName)) {
+                    try {
+                        val intent = Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                            data = Uri.parse("package:${requireContext().packageName}")
+                        }
+                        startActivity(intent)
+                    } catch (_: Exception) {
+                        try {
+                            val intent = Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                            startActivity(intent)
+                        } catch (_: Exception) {
+                            Toast.makeText(requireContext(), R.string.action_not_supported, Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                } else {
+                    Toast.makeText(requireContext(), R.string.already_ignoring_battery_optimizations, Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                Toast.makeText(requireContext(), R.string.action_not_supported, Toast.LENGTH_SHORT).show()
+            }
             true
         }
 

@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Wikipedia Globe & W icon -->
+    <path
+        android:fillColor="#1E293B"
+        android:pathData="M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM18.5,17h-2.1l-2.4,-7.2 -2.1,7.2h-1.8L7.5,7h2.2l1.6,6.2L13.2,7h1.6l1.9,6.2L18.5,7h2l-2,10z" />
+</vector>

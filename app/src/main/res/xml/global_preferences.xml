@@ -107,6 +107,17 @@
             app:defaultValue="true"
             app:title="@string/confirm_profile_delete" />
         <SwitchPreference
+            app:key="show_subscription_info_card"
+            app:defaultValue="true"
+            app:icon="@drawable/ic_file_cloud_queue"
+            app:title="@string/show_subscription_info_card"
+            app:summary="@string/show_subscription_info_card_summary" />
+        <Preference
+            app:key="ignoreBatteryOptimizations"
+            app:icon="@drawable/ic_baseline_battery_saver_24"
+            app:title="@string/ignore_battery_optimizations"
+            app:summary="@string/ignore_battery_optimizations_summary" />
+        <SwitchPreference
             app:icon="@drawable/ic_baseline_center_focus_weak_24"
             app:key="alwaysShowAddress"
             app:summary="@string/always_show_address_sum"

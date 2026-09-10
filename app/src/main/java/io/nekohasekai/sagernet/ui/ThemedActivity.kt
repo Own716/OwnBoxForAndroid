@@ -27,11 +27,13 @@ abstract class ThemedActivity : AppCompatActivity {
     private var lastUseSystemTheme: Boolean = false
     private var lastAmoledTheme: Boolean = false
     private var lastAppTheme: Int = 0
+    private var lastCustomThemeColor: Int = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         lastUseSystemTheme = DataStore.useSystemTheme
         lastAmoledTheme = DataStore.amoledTheme
         lastAppTheme = DataStore.appTheme
+        lastCustomThemeColor = DataStore.customThemeColor
 
         if (!isDialog) {
             Theme.apply(this)
@@ -75,7 +77,7 @@ abstract class ThemedActivity : AppCompatActivity {
         super.onResume()
         if (lastUseSystemTheme != DataStore.useSystemTheme ||
             lastAmoledTheme != DataStore.amoledTheme ||
-            (!DataStore.useSystemTheme && lastAppTheme != DataStore.appTheme)) {
+            (!DataStore.useSystemTheme && (lastAppTheme != DataStore.appTheme || (DataStore.appTheme == Theme.CUSTOM && lastCustomThemeColor != DataStore.customThemeColor)))) {
             ActivityCompat.recreate(this)
         }
     }

@@ -153,6 +153,7 @@ class MediaUnlockActivity : ThemedActivity() {
             MediaItem("youtube", "YouTube Premium", "流媒体服务", R.drawable.ic_platform_youtube, initialState, defStatus(), defDesc("YouTube Premium")),
             MediaItem("tiktok", "TikTok", "流媒体服务", R.drawable.ic_platform_tiktok, initialState, defStatus(), defDesc("TikTok")),
             MediaItem("spotify", "Spotify", "音乐音频服务", R.drawable.ic_platform_spotify, initialState, defStatus(), defDesc("Spotify")),
+            MediaItem("wikipedia", "Wikipedia", "网络百科服务", R.drawable.ic_platform_wikipedia, initialState, defStatus(), defDesc("Wikipedia")),
             MediaItem("chatgpt", "ChatGPT (OpenAI)", "AI 智能服务", R.drawable.ic_platform_chatgpt, initialState, defStatus(), defDesc("ChatGPT")),
             MediaItem("claude", "Claude (Anthropic)", "AI 智能服务", R.drawable.ic_platform_claude, initialState, defStatus(), defDesc("Claude")),
             MediaItem("gemini", "Google Gemini", "AI 智能服务", R.drawable.ic_platform_gemini, initialState, defStatus(), defDesc("Gemini"))
@@ -195,6 +196,7 @@ class MediaUnlockActivity : ThemedActivity() {
                 "youtube" -> testYouTube(item)
                 "tiktok" -> testTikTok(item)
                 "spotify" -> testSpotify(item)
+                "wikipedia" -> testWikipedia(item)
                 "chatgpt" -> testChatGpt(item)
                 "claude" -> testClaude(item)
                 "gemini" -> testGemini(item)
@@ -446,7 +448,20 @@ class MediaUnlockActivity : ThemedActivity() {
             region = matcher.group(1)?.uppercase() ?: ""
         }
 
-        if (!body.contains("tiktok-verify-page", ignoreCase = true)) {
+        val nodeCountry = LandingIpManager.getCachedInfo()?.countryCode?.uppercase().orEmpty()
+        if (region == "HK" || (region.isEmpty() && nodeCountry == "HK")) {
+            return@withContext item.copy(
+                state = TestState.BLOCKED,
+                statusText = "不支持 (HK)",
+                description = "TikTok 官方已停止在中国香港提供服务",
+                region = "HK"
+            )
+        }
+
+        if (!body.contains("tiktok-verify-page", ignoreCase = true) &&
+            !body.contains("verify-center", ignoreCase = true) &&
+            !body.contains("captcha", ignoreCase = true)
+        ) {
             val flag = if (region.isNotBlank()) LandingIpManager.countryCodeToFlagEmoji(region) + " " + region else ""
             item.copy(
                 state = TestState.UNLOCKED,
@@ -487,6 +502,67 @@ class MediaUnlockActivity : ThemedActivity() {
                 statusText = "未解锁",
                 description = "当前出口 IP 所在地区暂未开放 Spotify 服务"
             )
+        }
+    }
+
+    private suspend fun testWikipedia(item: MediaItem): MediaItem = withContext(Dispatchers.IO) {
+        val client = Libcore.newHttpClient().apply {
+            modernTLS()
+            tryProxyOutbound()
+        }
+        try {
+            val req = client.newRequest().apply {
+                setURL("https://en.wikipedia.org/w/api.php?action=query&meta=userinfo&uiprop=blockinfo&format=json")
+                applyBrowserHeaders("en.wikipedia.org")
+                setUserAgent(BROWSER_USER_AGENT)
+            }
+            val resp = req.execute()
+            val body = Util.getStringBox(resp.contentString)
+
+            if (body.contains("\"blockid\"") || body.contains("\"blockedby\"")) {
+                item.copy(
+                    state = TestState.PARTIAL,
+                    statusText = "仅只读 (编辑受限)",
+                    description = "当前出口 IP 被维基百科列入封禁列表，不可匿名/代理编辑"
+                )
+            } else if (body.contains("\"userinfo\"") || body.contains("\"id\":0") || body.contains("\"anon\"")) {
+                item.copy(
+                    state = TestState.UNLOCKED,
+                    statusText = "支持完整编辑",
+                    description = "当前出口 IP 访问正常且未被封禁，支持词条匿名编辑"
+                )
+            } else {
+                val testWeb = client.newRequest().apply {
+                    setURL("https://en.wikipedia.org/wiki/Main_Page")
+                    applyBrowserHeaders("en.wikipedia.org")
+                }
+                val webResp = testWeb.execute()
+                val webBody = Util.getStringBox(webResp.contentString)
+                if (webBody.contains("Wikipedia", ignoreCase = true) || webBody.contains("Main page", ignoreCase = true)) {
+                    item.copy(
+                        state = TestState.UNLOCKED,
+                        statusText = "正常访问",
+                        description = "维基百科访问顺畅"
+                    )
+                } else {
+                    item.copy(
+                        state = TestState.BLOCKED,
+                        statusText = "未解锁/访问受限",
+                        description = "无法正常载入维基百科页面"
+                    )
+                }
+            }
+        } catch (e: Throwable) {
+            val msg = e.message.orEmpty()
+            if (msg.contains("403") || msg.contains("Forbidden", ignoreCase = true)) {
+                item.copy(
+                    state = TestState.BLOCKED,
+                    statusText = "访问被拦截",
+                    description = "维基百科返回 403 Forbidden 封禁访问"
+                )
+            } else {
+                throw e
+            }
         }
     }
 

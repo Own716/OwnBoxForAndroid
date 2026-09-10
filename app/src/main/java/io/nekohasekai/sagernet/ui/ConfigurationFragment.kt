@@ -39,10 +39,15 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import androidx.viewpager2.widget.ViewPager2
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.progressindicator.LinearProgressIndicator
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import io.nekohasekai.sagernet.GroupOrder
 import io.nekohasekai.sagernet.GroupType
 import io.nekohasekai.sagernet.Key
@@ -1733,6 +1738,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                 onViewCreated(requireView(), null)
             }
             checkOrderMenu()
+            updateSubscriptionInfoCard()
             configurationListView.requestFocus()
         }
 
@@ -1876,6 +1882,100 @@ class ConfigurationFragment @JvmOverloads constructor(
                 setupItemTouchHelper()
                 setupBottomBarScrollDriver()
             }
+            updateSubscriptionInfoCard(view)
+        }
+
+        fun updateSubscriptionInfoCard(targetView: View? = this.view) {
+            val root = targetView ?: return
+            val card = root.findViewById<MaterialCardView>(R.id.card_subscription_info) ?: return
+
+            if (select || !::proxyGroup.isInitialized || proxyGroup.type != GroupType.SUBSCRIPTION || !DataStore.showSubscriptionInfoCard) {
+                card.isGone = true
+                return
+            }
+
+            val sub = proxyGroup.subscription
+            if (sub == null) {
+                card.isGone = true
+                return
+            }
+
+            val tvTitle = root.findViewById<TextView>(R.id.tv_subscription_title)
+            val tvExpire = root.findViewById<TextView>(R.id.tv_expire_date)
+            val tvTrafficStat = root.findViewById<TextView>(R.id.tv_traffic_stat)
+            val tvTrafficRemaining = root.findViewById<TextView>(R.id.tv_traffic_remaining)
+            val progress = root.findViewById<LinearProgressIndicator>(R.id.traffic_progress)
+            val tvNodeCount = root.findViewById<TextView>(R.id.tv_node_count)
+            val tvLastUpdated = root.findViewById<TextView>(R.id.tv_last_updated)
+
+            tvTitle?.text = proxyGroup.name ?: getString(R.string.subscription_info)
+
+            var usedBytes = 0L
+            var totalBytes = 0L
+            var expireSec = 0L
+
+            if (sub.bytesUsed != null && sub.bytesRemaining != null) {
+                usedBytes = sub.bytesUsed
+                totalBytes = sub.bytesUsed + sub.bytesRemaining
+                if (sub.expiryDate != null) {
+                    expireSec = sub.expiryDate.toLong()
+                }
+            } else if (!sub.subscriptionUserinfo.isNullOrBlank()) {
+                val info = sub.subscriptionUserinfo
+                fun extract(pattern: String): Long {
+                    return Regex(pattern, RegexOption.IGNORE_CASE).find(info)?.groupValues?.getOrNull(1)?.toLongOrNull() ?: 0L
+                }
+                val up = extract("upload=([0-9]+)")
+                val down = extract("download=([0-9]+)")
+                usedBytes = up + down
+                totalBytes = extract("total=([0-9]+)")
+                expireSec = extract("expire=([0-9]+)")
+            }
+
+            val ctx = root.context
+            if (totalBytes > 0L) {
+                val remainBytes = (totalBytes - usedBytes).coerceAtLeast(0L)
+                val usedStr = Formatter.formatFileSize(ctx, usedBytes)
+                val totalStr = Formatter.formatFileSize(ctx, totalBytes)
+                val remainStr = Formatter.formatFileSize(ctx, remainBytes)
+                tvTrafficStat?.text = "$usedStr / $totalStr"
+                tvTrafficRemaining?.text = "剩余 $remainStr"
+                tvTrafficRemaining?.isVisible = true
+                progress?.isVisible = true
+                val percent = ((usedBytes.toDouble() / totalBytes.toDouble()) * 100).toInt().coerceIn(0, 100)
+                progress?.progress = percent
+            } else if (usedBytes > 0L) {
+                val usedStr = Formatter.formatFileSize(ctx, usedBytes)
+                tvTrafficStat?.text = "已用: $usedStr"
+                tvTrafficRemaining?.isGone = true
+                progress?.isGone = true
+            } else {
+                tvTrafficStat?.text = "未限制 / 流量不限量"
+                tvTrafficRemaining?.isGone = true
+                progress?.isGone = true
+            }
+
+            if (expireSec > 0L) {
+                val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(expireSec * 1000L))
+                tvExpire?.text = "到期: $dateStr"
+                tvExpire?.isVisible = true
+            } else {
+                tvExpire?.text = "长期有效"
+                tvExpire?.isVisible = true
+            }
+
+            val count = adapter?.configurationIdList?.size ?: 0
+            tvNodeCount?.text = "节点数: $count"
+
+            if (sub.lastUpdated != null && sub.lastUpdated > 0) {
+                val updatedStr = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date(sub.lastUpdated.toLong() * 1000L))
+                tvLastUpdated?.text = "更新于: $updatedStr"
+                tvLastUpdated?.isVisible = true
+            } else {
+                tvLastUpdated?.isGone = true
+            }
+
+            card.isVisible = true
         }
 
         private fun setupBottomBarScrollDriver() {
@@ -2394,6 +2494,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                     } else if (newProfiles.isNotEmpty()) {
                         configurationListView.scrollTo(0, true)
                     }
+                    updateSubscriptionInfoCard()
 
                 }
             }
@@ -2490,11 +2591,59 @@ class ConfigurationFragment @JvmOverloads constructor(
                 }
                 view.setOnLongClickListener {
                     val proxyEntity = entity
-                    if (!select && proxyEntity.type != ProxyEntity.TYPE_CHAIN && proxyEntity.type != ProxyEntity.TYPE_BALANCER) {
-                        showShareMenu(shareLayout, proxyEntity)
-                        true
-                    } else false
+                    showNodeActionBottomSheet(proxyEntity)
+                    true
                 }
+            }
+
+            private fun showNodeActionBottomSheet(proxyEntity: ProxyEntity) {
+                if (select) return
+                val context = requireContext()
+                val dialog = BottomSheetDialog(context)
+                val sheetView = LayoutInflater.from(context).inflate(R.layout.dialog_profile_actions, null)
+
+                val tvName = sheetView.findViewById<TextView>(R.id.dialog_profile_name)
+                val tvType = sheetView.findViewById<TextView>(R.id.dialog_profile_type)
+                val btnEdit = sheetView.findViewById<View>(R.id.action_edit_node)
+                val btnMore = sheetView.findViewById<View>(R.id.action_more_node)
+                val btnDelete = sheetView.findViewById<View>(R.id.action_delete_node)
+
+                tvName.text = proxyEntity.displayName()
+                tvType.text = proxyEntity.displayType()
+
+                val pf = parentFragment as? ConfigurationFragment
+                val isSelected = pf?.isSelectedProfile(proxyEntity.id) == true
+                val isStarted = isSelected && DataStore.serviceState.started && (pf?.isCurrentProfile(proxyEntity.id) == true)
+
+                btnEdit.setOnClickListener {
+                    dialog.dismiss()
+                    context.startActivity(
+                        proxyEntity.settingIntent(
+                            context, proxyGroup.type == GroupType.SUBSCRIPTION
+                        )
+                    )
+                }
+
+                if (proxyEntity.type == ProxyEntity.TYPE_CHAIN || proxyEntity.type == ProxyEntity.TYPE_BALANCER) {
+                    btnMore.isGone = true
+                } else {
+                    btnMore.setOnClickListener {
+                        dialog.dismiss()
+                        showShareMenu(view, proxyEntity)
+                    }
+                }
+
+                btnDelete.setOnClickListener {
+                    dialog.dismiss()
+                    if (isStarted) {
+                        alert(getString(R.string.cannot_delete_active_profile)).tryToShow()
+                    } else {
+                        removeProfile(proxyEntity)
+                    }
+                }
+
+                dialog.setContentView(sheetView)
+                dialog.show()
             }
 
             private fun selectProfile(proxyEntity: ProxyEntity) {
@@ -2719,26 +2868,10 @@ class ConfigurationFragment @JvmOverloads constructor(
 
                 bindTestResult(proxyEntity, showTraffic, speedTestText)
 
-                val selectOrChain = select || proxyEntity.type == ProxyEntity.TYPE_CHAIN || proxyEntity.type == ProxyEntity.TYPE_BALANCER
-                val isDoubleColumn = layoutManager is FixedGridLayoutManager
-                
-                if (isDoubleColumn) {
-                    editButton.isGone = true
-                    shareLayout.isGone = true
-                    removeButton.isGone = true
-                    doubleColumnMenuButton.isVisible = true
-                } else {
-                    shareLayout.isGone = selectOrChain
-                    editButton.isGone = select
-                    removeButton.isGone = select
-                    doubleColumnMenuButton.isGone = true
-                }
-
-                proxyEntity.nekoBean?.apply {
-                    if (!isDoubleColumn) {
-                        shareLayout.isGone = true
-                    }
-                }
+                editButton.isGone = true
+                shareLayout.isGone = true
+                removeButton.isGone = true
+                doubleColumnMenuButton.isGone = true
 
                 val selected = pf.isSelectedProfile(proxyEntity.id)
                 val started =

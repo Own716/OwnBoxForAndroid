@@ -3,6 +3,7 @@ package io.nekohasekai.sagernet.bg
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.ProxyInfo
@@ -43,15 +44,41 @@ class VpnService : BaseVpnService(),
     }
 
     override var wakeLock: PowerManager.WakeLock? = null
+    private var wifiLock: android.net.wifi.WifiManager.WifiLock? = null
 
     @SuppressLint("WakelockTimeout")
     override fun acquireWakeLock() {
-        wakeLock = SagerNet.power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "sagernet:vpn")
-            .apply { acquire() }
+        if (wakeLock == null) {
+            wakeLock = SagerNet.power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "sagernet:vpn")
+                .apply { acquire() }
+        }
+        if (wifiLock == null) {
+            try {
+                val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as? android.net.wifi.WifiManager
+                @Suppress("DEPRECATION")
+                wifiLock = wifiManager?.createWifiLock(
+                    android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF,
+                    "sagernet:vpn_wifi"
+                )?.apply {
+                    setReferenceCounted(false)
+                    acquire()
+                }
+            } catch (_: Throwable) {
+            }
+        }
     }
 
     @Suppress("EXPERIMENTAL_API_USAGE")
     override suspend fun killProcesses(): Throwable? {
+        try {
+            wifiLock?.let {
+                if (it.isHeld) it.release()
+            }
+        } catch (_: Throwable) {
+        } finally {
+            wifiLock = null
+        }
+
         val currentConnection = conn
         var cleanupError: Throwable? = null
         Logs.i(

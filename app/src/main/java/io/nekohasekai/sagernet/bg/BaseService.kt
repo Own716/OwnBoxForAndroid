@@ -74,6 +74,16 @@ class BaseService {
                     }
                 }
 
+                Intent.ACTION_SCREEN_ON,
+                Intent.ACTION_USER_PRESENT -> {
+                    proxy?.box?.wake()
+                    if (DataStore.wakeResetConnections) {
+                        Libcore.resetAllConnections(true)
+                    }
+                }
+
+                Action.CLOSE -> service.stopRunner()
+
                 else -> service.stopRunner()
             }
         }
@@ -452,7 +462,7 @@ class BaseService {
             DataStore.baseService = this
 
             val data = data
-            if (data.state != State.Stopped) return Service.START_NOT_STICKY
+            if (data.state != State.Stopped) return Service.START_STICKY
             val profile = SagerDatabase.proxyDao.getById(DataStore.selectedProxy)
             this as Context
             if (profile == null) { // gracefully shutdown: https://stackoverflow.com/q/47337857/2245107
@@ -474,6 +484,8 @@ class BaseService {
                         addAction(PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED)
                     }
                     addAction(Action.RESET_UPSTREAM_CONNECTIONS)
+                    addAction(Intent.ACTION_SCREEN_ON)
+                    addAction(Intent.ACTION_USER_PRESENT)
                 }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     registerReceiver(
@@ -535,7 +547,7 @@ class BaseService {
                     data.connectingJob = null
                 }
             }
-            return Service.START_NOT_STICKY
+            return Service.START_STICKY
         }
     }
 

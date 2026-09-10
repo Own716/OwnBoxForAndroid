@@ -902,6 +902,15 @@
     <string name="balancer_custom_url">Custom Test URL</string>
     <string name="balancer_custom_url_sum">Custom probe URL for this Balancer (leave blank to use global default)</string>
     <string name="balancer_interval">Probe Interval</string>
-    <string name="balancer_interval_sum">%1$s seconds</string>
     <string name="balancer_select_group">Select Group</string>
+    <string name="show_subscription_info_card">Subscription Asset Info Card</string>
+    <string name="show_subscription_info_card_summary">Display subscription traffic and expiry card at top of subscription groups</string>
+    <string name="subscription_info">Subscription Info</string>
+    <string name="cannot_delete_active_profile">Active profile cannot be deleted. Please disconnect or select another profile first.</string>
+    <string name="ignore_battery_optimizations_summary">Keep VPN connection alive and prevent background sleeping or disconnections</string>
+    <string name="already_ignoring_battery_optimizations">Battery optimizations are already ignored</string>
+    <string name="action_not_supported">Action not supported on this device</string>
+    <string name="custom_color_title">Custom Theme Color (HEX / RGB)</string>
+    <string name="custom_color_apply">Save &amp; Apply</string>
+    <string name="custom_color_hex_hint">e.g. #00E676</string>
 </resources>

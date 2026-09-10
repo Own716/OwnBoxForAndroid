@@ -247,6 +247,7 @@ class ConfigBuildResult(
     var trafficMap: Map<String, List<ProxyEntity>>,
     var profileTagMap: Map<Long, String>,
     val selectorGroupId: Long,
+    val balancerMemberMap: Map<Long, List<Long>> = emptyMap(),
 ) {
     data class IndexEntity(var chain: LinkedHashMap<Int, ProxyEntity>)
 }
@@ -304,6 +305,7 @@ fun buildConfig(
 
     val trafficMap = HashMap<String, List<ProxyEntity>>()
     val tagMap = HashMap<Long, String>()
+    val balancerMemberMap = HashMap<Long, List<Long>>()
     val globalOutbounds = HashMap<Long, String>()
     val readableNames = mutableSetOf(TAG_DIRECT, TAG_BYPASS, TAG_BLOCK, TAG_FRAGMENT, TAG_MIXED, TAG_PROXY)
     val group = SagerDatabase.groupDao.getById(proxy.groupId)
@@ -693,7 +695,8 @@ fun buildConfig(
                 }
 
                 outbounds.add(balancerOutbound)
-                trafficMap[balancerTag] = memberEntities + entity
+                trafficMap[balancerTag] = listOf(entity)
+                balancerMemberMap[entity.id] = memberEntities.map { it.id }
                 return balancerTag
             }
 
@@ -1571,7 +1574,8 @@ fun buildConfig(
             proxy.id,
             trafficMap,
             tagMap,
-            if (buildSelector) group.id else -1L
+            if (buildSelector) group.id else -1L,
+            balancerMemberMap
         )
     }
 

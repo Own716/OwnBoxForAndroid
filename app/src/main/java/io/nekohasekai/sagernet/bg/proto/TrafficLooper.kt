@@ -101,11 +101,21 @@ class TrafficLooper
                 }
             }
         }
+        // If old proxy was balancer, set old members to ignore = true
+        data.proxy?.config?.balancerMemberMap?.get(selectorNowId)?.forEach { memberId ->
+            idMap[memberId]?.ignore = true
+        }
+
         selectorNowFakeTag = newData.tag
         selectorNowId = id
         newData.apply {
             tag = TAG_PROXY
             ignore = false
+        }
+
+        // If new proxy is balancer, set new members to ignore = false
+        data.proxy?.config?.balancerMemberMap?.get(id)?.forEach { memberId ->
+            idMap[memberId]?.ignore = false
         }
     }
 
@@ -197,6 +207,10 @@ class TrafficLooper
                     }
                     if (proxy.config.selectorGroupId >= 0L) {
                         selectMainLocked(proxy.config.mainEntId)
+                    } else {
+                        proxy.config.balancerMemberMap.values.forEach { memberIds ->
+                            memberIds.forEach { idMap[it]?.ignore = false }
+                        }
                     }
                     //
                     trafficUpdater = TrafficUpdater(
@@ -208,18 +222,48 @@ class TrafficLooper
                 trafficUpdater!!.updateAll()
                 currentCoroutineContext().ensureActive()
 
+                // Accumulate member traffic into Balancer entity
+                proxy.config.balancerMemberMap.forEach { (balancerId, memberIds) ->
+                    val balancerItem = idMap[balancerId] ?: return@forEach
+                    val members = memberIds.mapNotNull { idMap[it] }
+                    if (members.isNotEmpty()) {
+                        var sumTxRate = 0L
+                        var sumRxRate = 0L
+                        var sumTxDelta = 0L
+                        var sumRxDelta = 0L
+                        var hasDelta = false
+                        for (m in members) {
+                            sumTxRate += m.txRate
+                            sumRxRate += m.rxRate
+                            sumTxDelta += (m.tx - m.txBase)
+                            sumRxDelta += (m.rx - m.rxBase)
+                            if (m.hasTrafficDelta) hasDelta = true
+                        }
+                        balancerItem.txRate = sumTxRate
+                        balancerItem.rxRate = sumRxRate
+                        balancerItem.tx = balancerItem.txBase + sumTxDelta
+                        balancerItem.rx = balancerItem.rxBase + sumRxDelta
+                        if (hasDelta) {
+                            balancerItem.hasTrafficDelta = true
+                        }
+                    }
+                }
+
                 // add all non-bypass to "main"
                 var mainTxRate = 0L
                 var mainRxRate = 0L
                 var mainTx = 0L
                 var mainRx = 0L
+                val balancerItems = proxy.config.balancerMemberMap.keys.mapNotNull { idMap[it] }.toSet()
                 tagMap.forEach { (_, it) ->
-                    if (!it.ignore) {
-                        mainTxRate += it.txRate
-                        mainRxRate += it.rxRate
+                    if (it !in balancerItems) {
+                        if (!it.ignore) {
+                            mainTxRate += it.txRate
+                            mainRxRate += it.rxRate
+                        }
+                        mainTx += it.tx - it.txBase
+                        mainRx += it.rx - it.rxBase
                     }
-                    mainTx += it.tx - it.txBase
-                    mainRx += it.rx - it.rxBase
                 }
 
                 val trafficUpdates = arrayListOf<TrafficData>()

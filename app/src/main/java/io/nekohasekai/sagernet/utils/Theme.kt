@@ -33,8 +33,30 @@ object Theme {
     const val BLUE_GREY = 20
     const val BLACK = 21
     const val VERDANT_MINT = 22
+    const val CUSTOM = 99
 
     private fun defaultTheme() = GREEN
+
+    fun getClosestThemeForColor(color: Int): Int {
+        val colors = app.resources.getIntArray(R.array.material_colors)
+        val r = (color shr 16) and 0xFF
+        val g = (color shr 8) and 0xFF
+        val b = color and 0xFF
+        var minDistance = Double.MAX_VALUE
+        var closestTheme = GREEN
+        for (i in colors.indices) {
+            val c = colors[i]
+            val cr = (c shr 16) and 0xFF
+            val cg = (c shr 8) and 0xFF
+            val cb = c and 0xFF
+            val dist = (r - cr) * (r - cr) * 0.30 + (g - cg) * (g - cg) * 0.59 + (b - cb) * (b - cb) * 0.11
+            if (dist < minDistance) {
+                minDistance = dist
+                closestTheme = i + 1
+            }
+        }
+        return closestTheme
+    }
 
     fun apply(context: Context) {
         context.setTheme(getTheme())
@@ -94,6 +116,7 @@ object Theme {
             BLUE_GREY -> R.style.Theme_SagerNet_BlueGrey
             BLACK -> R.style.Theme_SagerNet_Black
             VERDANT_MINT -> R.style.Theme_SagerNet_VerdantMint
+            CUSTOM -> getTheme(getClosestThemeForColor(DataStore.customThemeColor))
             else -> getTheme(defaultTheme())
         }
     }
@@ -123,6 +146,7 @@ object Theme {
             BLUE_GREY -> R.style.Theme_SagerNet_Dialog_BlueGrey
             BLACK -> R.style.Theme_SagerNet_Dialog_Black
             VERDANT_MINT -> R.style.Theme_SagerNet_Dialog_VerdantMint
+            CUSTOM -> getDialogTheme(getClosestThemeForColor(DataStore.customThemeColor))
             else -> getDialogTheme(defaultTheme())
         }
     }

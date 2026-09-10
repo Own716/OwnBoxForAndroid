@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Pure Liquid Glass Material with Luminous Refraction -->
+    <!-- Pure Liquid Glass Base - Translucent Luminous Droplet -->
     <item>
         <shape android:shape="rectangle">
             <corners android:radius="26dp" />
@@ -12,7 +12,8 @@
                 android:type="linear" />
         </shape>
     </item>
-    <!-- Caustic Highlight Rim -->
+
+    <!-- Top-Left Caustic Highlight & Specular Gleam -->
     <item
         android:left="1dp"
         android:top="1dp"
@@ -28,7 +29,8 @@
                 android:type="linear" />
         </shape>
     </item>
-    <!-- Refraction Stroke -->
+
+    <!-- Refraction Edge Rim Stroke -->
     <item>
         <shape android:shape="rectangle">
             <corners android:radius="26dp" />

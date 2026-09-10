@@ -819,6 +819,15 @@
     <string name="balancer_custom_url">自定义测试 URL</string>
     <string name="balancer_custom_url_sum">针对此负载均衡节点的独立探测地址（留空使用全局默认）</string>
     <string name="balancer_interval">观测间隔</string>
-    <string name="balancer_interval_sum">%1$s 秒</string>
     <string name="balancer_select_group">选择分组</string>
+    <string name="show_subscription_info_card">置顶显示机场资产信息卡片</string>
+    <string name="show_subscription_info_card_summary">在订阅分组顶部展示流量配额、剩余与到期时间等资产卡片</string>
+    <string name="subscription_info">订阅资产信息</string>
+    <string name="cannot_delete_active_profile">正在运行的活动节点无法删除，请先断开连接或切换至其他节点。</string>
+    <string name="ignore_battery_optimizations_summary">将 OwnBox 加入系统电池白名单，保障熄屏长效保活与防休眠掉线</string>
+    <string name="already_ignoring_battery_optimizations">已成功加入电池优化白名单，长效保活已生效</string>
+    <string name="action_not_supported">当前设备不支持此操作</string>
+    <string name="custom_color_title">自定义主题色 (HEX / RGB)</string>
+    <string name="custom_color_apply">保存并应用</string>
+    <string name="custom_color_hex_hint">如 #00E676</string>
 </resources>
