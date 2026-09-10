@@ -41,7 +41,7 @@
             app:title="@string/language"
             app:useSimpleSummaryProvider="true" />
         <Preference
-            app:icon="@mipmap/ic_launcher"
+            app:icon="@drawable/ic_baseline_app_shortcut_24"
             app:key="changeIcon"
             app:title="@string/change_icon" />
         <io.nekohasekai.sagernet.widget.SubscriptionUserAgentPreference

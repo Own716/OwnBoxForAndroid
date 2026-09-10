@@ -1,4 +1,6 @@
-﻿# OwnBox for Android v2.5.0
+﻿# OwnBox for Android 更新日志 (Changelog)
+
+# OwnBox for Android v2.5.0
 
 ## 全新功能
 
