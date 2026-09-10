@@ -1,4 +1,4 @@
-﻿package loadbalance
+package loadbalance
 
 import (
 	"context"
@@ -141,3 +141,11 @@ func (s *LoadBalance) NewPacketConnection(ctx context.Context, conn N.PacketConn
 		s.connection.NewPacketConnection(ctx, selected, conn, metadata, onClose)
 	}
 }
+
+func (s *LoadBalance) Close() error {
+	if s.interruptGroup != nil {
+		return s.interruptGroup.Close()
+	}
+	return nil
+}
+

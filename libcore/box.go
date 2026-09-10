@@ -428,8 +428,12 @@ func UrlTest(i *BoxInstance, link string, timeout int32) (latency int32, err err
 	return
 }
 
-// urlTest 执行单次真实 HTTP/HTTPS 握手耗时测速（包含代理拨号、TLS 握手及响应标头耗时）。
-// 测速结果真实可信，与 TCPping / URL 测速基准一致，避免二次请求导致连接重置。
+// urlTest 替代 libneko/speedtest.UrlTest 与 fork 的 boxapi.CreateProxyHttpClient，
+// 对齐 Throne/husi 的"显式拨号 + 连接复用 + 双 HEAD 请求"模式：
+// 第一次 HEAD 预热（含握手，不计时），第二次 HEAD 复用同一连接计时。
+// 收益：① 延迟为纯 RTT（100~200ms），跨协议可比、贴近实际使用时连接复用的体感；
+// ② 第二次请求验证连接持续性——若远端关闭连接，优雅回退至预热耗时，避免假失败。
+// 超时由 ctx 全程控制（拨号 + 两次请求共用 timeout 预算）。
 func urlTest(instance *BoxInstance, tracker adapter.ConnectionTracker, link string, timeout int32) (int32, error) {
 	totalStarted := time.Now()
 	instance.urlTestTrace("urltest", "begin link=%s timeout=%dms", link, timeout)
@@ -461,61 +465,83 @@ func urlTest(instance *BoxInstance, tracker adapter.ConnectionTracker, link stri
 		return 0, E.New("no default outbound")
 	}
 	destination := M.ParseSocksaddrHostPortStr(hostname, port)
-
-	dialer := func(ctx context.Context, network, addr string) (net.Conn, error) {
-		dialStarted := time.Now()
-		instance.urlTestTrace("dial", "begin outbound=%q destination=%s", outbound.Tag(), destination)
-		conn, err := outbound.DialContext(ctx, N.NetworkTCP, destination)
-		if err != nil {
-			instance.urlTestTrace("dial", "failed elapsed=%s totalElapsed=%s error=%v", time.Since(dialStarted), time.Since(totalStarted), err)
-			return nil, err
-		}
-		instance.urlTestTrace("dial", "ok elapsed=%s", time.Since(dialStarted))
-		if tracker != nil {
-			conn = tracker.RoutedConnection(ctx, conn, adapter.InboundContext{
-				Outbound:    outbound.Tag(),
-				Destination: destination,
-			}, nil, outbound)
-		}
-		return conn, nil
+	dialStarted := time.Now()
+	instance.urlTestTrace("dial", "begin outbound=%q destination=%s", outbound.Tag(), destination)
+	conn, err := outbound.DialContext(ctx, N.NetworkTCP, destination)
+	if err != nil {
+		instance.urlTestTrace("dial", "failed elapsed=%s totalElapsed=%s error=%v", time.Since(dialStarted), time.Since(totalStarted), err)
+		return 0, err
 	}
-
-	transport := &http.Transport{
-		DialContext:       dialer,
-		DisableKeepAlives: true,
-		TLSClientConfig: &tls.Config{
-			ServerName:         hostname,
-			InsecureSkipVerify: true,
-		},
+	instance.urlTestTrace("dial", "ok elapsed=%s", time.Since(dialStarted))
+	if tracker != nil {
+		conn = tracker.RoutedConnection(ctx, conn, adapter.InboundContext{
+			Outbound:    outbound.Tag(),
+			Destination: destination,
+		}, nil, outbound)
 	}
+	defer conn.Close()
+
+	// client 恒复用上面建立的连接（keep-alive）；重定向不跟随（generate_204 类直返）。
 	client := &http.Client{
-		Transport: transport,
+		Transport: &http.Transport{
+			DialContext: func(context.Context, string, string) (net.Conn, error) {
+				return conn, nil
+			},
+			TLSClientConfig: &tls.Config{
+				ServerName:         hostname,
+				InsecureSkipVerify: true,
+			},
+		},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
 	}
-	defer transport.CloseIdleConnections()
+	defer client.CloseIdleConnections()
 
+	doHead := func() error {
+		req, err := http.NewRequestWithContext(ctx, http.MethodHead, link, nil)
+		if err != nil {
+			return err
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			return err
+		}
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
+		_ = resp.Body.Close()
+		if resp.StatusCode >= 400 {
+			return E.New("unexpected status: ", resp.Status)
+		}
+		return nil
+	}
+
+	// 第一次：预热（建立 TLS 会话等），不计时
+	warmupStarted := time.Now()
+	instance.urlTestTrace("warmup-head", "begin")
+	if err = doHead(); err != nil {
+		boxPlatformLogWriter.WriteMessage(sblog.LevelDebug, fmt.Sprintf("box.urlTest warmup request failed: %v", err))
+		instance.urlTestTrace("warmup-head", "failed elapsed=%s totalElapsed=%s error=%v", time.Since(warmupStarted), time.Since(totalStarted), err)
+		return 0, err
+	}
+	warmupElapsed := time.Since(warmupStarted)
+	instance.urlTestTrace("warmup-head", "ok elapsed=%s", warmupElapsed)
+
+	// 第二次：复用连接，纯 RTT 计时
 	start := time.Now()
-	instance.urlTestTrace("measure-request", "begin")
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, link, nil)
-	if err != nil {
-		return 0, err
+	instance.urlTestTrace("measure-head", "begin reusedConnection=true")
+	var latency int32
+	if err = doHead(); err != nil {
+		boxPlatformLogWriter.WriteMessage(sblog.LevelDebug, fmt.Sprintf("box.urlTest measure request reused conn failed: %v, fallback to warmup duration", err))
+		instance.urlTestTrace("measure-head", "fallback-warmup elapsed=%s totalElapsed=%s error=%v", time.Since(start), time.Since(totalStarted), err)
+		latency = int32(warmupElapsed.Milliseconds())
+		if latency <= 0 {
+			latency = 1
+		}
+	} else {
+		latency = int32(time.Since(start).Milliseconds())
 	}
-	req.Header.Set("User-Agent", "Mozilla/5.0")
-	resp, err := client.Do(req)
-	if err != nil {
-		boxPlatformLogWriter.WriteMessage(sblog.LevelDebug, fmt.Sprintf("box.urlTest request failed after %dms: %v", time.Since(start).Milliseconds(), err))
-		instance.urlTestTrace("measure-request", "failed elapsed=%s totalElapsed=%s error=%v", time.Since(start), time.Since(totalStarted), err)
-		return 0, err
-	}
-	_ = resp.Body.Close()
-	if resp.StatusCode >= 400 {
-		return 0, E.New("unexpected status: ", resp.Status)
-	}
-	latency := int32(time.Since(start).Milliseconds())
 	boxPlatformLogWriter.WriteMessage(sblog.LevelDebug, fmt.Sprintf("box.urlTest ok latency=%dms", latency))
-	instance.urlTestTrace("measure-request", "ok latency=%dms totalElapsed=%s", latency, time.Since(totalStarted))
+	instance.urlTestTrace("measure-head", "ok latency=%dms totalElapsed=%s", latency, time.Since(totalStarted))
 	return latency, nil
 }
 

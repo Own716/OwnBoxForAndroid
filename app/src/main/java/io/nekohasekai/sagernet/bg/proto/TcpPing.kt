@@ -1,4 +1,4 @@
-﻿package io.nekohasekai.sagernet.bg.proto
+package io.nekohasekai.sagernet.bg.proto
 
 import android.os.Build
 import android.os.SystemClock
@@ -18,7 +18,13 @@ class TcpPing {
     suspend fun doTest(profile: ProxyEntity): Int = withContext(Dispatchers.IO) {
         val bean = profile.requireBean()
         val host = if (!bean.finalAddress.isNullOrBlank()) bean.finalAddress else bean.serverAddress
-        val port = if (bean.finalPort != 0) bean.finalPort else (bean.serverPort ?: 443)
+        val port = if (bean.finalPort != 0) {
+            bean.finalPort
+        } else if (bean is io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean) {
+            io.nekohasekai.sagernet.fmt.hysteria.getFirstPort(bean.serverPorts ?: "443")
+        } else {
+            bean.serverPort ?: 443
+        }
 
         if (host.isNullOrBlank() || port <= 0 || port > 65535) {
             error("Invalid host or port: $host:$port")

@@ -264,7 +264,7 @@ fun isMultiPort(hyAddr: String): Boolean {
 }
 
 fun getFirstPort(portStr: String): Int {
-    return portStr.substringBefore(":").substringBefore(",").toIntOrNull() ?: 443
+    return portStr.substringBefore(":").substringBefore("-").substringBefore(",").trim().toIntOrNull() ?: 443
 }
 
 fun HysteriaBean.canUseSingBox(): Boolean {
@@ -358,17 +358,18 @@ fun buildSingBoxOutboundHysteriaBean(bean: HysteriaBean): SingBoxOptions.SingBox
 
 fun hopPortsToSingboxList(s: String): List<String> {
     return s.split(",").mapNotNull { item ->
-        val trimmed = item.trim().replace(":", "-")
+        val trimmed = item.trim()
         if (trimmed.isEmpty()) return@mapNotNull null
-        if (trimmed.contains("-")) {
-            val parts = trimmed.split("-").map { it.trim() }
+        if (trimmed.contains(":") || trimmed.contains("-")) {
+            val delimiter = if (trimmed.contains(":")) ":" else "-"
+            val parts = trimmed.split(delimiter).map { it.trim() }
             if (parts.size == 2 && parts[0].toIntOrNull() != null && parts[1].toIntOrNull() != null) {
-                "${parts[0]}-${parts[1]}"
+                "${parts[0]}:${parts[1]}"
             } else {
                 null
             }
         } else if (trimmed.toIntOrNull() != null) {
-            trimmed
+            "${trimmed}:${trimmed}"
         } else {
             null
         }
