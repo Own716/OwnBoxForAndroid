@@ -17,8 +17,8 @@ val generateRootLicenseAsset by tasks.registering(Copy::class) {
 
 android {
     defaultConfig {
-        versionName = "2.5.5"
-        versionCode = 256 * 5
+        versionName = requireMetadata().getProperty("VERSION_NAME")
+        versionCode = requireMetadata().getProperty("VERSION_CODE").toInt() * 5
     }
     compileOptions {
         isCoreLibraryDesugaringEnabled = true

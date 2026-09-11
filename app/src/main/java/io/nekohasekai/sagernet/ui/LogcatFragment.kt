@@ -105,7 +105,7 @@ class LogcatFragment : ToolbarFragment(R.layout.layout_logcat),
             R.id.action_send_logcat -> {
                 val context = requireContext()
                 runOnDefaultDispatcher {
-                    SendLog.sendLog(context, "NB4A")
+                    SendLog.sendLog(context, "OWN")
                 }
             }
 

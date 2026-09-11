@@ -99,7 +99,7 @@ class NetworkFragment : NamedFragment(R.layout.layout_network) {
         }
 
         binding.exportCrashLog.setOnClickListener {
-            SendLog.sendLog(requireContext(), "OwnBox_Diagnostics")
+            SendLog.sendLog(requireContext(), "OWN_Diagnostics")
         }
 
         binding.localBackupNow.setOnClickListener {

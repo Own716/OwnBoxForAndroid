@@ -18,8 +18,13 @@ import java.io.IOException
 object SendLog {
     // Create full log and send
     fun sendLog(context: Context, title: String) {
+        val safeTitle = if (title.isBlank() || title.contains("NB4A", ignoreCase = true)) {
+            title.replace("NB4A", "OWN", ignoreCase = true).ifBlank { "OWN" }
+        } else {
+            title
+        }
         val logFile = File.createTempFile(
-            "$title ",
+            "$safeTitle ",
             ".log",
             File(app.cacheDir, "log").also { it.mkdirs() })
 
