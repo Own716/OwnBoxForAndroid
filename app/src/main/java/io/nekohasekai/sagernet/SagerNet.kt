@@ -106,6 +106,7 @@ class SagerNet : Application(),
             Theme.apply(this)
             Theme.applyNightTheme()
             AppLocale.apply()
+            AppIconManager.init(this)
             DataStore.migrateSubscriptionUserAgents()
             runOnDefaultDispatcher {
                 DefaultNetworkListener.start(this) {

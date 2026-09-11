@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <item name="ic_launcher" type="mipmap">@mipmap/ic_launcher_light</item>
-    <color name="ic_launcher_background">#B4DFF0</color>
-    <color name="ic_launcher_background_light">#B4DFF0</color>
-    <color name="ic_launcher_background_dark">#071029</color>
+    <color name="ic_launcher_background">#FFFFFF</color>
+    <color name="ic_launcher_background_light">#FFFFFF</color>
+    <color name="ic_launcher_background_dark">#121421</color>
 </resources>

@@ -450,12 +450,11 @@ class StatsBar @JvmOverloads constructor(
             }
 
             result.onSuccess { info ->
-                if (lastMeasuredLatency <= 0 && info.durationMs > 0) {
-                    lastMeasuredLatency = info.durationMs.toInt()
-                    lastMeasureTime = android.os.SystemClock.elapsedRealtime()
-                }
                 btnIpDetail?.visibility = View.VISIBLE
                 updateStatusViews()
+                if (lastMeasuredLatency <= 0) {
+                    testConnection(silent = true)
+                }
             }.onFailure { err ->
                 Logs.w(err)
                 btnIpDetail?.visibility = View.VISIBLE

@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Own716/OwnBoxForAndroid/releases"><img src="https://img.shields.io/badge/Release-v2.5.7--preview-blue.svg?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/Own716/OwnBoxForAndroid/releases"><img src="https://img.shields.io/badge/Release-v2.5.8--preview-blue.svg?style=flat-square" alt="Version"></a>
   <a href="https://android-arsenal.com/api?level=21"><img src="https://img.shields.io/badge/Android-5.0%2B%20(API%2021%2B)-brightgreen.svg?style=flat-square" alt="API"></a>
   <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/License-GPL--3.0-orange.svg?style=flat-square" alt="License"></a>
   <a href="https://t.me/KarenOwn"><img src="https://img.shields.io/badge/Telegram-@KarenOwn-2CA5E0.svg?logo=telegram&style=flat-square" alt="Telegram"></a>
@@ -27,9 +27,9 @@
 ---
 ## 📖 项目介绍 / Introduction
 
-**OwnBox for Android** 是一款基于 Sing-box 官方原生核心深度定制打造的 Android 通用网络代理客户端。集合全协议栈支持、自定义桌面图标切换 (19 款质感图标，含 4 款原神角色图标)、TCP Ping 极速真连测试、常用应用分流一键预设、单节点独立测速、并发拨号、双网络加速、WebDAV 云备份同步、控制中心四叶草快捷磁贴与桌面小组件等丰富功能，兼具极速连接、低耗电量与优雅简洁的用户界面。
+**OwnBox for Android** 是一款基于 Sing-box 官方原生核心深度定制打造的 Android 通用网络代理客户端。集合全协议栈支持、自定义桌面图标切换 (9 款精选质感图标，支持系统深浅色主题自适应)、TCP Ping 极速真连测试、常用应用分流一键预设、单节点独立测速、并发拨号、双网络加速、WebDAV 云备份同步、控制中心快捷磁贴与桌面小组件等丰富功能，兼具极速连接、低耗电量与优雅简洁的用户界面。
 
-**OwnBox for Android** is a universal network proxy client for Android, deeply customized and built on top of the official native Sing-box core. It brings together full-protocol-stack support, customizable home screen icons (19 stylish icon designs, including 4 Genshin Impact character icons), lightning-fast real-connection TCP Ping testing, one-tap presets for routing common apps, standalone latency testing per node, concurrent dialing, dual-network acceleration, WebDAV cloud backup and sync, a Quick Settings clover-shaped tile, and home screen widgets — all combined with blazing-fast connections, low battery consumption, and an elegant, clean user interface.
+**OwnBox for Android** is a universal network proxy client for Android, deeply customized and built on top of the official native Sing-box core. It brings together full-protocol-stack support, customizable home screen icons (9 stylish icon designs with system light/dark auto-adaptation), lightning-fast real-connection TCP Ping testing, one-tap presets for routing common apps, standalone latency testing per node, concurrent dialing, dual-network acceleration, WebDAV cloud backup and sync, a Quick Settings tile, and home screen widgets — all combined with blazing-fast connections, low battery consumption, and an elegant, clean user interface.
 
 ---
 

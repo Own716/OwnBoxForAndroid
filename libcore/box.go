@@ -2,12 +2,15 @@ package libcore
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
 	"libcore/device"
 	"log"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"runtime"
 	"runtime/debug"
@@ -17,7 +20,6 @@ import (
 	"time"
 
 	"github.com/sagernet/sing-box/adapter"
-	"github.com/sagernet/sing-box/common/urltest"
 	"github.com/sagernet/sing-box/experimental/v2rayapi"
 	"github.com/sagernet/sing-box/protocol/group"
 
@@ -26,6 +28,7 @@ import (
 	sblog "github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
 	E "github.com/sagernet/sing/common/exceptions"
+	M "github.com/sagernet/sing/common/metadata"
 	"github.com/sagernet/sing/service"
 	"github.com/sagernet/sing/service/pause"
 )
@@ -456,46 +459,127 @@ func UrlTestFull(i *BoxInstance, link string, timeout int32) (latency int32, err
 	return UrlTest(i, link, timeout)
 }
 
-// urlTest 对齐官方 sing-box 及 Throne 测速标准：
-// 调用 sing-box 官方 common/urltest.URLTest，包含 NeedHandshakeForWrite 探测与多路复用预热机制，
-// 精确测量 HTTP HEAD 往返（真实 TTFB 延迟 ~100-250ms），彻底杜绝 EOF 伪失败与虚高延迟。
+// urlTest 对齐 Throne 及业界基准（两阶段 Keep-Alive 预热探测）：
+// 阶段一（预热）：通过 outbound 建立代理隧道并完成目标端 HTTP 握手，将保活长连接推入连接池；
+// 阶段二（测量）：复用连接池中已就绪的长连接发送 HTTP HEAD 探测，测得纯 1-RTT 网络往返时延（~100-180ms），
+// 彻底消除冷启动握手与 TLS 重建带来的额外虚高延迟。
 func urlTest(instance *BoxInstance, link string, timeout int32) (int32, error) {
 	outbound := instance.Outbound().Default()
 	if outbound == nil {
 		return 0, E.New("no default outbound")
 	}
 
+	if link == "" {
+		link = defaultFallbackURL
+	}
+	linkURL, err := url.Parse(link)
+	if err != nil {
+		return 0, E.Cause(err, "parse test link")
+	}
+	hostname := linkURL.Hostname()
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Millisecond)
 	defer cancel()
 
-	delay, err := urltest.URLTest(ctx, link, outbound)
+	transport := &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return outbound.DialContext(ctx, network, M.ParseSocksaddr(addr))
+		},
+		TLSClientConfig: &tls.Config{
+			ServerName:         hostname,
+			InsecureSkipVerify: true,
+		},
+		DisableKeepAlives: false,
+		MaxIdleConns:      5,
+		IdleConnTimeout:   10 * time.Second,
+	}
+	defer transport.CloseIdleConnections()
+
+	client := &http.Client{
+		Transport: transport,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+
+	// 阶段一：预热（建链与握手）
+	req1, err := http.NewRequestWithContext(ctx, http.MethodHead, link, nil)
 	if err != nil {
 		return 0, err
 	}
-	res := int32(delay)
-	if res <= 0 {
-		res = 1
+	req1.Header.Set("User-Agent", browserUserAgent)
+
+	start1 := time.Now()
+	resp1, err := client.Do(req1)
+	if err != nil {
+		return 0, err
 	}
-	return res, nil
+	_, _ = io.Copy(io.Discard, resp1.Body)
+	_ = resp1.Body.Close()
+	pass1 := time.Since(start1)
+
+	// 阶段二：复用保活连接，测得纯 1-RTT
+	req2, err := http.NewRequestWithContext(ctx, http.MethodHead, link, nil)
+	if err == nil {
+		req2.Header.Set("User-Agent", browserUserAgent)
+		start2 := time.Now()
+		resp2, err2 := client.Do(req2)
+		if err2 == nil {
+			_, _ = io.Copy(io.Discard, resp2.Body)
+			_ = resp2.Body.Close()
+			latency := int32(time.Since(start2).Milliseconds())
+			if latency <= 0 {
+				latency = 1
+			}
+			return latency, nil
+		}
+	}
+
+	// 备选回退：若远端不支持 Keep-Alive，则使用第一阶段耗时
+	latency := int32(pass1.Milliseconds())
+	if latency <= 0 {
+		latency = 1
+	}
+	return latency, nil
 }
 
-// urlTestDirect 为无 box 实例时的直连测速：单 HEAD，纯响应计时。
+// urlTestDirect 为直连测速：同样采用两阶段 Keep-Alive 探测纯 RTT。
 func urlTestDirect(client *http.Client, link string) (int32, error) {
-	req, err := http.NewRequest(http.MethodHead, link, nil)
+	req1, err := http.NewRequest(http.MethodHead, link, nil)
 	if err != nil {
 		return 0, err
 	}
-	start := time.Now()
-	resp, err := client.Do(req)
+	req1.Header.Set("User-Agent", browserUserAgent)
+	start1 := time.Now()
+	resp1, err := client.Do(req1)
 	if err != nil {
 		return 0, err
 	}
-	_ = resp.Body.Close()
-	elapsed := int32(time.Since(start).Milliseconds())
-	if elapsed <= 0 {
-		elapsed = 1
+	_, _ = io.Copy(io.Discard, resp1.Body)
+	_ = resp1.Body.Close()
+	pass1 := time.Since(start1)
+
+	req2, err := http.NewRequest(http.MethodHead, link, nil)
+	if err == nil {
+		req2.Header.Set("User-Agent", browserUserAgent)
+		start2 := time.Now()
+		resp2, err2 := client.Do(req2)
+		if err2 == nil {
+			_, _ = io.Copy(io.Discard, resp2.Body)
+			_ = resp2.Body.Close()
+			latency := int32(time.Since(start2).Milliseconds())
+			if latency <= 0 {
+				latency = 1
+			}
+			return latency, nil
+		}
 	}
-	return elapsed, nil
+
+	latency := int32(pass1.Milliseconds())
+	if latency <= 0 {
+		latency = 1
+	}
+	return latency, nil
 }
 
 var protectCloser io.Closer

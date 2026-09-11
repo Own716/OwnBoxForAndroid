@@ -821,19 +821,9 @@
         <string name="app_icon_nekobox" translatable="false">NekoBox</string>
         <string name="app_icon_midnight">Midnight</string>
         <string name="app_icon_heavens">Heavens</string>
-        <string name="app_icon_halloween">Halloween</string>
-        <string name="app_icon_cyberpunk">Cyberpunk</string>
         <string name="app_icon_black_white">Black and White</string>
-        <string name="app_icon_pink">Pink</string>
-        <string name="app_icon_druid">Druid</string>
-        <string name="app_icon_red">Red</string>
-        <string name="app_icon_russian">Russian</string>
         <string name="app_icon_text">Text</string>
         <string name="app_icon_selected">Selected</string>
-    <string name="app_icon_hutao">Hu Tao</string>
-        <string name="app_icon_furina">Furina</string>
-        <string name="app_icon_raiden">Raiden Shogun</string>
-        <string name="app_icon_ganyu">Ganyu</string>
     <string name="switch_node">Switch Node</string>
     <string name="traffic_chart_title">Real-time Traffic &amp; Connections</string>
     <string name="traffic_chart_summary">View real-time speed chart and manage active connections</string>
