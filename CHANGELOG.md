@@ -1,5 +1,20 @@
 # OwnBox for Android 更新日志 (Changelog)
 
+# OwnBox for Android v2.5.7 预览版 (v2.5.7-preview)
+
+## 核心修复与体验优化
+
+* **HY2 节点 TCP Ping 与 URL Test 连通性彻底修复**：
+  - 剔除 `HysteriaFmt` 中硬编码的错误 `alpn = ["h3"]` 配置，解除与 Hysteria 2 协议标准 ALPN 冲突导致的 `EOF` 握手阻断；为 Hysteria 1/2 与 TUIC 全面引入 `serverAddress` 智能 SNI 兜底策略。
+  - 废弃已失效且会产生 3 秒超时挂起的伪造 QUIC 协商包探测，对纯 UDP 协议节点（HY2、TUIC、WireGuard）直接透传由 URL Test 高效测试，彻底消除 UDP 协议探测黑洞。
+* **URL Test / TCP Ping 延迟严重虚高彻底消除与算法对齐**：
+  - 移除 URL Test 启动前针对测试目标域名在未代理环境下的主线程阻塞式 DNS 预解析（`InetAddress.getAllByName`），消除测速启动排队与首节点卡死问题。
+  - 内核层（libcore）测速机制无缝升级为官方 `sing-box` 原生 `urltest.URLTest` 链路标准（结合 `NeedHandshakeForWrite` 与高效 HTTP HEAD 探针），仅测量真实的代理网络往返首包延迟（TTFB），彻底消除 2000ms+ 虚高读数，测速数值精准对齐主流客户端（~150-300ms）。
+  - TCP Ping 计时严格隔离：将 `InetSocketAddress` 域名解析前置于计时器外，仅精确测量纯 TCP 三次握手 RTT 时间；并为测速并发协程增加超时安全保护。
+* **落地 IP 详情弹窗底部按钮颜色冲突与对比度优化**：
+  - 彻底重构“复制信息”、“重新测速”及“完成”底部按钮的主题色与文字对比度适配；
+  - 描边线框按钮采用清晰的主题色高对比文字、图标与边框，主要操作按钮采用主题色背景搭配白色文字，全面消除浅色、纯白、深色及 AMOLED 黑色主题下的按钮隐形与不可见问题。
+
 # OwnBox for Android v2.5.6 预览版 (v2.5.6-preview)
 
 ## 核心修复与体验升级

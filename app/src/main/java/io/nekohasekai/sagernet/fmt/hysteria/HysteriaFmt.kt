@@ -299,8 +299,9 @@ fun buildSingBoxOutboundHysteriaBean(bean: HysteriaBean): SingBoxOptions.SingBox
                 recv_window_conn = bean.connectionReceiveWindow.toLong()
             }
             tls = SingBoxOptions.OutboundTLSOptions().apply {
-                if (bean.sni.isNotBlank()) {
-                    server_name = bean.sni
+                val effectiveSni = bean.sni.takeIf { it.isNotBlank() } ?: bean.serverAddress
+                if (effectiveSni.isNotBlank()) {
+                    server_name = effectiveSni
                 }
                 if (bean.alpn.isNotBlank()) {
                     alpn = bean.alpn.listByLineOrComma()
@@ -341,10 +342,13 @@ fun buildSingBoxOutboundHysteriaBean(bean: HysteriaBean): SingBoxOptions.SingBox
 //                recv_window_conn = bean.connectionReceiveWindow.toLong()
 //            }
             tls = SingBoxOptions.OutboundTLSOptions().apply {
-                if (bean.sni.isNotBlank()) {
-                    server_name = bean.sni
+                val effectiveSni = bean.sni.takeIf { it.isNotBlank() } ?: bean.serverAddress
+                if (effectiveSni.isNotBlank()) {
+                    server_name = effectiveSni
                 }
-                alpn = listOf("h3")
+                if (bean.alpn.isNotBlank()) {
+                    alpn = bean.alpn.listByLineOrComma()
+                }
                 if (bean.caText.isNotBlank()) {
                     certificate = bean.caText
                 }

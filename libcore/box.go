@@ -2,15 +2,12 @@ package libcore
 
 import (
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
 	"libcore/device"
 	"log"
-	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"runtime"
 	"runtime/debug"
@@ -20,6 +17,7 @@ import (
 	"time"
 
 	"github.com/sagernet/sing-box/adapter"
+	"github.com/sagernet/sing-box/common/urltest"
 	"github.com/sagernet/sing-box/experimental/v2rayapi"
 	"github.com/sagernet/sing-box/protocol/group"
 
@@ -28,8 +26,6 @@ import (
 	sblog "github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
 	E "github.com/sagernet/sing/common/exceptions"
-	M "github.com/sagernet/sing/common/metadata"
-	N "github.com/sagernet/sing/common/network"
 	"github.com/sagernet/sing/service"
 	"github.com/sagernet/sing/service/pause"
 )
@@ -437,17 +433,13 @@ func UrlTest(i *BoxInstance, link string, timeout int32) (latency int32, err err
 			latency, err = urlTestDirect(client, fallback)
 		}
 	} else {
-		var connectionTracker adapter.ConnectionTracker
-		if i.v2api != nil {
-			connectionTracker = i.v2api
-		}
-		latency, err = urlTest(i, connectionTracker, link, timeout)
+		latency, err = urlTest(i, link, timeout)
 		if err != nil {
 			primaryErr := err
 			fallback := getFallbackLink(link)
 			boxPlatformLogWriter.WriteMessage(sblog.LevelDebug, fmt.Sprintf("box.UrlTest primary failed: %v, trying fallback: %s", err, fallback))
 			var fbErr error
-			latency, fbErr = urlTest(i, connectionTracker, fallback, timeout)
+			latency, fbErr = urlTest(i, fallback, timeout)
 			if fbErr != nil {
 				err = primaryErr
 			} else {
@@ -465,122 +457,45 @@ func UrlTestFull(i *BoxInstance, link string, timeout int32) (latency int32, err
 }
 
 // urlTest 对齐官方 sing-box 及 Throne 测速标准：
-// 显式出站拨号建立隧道后，发起单次 HTTP GET 请求，精确测量服务端响应头往返（TTFB 延迟 ~150-350ms）。
-// 单次请求杜绝复用已关闭 QUIC/TCP 流导致的 EOF 假失败，且彻底消除包含冷启动建链的 1000~2000ms 虚高延迟。
-func urlTest(instance *BoxInstance, tracker adapter.ConnectionTracker, link string, timeout int32) (int32, error) {
-	totalStarted := time.Now()
-	instance.urlTestTrace("urltest", "begin link=%s timeout=%dms", link, timeout)
-	linkURL, err := url.Parse(link)
-	if err != nil {
-		instance.urlTestTrace("parse-link", "failed elapsed=%s error=%v", time.Since(totalStarted), err)
-		return 0, E.Cause(err, "parse test link")
-	}
-	hostname := linkURL.Hostname()
-	port := linkURL.Port()
-	if port == "" {
-		switch linkURL.Scheme {
-		case "http":
-			port = "80"
-		case "https":
-			port = "443"
-		default:
-			instance.urlTestTrace("parse-link", "failed elapsed=%s error=unsupported-scheme scheme=%q", time.Since(totalStarted), linkURL.Scheme)
-			return 0, E.New("unsupported test link scheme: ", linkURL.Scheme)
-		}
+// 调用 sing-box 官方 common/urltest.URLTest，包含 NeedHandshakeForWrite 探测与多路复用预热机制，
+// 精确测量 HTTP HEAD 往返（真实 TTFB 延迟 ~100-250ms），彻底杜绝 EOF 伪失败与虚高延迟。
+func urlTest(instance *BoxInstance, link string, timeout int32) (int32, error) {
+	outbound := instance.Outbound().Default()
+	if outbound == nil {
+		return 0, E.New("no default outbound")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Millisecond)
 	defer cancel()
 
-	outbound := instance.Outbound().Default()
-	if outbound == nil {
-		instance.urlTestTrace("select-outbound", "failed elapsed=%s error=no-default-outbound", time.Since(totalStarted))
-		return 0, E.New("no default outbound")
-	}
-	destination := M.ParseSocksaddrHostPortStr(hostname, port)
-	dialStarted := time.Now()
-	instance.urlTestTrace("dial", "begin outbound=%q destination=%s", outbound.Tag(), destination)
-	conn, err := outbound.DialContext(ctx, N.NetworkTCP, destination)
-	if err != nil {
-		instance.urlTestTrace("dial", "failed elapsed=%s totalElapsed=%s error=%v", time.Since(dialStarted), time.Since(totalStarted), err)
-		return 0, err
-	}
-	instance.urlTestTrace("dial", "ok elapsed=%s", time.Since(dialStarted))
-	if tracker != nil {
-		conn = tracker.RoutedConnection(ctx, conn, adapter.InboundContext{
-			Outbound:    outbound.Tag(),
-			Destination: destination,
-		}, nil, outbound)
-	}
-	defer conn.Close()
-
-	client := &http.Client{
-		Transport: &http.Transport{
-			DialContext: func(context.Context, string, string) (net.Conn, error) {
-				return conn, nil
-			},
-			TLSClientConfig: &tls.Config{
-				ServerName:         hostname,
-				InsecureSkipVerify: true,
-				NextProtos:         []string{"http/1.1"},
-			},
-			TLSNextProto:      make(map[string]func(string, *tls.Conn) http.RoundTripper),
-			ForceAttemptHTTP2: false,
-			DisableKeepAlives: true,
-		},
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
-	defer client.CloseIdleConnections()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, link, nil)
+	delay, err := urltest.URLTest(ctx, link, outbound)
 	if err != nil {
 		return 0, err
 	}
-	req.Header.Set("User-Agent", browserUserAgent)
-	req.Header.Set("Accept", "*/*")
-
-	// 记录向远端发起请求的起始时间（单次请求，杜绝复用已关闭 QUIC/TCP 流导致的 EOF）
-	start := time.Now()
-	instance.urlTestTrace("measure-get", "begin")
-	resp, err := client.Do(req)
-	if err != nil {
-		instance.urlTestTrace("measure-get", "failed elapsed=%s error=%v", time.Since(start), err)
-		return 0, err
+	res := int32(delay)
+	if res <= 0 {
+		res = 1
 	}
-	_ = resp.Body.Close()
-	if resp.StatusCode >= 400 {
-		return 0, E.New("unexpected status: ", resp.Status)
-	}
-
-	latency := int32(time.Since(start).Milliseconds())
-	if latency <= 0 {
-		latency = 1
-	}
-	boxPlatformLogWriter.WriteMessage(sblog.LevelDebug, fmt.Sprintf("box.urlTest ok latency=%dms", latency))
-	instance.urlTestTrace("measure-get", "ok latency=%dms totalElapsed=%s", latency, time.Since(totalStarted))
-	return latency, nil
+	return res, nil
 }
 
-// urlTestDirect 为无 box 实例时的直连测速：单 GET，计时含拨号。
+// urlTestDirect 为无 box 实例时的直连测速：单 HEAD，纯响应计时。
 func urlTestDirect(client *http.Client, link string) (int32, error) {
-	req, err := http.NewRequest(http.MethodGet, link, nil)
+	req, err := http.NewRequest(http.MethodHead, link, nil)
 	if err != nil {
 		return 0, err
 	}
-	req.Header.Set("User-Agent", browserUserAgent)
-	req.Header.Set("Accept", "*/*")
 	start := time.Now()
 	resp, err := client.Do(req)
 	if err != nil {
 		return 0, err
 	}
 	_ = resp.Body.Close()
-	if resp.StatusCode >= 400 {
-		return 0, E.New("unexpected status: ", resp.Status)
+	elapsed := int32(time.Since(start).Milliseconds())
+	if elapsed <= 0 {
+		elapsed = 1
 	}
-	return int32(time.Since(start).Milliseconds()), nil
+	return elapsed, nil
 }
 
 var protectCloser io.Closer

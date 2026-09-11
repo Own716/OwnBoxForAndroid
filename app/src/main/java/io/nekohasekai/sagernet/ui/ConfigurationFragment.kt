@@ -1426,12 +1426,6 @@ class ConfigurationFragment @JvmOverloads constructor(
         )
 
         val mainJob = runOnDefaultDispatcher {
-            runCatching {
-                val host = java.net.URI(targetUrl).host
-                if (!host.isNullOrBlank() && !host.matches(Regex("^[0-9.]+$|^[0-9a-fA-F:]+$"))) {
-                    java.net.InetAddress.getAllByName(host)
-                }
-            }
             val profilesList = SagerDatabase.proxyDao.getByGroup(group.id)
             test.proxyN = profilesList.size
             val profiles = ConcurrentLinkedQueue(profilesList)
@@ -1525,7 +1519,9 @@ class ConfigurationFragment @JvmOverloads constructor(
                         val profile = profiles.poll() ?: break
                         profile.status = 0
                         try {
-                            val result = tcpPing.doTest(profile)
+                            val result = kotlinx.coroutines.withTimeoutOrNull(DataStore.connectionTestTimeout + 1500L) {
+                                tcpPing.doTest(profile)
+                            } ?: throw java.util.concurrent.TimeoutException("TCP ping timeout")
                             profile.status = 1
                             profile.ping = result
                             profile.error = null

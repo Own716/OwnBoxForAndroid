@@ -7,9 +7,12 @@ import android.content.Context
 import android.view.LayoutInflater
 import android.widget.TextView
 import android.widget.Toast
+import android.content.res.ColorStateList
+import android.graphics.Color
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
 import io.nekohasekai.sagernet.R
+import io.nekohasekai.sagernet.ktx.getColorAttr
 import io.nekohasekai.sagernet.utils.LandingIpInfo
 
 object LandingIpBottomSheet {
@@ -86,6 +89,19 @@ object LandingIpBottomSheet {
             view.findViewById<TextView>(R.id.tv_label_asn)?.setTextColor(secondaryTextColor)
             view.findViewById<TextView>(R.id.tv_label_duration)?.setTextColor(secondaryTextColor)
         }
+
+        val primaryColor = activity.getColorAttr(R.attr.colorPrimary)
+        val primaryStateList = ColorStateList.valueOf(primaryColor)
+
+        btnCopyIp.setTextColor(primaryStateList)
+        btnCopyIp.strokeColor = primaryStateList
+        btnCopyIp.iconTint = primaryStateList
+
+        btnRetest.setTextColor(primaryStateList)
+        btnRetest.strokeColor = primaryStateList
+
+        btnDismiss.backgroundTintList = primaryStateList
+        btnDismiss.setTextColor(Color.WHITE)
 
         btnCopyIp.setOnClickListener {
             val clipboard = activity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager

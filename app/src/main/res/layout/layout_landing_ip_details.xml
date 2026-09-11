@@ -89,6 +89,9 @@
                 android:layout_height="wrap_content"
                 android:text="@string/copy"
                 android:textSize="13sp"
+                android:textColor="?attr/colorPrimary"
+                app:strokeColor="?attr/colorPrimary"
+                app:iconTint="?attr/colorPrimary"
                 app:icon="@drawable/ic_content_copy" />
 
         </LinearLayout>
@@ -219,7 +222,9 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginEnd="8dp"
-            android:text="@string/retest" />
+            android:text="@string/retest"
+            android:textColor="?attr/colorPrimary"
+            app:strokeColor="?attr/colorPrimary" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_dismiss"
@@ -228,7 +233,9 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginStart="8dp"
-            android:text="@string/done" />
+            android:text="@string/done"
+            android:textColor="@color/white"
+            app:backgroundTint="?attr/colorPrimary" />
 
     </LinearLayout>
 

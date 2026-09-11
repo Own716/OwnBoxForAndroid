@@ -83,8 +83,9 @@ fun buildSingBoxOutboundTuicBean(bean: TuicBean): SingBoxOptions.Outbound_TUICOp
         zero_rtt_handshake = bean.reduceRTT
         udp_fragment = true
         tls = SingBoxOptions.OutboundTLSOptions().apply {
-            if (bean.sni.isNotBlank()) {
-                server_name = bean.sni
+            val effectiveSni = bean.sni.takeIf { it.isNotBlank() } ?: bean.serverAddress
+            if (effectiveSni.isNotBlank() && !bean.disableSNI) {
+                server_name = effectiveSni
             }
             if (bean.alpn.isNotBlank()) {
                 alpn = bean.alpn.listByLineOrComma()
