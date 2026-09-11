@@ -37,7 +37,11 @@ import io.nekohasekai.sagernet.aidl.ISagerNetService
 import io.nekohasekai.sagernet.bg.BaseService
 import io.nekohasekai.sagernet.bg.SagerConnection
 import io.nekohasekai.sagernet.database.DataStore
+import android.widget.Toast
+import androidx.annotation.StringRes
+import com.google.android.material.snackbar.Snackbar
 import io.nekohasekai.sagernet.ui.MainActivity
+import io.nekohasekai.sagernet.ui.MessageStore
 import io.nekohasekai.sagernet.ui.ThemedActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -216,8 +220,56 @@ fun View.crossFadeFrom(other: View) {
 }
 
 
-fun Fragment.snackbar(textId: Int) = (requireActivity() as MainActivity).snackbar(textId)
-fun Fragment.snackbar(text: CharSequence) = (requireActivity() as MainActivity).snackbar(text)
+fun Fragment.snackbar(textId: Int): Snackbar {
+    val mainAct = (activity as? MainActivity)
+        ?: (MessageStore.getCurrentActivity() as? MainActivity)
+    if (mainAct != null) {
+        return mainAct.snackbar(textId)
+    }
+    val decorView = MessageStore.getCurrentActivity()?.window?.decorView
+    if (decorView != null) {
+        return Snackbar.make(decorView, textId, Snackbar.LENGTH_LONG)
+    }
+    return (activity as? MainActivity)?.snackbar(textId)
+        ?: (requireActivity() as MainActivity).snackbar(textId)
+}
+
+fun Fragment.snackbar(text: CharSequence): Snackbar {
+    val mainAct = (activity as? MainActivity)
+        ?: (MessageStore.getCurrentActivity() as? MainActivity)
+    if (mainAct != null) {
+        return mainAct.snackbar(text)
+    }
+    val decorView = MessageStore.getCurrentActivity()?.window?.decorView
+    if (decorView != null) {
+        return Snackbar.make(decorView, text, Snackbar.LENGTH_LONG)
+    }
+    return (activity as? MainActivity)?.snackbar(text)
+        ?: (requireActivity() as MainActivity).snackbar(text)
+}
+
+fun Fragment.safeSnackbar(text: CharSequence) {
+    val mainAct = (activity as? MainActivity)
+        ?: (MessageStore.getCurrentActivity() as? MainActivity)
+    if (isAdded && mainAct != null && !mainAct.isFinishing && !mainAct.isDestroyed) {
+        try {
+            mainAct.snackbar(text).show()
+            return
+        } catch (e: Exception) {
+            Logs.w(e)
+        }
+    }
+    Toast.makeText(SagerNet.application, text, Toast.LENGTH_SHORT).show()
+}
+
+fun Fragment.safeSnackbar(@StringRes textId: Int) {
+    val text = try {
+        (context ?: SagerNet.application).getString(textId)
+    } catch (_: Exception) {
+        ""
+    }
+    if (text.isNotEmpty()) safeSnackbar(text)
+}
 
 fun ThemedActivity.startFilesForResult(
     launcher: ActivityResultLauncher<String>, input: String
@@ -238,7 +290,7 @@ fun Fragment.startFilesForResult(
     } catch (_: ActivityNotFoundException) {
     } catch (_: SecurityException) {
     }
-    (requireActivity() as ThemedActivity).snackbar(getString(R.string.file_manager_missing)).show()
+    safeSnackbar(R.string.file_manager_missing)
 }
 
 fun Fragment.needReload() {

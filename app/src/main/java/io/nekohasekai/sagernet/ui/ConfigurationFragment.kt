@@ -96,6 +96,7 @@ import io.nekohasekai.sagernet.ktx.runOnMainDispatcher
 import io.nekohasekai.sagernet.ktx.scrollTo
 import io.nekohasekai.sagernet.ktx.showAllowingStateLoss
 import io.nekohasekai.sagernet.ktx.snackbar
+import io.nekohasekai.sagernet.ktx.safeSnackbar
 import io.nekohasekai.sagernet.ktx.startFilesForResult
 import io.nekohasekai.sagernet.ktx.tryToShow
 import io.nekohasekai.sagernet.plugin.PluginManager
@@ -616,14 +617,14 @@ class ConfigurationFragment @JvmOverloads constructor(
                             ?.let { pl -> proxies.addAll(pl) }
                     }
                     if (proxies.isEmpty()) onMainDispatcher {
-                        snackbar(getString(R.string.no_proxies_found_in_file)).show()
+                        safeSnackbar(R.string.no_proxies_found_in_file)
                     } else import(proxies)
                 } catch (e: SubscriptionFoundException) {
-                    (requireActivity() as MainActivity).importSubscription(e.link.toUri())
+                    ((activity as? MainActivity) ?: (MessageStore.getCurrentActivity() as? MainActivity))?.importSubscription(e.link.toUri())
                 } catch (e: Exception) {
                     Logs.w(e)
                     onMainDispatcher {
-                        snackbar(e.readableMessage).show()
+                        safeSnackbar(e.readableMessage)
                     }
                 }
             }
@@ -640,11 +641,9 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
         onMainDispatcher {
             DataStore.editingGroup = targetId
-            snackbar(
-                requireContext().resources.getQuantityString(
-                    R.plurals.added, finalProxies.size, finalProxies.size
-                )
-            ).show()
+            val res = (context ?: SagerNet.application).resources
+            val msg = res.getQuantityString(R.plurals.added, finalProxies.size, finalProxies.size)
+            safeSnackbar(msg)
         }
 
     }
@@ -669,7 +668,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                         val proxies = if (shouldDeduplicate) rawProxies?.deduplicateProxies() else rawProxies
                         if (proxies.isNullOrEmpty()) {
                             onMainDispatcher {
-                                snackbar(getString(R.string.no_proxies_found_in_clipboard)).show()
+                                safeSnackbar(R.string.no_proxies_found_in_clipboard)
                             }
                         } else {
                             onMainDispatcher {
@@ -678,22 +677,25 @@ class ConfigurationFragment @JvmOverloads constructor(
                                     "• [$proto] ${it.displayName()}"
                                 } + if (proxies.size > 8) "\n... (+${proxies.size - 8})" else ""
 
-                                com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
-                                    .setTitle(getString(R.string.import_preview_title, proxies.size))
-                                    .setMessage(previewList)
-                                    .setPositiveButton(R.string.import_preview_confirm) { _, _ ->
-                                        runOnDefaultDispatcher {
-                                            import(proxies)
+                                val ctx = context ?: MessageStore.getCurrentActivity()
+                                if (ctx != null) {
+                                    com.google.android.material.dialog.MaterialAlertDialogBuilder(ctx)
+                                        .setTitle(ctx.getString(R.string.import_preview_title, proxies.size))
+                                        .setMessage(previewList)
+                                        .setPositiveButton(R.string.import_preview_confirm) { _, _ ->
+                                            runOnDefaultDispatcher {
+                                                import(proxies)
+                                            }
                                         }
-                                    }
-                                    .setNegativeButton(android.R.string.cancel, null)
-                                    .show()
+                                        .setNegativeButton(android.R.string.cancel, null)
+                                        .show()
+                                }
                             }
                         }
                     } catch (e: SubscriptionFoundException) {
                         onMainDispatcher {
                             if (e.link.startsWith("sn://")) {
-                                (requireActivity() as MainActivity).importSubscription(e.link.toUri())
+                                ((activity as? MainActivity) ?: (MessageStore.getCurrentActivity() as? MainActivity))?.importSubscription(e.link.toUri())
                             } else {
                                 val subscriptionLink = Uri.parse(e.link).getQueryParameter("url") ?: e.link
 
@@ -703,16 +705,18 @@ class ConfigurationFragment @JvmOverloads constructor(
                                 subscription.link = subscriptionLink
                                 subscription.autoUpdate = false
                                 group.name = ""
-                                startActivity(Intent(requireContext(), GroupSettingsActivity::class.java).apply {
+                                val ctx = context ?: MessageStore.getCurrentActivity() ?: SagerNet.application
+                                ctx.startActivity(Intent(ctx, GroupSettingsActivity::class.java).apply {
                                     putExtra(GroupSettingsActivity.EXTRA_FROM_CLIPBOARD, true)
                                     putExtra(GroupSettingsActivity.EXTRA_GROUP_SUBSCRIPTION_LINK, subscriptionLink)
+                                    if (ctx == SagerNet.application) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                 })
                             }
                         }
                     } catch (e: Exception) {
                         Logs.w(e)
                         onMainDispatcher {
-                            snackbar(e.readableMessage).show()
+                            safeSnackbar(e.readableMessage)
                         }
                     }
                 }
@@ -908,34 +912,38 @@ class ConfigurationFragment @JvmOverloads constructor(
                     }
                     onMainDispatcher {
                         if (toClear.isEmpty()) {
-                            snackbar(getString(R.string.no_duplicate_profiles)).show()
+                            safeSnackbar(R.string.no_duplicate_profiles)
                         } else {
-                            MaterialAlertDialogBuilder(requireContext()).setTitle(R.string.confirm)
-                                .setMessage(
-                                    getString(R.string.delete_confirm_prompt) + "\n" +
-                                            toClear.mapIndexedNotNull { index, proxyEntity ->
-                                                if (index < 20) {
-                                                    proxyEntity.displayName()
-                                                } else if (index == 20) {
-                                                    "......"
-                                                } else {
-                                                    null
-                                                }
-                                            }.joinToString("\n")
-                                )
-                                .setPositiveButton(R.string.yes) { _, _ ->
-                                    val count = toClear.size
-                                    runOnDefaultDispatcher {
-                                        SagerDatabase.proxyDao.deleteProxy(toClear)
-                                        GroupManager.postReload(targetGroupId)
-                                        onMainDispatcher {
-                                            adapter.groupFragments[targetGroupId]?.adapter?.reloadProfiles()
-                                            snackbar(getString(R.string.duplicate_profiles_removed, count)).show()
+                            val ctx = context ?: MessageStore.getCurrentActivity()
+                            if (ctx != null) {
+                                MaterialAlertDialogBuilder(ctx).setTitle(R.string.confirm)
+                                    .setMessage(
+                                        ctx.getString(R.string.delete_confirm_prompt) + "\n" +
+                                                toClear.mapIndexedNotNull { index, proxyEntity ->
+                                                    if (index < 20) {
+                                                        proxyEntity.displayName()
+                                                    } else if (index == 20) {
+                                                        "......"
+                                                    } else {
+                                                        null
+                                                    }
+                                                }.joinToString("\n")
+                                    )
+                                    .setPositiveButton(R.string.yes) { _, _ ->
+                                        val count = toClear.size
+                                        runOnDefaultDispatcher {
+                                            SagerDatabase.proxyDao.deleteProxy(toClear)
+                                            GroupManager.postReload(targetGroupId)
+                                            onMainDispatcher {
+                                                adapter.groupFragments[targetGroupId]?.adapter?.reloadProfiles()
+                                                val res = (context ?: SagerNet.application).resources
+                                                safeSnackbar(res.getString(R.string.duplicate_profiles_removed, count))
+                                            }
                                         }
                                     }
-                                }
-                                .setNegativeButton(R.string.no, null)
-                                .show()
+                                    .setNegativeButton(R.string.no, null)
+                                    .show()
+                            }
                         }
                     }
                 }
@@ -3145,8 +3153,7 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             fun export(link: String) {
                 val success = SagerNet.trySetPrimaryClip(link)
-                (activity as MainActivity).snackbar(if (success) R.string.action_export_msg else R.string.action_export_err)
-                    .show()
+                safeSnackbar(if (success) R.string.action_export_msg else R.string.action_export_err)
             }
 
             override fun onMenuItemClick(item: MenuItem): Boolean {
@@ -3174,7 +3181,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                     }
                 } catch (e: Exception) {
                     Logs.w(e)
-                    (activity as MainActivity).snackbar(e.readableMessage).show()
+                    safeSnackbar(e.readableMessage)
                     return true
                 }
                 return true
@@ -3188,18 +3195,19 @@ class ConfigurationFragment @JvmOverloads constructor(
             if (data != null) {
                 runOnDefaultDispatcher {
                     try {
-                        (requireActivity() as MainActivity).contentResolver.openOutputStream(data)!!
+                        val resolver = (context ?: MessageStore.getCurrentActivity() ?: SagerNet.application).contentResolver
+                        resolver.openOutputStream(data)!!
                             .bufferedWriter()
                             .use {
                                 it.write(DataStore.serverConfig)
                             }
                         onMainDispatcher {
-                            snackbar(getString(R.string.action_export_msg)).show()
+                            safeSnackbar(R.string.action_export_msg)
                         }
                     } catch (e: Exception) {
                         Logs.w(e)
                         onMainDispatcher {
-                            snackbar(e.readableMessage).show()
+                            safeSnackbar(e.readableMessage)
                         }
                     }
 

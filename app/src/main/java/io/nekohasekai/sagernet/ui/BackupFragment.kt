@@ -86,16 +86,17 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
         if (data != null) {
             runOnDefaultDispatcher {
                 try {
-                    requireActivity().contentResolver.openOutputStream(data)!!.use { os ->
+                    val resolver = (context ?: MessageStore.getCurrentActivity() ?: SagerNet.application).contentResolver
+                    resolver.openOutputStream(data)!!.use { os ->
                         os.write(backupData)
                     }
                     onMainDispatcher {
-                        snackbar(getString(R.string.action_export_msg)).show()
+                        safeSnackbar(R.string.action_export_msg)
                     }
                 } catch (e: Exception) {
                     Logs.w(e)
                     onMainDispatcher {
-                        snackbar(e.readableMessage).show()
+                        safeSnackbar(e.readableMessage)
                     }
                 }
             }
@@ -628,7 +629,8 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
 
         if (!fileName.endsWith(".thrbackup", ignoreCase = true)) {
             onMainDispatcher {
-                snackbar(getString(R.string.backup_not_throne_desktop, fileName)).show()
+                val res = (context ?: SagerNet.application).resources
+                safeSnackbar(res.getString(R.string.backup_not_throne_desktop, fileName))
             }
             return
         }
@@ -707,7 +709,8 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
 
         if (!fileName.endsWith(".json") && !fileName.endsWith(".zip")) {
             onMainDispatcher {
-                snackbar(getString(R.string.backup_not_file, fileName)).show()
+                val res = (context ?: SagerNet.application).resources
+                safeSnackbar(res.getString(R.string.backup_not_file, fileName))
             }
             return
         }

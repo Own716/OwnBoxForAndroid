@@ -15,6 +15,8 @@ object MessageStore {
         currentActivity = WeakReference(activity)
     }
 
+    fun getCurrentActivity(): Activity? = currentActivity?.get()
+
     fun showMessage(message: String) {
         val activity = currentActivity?.get() ?: return
         try {
