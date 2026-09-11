@@ -210,9 +210,10 @@ class MainActivity : ThemedActivity(),
                     runOnDefaultDispatcher {
                         try {
                             val rawProxies = io.nekohasekai.sagernet.group.RawUpdater.parseRaw(text)
-                            val proxies = rawProxies?.deduplicateProxies()
+                            val targetId = DataStore.selectedGroupForImport()
+                            val targetGroup = io.nekohasekai.sagernet.database.SagerDatabase.groupDao.getById(targetId)
+                            val proxies = if (targetGroup?.subscription?.deduplication == true) rawProxies?.deduplicateProxies() else rawProxies
                             if (!proxies.isNullOrEmpty()) {
-                                val targetId = DataStore.selectedGroupForImport()
                                 proxies.forEach { profile ->
                                     ProfileManager.createProfile(targetId, profile)
                                 }

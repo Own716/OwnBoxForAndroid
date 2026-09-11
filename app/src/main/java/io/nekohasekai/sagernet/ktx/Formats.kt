@@ -299,7 +299,7 @@ suspend fun parseProxies(text: String): List<AbstractBean> {
         }
     }
     val chosen = if (entitiesByLine.size >= entities.size) entitiesByLine else entities
-    return chosen.deduplicateProxies()
+    return chosen
 }
 
 fun <T : Serializable> T.applyDefaultValues(): T {

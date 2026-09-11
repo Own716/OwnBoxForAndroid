@@ -461,9 +461,9 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
             }
 
             val subscription = proxyGroup.subscription
-            if (subscription != null && ((subscription.bytesUsed != null && subscription.bytesUsed > 0L) || (subscription.bytesRemaining != null && subscription.bytesRemaining > 0L))) {
+            if (subscription != null && subscription.bytesUsed > 0L) { // SIP008 & Open Online Config
                 groupTraffic.isVisible = true
-                var text = if (subscription.bytesRemaining != null && subscription.bytesRemaining > 0L && subscription.bytesUsed != null && subscription.bytesUsed > 0L) {
+                groupTraffic.text = if (subscription.bytesRemaining > 0L) {
                     app.getString(
                         R.string.subscription_traffic, Formatter.formatFileSize(
                             app, subscription.bytesUsed
@@ -471,24 +471,13 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
                             app, subscription.bytesRemaining
                         )
                     )
-                } else if (subscription.bytesRemaining != null && subscription.bytesRemaining > 0L) {
-                    app.getString(
-                        R.string.traffic_available, Formatter.formatFileSize(
-                            app, subscription.bytesRemaining
-                        )
-                    )
                 } else {
                     app.getString(
                         R.string.subscription_used, Formatter.formatFileSize(
-                            app, subscription.bytesUsed ?: 0L
+                            app, subscription.bytesUsed
                         )
                     )
                 }
-                if (subscription.expiryDate != null && subscription.expiryDate > 0) {
-                    val expTime = if (subscription.expiryDate > 100_000_000_000L) subscription.expiryDate.toLong() else subscription.expiryDate.toLong() * 1000L
-                    text += "\n" + getString(R.string.subscription_expire, Util.timeStamp2Text(expTime))
-                }
-                groupTraffic.text = text
                 groupStatus.setPadding(0)
             } else if (subscription != null && !subscription.subscriptionUserinfo.isNullOrBlank()) { // Raw
                 var text = ""

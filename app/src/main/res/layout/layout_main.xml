@@ -62,33 +62,77 @@
                 android:paddingHorizontal="16dp"
                 android:paddingVertical="10dp">
 
-                <!-- Row 1: 上行与下行速率水平并排居左展示 -->
+                <!-- Row 1: 左侧 tx / rx (间距 8dp)，右侧 status (HTTPS握手延迟) 与 btn_ip_detail -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
-                    <TextView
-                        android:id="@+id/tx"
+                    <!-- tx / rx 速率区域 -->
+                    <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:ellipsize="none"
-                        android:singleLine="true"
-                        android:textColor="@color/white"
-                        android:textSize="13sp"
-                        tools:text="▲  0 B/s" />
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
 
-                    <TextView
-                        android:id="@+id/rx"
-                        android:layout_width="wrap_content"
+                        <TextView
+                            android:id="@+id/tx"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:ellipsize="none"
+                            android:singleLine="true"
+                            android:textColor="@color/white"
+                            android:textSize="13sp"
+                            tools:text="▲  0 B/s" />
+
+                        <TextView
+                            android:id="@+id/rx"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:ellipsize="none"
+                            android:singleLine="true"
+                            android:textColor="@color/white"
+                            android:textSize="13sp"
+                            tools:text="▼  0 B/s" />
+
+                    </LinearLayout>
+
+                    <!-- 右侧：status 延迟与重测刷新按钮 -->
+                    <LinearLayout
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="20dp"
-                        android:ellipsize="none"
-                        android:singleLine="true"
-                        android:textColor="@color/white"
-                        android:textSize="13sp"
-                        tools:text="▼  0 B/s" />
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1"
+                        android:gravity="center_vertical|end"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/status"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:singleLine="true"
+                            android:textColor="@color/white"
+                            android:textSize="13sp"
+                            tools:text="HTTPS 握手 202ms" />
+
+                        <ImageView
+                            android:id="@+id/btn_ip_detail"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_marginStart="4dp"
+                            android:background="?android:attr/selectableItemBackgroundBorderless"
+                            android:contentDescription="@string/retest"
+                            android:padding="2dp"
+                            android:src="@drawable/ic_baseline_refresh_24"
+                            android:visibility="gone"
+                            app:tint="@color/white"
+                            tools:visibility="visible" />
+
+                    </LinearLayout>
 
                 </LinearLayout>
 
@@ -100,45 +144,13 @@
                     android:layout_marginTop="4dp"
                     android:ellipsize="end"
                     android:maxLines="1"
+                    android:singleLine="true"
                     android:textColor="@color/white"
                     android:textSize="14sp"
                     android:textStyle="bold"
                     android:visibility="gone"
                     tools:text="🇰🇷 KR 118.218.10.157"
                     tools:visibility="visible" />
-
-                <!-- Row 3: 握手延迟与刷新操作 -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="3dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:id="@+id/status"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:textColor="@color/white"
-                        android:textSize="13sp"
-                        tools:text="HTTPS 握手 202ms" />
-
-                    <ImageView
-                        android:id="@+id/btn_ip_detail"
-                        android:layout_width="28dp"
-                        android:layout_height="28dp"
-                        android:background="?android:attr/selectableItemBackgroundBorderless"
-                        android:contentDescription="@string/retest"
-                        android:padding="3dp"
-                        android:src="@drawable/ic_baseline_refresh_24"
-                        android:visibility="gone"
-                        app:tint="@color/white"
-                        tools:visibility="visible" />
-
-                </LinearLayout>
 
             </LinearLayout>
 

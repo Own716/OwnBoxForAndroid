@@ -91,18 +91,6 @@
                     tools:text="已用流量: 8.12 GB" />
             </LinearLayout>
 
-            <!-- Traffic Progress Bar -->
-            <com.google.android.material.progressindicator.LinearProgressIndicator
-                android:id="@+id/traffic_progress"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                app:indicatorColor="?attr/colorPrimary"
-                app:trackColor="#20808080"
-                app:trackCornerRadius="4dp"
-                app:trackThickness="6dp"
-                tools:progress="35" />
-
             <!-- Bottom Row: Node Count & Last Updated -->
             <LinearLayout
                 android:layout_width="match_parent"

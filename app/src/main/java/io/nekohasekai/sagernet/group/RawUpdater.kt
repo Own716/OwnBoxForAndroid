@@ -273,10 +273,15 @@ object RawUpdater : GroupUpdater() {
         }
 
         val toDelete = remainingExists
-        changed += toDelete.size
-        val deleted = toDelete.map { it.displayName() }
+        val isShrunkTooMuch = exists.size >= 10 && proxies.size < exists.size * 0.70
+        if (isShrunkTooMuch) {
+            Logs.w("RawUpdater circuit breaker triggered: exists=${exists.size}, fetched=${proxies.size}, skipping deletion")
+        } else if (toDelete.isNotEmpty()) {
+            changed += toDelete.size
+        }
+        val deleted = if (isShrunkTooMuch) emptyList() else toDelete.map { it.displayName() }
 
-        Logs.d("toDelete profiles (orphans/removed/duplicates): ${toDelete.size}")
+        Logs.d("toDelete profiles (orphans/removed/duplicates): ${toDelete.size}, isShrunkTooMuch=$isShrunkTooMuch")
         Logs.d("toInsert profiles: ${toInsert.size}")
         Logs.d("toUpdate profiles: ${toUpdate.size}")
 
@@ -288,7 +293,7 @@ object RawUpdater : GroupUpdater() {
                 Logs.d("Updated profiles: $it")
             }
         }
-        if (toDelete.isNotEmpty()) {
+        if (!isShrunkTooMuch && toDelete.isNotEmpty()) {
             SagerDatabase.proxyDao.deleteProxy(toDelete).also {
                 Logs.d("Deleted profiles: $it")
             }
@@ -932,7 +937,7 @@ object RawUpdater : GroupUpdater() {
                     }
                 }
                 if (proxies.isNotEmpty()) {
-                    return proxies.deduplicateProxies()
+                    return proxies
                 }
             } catch (e: Exception) {
                 Logs.w(e)
@@ -948,7 +953,7 @@ object RawUpdater : GroupUpdater() {
                     it
                 })
                 if (proxies.isNotEmpty()) {
-                    return proxies.deduplicateProxies()
+                    return proxies
                 }
             } catch (e: Exception) {
                 Logs.w(e)
@@ -959,7 +964,7 @@ object RawUpdater : GroupUpdater() {
             val json = JSONTokener(text).nextValue()
             val jsonProxies = parseJSON(json)
             if (!jsonProxies.isNullOrEmpty()) {
-                return jsonProxies.deduplicateProxies()
+                return jsonProxies
             }
         } catch (ignored: Exception) {
         }
@@ -968,7 +973,7 @@ object RawUpdater : GroupUpdater() {
             val base64Decoded = text.decodeBase64UrlSafe()
             val parsed = parseProxies(base64Decoded)
             if (!parsed.isNullOrEmpty()) {
-                return parsed.deduplicateProxies()
+                return parsed
             }
         } catch (ignored: Exception) {
         }
@@ -976,7 +981,7 @@ object RawUpdater : GroupUpdater() {
         try {
             val parsed = parseProxies(text)
             if (!parsed.isNullOrEmpty()) {
-                return parsed.deduplicateProxies()
+                return parsed
             }
         } catch (e: SubscriptionFoundException) {
             throw e

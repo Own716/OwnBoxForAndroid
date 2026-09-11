@@ -128,7 +128,9 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import moe.matsuri.nb4a.Protocols
 import moe.matsuri.nb4a.Protocols.getProtocolColor
@@ -137,6 +139,7 @@ import moe.matsuri.nb4a.proxy.config.ConfigSettingActivity
 import moe.matsuri.nb4a.proxy.shadowtls.ShadowTLSSettingsActivity
 import moe.matsuri.nb4a.ui.ConnectionTestNotification
 import okhttp3.internal.closeQuietly
+import moe.matsuri.nb4a.utils.toBytesString
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicInteger
@@ -628,15 +631,16 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     suspend fun import(proxies: List<AbstractBean>) {
         val targetId = DataStore.selectedGroupForImport()
-        val distinctProxies = proxies.deduplicateProxies()
-        for (proxy in distinctProxies) {
+        val group = SagerDatabase.groupDao.getById(targetId)
+        val finalProxies = if (group?.subscription?.deduplication == true) proxies.deduplicateProxies() else proxies
+        for (proxy in finalProxies) {
             ProfileManager.createProfile(targetId, proxy)
         }
         onMainDispatcher {
             DataStore.editingGroup = targetId
             snackbar(
                 requireContext().resources.getQuantityString(
-                    R.plurals.added, distinctProxies.size, distinctProxies.size
+                    R.plurals.added, finalProxies.size, finalProxies.size
                 )
             ).show()
         }
@@ -656,7 +660,9 @@ class ConfigurationFragment @JvmOverloads constructor(
                 } else runOnDefaultDispatcher {
                     try {
                         val rawProxies = RawUpdater.parseRaw(text)
-                        val proxies = rawProxies?.deduplicateProxies()
+                        val targetId = DataStore.selectedGroupForImport()
+                        val group = SagerDatabase.groupDao.getById(targetId)
+                        val proxies = if (group?.subscription?.deduplication == true) rawProxies?.deduplicateProxies() else rawProxies
                         if (proxies.isNullOrEmpty()) {
                             onMainDispatcher {
                                 snackbar(getString(R.string.no_proxies_found_in_clipboard)).show()
@@ -886,7 +892,7 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             R.id.action_remove_duplicate -> {
                 runOnDefaultDispatcher {
-                    val targetGroupId = DataStore.selectedGroup
+                    val targetGroupId = DataStore.currentGroupId()
                     val profiles = SagerDatabase.proxyDao.getByGroup(targetGroupId)
                     val toClear = mutableListOf<ProxyEntity>()
                     val uniqueProxies = LinkedHashSet<Protocols.Deduplication>()
@@ -915,23 +921,11 @@ class ConfigurationFragment @JvmOverloads constructor(
                                 )
                                 .setPositiveButton(R.string.yes) { _, _ ->
                                     val count = toClear.size
-                                    for (profile in toClear) {
-                                        adapter.groupFragments[targetGroupId]?.adapter?.apply {
-                                            val index = configurationIdList.indexOf(profile.id)
-                                            if (index >= 0) {
-                                                configurationIdList.removeAt(index)
-                                                configurationList.remove(profile.id)
-                                                notifyItemRemoved(index)
-                                            }
-                                        }
-                                    }
                                     runOnDefaultDispatcher {
-                                        for (profile in toClear) {
-                                            ProfileManager.deleteProfile2(
-                                                profile.groupId, profile.id
-                                            )
-                                        }
+                                        SagerDatabase.proxyDao.deleteProxy(toClear)
+                                        GroupManager.postReload(targetGroupId)
                                         onMainDispatcher {
+                                            adapter.groupFragments[targetGroupId]?.adapter?.reloadProfiles()
                                             snackbar(getString(R.string.duplicate_profiles_removed, count)).show()
                                         }
                                     }
@@ -941,6 +935,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                         }
                     }
                 }
+                return true
             }
 
             R.id.action_speed_test_group -> {
@@ -1396,7 +1391,14 @@ class ConfigurationFragment @JvmOverloads constructor(
                     "currentProfile=${DataStore.currentProfile} network=${SagerNet.underlyingNetwork}"
         )
 
+        val udpSemaphore = Semaphore(2)
         val mainJob = runOnDefaultDispatcher {
+            runCatching {
+                val host = java.net.URI(targetUrl).host
+                if (!host.isNullOrBlank() && !host.matches(Regex("^[0-9.]+$|^[0-9a-fA-F:]+$"))) {
+                    java.net.InetAddress.getAllByName(host)
+                }
+            }
             val profilesList = SagerDatabase.proxyDao.getByGroup(group.id)
             test.proxyN = profilesList.size
             val profiles = ConcurrentLinkedQueue(profilesList)
@@ -1413,7 +1415,15 @@ class ConfigurationFragment @JvmOverloads constructor(
                         )
 
                         try {
-                            val result = urlTest.doTest(profile)
+                            val bean = runCatching { profile.requireBean() }.getOrNull()
+                            val isUdp = bean is io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean ||
+                                    bean is io.nekohasekai.sagernet.fmt.tuic.TuicBean ||
+                                    bean is io.nekohasekai.sagernet.fmt.wireguard.WireGuardBean
+                            val result = if (isUdp) {
+                                udpSemaphore.withPermit { urlTest.doTest(profile) }
+                            } else {
+                                urlTest.doTest(profile)
+                            }
                             profile.status = 1
                             profile.ping = result
                             Logs.d("URLTest ${profile.displayName()}: done, ping=${result}ms")
@@ -2022,7 +2032,6 @@ class ConfigurationFragment @JvmOverloads constructor(
             val tvExpire = root.findViewById<TextView>(R.id.tv_expire_date)
             val tvTrafficStat = root.findViewById<TextView>(R.id.tv_traffic_stat)
             val tvTrafficRemaining = root.findViewById<TextView>(R.id.tv_traffic_remaining)
-            val progress = root.findViewById<LinearProgressIndicator>(R.id.traffic_progress)
             val tvNodeCount = root.findViewById<TextView>(R.id.tv_node_count)
             val tvLastUpdated = root.findViewById<TextView>(R.id.tv_last_updated)
 
@@ -2130,21 +2139,17 @@ class ConfigurationFragment @JvmOverloads constructor(
                 }
             }
 
-            val ctx = root.context
             if (totalBytes > 0L) {
                 val remainBytes = (totalBytes - usedBytes).coerceAtLeast(0L)
-                val usedStr = Formatter.formatFileSize(ctx, usedBytes)
-                val remainStr = Formatter.formatFileSize(ctx, remainBytes)
+                val usedStr = usedBytes.toBytesString()
+                val remainStr = remainBytes.toBytesString()
                 tvTrafficStat?.text = getString(R.string.traffic_available, remainStr)
                 tvTrafficRemaining?.text = getString(R.string.traffic_used, usedStr)
                 tvTrafficRemaining?.isVisible = true
-                progress?.isVisible = true
-                val percent = ((usedBytes.toDouble() / totalBytes.toDouble()) * 100).toInt().coerceIn(0, 100)
-                progress?.progress = percent
             } else if (fallbackTrafficStr != null) {
                 tvTrafficStat?.text = getString(R.string.traffic_available, fallbackTrafficStr)
                 if (usedBytes > 0L) {
-                    val usedStr = Formatter.formatFileSize(ctx, usedBytes)
+                    val usedStr = usedBytes.toBytesString()
                     tvTrafficRemaining?.text = getString(R.string.traffic_used, usedStr)
                     tvTrafficRemaining?.isVisible = true
                 } else if (fallbackUsedStr != null) {
@@ -2153,11 +2158,10 @@ class ConfigurationFragment @JvmOverloads constructor(
                 } else {
                     tvTrafficRemaining?.isGone = true
                 }
-                progress?.isGone = true
             } else if (isUnlimited || totalBytes == 0L) {
                 tvTrafficStat?.text = getString(R.string.traffic_available, getString(R.string.traffic_unlimited))
                 if (usedBytes > 0L) {
-                    val usedStr = Formatter.formatFileSize(ctx, usedBytes)
+                    val usedStr = usedBytes.toBytesString()
                     tvTrafficRemaining?.text = getString(R.string.traffic_used, usedStr)
                     tvTrafficRemaining?.isVisible = true
                 } else if (fallbackUsedStr != null) {
@@ -2166,11 +2170,9 @@ class ConfigurationFragment @JvmOverloads constructor(
                 } else {
                     tvTrafficRemaining?.isGone = true
                 }
-                progress?.isGone = true
             } else {
                 tvTrafficStat?.text = getString(R.string.traffic_available, getString(R.string.traffic_unlimited))
                 tvTrafficRemaining?.isGone = true
-                progress?.isGone = true
             }
 
             if (expireMillis > 0L) {

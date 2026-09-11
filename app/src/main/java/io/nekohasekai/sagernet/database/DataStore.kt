@@ -174,7 +174,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var defaultSubscriptionUserAgent: String
         get() {
             val stored = configurationStore.getString(Key.DEFAULT_SUBSCRIPTION_USER_AGENT, "")
-            return if (!stored.isNullOrBlank()) stored else "Singbox/1.14"
+            return if (!stored.isNullOrBlank()) stored else "NekoBox/Android/1.4.2 (Prefer ClashMeta Format)"
         }
         set(value) = configurationStore.putString(Key.DEFAULT_SUBSCRIPTION_USER_AGENT, value)
 
