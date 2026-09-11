@@ -83,22 +83,37 @@ object RawUpdater : GroupUpdater() {
             var lastRespHeaderProfileTitle: String? = null
             var lastException: Throwable? = null
 
+            fun executeRequest(ua: String, useProxy: Boolean): libcore.HTTPResponse {
+                val client = Libcore.newHttpClient().apply {
+                    if (useProxy) {
+                        tryProxyOutbound()
+                    }
+                    when (DataStore.appTLSVersion) {
+                        "1.3" -> restrictedTLS()
+                    }
+                }
+                val request = client.newRequest().apply {
+                    if (DataStore.allowInsecureOnRequest) {
+                        allowInsecure()
+                    }
+                    setURL(subscription.link)
+                    setUserAgent(ua)
+                }
+                return request.execute()
+            }
+
             for (ua in candidateUas) {
                 try {
-                    val client = Libcore.newHttpClient().apply {
-                        tryProxyOutbound()
-                        when (DataStore.appTLSVersion) {
-                            "1.3" -> restrictedTLS()
+                    val response = if (DataStore.serviceState.connected) {
+                        try {
+                            executeRequest(ua, useProxy = true)
+                        } catch (proxyError: Throwable) {
+                            Logs.w("Subscription proxy fetch failed for UA $ua (${proxyError.readableMessage}), falling back to direct network...")
+                            executeRequest(ua, useProxy = false)
                         }
+                    } else {
+                        executeRequest(ua, useProxy = false)
                     }
-                    val request = client.newRequest().apply {
-                        if (DataStore.allowInsecureOnRequest) {
-                            allowInsecure()
-                        }
-                        setURL(subscription.link)
-                        setUserAgent(ua)
-                    }
-                    val response = request.execute()
 
                     val userInfo = response.getHeader("Subscription-Userinfo")
                         ?: response.getHeader("subscription-userinfo")

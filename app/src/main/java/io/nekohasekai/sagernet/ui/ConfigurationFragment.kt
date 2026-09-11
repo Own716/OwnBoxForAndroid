@@ -2041,14 +2041,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             var totalBytes = 0L
             var expireMillis = 0L
 
-            if (sub.bytesUsed != null && sub.bytesRemaining != null) {
-                usedBytes = sub.bytesUsed
-                totalBytes = sub.bytesUsed + sub.bytesRemaining
-                if (sub.expiryDate != null && sub.expiryDate > 0) {
-                    val exp = sub.expiryDate.toLong()
-                    expireMillis = if (exp > 100_000_000_000L) exp else exp * 1000L
-                }
-            } else if (!sub.subscriptionUserinfo.isNullOrBlank()) {
+            if (!sub.subscriptionUserinfo.isNullOrBlank()) {
                 val info = sub.subscriptionUserinfo
                 fun extract(pattern: String): Long {
                     return Regex(pattern, RegexOption.IGNORE_CASE).find(info)?.groupValues?.getOrNull(1)?.toLongOrNull() ?: 0L
@@ -2059,6 +2052,14 @@ class ConfigurationFragment @JvmOverloads constructor(
                 totalBytes = extract("total=([0-9]+)")
                 val exp = extract("expire=([0-9]+)")
                 if (exp > 0L) {
+                    expireMillis = if (exp > 100_000_000_000L) exp else exp * 1000L
+                }
+            }
+            if (usedBytes == 0L && totalBytes == 0L && sub.bytesUsed != null && sub.bytesRemaining != null && (sub.bytesUsed > 0L || sub.bytesRemaining > 0L)) {
+                usedBytes = sub.bytesUsed
+                totalBytes = sub.bytesUsed + sub.bytesRemaining
+                if (expireMillis <= 0L && sub.expiryDate != null && sub.expiryDate > 0) {
+                    val exp = sub.expiryDate.toLong()
                     expireMillis = if (exp > 100_000_000_000L) exp else exp * 1000L
                 }
             }

@@ -124,11 +124,29 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
                 MaterialAlertDialogBuilder(requireContext()).setTitle(R.string.confirm)
                     .setMessage(R.string.update_all_subscription)
                     .setPositiveButton(R.string.yes) { _, _ ->
-                        SagerDatabase.groupDao.allGroups()
-                            .filter { it.type == GroupType.SUBSCRIPTION }
-                            .forEach {
-                                GroupUpdater.startUpdate(it, true)
+                        val subGroups = SagerDatabase.groupDao.allGroups().filter { it.type == GroupType.SUBSCRIPTION }
+                        if (subGroups.isEmpty()) return@setPositiveButton
+                        runOnDefaultDispatcher {
+                            var successCount = 0
+                            var failCount = 0
+                            for (group in subGroups) {
+                                val ok = runCatching {
+                                    GroupUpdater.executeUpdate(group, true)
+                                }.getOrElse { e ->
+                                    Logs.w("Batch update failed for ${group.displayName()}: ${e.readableMessage}")
+                                    false
+                                }
+                                if (ok) successCount++ else failCount++
                             }
+                            onMainDispatcher {
+                                val msg = if (failCount == 0) {
+                                    "全部订阅更新完成（共 ${successCount} 个）"
+                                } else {
+                                    "订阅更新完成：${successCount} 个成功，${failCount} 个失败"
+                                }
+                                snackbar(msg).show()
+                            }
+                        }
                     }
                     .setNegativeButton(R.string.no, null)
                     .show()
