@@ -142,10 +142,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          name: OwnBox ${{ github.event.inputs.tag || github.ref_name }}
+          name: Own for Android ${{ github.event.inputs.tag || github.ref_name }}
           body_path: RELEASE_NOTES.md
           files: apks/*.apk
           draft: false
           prerelease: ${{ contains(github.event.inputs.tag || github.ref_name, 'preview') || contains(github.event.inputs.tag || github.ref_name, 'alpha') || contains(github.event.inputs.tag || github.ref_name, 'beta') }}
+          make_latest: ${{ !(contains(github.event.inputs.tag || github.ref_name, 'preview') || contains(github.event.inputs.tag || github.ref_name, 'alpha') || contains(github.event.inputs.tag || github.ref_name, 'beta')) }}
           generate_release_notes: false
 
