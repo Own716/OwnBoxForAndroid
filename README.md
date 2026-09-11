@@ -1,7 +1,7 @@
 # Own for Android (原 OwnBox)
 
 <p align="center">
-  <img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="128" height="128" alt="Own Logo">
+  <img src="docs/logo.png" width="128" height="128" alt="Own Logo">
   <br>
   <b>适用于 Android 的现代化通用代理工具链与网络调试客户端</b>
   <br>
@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Own716/OwnBoxForAndroid/releases"><img src="https://img.shields.io/badge/Release-v2.5.9--preview-blue.svg?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/Own716/OwnBoxForAndroid/releases"><img src="https://img.shields.io/badge/Release-v2.6.0-blue.svg?style=flat-square" alt="Version"></a>
   <a href="https://android-arsenal.com/api?level=21"><img src="https://img.shields.io/badge/Android-5.0%2B%20(API%2021%2B)-brightgreen.svg?style=flat-square" alt="API"></a>
   <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/License-GPL--3.0-orange.svg?style=flat-square" alt="License"></a>
   <a href="https://t.me/KarenOwn"><img src="https://img.shields.io/badge/Telegram-@KarenOwn-2CA5E0.svg?logo=telegram&style=flat-square" alt="Telegram"></a>
