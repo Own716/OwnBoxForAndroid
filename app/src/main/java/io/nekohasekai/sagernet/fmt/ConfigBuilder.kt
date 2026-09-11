@@ -622,7 +622,6 @@ fun buildConfig(
                 // inet4_address/inet6_address 与 endpoint_independent_nat 已于 1.12 移除（构造函数硬报错），
                 // address 为合并后的新字段。
                 address = when (ipv6Mode) {
-                    IPv6Mode.DISABLE -> listOf(VpnService.PRIVATE_VLAN4_CLIENT + "/28")
                     IPv6Mode.ONLY -> listOf(VpnService.PRIVATE_VLAN6_CLIENT + "/126")
                     else -> listOf(
                         VpnService.PRIVATE_VLAN4_CLIENT + "/28",
@@ -1504,6 +1503,13 @@ fun buildConfig(
                     server = serverTag
                 })
             }
+        }
+
+        if (!forTest && ipv6Mode == IPv6Mode.DISABLE) {
+            dns.rules.add(0, DNSRule_DefaultOptions().apply {
+                query_type = listOf("AAAA")
+                action = "reject"
+            })
         }
 
         // Synchronize route.rules and route.final_ against available outbound tags to avoid "tag not found"

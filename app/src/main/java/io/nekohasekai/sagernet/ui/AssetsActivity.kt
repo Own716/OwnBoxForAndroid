@@ -232,11 +232,21 @@ class AssetsActivity : ThemedActivity() {
                 layout.refreshLayout.isEnabled = false
                 binding.subscriptionUpdateProgress.isInvisible = false
                 binding.rulesUpdate.isInvisible = true
+                android.widget.Toast.makeText(this@AssetsActivity, "正在检查并更新 ${file.name}...", android.widget.Toast.LENGTH_SHORT).show()
                 runOnDefaultDispatcher {
                     runCatching {
                         updateAsset(file, versionFile, localVersion)
+                    }.onSuccess { updated ->
+                        onMainDispatcher {
+                            if (updated) {
+                                android.widget.Toast.makeText(this@AssetsActivity, "${file.name} 更新成功！", android.widget.Toast.LENGTH_SHORT).show()
+                            } else {
+                                android.widget.Toast.makeText(this@AssetsActivity, "${file.name} 已经是最新版本", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        }
                     }.onFailure {
                         onMainDispatcher {
+                            android.widget.Toast.makeText(this@AssetsActivity, "${file.name} 更新失败: ${it.readableMessage}", android.widget.Toast.LENGTH_LONG).show()
                             alert(it.readableMessage).tryToShow()
                         }
                     }
@@ -272,12 +282,13 @@ class AssetsActivity : ThemedActivity() {
         ),
     )
 
-    suspend fun updateAsset(file: File, versionFile: File, localVersion: String) {
+    suspend fun updateAsset(file: File, versionFile: File, localVersion: String): Boolean {
         if (DataStore.rulesProvider == 4){
             return updateCustomAsset(file, versionFile)
         }
         val fileName = file.name
         val repo = rulesProviders[DataStore.rulesProvider].repoByFileName[fileName]
+            ?: error("No repository configured for $fileName")
 
         val client = Libcore.newHttpClient().apply {
                     modernTLS()
@@ -286,26 +297,49 @@ class AssetsActivity : ThemedActivity() {
                 }
 
         try {
-            var response = client.newRequest().apply {
-                setURL("https://api.github.com/repos/$repo/releases/latest")
-            }.execute()
+            var tagName = ""
+            var browserDownloadUrl = ""
 
-            val release = JSONObject(Util.getStringBox(response.contentString))
-            val tagName = release.optString("tag_name")
+            val apiSameVersion = runCatching {
+                val response = client.newRequest().apply {
+                    setURL("https://api.github.com/repos/$repo/releases/latest")
+                }.execute()
 
-            if (tagName == localVersion) {
+                val release = JSONObject(Util.getStringBox(response.contentString))
+                val tag = release.optString("tag_name")
+
+                if (tag.isNotBlank() && tag == localVersion) {
+                    tagName = tag
+                    return@runCatching true
+                }
+
+                if (release.has("assets")) {
+                    val releaseAssets = release.getJSONArray("assets").filterIsInstance<JSONObject>()
+                    val assetToDownload = releaseAssets.find { it.getStr("name") == fileName }
+                    if (assetToDownload != null) {
+                        tagName = tag
+                        browserDownloadUrl = assetToDownload.optString("browser_download_url")
+                    }
+                }
+                false
+            }.getOrDefault(false)
+
+            if (apiSameVersion && tagName == localVersion) {
                 onMainDispatcher {
                     snackbar(R.string.route_asset_no_update).show()
                 }
-                return
+                return false
             }
 
-            val releaseAssets = release.getJSONArray("assets").filterIsInstance<JSONObject>()
-            val assetToDownload = releaseAssets.find { it.getStr("name") == fileName }
-                ?: error("File $fileName not found in release ${release["url"]}")
-            val browserDownloadUrl = assetToDownload.getStr("browser_download_url")
+            // 遇到 GitHub API 403 限频或解析失败时，直接使用 GitHub Releases 直连下载地址降级兜底
+            if (browserDownloadUrl.isBlank()) {
+                browserDownloadUrl = "https://github.com/$repo/releases/latest/download/$fileName"
+                if (tagName.isBlank()) {
+                    tagName = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.getDefault()).format(java.util.Date())
+                }
+            }
 
-            response = client.newRequest().apply {
+            val response = client.newRequest().apply {
                 setURL(browserDownloadUrl)
             }.execute()
 
@@ -328,19 +362,20 @@ class AssetsActivity : ThemedActivity() {
             onMainDispatcher {
                 snackbar(R.string.route_asset_updated).show()
             }
+            return true
         } finally {
             client.close()
         }
     }
 
-    suspend fun updateCustomAsset(file: File, versionFile: File) {
+    suspend fun updateCustomAsset(file: File, versionFile: File): Boolean {
         val fileName = file.name
         val url: String = if (fileName == "geoip.db") {
             DataStore.rulesGeoipUrl
         } else if (fileName == "geosite.db") {
             DataStore.rulesGeositeUrl
         } else {
-            return
+            return false
         }
         val client = Libcore.newHttpClient().apply {
                     modernTLS()
@@ -356,13 +391,14 @@ class AssetsActivity : ThemedActivity() {
             response.writeTo(cacheFile.canonicalPath)
             cacheFile.renameTo(file)
 
-            val currentDate = java.text.SimpleDateFormat("yyyyMMdd").format(java.util.Date())
+            val currentDate = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.getDefault()).format(java.util.Date())
             versionFile.writeText(currentDate)
 
             adapter.reloadAssets()
             onMainDispatcher {
                 snackbar(R.string.route_asset_updated).show()
             }
+            return true
         } finally {
             client.close()
             // if (versionFile.isFile) {

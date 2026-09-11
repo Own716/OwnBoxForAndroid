@@ -900,25 +900,39 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             R.id.action_remove_duplicate -> {
                 runOnDefaultDispatcher {
-                    val targetGroupId = DataStore.currentGroupId()
+                    val targetGroupId = DataStore.selectedGroup.takeIf { it > 0 } ?: DataStore.currentGroupId()
                     val profiles = SagerDatabase.proxyDao.getByGroup(targetGroupId)
+                    val grouped = profiles.groupBy { pf ->
+                        runCatching {
+                            Protocols.Deduplication(pf.requireBean(), pf.displayType()).hash()
+                        }.getOrElse { "id_${pf.id}" }
+                    }
                     val toClear = mutableListOf<ProxyEntity>()
-                    val uniqueProxies = LinkedHashSet<Protocols.Deduplication>()
-                    for (pf in profiles) {
-                        val proxy = Protocols.Deduplication(pf.requireBean(), pf.displayType())
-                        if (!uniqueProxies.add(proxy)) {
-                            toClear += pf
+                    val keptMapping = mutableMapOf<Long, Long>()
+
+                    for ((_, group) in grouped) {
+                        if (group.size > 1) {
+                            // 保留首个节点；若当前选中的节点也在该重复组内，则优先保留当前选中节点
+                            val kept = group.find { it.id == DataStore.selectedProxy } ?: group.first()
+                            for (pf in group) {
+                                if (pf.id != kept.id) {
+                                    toClear.add(pf)
+                                    keptMapping[pf.id] = kept.id
+                                }
+                            }
                         }
                     }
+
                     onMainDispatcher {
                         if (toClear.isEmpty()) {
                             safeSnackbar(R.string.no_duplicate_profiles)
                         } else {
                             val ctx = context ?: MessageStore.getCurrentActivity()
                             if (ctx != null) {
+                                val promptHeader = "已找到 ${toClear.size} 个冗余的重复节点（将保留对应首个节点，仅移除重复项），是否确认删除？\n"
                                 MaterialAlertDialogBuilder(ctx).setTitle(R.string.confirm)
                                     .setMessage(
-                                        ctx.getString(R.string.delete_confirm_prompt) + "\n" +
+                                        promptHeader +
                                                 toClear.mapIndexedNotNull { index, proxyEntity ->
                                                     if (index < 20) {
                                                         proxyEntity.displayName()
@@ -932,8 +946,16 @@ class ConfigurationFragment @JvmOverloads constructor(
                                     .setPositiveButton(R.string.yes) { _, _ ->
                                         val count = toClear.size
                                         runOnDefaultDispatcher {
+                                            // 平滑迁移选中项：若当前选中的节点在删除列表中，无缝迁移至保留节点
+                                            val currentSelected = DataStore.selectedProxy
+                                            if (keptMapping.containsKey(currentSelected)) {
+                                                DataStore.selectedProxy = keptMapping[currentSelected] ?: 0L
+                                            }
+
                                             SagerDatabase.proxyDao.deleteProxy(toClear)
+                                            GroupManager.rearrange(targetGroupId)
                                             GroupManager.postReload(targetGroupId)
+
                                             onMainDispatcher {
                                                 adapter.groupFragments[targetGroupId]?.adapter?.reloadProfiles()
                                                 val res = (context ?: SagerNet.application).resources
@@ -1403,7 +1425,6 @@ class ConfigurationFragment @JvmOverloads constructor(
                     "currentProfile=${DataStore.currentProfile} network=${SagerNet.underlyingNetwork}"
         )
 
-        val udpSemaphore = Semaphore(2)
         val mainJob = runOnDefaultDispatcher {
             runCatching {
                 val host = java.net.URI(targetUrl).host
@@ -1427,15 +1448,9 @@ class ConfigurationFragment @JvmOverloads constructor(
                         )
 
                         try {
-                            val bean = runCatching { profile.requireBean() }.getOrNull()
-                            val isUdp = bean is io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean ||
-                                    bean is io.nekohasekai.sagernet.fmt.tuic.TuicBean ||
-                                    bean is io.nekohasekai.sagernet.fmt.wireguard.WireGuardBean
-                            val result = if (isUdp) {
-                                udpSemaphore.withPermit { urlTest.doTest(profile) }
-                            } else {
+                            val result = kotlinx.coroutines.withTimeoutOrNull(DataStore.connectionTestTimeout + 1500L) {
                                 urlTest.doTest(profile)
-                            }
+                            } ?: throw java.util.concurrent.TimeoutException("URL test timeout")
                             profile.status = 1
                             profile.ping = result
                             Logs.d("URLTest ${profile.displayName()}: done, ping=${result}ms")

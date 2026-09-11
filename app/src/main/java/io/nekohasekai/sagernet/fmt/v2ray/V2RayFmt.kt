@@ -831,11 +831,11 @@ fun buildSingBoxOutboundStreamSettings(bean: StandardV2RayBean): V2RayTransportO
 }
 
 fun buildSingBoxOutboundTLS(bean: StandardV2RayBean): OutboundTLSOptions? {
-    if (bean.security != "tls") return null
+    if (bean !is TrojanBean && bean.security != "tls") return null
     return OutboundTLSOptions().apply {
         enabled = true
         insecure = bean.allowInsecure || DataStore.globalAllowInsecure
-        if (bean.sni.isNotBlank()) server_name = bean.sni
+        server_name = bean.sni.takeIf { it.isNotBlank() } ?: bean.serverAddress
         if (bean.alpn.isNotBlank()) {
             // 当传输协议为WebSocket时，过滤掉h2和h3
             val alpnList = bean.alpn.listByLineOrComma()
@@ -936,7 +936,13 @@ fun buildSingBoxOutboundStandardV2RayBean(bean: StandardV2RayBean): Outbound {
                 server = bean.serverAddress
                 server_port = bean.serverPort
                 password = bean.password
-                tls = buildSingBoxOutboundTLS(bean)
+                tls = (buildSingBoxOutboundTLS(bean) ?: OutboundTLSOptions()).apply {
+                    enabled = true
+                    if (server_name.isNullOrBlank()) {
+                        server_name = bean.sni.takeIf { it.isNotBlank() } ?: bean.serverAddress
+                    }
+                    insecure = bean.allowInsecure || DataStore.globalAllowInsecure
+                }
                 transport = buildSingBoxOutboundStreamSettings(bean)
             }
         }

@@ -59,8 +59,8 @@
                 android:layout_height="wrap_content"
                 android:background="?android:attr/selectableItemBackground"
                 android:orientation="vertical"
-                android:paddingHorizontal="12dp"
-                android:paddingVertical="10dp">
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="14dp">
 
                 <!-- Row 1: 左侧 tx / rx (左肩)，中央 FAB 凹槽安全隔离，右侧 status 与 btn_ip_detail (右肩) -->
                 <LinearLayout
@@ -117,7 +117,7 @@
                         android:layout_width="52dp"
                         android:layout_height="1dp" />
 
-                    <!-- 右肩：status 延迟与重测刷新按钮（规整靠右对齐，自适应防溢出） -->
+                    <!-- 右肩：status 延迟与重测刷新按钮（规整靠右对齐，上下两行排版防大字体截断） -->
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
@@ -125,28 +125,55 @@
                         android:gravity="center_vertical|end"
                         android:orientation="horizontal">
 
-                        <TextView
-                            android:id="@+id/status"
+                        <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:ellipsize="end"
-                            android:gravity="end"
-                            android:maxLines="1"
-                            android:singleLine="true"
-                            android:textColor="@color/white"
-                            android:textSize="13sp"
-                            app:autoSizeMaxTextSize="13sp"
-                            app:autoSizeMinTextSize="9sp"
-                            app:autoSizeStepGranularity="1sp"
-                            app:autoSizeTextType="uniform"
-                            tools:text="HTTPS 握手 202ms" />
+                            android:gravity="end|center_vertical"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/status_title"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:ellipsize="end"
+                                android:gravity="end"
+                                android:maxLines="1"
+                                android:singleLine="true"
+                                android:textColor="@color/white"
+                                android:textSize="11sp"
+                                android:visibility="gone"
+                                app:autoSizeMaxTextSize="11sp"
+                                app:autoSizeMinTextSize="8sp"
+                                app:autoSizeStepGranularity="0.5sp"
+                                app:autoSizeTextType="uniform"
+                                tools:text="HTTPS 握手延迟"
+                                tools:visibility="visible" />
+
+                            <TextView
+                                android:id="@+id/status"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:ellipsize="end"
+                                android:gravity="end"
+                                android:maxLines="1"
+                                android:singleLine="true"
+                                android:textColor="@color/white"
+                                android:textSize="13sp"
+                                android:textStyle="bold"
+                                app:autoSizeMaxTextSize="13sp"
+                                app:autoSizeMinTextSize="9sp"
+                                app:autoSizeStepGranularity="0.5sp"
+                                app:autoSizeTextType="uniform"
+                                tools:text="202ms" />
+
+                        </LinearLayout>
 
                         <ImageView
                             android:id="@+id/btn_ip_detail"
                             android:layout_width="24dp"
                             android:layout_height="24dp"
-                            android:layout_marginStart="4dp"
+                            android:layout_marginStart="6dp"
                             android:background="?android:attr/selectableItemBackgroundBorderless"
                             android:contentDescription="@string/retest"
                             android:padding="2dp"

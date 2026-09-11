@@ -44,6 +44,7 @@ class StatsBar @JvmOverloads constructor(
     }
 
     private lateinit var statusText: TextView
+    private lateinit var statusTitleText: TextView
     private lateinit var statusIpText: TextView
     private lateinit var txText: TextView
     private lateinit var rxText: TextView
@@ -126,6 +127,8 @@ class StatsBar @JvmOverloads constructor(
         if (!this::statusText.isInitialized) {
             statusText = findViewById(R.id.status)
             statusText.isSelected = true
+            statusTitleText = findViewById(R.id.status_title)
+            statusTitleText.isSelected = true
             statusIpText = findViewById(R.id.status_ip)
             statusIpText.isSelected = true
             txText = findViewById(R.id.tx)
@@ -139,7 +142,8 @@ class StatsBar @JvmOverloads constructor(
                 txText.setTextColor(android.graphics.Color.parseColor("#757575"))
                 rxText.setTextColor(android.graphics.Color.parseColor("#757575"))
                 statusIpText.setTextColor(android.graphics.Color.parseColor("#212121"))
-                statusText.setTextColor(android.graphics.Color.parseColor("#424242"))
+                statusTitleText.setTextColor(android.graphics.Color.parseColor("#757575"))
+                statusText.setTextColor(android.graphics.Color.parseColor("#212121"))
                 (btnIpDetail as? android.widget.ImageView)?.imageTintList =
                     android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#212121"))
             }
@@ -353,19 +357,26 @@ class StatsBar @JvmOverloads constructor(
             }
 
             if (customStatus != null) {
+                statusTitleText.visibility = View.GONE
                 statusText.text = customStatus
             } else {
-                val isHttps = DataStore.connectionTestURL.startsWith("https://")
+                val isHttps = DataStore.connectionTestURL.startsWith("https://", ignoreCase = true)
                 val handshakeType = if (isHttps) "HTTPS" else "HTTP"
                 if (latency > 0) {
-                    statusText.text = "$handshakeType 握手 ${latency}ms"
-                } else if (cached == null && DataStore.showLandingIp) {
-                    statusText.text = context.getString(R.string.landing_ip_querying)
+                    statusTitleText.text = "$handshakeType 握手延迟"
+                    statusTitleText.visibility = View.VISIBLE
+                    statusText.text = "${latency}ms"
                 } else {
-                    statusText.text = app.getString(R.string.vpn_connected)
+                    statusTitleText.visibility = View.GONE
+                    if (cached == null && DataStore.showLandingIp) {
+                        statusText.text = context.getString(R.string.landing_ip_querying)
+                    } else {
+                        statusText.text = app.getString(R.string.vpn_connected)
+                    }
                 }
             }
         } else {
+            statusTitleText.visibility = View.GONE
             statusIpText.visibility = View.GONE
             statusText.text = customStatus ?: context.getText(
                 when (currentState) {

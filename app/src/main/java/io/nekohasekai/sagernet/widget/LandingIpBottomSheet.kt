@@ -38,6 +38,55 @@ object LandingIpBottomSheet {
         tvAsn.text = if (info.asn.isNotBlank()) info.asn else activity.getString(R.string.unknown)
         tvDuration.text = "${info.durationMs} ms"
 
+        val isWhite = io.nekohasekai.sagernet.utils.Theme.isWhiteTheme()
+        val isNight = io.nekohasekai.sagernet.utils.Theme.usingNightMode()
+
+        val cardBgColor = when {
+            isWhite -> android.graphics.Color.parseColor("#F5F6F8")
+            isNight -> android.graphics.Color.parseColor("#1E1E1E")
+            else -> null
+        }
+        val strokeColor = when {
+            isWhite -> android.graphics.Color.parseColor("#E0E0E0")
+            isNight -> android.graphics.Color.parseColor("#333333")
+            else -> null
+        }
+        val primaryTextColor = when {
+            isWhite -> android.graphics.Color.parseColor("#1A1A1A")
+            isNight -> android.graphics.Color.parseColor("#F5F5F5")
+            else -> null
+        }
+        val secondaryTextColor = when {
+            isWhite -> android.graphics.Color.parseColor("#5A5A5A")
+            isNight -> android.graphics.Color.parseColor("#B0B0B0")
+            else -> null
+        }
+
+        if (cardBgColor != null) {
+            view.findViewById<com.google.android.material.card.MaterialCardView>(R.id.card_ip)?.setCardBackgroundColor(cardBgColor)
+            view.findViewById<com.google.android.material.card.MaterialCardView>(R.id.card_details)?.setCardBackgroundColor(cardBgColor)
+        }
+        if (strokeColor != null) {
+            view.findViewById<com.google.android.material.card.MaterialCardView>(R.id.card_ip)?.strokeColor = strokeColor
+            view.findViewById<com.google.android.material.card.MaterialCardView>(R.id.card_details)?.strokeColor = strokeColor
+            view.findViewById<android.view.View>(R.id.divider1)?.setBackgroundColor(strokeColor)
+            view.findViewById<android.view.View>(R.id.divider2)?.setBackgroundColor(strokeColor)
+        }
+        if (primaryTextColor != null) {
+            view.findViewById<TextView>(R.id.tv_title)?.setTextColor(primaryTextColor)
+            tvFullIp.setTextColor(primaryTextColor)
+            tvIsp.setTextColor(primaryTextColor)
+            tvAsn.setTextColor(primaryTextColor)
+            tvDuration.setTextColor(primaryTextColor)
+        }
+        if (secondaryTextColor != null) {
+            tvLocation.setTextColor(secondaryTextColor)
+            view.findViewById<TextView>(R.id.tv_label_ip)?.setTextColor(secondaryTextColor)
+            view.findViewById<TextView>(R.id.tv_label_isp)?.setTextColor(secondaryTextColor)
+            view.findViewById<TextView>(R.id.tv_label_asn)?.setTextColor(secondaryTextColor)
+            view.findViewById<TextView>(R.id.tv_label_duration)?.setTextColor(secondaryTextColor)
+        }
+
         btnCopyIp.setOnClickListener {
             val clipboard = activity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             val clip = ClipData.newPlainText("IP", info.ip)

@@ -449,14 +449,7 @@ func UrlTest(i *BoxInstance, link string, timeout int32) (latency int32, err err
 			var fbErr error
 			latency, fbErr = urlTest(i, connectionTracker, fallback, timeout)
 			if fbErr != nil {
-				boxPlatformLogWriter.WriteMessage(sblog.LevelDebug, fmt.Sprintf("box.UrlTest two-stage failed, trying fallback with urlTestFull: %v", fbErr))
-				var fullErr error
-				latency, fullErr = urlTestFull(i, connectionTracker, fallback, timeout)
-				if fullErr != nil {
-					err = primaryErr
-				} else {
-					err = nil
-				}
+				err = primaryErr
 			} else {
 				err = nil
 			}
@@ -466,143 +459,14 @@ func UrlTest(i *BoxInstance, link string, timeout int32) (latency int32, err err
 	return
 }
 
-// UrlTestFull 全链路真实测速（用于节点列表/分组批量测速）：
-// 计时包含：底层代理建链、TLS 握手协商、发起 HTTP GET 请求到接收完整响应头。
-// 测速结果反映真实冷启动网络链路延迟（300ms ~ 2000ms），失败时尝试备用地址降级。
+// UrlTestFull 对齐官方 sing-box 与 Throne 真实 TTFB 测速标准（与 UrlTest 保持一致的单次请求 TTFB 算法）。
 func UrlTestFull(i *BoxInstance, link string, timeout int32) (latency int32, err error) {
-	defer device.DeferPanicToError("box.UrlTestFull", func(err_ error) { err = err_ })
-	if i == nil {
-		i = mainInstance
-	}
-	boxPlatformLogWriter.WriteMessage(sblog.LevelDebug, fmt.Sprintf("box.UrlTestFull link=%s timeout=%dms instance=%v", link, timeout, i != nil))
-	if i == nil {
-		client := &http.Client{Timeout: time.Duration(timeout) * time.Millisecond}
-		latency, err = urlTestDirect(client, link)
-		if err != nil {
-			fallback := getFallbackLink(link)
-			boxPlatformLogWriter.WriteMessage(sblog.LevelDebug, fmt.Sprintf("box.UrlTestFull direct failed: %v, trying fallback: %s", err, fallback))
-			latency, err = urlTestDirect(client, fallback)
-		}
-	} else {
-		var connectionTracker adapter.ConnectionTracker
-		if i.v2api != nil {
-			connectionTracker = i.v2api
-		}
-		latency, err = urlTestFull(i, connectionTracker, link, timeout)
-		if err != nil {
-			primaryErr := err
-			fallback := getFallbackLink(link)
-			boxPlatformLogWriter.WriteMessage(sblog.LevelDebug, fmt.Sprintf("box.UrlTestFull primary failed: %v, trying fallback: %s", err, fallback))
-			var fbErr error
-			latency, fbErr = urlTestFull(i, connectionTracker, fallback, timeout)
-			if fbErr != nil {
-				err = primaryErr
-			} else {
-				err = nil
-			}
-		}
-	}
-	boxPlatformLogWriter.WriteMessage(sblog.LevelDebug, fmt.Sprintf("box.UrlTestFull result latency=%dms err=%v", latency, err))
-	return
+	return UrlTest(i, link, timeout)
 }
 
-// urlTestFull 实现单次全链路端到端测量
-func urlTestFull(instance *BoxInstance, tracker adapter.ConnectionTracker, link string, timeout int32) (int32, error) {
-	totalStarted := time.Now()
-	instance.urlTestTrace("urltest-full", "begin link=%s timeout=%dms", link, timeout)
-	linkURL, err := url.Parse(link)
-	if err != nil {
-		instance.urlTestTrace("parse-link", "failed elapsed=%s error=%v", time.Since(totalStarted), err)
-		return 0, E.Cause(err, "parse test link")
-	}
-	hostname := linkURL.Hostname()
-	port := linkURL.Port()
-	if port == "" {
-		switch linkURL.Scheme {
-		case "http":
-			port = "80"
-		case "https":
-			port = "443"
-		default:
-			instance.urlTestTrace("parse-link", "failed elapsed=%s error=unsupported-scheme scheme=%q", time.Since(totalStarted), linkURL.Scheme)
-			return 0, E.New("unsupported test link scheme: ", linkURL.Scheme)
-		}
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Millisecond)
-	defer cancel()
-
-	outbound := instance.Outbound().Default()
-	if outbound == nil {
-		instance.urlTestTrace("select-outbound", "failed elapsed=%s error=no-default-outbound", time.Since(totalStarted))
-		return 0, E.New("no default outbound")
-	}
-	destination := M.ParseSocksaddrHostPortStr(hostname, port)
-
-	dialer := func(ctx context.Context, network, addr string) (net.Conn, error) {
-		conn, err := outbound.DialContext(ctx, N.NetworkTCP, destination)
-		if err != nil {
-			return nil, err
-		}
-		if tracker != nil {
-			conn = tracker.RoutedConnection(ctx, conn, adapter.InboundContext{
-				Outbound:    outbound.Tag(),
-				Destination: destination,
-			}, nil, outbound)
-		}
-		return conn, nil
-	}
-
-	transport := &http.Transport{
-		DialContext: dialer,
-		TLSClientConfig: &tls.Config{
-			ServerName:         hostname,
-			InsecureSkipVerify: true,
-			NextProtos:         []string{"http/1.1"},
-		},
-		TLSNextProto:      make(map[string]func(string, *tls.Conn) http.RoundTripper),
-		ForceAttemptHTTP2: false,
-		DisableKeepAlives: true,
-	}
-	defer transport.CloseIdleConnections()
-
-	client := &http.Client{
-		Transport: transport,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, link, nil)
-	if err != nil {
-		return 0, err
-	}
-	req.Header.Set("User-Agent", browserUserAgent)
-	req.Header.Set("Accept", "*/*")
-
-	reqStarted := time.Now()
-	resp, err := client.Do(req)
-	if err != nil {
-		instance.urlTestTrace("full-request", "failed elapsed=%s error=%v", time.Since(reqStarted), err)
-		return 0, err
-	}
-	elapsed := int32(time.Since(reqStarted).Milliseconds())
-	_ = resp.Body.Close()
-	if resp.StatusCode >= 400 {
-		return 0, E.New("unexpected status: ", resp.Status)
-	}
-
-	if elapsed <= 0 {
-		elapsed = 1
-	}
-	instance.urlTestTrace("full-request", "ok elapsed=%s latency=%dms", time.Since(totalStarted), elapsed)
-	return elapsed, nil
-}
-
-// urlTest 替代 libneko/speedtest.UrlTest 与 fork 的 boxapi.CreateProxyHttpClient，
-// 对齐 Throne/husi 的"显式拨号 + 连接复用 + 双请求"模式：
-// 第一次预热（含握手，不计时），第二次复用同一连接计时。
-// 收益：延迟为纯 RTT（100~200ms），适用于主页落地 IP 握手延迟测试。
+// urlTest 对齐官方 sing-box 及 Throne 测速标准：
+// 显式出站拨号建立隧道后，发起单次 HTTP GET 请求，精确测量服务端响应头往返（TTFB 延迟 ~150-350ms）。
+// 单次请求杜绝复用已关闭 QUIC/TCP 流导致的 EOF 假失败，且彻底消除包含冷启动建链的 1000~2000ms 虚高延迟。
 func urlTest(instance *BoxInstance, tracker adapter.ConnectionTracker, link string, timeout int32) (int32, error) {
 	totalStarted := time.Now()
 	instance.urlTestTrace("urltest", "begin link=%s timeout=%dms", link, timeout)
@@ -650,7 +514,6 @@ func urlTest(instance *BoxInstance, tracker adapter.ConnectionTracker, link stri
 	}
 	defer conn.Close()
 
-	// client 恒复用上面建立的连接（keep-alive）；重定向不跟随（generate_204 类直返）。
 	client := &http.Client{
 		Transport: &http.Transport{
 			DialContext: func(context.Context, string, string) (net.Conn, error) {
@@ -663,6 +526,7 @@ func urlTest(instance *BoxInstance, tracker adapter.ConnectionTracker, link stri
 			},
 			TLSNextProto:      make(map[string]func(string, *tls.Conn) http.RoundTripper),
 			ForceAttemptHTTP2: false,
+			DisableKeepAlives: true,
 		},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
@@ -670,49 +534,29 @@ func urlTest(instance *BoxInstance, tracker adapter.ConnectionTracker, link stri
 	}
 	defer client.CloseIdleConnections()
 
-	doReq := func() error {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, link, nil)
-		if err != nil {
-			return err
-		}
-		req.Header.Set("User-Agent", browserUserAgent)
-		req.Header.Set("Accept", "*/*")
-		req.Header.Set("Connection", "keep-alive")
-		resp, err := client.Do(req)
-		if err != nil {
-			return err
-		}
-		_ = resp.Body.Close()
-		if resp.StatusCode >= 400 {
-			return E.New("unexpected status: ", resp.Status)
-		}
-		return nil
-	}
-
-	// 第一次：预热（建立 TLS 会话等），不计时
-	warmupStarted := time.Now()
-	instance.urlTestTrace("warmup-get", "begin")
-	if err = doReq(); err != nil {
-		boxPlatformLogWriter.WriteMessage(sblog.LevelDebug, fmt.Sprintf("box.urlTest warmup request failed: %v", err))
-		instance.urlTestTrace("warmup-get", "failed elapsed=%s totalElapsed=%s error=%v", time.Since(warmupStarted), time.Since(totalStarted), err)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, link, nil)
+	if err != nil {
 		return 0, err
 	}
-	warmupElapsed := time.Since(warmupStarted)
-	instance.urlTestTrace("warmup-get", "ok elapsed=%s", warmupElapsed)
+	req.Header.Set("User-Agent", browserUserAgent)
+	req.Header.Set("Accept", "*/*")
 
-	// 第二次：复用连接，纯 RTT 计时
+	// 记录向远端发起请求的起始时间（单次请求，杜绝复用已关闭 QUIC/TCP 流导致的 EOF）
 	start := time.Now()
-	instance.urlTestTrace("measure-get", "begin reusedConnection=true")
-	var latency int32
-	if err = doReq(); err != nil {
-		boxPlatformLogWriter.WriteMessage(sblog.LevelDebug, fmt.Sprintf("box.urlTest measure request reused conn failed: %v, fallback to warmup duration", err))
-		instance.urlTestTrace("measure-get", "fallback-warmup elapsed=%s totalElapsed=%s error=%v", time.Since(start), time.Since(totalStarted), err)
-		latency = int32(warmupElapsed.Milliseconds())
-		if latency <= 0 {
-			latency = 1
-		}
-	} else {
-		latency = int32(time.Since(start).Milliseconds())
+	instance.urlTestTrace("measure-get", "begin")
+	resp, err := client.Do(req)
+	if err != nil {
+		instance.urlTestTrace("measure-get", "failed elapsed=%s error=%v", time.Since(start), err)
+		return 0, err
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return 0, E.New("unexpected status: ", resp.Status)
+	}
+
+	latency := int32(time.Since(start).Milliseconds())
+	if latency <= 0 {
+		latency = 1
 	}
 	boxPlatformLogWriter.WriteMessage(sblog.LevelDebug, fmt.Sprintf("box.urlTest ok latency=%dms", latency))
 	instance.urlTestTrace("measure-get", "ok latency=%dms totalElapsed=%s", latency, time.Since(totalStarted))

@@ -1,6 +1,12 @@
-# OwnBox for Android v2.5.5 预览版 (v2.5.5-preview)
+# OwnBox for Android v2.5.6 预览版 (v2.5.6-preview)
 
 ## 版本更新摘要（Release Notes）
 
-* **订阅批量更新闪退修复 (Fragment Lifecycle)**：彻底修复在订阅分组列表点击“一键更新所有订阅”时，因用户离开页面或页面切换导致 Fragment 解除绑定（Detached）而抛出 `java.lang.IllegalStateException: Fragment not attached to an activity` 的致命闪退问题。
-* **全局异步通知与生命周期防御性加固**：全面重构 Fragment 提示组件，新增 `safeSnackbar` 安全派发机制与全局活动回退兜底，针对所有后台并发任务、导入导出操作实施全方位生命周期安全保护，杜绝任何页面脱离导致的空指针与状态异常崩溃。
+* **主页底部落地 IP 卡片加高与两行排版**：底部状态栏高度参照 Throne 适度加高，右侧延迟全新重构为清晰的上下两行排版（上行严格独立展示“HTTP/HTTPS 握手延迟”，下行加粗展示具体延迟数值），彻底解决系统大字号下的文本截断与字串拼接错位。
+* **路由与规则资源更新 403 频控绕过与提示**：直连 GitHub Releases 官方下载地址，彻底绕过 GitHub REST API 60次/小时的未认证 403 速率限制，并补充完善检查更新、更新成功与失败的友好 Toast 状态通知。
+* **节点去重逻辑重构（保留首个/选中项）**：彻底重构右上角“删除重复的服务器”功能，保留各重复组的首个（或当前选中的）节点，仅安全剔除多余冗余节点，并平滑迁移当前选中状态与同步刷新列表。
+* **URL Test 测速延迟虚高与算法对齐**：全面对齐官方 sing-box 及 Throne 测速标准，改用显式出站拨号建立隧道后单次 HTTP GET 精确测量 TTFB 延迟（~150-350ms），彻底消除包含冷启动建链的 1000~2000ms+ 虚高读数。
+* **Hysteria2 与 TUIC 测速 EOF 及死锁修复**：消除人工设置的 `udpSemaphore(2)` 并发瓶颈，加入超时熔断保护，防止异常节点阻塞整队；彻底杜绝在已关闭 QUIC 流上重用连接导致的 EOF 伪失败。
+* **Trojan 节点 URL Test 可用性修复**：修复构建 Trojan 出站时缺失 TLS enabled 与 server_name/SNI 导致的握手协商失败。
+* **IPv6 禁用开关泄露与黑洞拦截**：解决 Android VPN 服务未捕获 IPv6 导致的物理网卡直连泄露，在 VPN 顶层完整接管 IPv6 路由与地址，并在 sing-box 内核层严格阻断并丢弃所有 IPv6 流量及 AAAA 查询。
+* **极端白底与纯黑/AMOLED 主题对比度校准**：全面优化落地 IP 详情弹窗等界面在纯白和暗黑/AMOLED 模式下的背景、边框与文字对比度，文字清晰锐利易读。

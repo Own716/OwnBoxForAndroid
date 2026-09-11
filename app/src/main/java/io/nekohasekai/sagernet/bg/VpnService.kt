@@ -150,11 +150,9 @@ class VpnService : BaseVpnService(),
             .setMtu(DataStore.mtu)
         val ipv6Mode = DataStore.ipv6Mode
 
-        // address
+        // address: 始终添加 IPv6 虚拟地址与路由，确保 Android 系统完整接管 IPv6，彻底杜绝从物理网卡泄露
         builder.addAddress(PRIVATE_VLAN4_CLIENT, 30)
-        if (ipv6Mode != IPv6Mode.DISABLE) {
-            builder.addAddress(PRIVATE_VLAN6_CLIENT, 126)
-        }
+        builder.addAddress(PRIVATE_VLAN6_CLIENT, 126)
         builder.addDnsServer(PRIVATE_VLAN4_ROUTER)
 
         // route
@@ -166,14 +164,11 @@ class VpnService : BaseVpnService(),
             builder.addRoute(PRIVATE_VLAN4_ROUTER, 32)
             builder.addRoute(FAKEDNS_VLAN4_CLIENT, 15)
             // https://issuetracker.google.com/issues/149636790
-            if (ipv6Mode != IPv6Mode.DISABLE) {
-                builder.addRoute("2000::", 3)
-            }
+            builder.addRoute("2000::", 3)
+            builder.addRoute("fc00::", 7)
         } else {
             builder.addRoute("0.0.0.0", 0)
-            if (ipv6Mode != IPv6Mode.DISABLE) {
-                builder.addRoute("::", 0)
-            }
+            builder.addRoute("::", 0)
         }
 
         updateUnderlyingNetwork(builder)
