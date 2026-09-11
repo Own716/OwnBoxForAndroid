@@ -26,7 +26,10 @@ import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.widget.ListListener
 import io.nekohasekai.sagernet.widget.QRCodeDialog
 import io.nekohasekai.sagernet.widget.UndoSnackbarManager
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.supervisorScope
 import moe.matsuri.nb4a.utils.Util
 import moe.matsuri.nb4a.utils.toBytesString
 import java.lang.NumberFormatException
@@ -127,24 +130,28 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
                         val subGroups = SagerDatabase.groupDao.allGroups().filter { it.type == GroupType.SUBSCRIPTION }
                         if (subGroups.isEmpty()) return@setPositiveButton
                         runOnDefaultDispatcher {
-                            var successCount = 0
-                            var failCount = 0
-                            for (group in subGroups) {
-                                val ok = runCatching {
-                                    GroupUpdater.executeUpdate(group, true)
-                                }.getOrElse { e ->
-                                    Logs.w("Batch update failed for ${group.displayName()}: ${e.readableMessage}")
-                                    false
+                            supervisorScope {
+                                val tasks = subGroups.map { group ->
+                                    async {
+                                        runCatching {
+                                            GroupUpdater.executeUpdate(group, false)
+                                        }.getOrElse { e ->
+                                            Logs.w("Batch update failed for ${group.displayName()}: ${e.readableMessage}")
+                                            false
+                                        }
+                                    }
                                 }
-                                if (ok) successCount++ else failCount++
-                            }
-                            onMainDispatcher {
-                                val msg = if (failCount == 0) {
-                                    "全部订阅更新完成（共 ${successCount} 个）"
-                                } else {
-                                    "订阅更新完成：${successCount} 个成功，${failCount} 个失败"
+                                val results = tasks.awaitAll()
+                                val successCount = results.count { it }
+                                val failCount = results.count { !it }
+                                onMainDispatcher {
+                                    val msg = if (failCount == 0) {
+                                        "全部订阅更新完成（共 ${successCount} 个）"
+                                    } else {
+                                        "订阅更新完成：${successCount} 个成功，${failCount} 个失败"
+                                    }
+                                    snackbar(msg).show()
                                 }
-                                snackbar(msg).show()
                             }
                         }
                     }

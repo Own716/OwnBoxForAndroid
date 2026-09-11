@@ -21,6 +21,7 @@ import com.king.zxing.util.PermissionUtils
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProfileManager
+import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.databinding.LayoutScannerBinding
 import io.nekohasekai.sagernet.group.RawUpdater
 import io.nekohasekai.sagernet.ktx.deduplicateProxies
@@ -103,9 +104,12 @@ class ScannerActivity : ThemedActivity(),
             try {
                 val text = result?.text ?: throw Exception("QR code not found")
                 val rawResults = RawUpdater.parseRaw(text)
-                val results = rawResults?.deduplicateProxies()
+                val currentGroupId = DataStore.selectedGroupForImport()
+                val targetGroup = SagerDatabase.groupDao.getById(currentGroupId)
+                val currentGroup = DataStore.currentGroup()
+                val shouldDeduplicate = (targetGroup?.subscription?.deduplication == true) || (currentGroup.subscription?.deduplication == true)
+                val results = if (shouldDeduplicate) rawResults?.deduplicateProxies() else rawResults
                 if (!results.isNullOrEmpty()) {
-                    val currentGroupId = DataStore.selectedGroupForImport()
                     if (DataStore.selectedGroup != currentGroupId) {
                         DataStore.selectedGroup = currentGroupId
                     }

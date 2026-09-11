@@ -447,11 +447,18 @@ object RawUpdater : GroupUpdater() {
                                     "v2ray-plugin" -> {
                                         ssPlugin.apply {
                                             add("v2ray-plugin")
-                                            add("mode=" + (opts["mode"]?.toString() ?: ""))
-                                            if (opts["mode"]?.toString() == "true") add("tls")
-                                            add("host=" + (opts["host"]?.toString() ?: ""))
-                                            add("path=" + (opts["path"]?.toString() ?: ""))
-                                            if (opts["mux"]?.toString() == "true") add("mux=8")
+                                            val mode = opts["mode"]?.toString() ?: "websocket"
+                                            if (mode.isNotBlank()) add("mode=$mode")
+                                            if (opts["tls"]?.toString() == "true") add("tls")
+                                            val host = opts["host"]?.toString()
+                                            if (!host.isNullOrBlank()) add("host=$host")
+                                            val path = opts["path"]?.toString()
+                                            if (!path.isNullOrBlank()) add("path=$path")
+                                            if (opts["mux"]?.toString() == "true") {
+                                                add("mux=8")
+                                            } else {
+                                                add("mux=0")
+                                            }
                                         }
                                     }
                                 }

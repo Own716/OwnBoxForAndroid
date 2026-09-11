@@ -455,12 +455,12 @@ class StatsBar @JvmOverloads constructor(
 
     @SuppressLint("SetTextI18n")
     fun updateSpeed(txRate: Long, rxRate: Long) {
-        txText.text = "▲  ${
+        txText.text = "▲ ${
             context.getString(
                 R.string.speed, Formatter.formatFileSize(context, txRate)
             )
         }"
-        rxText.text = "▼  ${
+        rxText.text = "▼ ${
             context.getString(
                 R.string.speed, Formatter.formatFileSize(context, rxRate)
             )

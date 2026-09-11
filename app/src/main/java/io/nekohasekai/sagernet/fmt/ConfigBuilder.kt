@@ -587,6 +587,9 @@ fun buildConfig(
         }
 
         fun autoDnsDomainStrategy(s: String): String? {
+            if (ipv6Mode == IPv6Mode.DISABLE) {
+                return "ipv4_only"
+            }
             if (s.isNotEmpty()) {
                 return s
             }
@@ -731,7 +734,7 @@ fun buildConfig(
             val chainTag = "c-$chainId"
             var muxApplied = false
 
-            val defaultServerDomainStrategy = SingBoxOptionsUtil.domainStrategy("server")
+            val defaultServerDomainStrategy = if (ipv6Mode == IPv6Mode.DISABLE) "ipv4_only" else SingBoxOptionsUtil.domainStrategy("server")
 
             profileList.forEachIndexed { index, proxyEntity ->
                 val bean = proxyEntity.requireBean()
@@ -1387,6 +1390,9 @@ fun buildConfig(
         }
 
         dns.final_ = if (forTest) "dns-direct" else "dns-remote"
+        if (ipv6Mode == IPv6Mode.DISABLE) {
+            dns.strategy = "ipv4_only"
+        }
 
         // dns object user rules
         if (enableDnsRouting) {
@@ -1403,6 +1409,16 @@ fun buildConfig(
             dns.rules = listOf()
         } else {
             // built-in DNS rules
+            if (ipv6Mode == IPv6Mode.DISABLE) {
+                dns.rules.add(0, DNSRule_DefaultOptions().apply {
+                    query_type = listOf("AAAA")
+                    action = "reject"
+                })
+                route.rules.add(0, Rule_DefaultOptions().apply {
+                    ip_version = 6
+                    action = "reject"
+                })
+            }
             route.rules.add(0, Rule_DefaultOptions().apply {
                 protocol = listOf("dns")
                 action = "hijack-dns"
@@ -1437,13 +1453,15 @@ fun buildConfig(
                     type = "fakeip"
                     tag = "dns-fake"
                     inet4_range = "198.18.0.0/15"
-                    inet6_range = "fc00::/18"
+                    if (ipv6Mode != IPv6Mode.DISABLE) {
+                        inet6_range = "fc00::/18"
+                    }
                 })
                 dns.rules.add(DNSRule_DefaultOptions().apply {
                     inbound = listOf("tun-in")
                     server = "dns-fake"
                     disable_cache = true
-                    query_type = listOf("A", "AAAA")
+                    query_type = if (ipv6Mode == IPv6Mode.DISABLE) listOf("A") else listOf("A", "AAAA")
                 })
             }
             if (dnsHosts.isNotEmpty()) {

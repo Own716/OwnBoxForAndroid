@@ -449,7 +449,14 @@ func UrlTest(i *BoxInstance, link string, timeout int32) (latency int32, err err
 			var fbErr error
 			latency, fbErr = urlTest(i, connectionTracker, fallback, timeout)
 			if fbErr != nil {
-				err = primaryErr
+				boxPlatformLogWriter.WriteMessage(sblog.LevelDebug, fmt.Sprintf("box.UrlTest two-stage failed, trying fallback with urlTestFull: %v", fbErr))
+				var fullErr error
+				latency, fullErr = urlTestFull(i, connectionTracker, fallback, timeout)
+				if fullErr != nil {
+					err = primaryErr
+				} else {
+					err = nil
+				}
 			} else {
 				err = nil
 			}

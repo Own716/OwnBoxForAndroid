@@ -630,9 +630,11 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
 
     suspend fun import(proxies: List<AbstractBean>) {
+        val currentGroup = DataStore.currentGroup()
         val targetId = DataStore.selectedGroupForImport()
-        val group = SagerDatabase.groupDao.getById(targetId)
-        val finalProxies = if (group?.subscription?.deduplication == true) proxies.deduplicateProxies() else proxies
+        val targetGroup = SagerDatabase.groupDao.getById(targetId)
+        val shouldDeduplicate = (targetGroup?.subscription?.deduplication == true) || (currentGroup.subscription?.deduplication == true)
+        val finalProxies = if (shouldDeduplicate) proxies.deduplicateProxies() else proxies
         for (proxy in finalProxies) {
             ProfileManager.createProfile(targetId, proxy)
         }
@@ -660,9 +662,11 @@ class ConfigurationFragment @JvmOverloads constructor(
                 } else runOnDefaultDispatcher {
                     try {
                         val rawProxies = RawUpdater.parseRaw(text)
+                        val currentGroup = DataStore.currentGroup()
                         val targetId = DataStore.selectedGroupForImport()
-                        val group = SagerDatabase.groupDao.getById(targetId)
-                        val proxies = if (group?.subscription?.deduplication == true) rawProxies?.deduplicateProxies() else rawProxies
+                        val targetGroup = SagerDatabase.groupDao.getById(targetId)
+                        val shouldDeduplicate = (targetGroup?.subscription?.deduplication == true) || (currentGroup.subscription?.deduplication == true)
+                        val proxies = if (shouldDeduplicate) rawProxies?.deduplicateProxies() else rawProxies
                         if (proxies.isNullOrEmpty()) {
                             onMainDispatcher {
                                 snackbar(getString(R.string.no_proxies_found_in_clipboard)).show()
@@ -2017,12 +2021,20 @@ class ConfigurationFragment @JvmOverloads constructor(
             val root = targetView ?: return
             val card = root.findViewById<MaterialCardView>(R.id.card_subscription_info) ?: return
 
-            if (select || !::proxyGroup.isInitialized || proxyGroup.type != GroupType.SUBSCRIPTION || !DataStore.showSubscriptionInfoCard) {
+            if (select || !::proxyGroup.isInitialized || !DataStore.showSubscriptionInfoCard) {
                 card.isGone = true
                 return
             }
 
-            val sub = proxyGroup.subscription
+            val currentGroup = SagerDatabase.groupDao.getById(proxyGroup.id) ?: proxyGroup
+            proxyGroup = currentGroup
+
+            if (currentGroup.type != GroupType.SUBSCRIPTION) {
+                card.isGone = true
+                return
+            }
+
+            val sub = currentGroup.subscription
             if (sub == null) {
                 card.isGone = true
                 return
@@ -2035,7 +2047,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             val tvNodeCount = root.findViewById<TextView>(R.id.tv_node_count)
             val tvLastUpdated = root.findViewById<TextView>(R.id.tv_last_updated)
 
-            tvTitle?.text = proxyGroup.name ?: getString(R.string.subscription_info)
+            tvTitle?.text = currentGroup.name ?: getString(R.string.subscription_info)
 
             var usedBytes = 0L
             var totalBytes = 0L
@@ -2054,26 +2066,25 @@ class ConfigurationFragment @JvmOverloads constructor(
                 if (exp > 0L) {
                     expireMillis = if (exp > 100_000_000_000L) exp else exp * 1000L
                 }
-            }
-            if (usedBytes == 0L && totalBytes == 0L && sub.bytesUsed != null && sub.bytesRemaining != null && (sub.bytesUsed > 0L || sub.bytesRemaining > 0L)) {
-                usedBytes = sub.bytesUsed
-                totalBytes = sub.bytesUsed + sub.bytesRemaining
-                if (expireMillis <= 0L && sub.expiryDate != null && sub.expiryDate > 0) {
+            } else if (sub.bytesUsed != null || sub.bytesRemaining != null) {
+                usedBytes = sub.bytesUsed ?: 0L
+                totalBytes = (sub.bytesUsed ?: 0L) + (sub.bytesRemaining ?: 0L)
+                if (sub.expiryDate != null && sub.expiryDate > 0) {
                     val exp = sub.expiryDate.toLong()
                     expireMillis = if (exp > 100_000_000_000L) exp else exp * 1000L
                 }
             }
 
-            // 补充节点文本回退提取机制（正则匹配 套餐到期 与 剩余流量 回填卡片）
+            // 仅在完全没有提取到任何流量信息时，尝试从节点名称回退
             var fallbackExpireStr: String? = null
             var fallbackTrafficStr: String? = null
             var fallbackUsedStr: String? = null
             var isUnlimited = false
-            if (expireMillis <= 0L || totalBytes <= 0L) {
+            if (usedBytes == 0L && totalBytes == 0L && expireMillis <= 0L) {
                 val expireRegex = Regex(".*(?:套餐到期|到期时间|过期时间|到期)[：:]\\s*([0-9]{4}[-/][0-9]{2}[-/][0-9]{2})", RegexOption.IGNORE_CASE)
                 val trafficRegex = Regex(".*(?:剩余流量|可用流量|剩余)[：:]\\s*([0-9.]+\\s*[KMGT]?B|无限|不限|不限量)", RegexOption.IGNORE_CASE)
                 val usedRegex = Regex(".*(?:已用流量|已用|已使用)[：:]\\s*([0-9.]+\\s*[KMGT]?B)", RegexOption.IGNORE_CASE)
-                val allGroupProfiles = SagerDatabase.proxyDao.getByGroup(proxyGroup.id)
+                val allGroupProfiles = SagerDatabase.proxyDao.getByGroup(currentGroup.id)
                 for (p in allGroupProfiles) {
                     val name = p.displayName()
                     if (expireMillis <= 0L && fallbackExpireStr == null) {
@@ -2106,40 +2117,6 @@ class ConfigurationFragment @JvmOverloads constructor(
                 }
             }
 
-            if (fallbackExpireStr != null || fallbackTrafficStr != null || fallbackUsedStr != null) {
-                fun parseFallbackBytes(s: String): Long {
-                    val u = s.uppercase()
-                    val num = u.filter { it.isDigit() || it == '.' }.toDoubleOrNull() ?: return 0L
-                    return when {
-                        u.contains("TB") || u.contains("T") -> (num * 1024 * 1024 * 1024 * 1024).toLong()
-                        u.contains("GB") || u.contains("G") -> (num * 1024 * 1024 * 1024).toLong()
-                        u.contains("MB") || u.contains("M") -> (num * 1024 * 1024).toLong()
-                        u.contains("KB") || u.contains("K") -> (num * 1024).toLong()
-                        u.contains("B") -> num.toLong()
-                        else -> 0L
-                    }
-                }
-                var modified = false
-                if ((sub.bytesRemaining == null || sub.bytesRemaining <= 0L) && fallbackTrafficStr != null) {
-                    sub.bytesRemaining = parseFallbackBytes(fallbackTrafficStr)
-                    modified = true
-                }
-                if ((sub.bytesUsed == null || sub.bytesUsed <= 0L) && fallbackUsedStr != null) {
-                    sub.bytesUsed = parseFallbackBytes(fallbackUsedStr)
-                    modified = true
-                }
-                if ((sub.expiryDate == null || sub.expiryDate <= 0) && expireMillis > 0L) {
-                    sub.expiryDate = (expireMillis / 1000L).toInt()
-                    modified = true
-                }
-                if (modified) {
-                    runOnDefaultDispatcher {
-                        proxyGroup.subscription = sub
-                        SagerDatabase.groupDao.updateGroup(proxyGroup)
-                    }
-                }
-            }
-
             if (totalBytes > 0L) {
                 val remainBytes = (totalBytes - usedBytes).coerceAtLeast(0L)
                 val usedStr = usedBytes.toBytesString()
@@ -2147,30 +2124,22 @@ class ConfigurationFragment @JvmOverloads constructor(
                 tvTrafficStat?.text = getString(R.string.traffic_available, remainStr)
                 tvTrafficRemaining?.text = getString(R.string.traffic_used, usedStr)
                 tvTrafficRemaining?.isVisible = true
+            } else if (usedBytes > 0L) {
+                val usedStr = usedBytes.toBytesString()
+                tvTrafficStat?.text = getString(R.string.traffic_available, getString(R.string.traffic_unlimited))
+                tvTrafficRemaining?.text = getString(R.string.traffic_used, usedStr)
+                tvTrafficRemaining?.isVisible = true
             } else if (fallbackTrafficStr != null) {
                 tvTrafficStat?.text = getString(R.string.traffic_available, fallbackTrafficStr)
-                if (usedBytes > 0L) {
-                    val usedStr = usedBytes.toBytesString()
-                    tvTrafficRemaining?.text = getString(R.string.traffic_used, usedStr)
-                    tvTrafficRemaining?.isVisible = true
-                } else if (fallbackUsedStr != null) {
+                if (fallbackUsedStr != null) {
                     tvTrafficRemaining?.text = getString(R.string.traffic_used, fallbackUsedStr)
                     tvTrafficRemaining?.isVisible = true
                 } else {
                     tvTrafficRemaining?.isGone = true
                 }
-            } else if (isUnlimited || totalBytes == 0L) {
+            } else if (isUnlimited) {
                 tvTrafficStat?.text = getString(R.string.traffic_available, getString(R.string.traffic_unlimited))
-                if (usedBytes > 0L) {
-                    val usedStr = usedBytes.toBytesString()
-                    tvTrafficRemaining?.text = getString(R.string.traffic_used, usedStr)
-                    tvTrafficRemaining?.isVisible = true
-                } else if (fallbackUsedStr != null) {
-                    tvTrafficRemaining?.text = getString(R.string.traffic_used, fallbackUsedStr)
-                    tvTrafficRemaining?.isVisible = true
-                } else {
-                    tvTrafficRemaining?.isGone = true
-                }
+                tvTrafficRemaining?.isGone = true
             } else {
                 tvTrafficStat?.text = getString(R.string.traffic_available, getString(R.string.traffic_unlimited))
                 tvTrafficRemaining?.isGone = true
@@ -2696,20 +2665,6 @@ class ConfigurationFragment @JvmOverloads constructor(
                     }
                 }
 
-                // 智能过滤纯提示型虚拟节点（包含“套餐到期”、“剩余流量”、“官网地址”等纯提示节点）
-                fun isVirtualInfoNode(name: String): Boolean {
-                    val trimmed = name.trim()
-                    val patterns = listOf(
-                        Regex(".*(?:套餐到期|到期时间|过期时间|账号到期|服务到期)[：:].*", RegexOption.IGNORE_CASE),
-                        Regex(".*(?:剩余流量|可用流量|已用流量|总计流量|流量剩余)[：:].*", RegexOption.IGNORE_CASE),
-                        Regex(".*(?:官网地址|官方网站|最新网址|TG频道|电报群)[：:].*", RegexOption.IGNORE_CASE)
-                    )
-                    return patterns.any { it.matches(trimmed) }
-                }
-                val realProfiles = newProfiles.filter { !isVirtualInfoNode(it.displayName()) }
-                if (realProfiles.isNotEmpty()) {
-                    newProfiles = realProfiles
-                }
 
                 val newProfileMap = newProfiles.associateBy { it.id }
                 val newProfileIds = newProfiles.map { it.id }.distinct()
@@ -2827,7 +2782,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                     removeProfile(entity)
                 }
                 doubleColumnMenuButton.setOnClickListener {
-                    showDoubleColumnMenu(it, entity)
+                    showNodeActionDialog(entity)
                 }
                 shareLayout.setOnClickListener {
                     val proxyEntity = entity
@@ -2835,13 +2790,8 @@ class ConfigurationFragment @JvmOverloads constructor(
                         showShareMenu(it, proxyEntity)
                     }
                 }
-                view.isLongClickable = true
-                view.setOnLongClickListener {
-                    val proxyEntity = entity
-                    view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                    showNodeActionDialog(proxyEntity)
-                    true
-                }
+                view.isLongClickable = false
+                view.setOnLongClickListener(null)
             }
 
             private fun showNodeActionDialog(proxyEntity: ProxyEntity) {
@@ -3135,7 +3085,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                 editButton.isGone = true
                 shareLayout.isGone = true
                 removeButton.isGone = true
-                doubleColumnMenuButton.isGone = true
+                doubleColumnMenuButton.isVisible = !select
 
                 val selected = pf.isSelectedProfile(proxyEntity.id)
                 val started =
@@ -3143,13 +3093,6 @@ class ConfigurationFragment @JvmOverloads constructor(
                 editButton.isEnabled = !started
                 removeButton.isEnabled = !started
                 applySelected(selected)
-
-                if (!(select || proxyEntity.type == ProxyEntity.TYPE_CHAIN || proxyEntity.type == ProxyEntity.TYPE_BALANCER)) {
-                    shareLayer.setBackgroundColor(Color.TRANSPARENT)
-                    shareButton.setImageResource(R.drawable.ic_baseline_more_vert_24)
-                    shareButton.setColorFilter(Color.GRAY)
-                    shareButton.isVisible = true
-                }
 
                 lastBoundTx = tx
                 lastBoundRx = rx

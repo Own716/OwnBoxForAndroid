@@ -59,7 +59,7 @@
                 android:layout_height="wrap_content"
                 android:background="?android:attr/selectableItemBackground"
                 android:orientation="vertical"
-                android:paddingHorizontal="16dp"
+                android:paddingHorizontal="12dp"
                 android:paddingVertical="10dp">
 
                 <!-- Row 1: 左侧 tx / rx (左肩)，中央 FAB 凹槽安全隔离，右侧 status 与 btn_ip_detail (右肩) -->
@@ -69,11 +69,11 @@
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
-                    <!-- 左肩：tx / rx 速率区域（严格限制在 FAB 左侧安全空间，启用自适应缩放） -->
+                    <!-- 左肩：tx / rx 速率区域（合理分配权重与内边距，启用自适应缩放防截断） -->
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
+                        android:layout_weight="1.15"
                         android:gravity="center_vertical|start"
                         android:orientation="horizontal">
 
@@ -88,8 +88,8 @@
                             android:textColor="@color/white"
                             android:textSize="13sp"
                             app:autoSizeMaxTextSize="13sp"
-                            app:autoSizeMinTextSize="9sp"
-                            app:autoSizeStepGranularity="1sp"
+                            app:autoSizeMinTextSize="8sp"
+                            app:autoSizeStepGranularity="0.5sp"
                             app:autoSizeTextType="uniform"
                             tools:text="▲ 0 B/s" />
 
@@ -97,16 +97,16 @@
                             android:id="@+id/rx"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="4dp"
-                            android:layout_weight="1"
+                            android:layout_marginStart="3dp"
+                            android:layout_weight="1.25"
                             android:ellipsize="end"
                             android:maxLines="1"
                             android:singleLine="true"
                             android:textColor="@color/white"
                             android:textSize="13sp"
                             app:autoSizeMaxTextSize="13sp"
-                            app:autoSizeMinTextSize="9sp"
-                            app:autoSizeStepGranularity="1sp"
+                            app:autoSizeMinTextSize="8sp"
+                            app:autoSizeStepGranularity="0.5sp"
                             app:autoSizeTextType="uniform"
                             tools:text="▼ 0 B/s" />
 
@@ -114,7 +114,7 @@
 
                     <!-- 中央：FAB 悬浮球凹槽物理安全隔离空间 -->
                     <Space
-                        android:layout_width="64dp"
+                        android:layout_width="52dp"
                         android:layout_height="1dp" />
 
                     <!-- 右肩：status 延迟与重测刷新按钮（规整靠右对齐，自适应防溢出） -->

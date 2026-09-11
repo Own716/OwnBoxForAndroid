@@ -95,8 +95,8 @@ class GroupSettingsActivity(
         type = DataStore.groupType
         order = DataStore.groupOrder
         isSelector = DataStore.groupIsSelector
-        DataStore.setGroupIsUrlTest(id, DataStore.groupIsUrlTest)
-        DataStore.setGroupIsLoadBalance(id, DataStore.groupIsLoadBalance)
+        DataStore.setGroupIsUrlTest(id, false)
+        DataStore.setGroupIsLoadBalance(id, false)
         DataStore.setGroupUrlTestUrl(id, DataStore.groupUrlTestUrl)
         DataStore.setGroupUrlTestInterval(id, DataStore.groupUrlTestInterval.toLong())
         DataStore.setGroupUrlTestTolerance(id, DataStore.groupUrlTestTolerance)
@@ -208,31 +208,6 @@ class GroupSettingsActivity(
             true
         }
 
-        val groupIsUrlTest = findPreference<SwitchPreference>("groupIsUrlTest")
-        val groupIsLoadBalance = findPreference<SwitchPreference>("groupIsLoadBalance")
-        val groupUrlTestCategory = findPreference<PreferenceCategory>("groupUrlTestCategory")
-        fun updateUrlTest(enabled: Boolean = DataStore.groupIsUrlTest) {
-            groupUrlTestCategory?.isVisible = enabled
-        }
-        updateUrlTest()
-        groupIsUrlTest?.setOnPreferenceChangeListener { _, newValue ->
-            val enabled = newValue as Boolean
-            if (enabled) {
-                groupIsLoadBalance?.isChecked = false
-                DataStore.groupIsLoadBalance = false
-            }
-            updateUrlTest(enabled)
-            true
-        }
-        groupIsLoadBalance?.setOnPreferenceChangeListener { _, newValue ->
-            val enabled = newValue as Boolean
-            if (enabled) {
-                groupIsUrlTest?.isChecked = false
-                DataStore.groupIsUrlTest = false
-                updateUrlTest(false)
-            }
-            true
-        }
 
         val subscriptionAutoUpdate =
             findPreference<SwitchPreference>(Key.SUBSCRIPTION_AUTO_UPDATE)!!

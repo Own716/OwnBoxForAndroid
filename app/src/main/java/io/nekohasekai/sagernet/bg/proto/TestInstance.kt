@@ -70,7 +70,7 @@ class TestInstance(profile: ProxyEntity, val link: String, private val timeout: 
                     stage = "core-urltest"
                     started = SystemClock.elapsedRealtime()
                     trace("core-urltest", "begin")
-                    val latency = Libcore.urlTest(box, link, timeout)
+                    val latency = Libcore.urlTestFull(box, link, timeout)
                     trace(
                         "core-urltest",
                         "ok elapsed=${SystemClock.elapsedRealtime() - started}ms latency=${latency}ms"
