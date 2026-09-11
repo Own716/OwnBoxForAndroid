@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">OwnBox</string>
-    <string name="app_name_long" translatable="false">OwnBox for Android</string>
+    <string name="app_name" translatable="false">Own</string>
+    <string name="app_name_long" translatable="false">Own for Android</string>
     <string name="app_desc">Універсальний набір інструментів проксі для Android, написаний на Kotlin.</string>
     <string name="project">Проєкт</string>
     <string name="github">Вихідний код</string>

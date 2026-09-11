@@ -542,7 +542,7 @@
         <receiver
             android:name="io.nekohasekai.sagernet.widget.OwnBoxWidget1x1"
             android:exported="true"
-            android:label="OwnBox 1×1 (水滴微球)">
+            android:label="Own 1×1 (水滴微球)">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="com.ownbox.app.widget.ACTION_TOGGLE" />
@@ -555,7 +555,7 @@
         <receiver
             android:name="io.nekohasekai.sagernet.widget.OwnBoxWidget2x2"
             android:exported="true"
-            android:label="OwnBox 2×2 (紧凑状态)">
+            android:label="Own 2×2 (紧凑状态)">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="com.ownbox.app.widget.ACTION_TOGGLE" />
@@ -568,7 +568,7 @@
         <receiver
             android:name="io.nekohasekai.sagernet.widget.OwnBoxWidget4x1"
             android:exported="true"
-            android:label="OwnBox 4×1 (胶囊操作栏)">
+            android:label="Own 4×1 (胶囊操作栏)">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="com.ownbox.app.widget.ACTION_TOGGLE" />
@@ -581,7 +581,7 @@
         <receiver
             android:name="io.nekohasekai.sagernet.widget.OwnBoxWidget4x2"
             android:exported="true"
-            android:label="OwnBox 4×2 (全景仪表板)">
+            android:label="Own 4×2 (全景仪表板)">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="com.ownbox.app.widget.ACTION_TOGGLE" />

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">OwnBox</string>
-    <string name="app_name_long" translatable="false">OwnBox for Android</string>
+    <string name="app_name" translatable="false">Own</string>
+    <string name="app_name_long" translatable="false">Own for Android</string>
     <string name="app_desc">The universal proxy toolchain for Android, written in Kotlin.</string>
     <string name="project">Project</string>
     <string name="github">Source code</string>
@@ -811,7 +811,14 @@
     <string name="auto_backup_local_sum">Automatically back up profiles daily to local storage</string>
     <string name="subscription_enabled">Subscription enabled</string>
     <string name="subscription_disabled">Subscription disabled</string>
-    <string name="widget_name">OwnBox Quick Switch</string>
+    <string name="widget_name">Own Quick Switch</string>
+    <string name="ui_settings">User Interface Settings</string>
+    <string name="vpn_settings">VPN Settings</string>
+    <string name="core_settings">Core Settings</string>
+    <string name="mode_and_inbound_settings">Mode &amp; Inbound Settings</string>
+    <string name="dns_settings">DNS Settings</string>
+    <string name="observatory_settings">Observatory Settings</string>
+    <string name="advanced_settings">Advanced Settings</string>
     <string name="widget_toggle">Tap to toggle connection</string>
     <string name="change_icon">Change icon</string>
         <string name="app_icon_dynamic">Dynamic</string>

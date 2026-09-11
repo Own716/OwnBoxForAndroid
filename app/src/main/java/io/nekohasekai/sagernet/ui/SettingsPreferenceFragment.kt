@@ -72,36 +72,11 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
             true
         }
 
-        findPreference<Preference>("ignoreBatteryOptimizations")?.setOnPreferenceClickListener {
-            val pm = requireContext().getSystemService(android.content.Context.POWER_SERVICE) as? android.os.PowerManager
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && pm != null) {
-                if (!pm.isIgnoringBatteryOptimizations(requireContext().packageName)) {
-                    try {
-                        val intent = Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                            data = Uri.parse("package:${requireContext().packageName}")
-                        }
-                        startActivity(intent)
-                    } catch (_: Exception) {
-                        try {
-                            val intent = Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-                            startActivity(intent)
-                        } catch (_: Exception) {
-                            Toast.makeText(requireContext(), R.string.action_not_supported, Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                } else {
-                    Toast.makeText(requireContext(), R.string.already_ignoring_battery_optimizations, Toast.LENGTH_SHORT).show()
-                }
-            } else {
-                Toast.makeText(requireContext(), R.string.action_not_supported, Toast.LENGTH_SHORT).show()
-            }
-            true
-        }
-
-
+        val categoryUI = findPreference<ExpandablePreferenceCategory>("categoryUI")
         val appTheme = findPreference<ColorPickerPreference>(Key.APP_THEME)!!
         val useSystemTheme = findPreference<SwitchPreference>(Key.USE_SYSTEM_THEME)!!
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            categoryUI?.setChildVisibilityRule(Key.USE_SYSTEM_THEME) { false }
             useSystemTheme.isVisible = false
         } else {
             useSystemTheme.setOnPreferenceChangeListener { _, newValue ->
@@ -264,13 +239,18 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
             true
         }
 
+        val categoryCore = findPreference<ExpandablePreferenceCategory>("categoryCore")
         val rulesProvider = findPreference<SimpleMenuPreference>(Key.RULES_PROVIDER)!!
         val rulesGeositeUrl = findPreference<EditTextPreference>(Key.RULES_GEOSITE_URL)!!
         val rulesGeoipUrl = findPreference<EditTextPreference>(Key.RULES_GEOIP_URL)!!
+        categoryCore?.setChildVisibilityRule(Key.RULES_GEOSITE_URL) { DataStore.rulesProvider == 4 }
+        categoryCore?.setChildVisibilityRule(Key.RULES_GEOIP_URL) { DataStore.rulesProvider == 4 }
         rulesGeositeUrl.isVisible = DataStore.rulesProvider == 4
         rulesGeoipUrl.isVisible = DataStore.rulesProvider == 4
         rulesProvider.setOnPreferenceChangeListener { _, newValue ->
             val provider = (newValue as String).toInt()
+            categoryCore?.updateChildVisibility(Key.RULES_GEOSITE_URL)
+            categoryCore?.updateChildVisibility(Key.RULES_GEOIP_URL)
             rulesGeositeUrl.isVisible = provider == 4
             rulesGeoipUrl.isVisible = provider == 4
             true

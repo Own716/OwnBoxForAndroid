@@ -205,6 +205,13 @@
     <string name="auto_backup_local_sum">每日自动在应用私有存储中备份节点配置与分流规则</string>
     <string name="subscription_enabled">启用此订阅</string>
     <string name="subscription_disabled">已禁用此订阅</string>
-    <string name="widget_name">OwnBox 快捷开关</string>
+    <string name="widget_name">Own 快捷开关</string>
+    <string name="ui_settings">使用者介面設定</string>
+    <string name="vpn_settings">VPN 設定</string>
+    <string name="core_settings">核心設定</string>
+    <string name="mode_and_inbound_settings">模式與入站設定</string>
+    <string name="dns_settings">DNS 設定</string>
+    <string name="observatory_settings">連線觀測設定 (Observatory)</string>
+    <string name="advanced_settings">進階設定</string>
     <string name="widget_toggle">点击切换连接</string>
 </resources>
