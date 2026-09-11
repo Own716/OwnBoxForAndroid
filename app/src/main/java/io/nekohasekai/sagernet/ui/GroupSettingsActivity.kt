@@ -82,15 +82,15 @@ class GroupSettingsActivity(
 
     fun ProxyGroup.serialize() {
         val rawName = DataStore.groupName.trim()
-        name = if (rawName.isNotBlank()) {
+        name = if (rawName.isNotBlank() && !RawUpdater.isDefaultGroupName(rawName)) {
             rawName
         } else if (type == GroupType.SUBSCRIPTION) {
             val candidate = DataStore.subscriptionLink.takeIf { it.isNotBlank() }?.let { link: String ->
                 RawUpdater.extractAirportName(link)
             }
-            candidate ?: ("Subscription #" + System.currentTimeMillis())
+            candidate ?: (if (rawName.isNotBlank()) rawName else ("Subscription #" + System.currentTimeMillis()))
         } else {
-            "My group"
+            if (rawName.isNotBlank()) rawName else "My group"
         }
         type = DataStore.groupType
         order = DataStore.groupOrder

@@ -633,6 +633,8 @@
     <string name="show_group_in_notification">Show group name in notification</string>
     <string name="reset_connections">Reset Connections</string>
     <string name="remove_duplicate">Remove duplicate servers</string>
+    <string name="no_duplicate_profiles">No duplicate servers found</string>
+    <string name="duplicate_profiles_removed">Removed %1$d duplicate servers</string>
     <string name="mtu_help">Long press the preference to set custom MTU.</string>
     <string name="log_level_help">Long press the preference to set the buffer size.</string>
     <string name="tls_camouflage_settings">TLS Camouflage Settings</string>

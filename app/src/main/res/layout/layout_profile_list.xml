@@ -63,7 +63,7 @@
                     tools:text="到期: 2026-12-31" />
             </LinearLayout>
 
-            <!-- Traffic Stats (Used / Total / Remaining) -->
+            <!-- Traffic Stats (Available / Used) -->
             <LinearLayout
                 android:id="@+id/layout_traffic_details"
                 android:layout_width="match_parent"
@@ -80,15 +80,15 @@
                     android:textColor="?android:attr/textColorPrimary"
                     android:textSize="13sp"
                     android:textStyle="bold"
-                    tools:text="已用: 45.2 GB / 200 GB" />
+                    tools:text="可用流量: 91.88 GB" />
 
                 <TextView
                     android:id="@+id/tv_traffic_remaining"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textColor="?attr/colorPrimary"
+                    android:textColor="?android:attr/textColorSecondary"
                     android:textSize="12sp"
-                    tools:text="剩余 154.8 GB" />
+                    tools:text="已用流量: 8.12 GB" />
             </LinearLayout>
 
             <!-- Traffic Progress Bar -->

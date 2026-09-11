@@ -44,6 +44,7 @@ class StatsBar @JvmOverloads constructor(
     }
 
     private lateinit var statusText: TextView
+    private lateinit var statusIpText: TextView
     private lateinit var txText: TextView
     private lateinit var rxText: TextView
     private var btnIpDetail: View? = null
@@ -125,6 +126,8 @@ class StatsBar @JvmOverloads constructor(
         if (!this::statusText.isInitialized) {
             statusText = findViewById(R.id.status)
             statusText.isSelected = true
+            statusIpText = findViewById(R.id.status_ip)
+            statusIpText.isSelected = true
             txText = findViewById(R.id.tx)
             rxText = findViewById(R.id.rx)
             btnIpDetail = findViewById(R.id.btn_ip_detail)
@@ -135,7 +138,8 @@ class StatsBar @JvmOverloads constructor(
                 backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.WHITE)
                 txText.setTextColor(android.graphics.Color.parseColor("#757575"))
                 rxText.setTextColor(android.graphics.Color.parseColor("#757575"))
-                statusText.setTextColor(android.graphics.Color.parseColor("#212121"))
+                statusIpText.setTextColor(android.graphics.Color.parseColor("#212121"))
+                statusText.setTextColor(android.graphics.Color.parseColor("#424242"))
                 (btnIpDetail as? android.widget.ImageView)?.imageTintList =
                     android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#212121"))
             }
@@ -332,29 +336,52 @@ class StatsBar @JvmOverloads constructor(
     }
 
     private fun formatStatus(latency: Int = lastMeasuredLatency): String {
-        val cached = LandingIpManager.getCachedInfo()
         val isHttps = DataStore.connectionTestURL.startsWith("https://")
         val handshakeType = if (isHttps) "HTTPS" else "HTTP"
+        return if (latency > 0) "$handshakeType 握手 ${latency}ms" else app.getString(R.string.vpn_connected)
+    }
 
-        return if (DataStore.showLandingIp && cached != null && cached.ip.isNotBlank()) {
-            if (latency > 0) {
-                "${cached.countryFlag} ${cached.countryCode} ${cached.ip} · $handshakeType 握手 $latency 毫秒"
+    private fun updateStatusViews(latency: Int = lastMeasuredLatency, customStatus: CharSequence? = null) {
+        initViews()
+        if (currentState == BaseService.State.Connected) {
+            val cached = LandingIpManager.getCachedInfo()
+            if (DataStore.showLandingIp && cached != null && cached.ip.isNotBlank()) {
+                statusIpText.text = "${cached.countryFlag} ${cached.countryCode} ${cached.ip}"
+                statusIpText.visibility = View.VISIBLE
             } else {
-                "${cached.countryFlag} ${cached.countryCode} ${cached.ip}"
+                statusIpText.visibility = View.GONE
+            }
+
+            if (customStatus != null) {
+                statusText.text = customStatus
+            } else {
+                val isHttps = DataStore.connectionTestURL.startsWith("https://")
+                val handshakeType = if (isHttps) "HTTPS" else "HTTP"
+                if (latency > 0) {
+                    statusText.text = "$handshakeType 握手 ${latency}ms"
+                } else if (cached == null && DataStore.showLandingIp) {
+                    statusText.text = context.getString(R.string.landing_ip_querying)
+                } else {
+                    statusText.text = app.getString(R.string.vpn_connected)
+                }
             }
         } else {
-            if (latency > 0) {
-                "连接成功: $handshakeType 握手耗时 $latency 毫秒"
-            } else {
-                app.getString(R.string.vpn_connected)
-            }
+            statusIpText.visibility = View.GONE
+            statusText.text = customStatus ?: context.getText(
+                when (currentState) {
+                    BaseService.State.Connecting -> R.string.connecting
+                    BaseService.State.Stopping -> R.string.stopping
+                    else -> R.string.not_connected
+                }
+            )
         }
+        TooltipCompat.setTooltipText(this, statusText.text)
     }
 
     fun refreshDisplay() {
         if (currentState == BaseService.State.Connected) {
             btnIpDetail?.visibility = if (DataStore.showLandingIp) View.VISIBLE else View.GONE
-            setStatus(formatStatus())
+            updateStatusViews()
             if (DataStore.showLandingIp && LandingIpManager.getCachedInfo() == null) {
                 refreshLandingIp(forceRefresh = false)
             }
@@ -366,7 +393,7 @@ class StatsBar @JvmOverloads constructor(
         updateHideOnScroll()
         if (state == BaseService.State.Connected) {
             btnIpDetail?.visibility = if (DataStore.showLandingIp) View.VISIBLE else View.GONE
-            setStatus(formatStatus())
+            updateStatusViews()
             if (DataStore.showLandingIp) {
                 refreshLandingIp(forceRefresh = false)
             }
@@ -376,15 +403,7 @@ class StatsBar @JvmOverloads constructor(
             resetLatencyState()
             LandingIpManager.clearCache()
             updateSpeed(0, 0)
-            setStatus(
-                context.getText(
-                    when (state) {
-                        BaseService.State.Connecting -> R.string.connecting
-                        BaseService.State.Stopping -> R.string.stopping
-                        else -> R.string.not_connected
-                    }
-                )
-            )
+            updateStatusViews()
         }
     }
 
@@ -392,20 +411,20 @@ class StatsBar @JvmOverloads constructor(
         if (currentState != BaseService.State.Connected) return
         if (!DataStore.showLandingIp) {
             btnIpDetail?.visibility = View.GONE
-            setStatus(formatStatus())
+            updateStatusViews()
             return
         }
         val currentProfile = DataStore.selectedProxy
         val cached = LandingIpManager.getCachedInfo()
         if (!forceRefresh && cached != null) {
             btnIpDetail?.visibility = View.VISIBLE
-            setStatus(formatStatus())
+            updateStatusViews()
             return
         }
 
         btnIpDetail?.visibility = View.VISIBLE
         if (cached == null && lastMeasuredLatency <= 0) {
-            setStatus(context.getString(R.string.landing_ip_querying))
+            updateStatusViews(customStatus = context.getString(R.string.landing_ip_querying))
         }
 
         val activity = context as? MainActivity
@@ -415,7 +434,7 @@ class StatsBar @JvmOverloads constructor(
             if (currentState != BaseService.State.Connected) return@launch
             if (!DataStore.showLandingIp) {
                 btnIpDetail?.visibility = View.GONE
-                setStatus(formatStatus())
+                updateStatusViews()
                 return@launch
             }
 
@@ -425,11 +444,11 @@ class StatsBar @JvmOverloads constructor(
                     lastMeasureTime = android.os.SystemClock.elapsedRealtime()
                 }
                 btnIpDetail?.visibility = View.VISIBLE
-                setStatus(formatStatus())
+                updateStatusViews()
             }.onFailure { err ->
                 Logs.w(err)
                 btnIpDetail?.visibility = View.VISIBLE
-                setStatus(formatStatus())
+                updateStatusViews()
             }
         }
     }
@@ -462,9 +481,9 @@ class StatsBar @JvmOverloads constructor(
                 0
             }
             val displayLatency = (lastMeasuredLatency + jitter).coerceAtLeast(1)
-            setStatus(formatStatus(displayLatency))
+            updateStatusViews(displayLatency)
         } else if (!silent) {
-            setStatus(app.getText(R.string.connection_test_testing))
+            updateStatusViews(customStatus = app.getText(R.string.connection_test_testing))
         }
 
         // 2. 避免同时在后台并发堆积过量物理网络请求
@@ -487,9 +506,9 @@ class StatsBar @JvmOverloads constructor(
                     if (elapsed > 0) {
                         lastMeasuredLatency = elapsed
                         lastMeasureTime = android.os.SystemClock.elapsedRealtime()
-                        setStatus(formatStatus(elapsed))
+                        updateStatusViews(elapsed)
                     } else if (lastMeasuredLatency <= 0) {
-                        setStatus(app.getText(R.string.connection_test_fail))
+                        updateStatusViews(customStatus = app.getText(R.string.connection_test_fail))
                     }
                 }
             } catch (e: Exception) {
@@ -498,7 +517,7 @@ class StatsBar @JvmOverloads constructor(
                     if (currentState != BaseService.State.Connected) return@withContext
                     Logs.w("testConnection error: $e")
                     if (lastMeasuredLatency <= 0) {
-                        setStatus(app.getText(R.string.connection_test_fail))
+                        updateStatusViews(customStatus = app.getText(R.string.connection_test_fail))
                         if (!silent) {
                             activity.snackbar(
                                 app.getString(

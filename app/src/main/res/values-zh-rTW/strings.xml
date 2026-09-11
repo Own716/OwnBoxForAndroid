@@ -517,6 +517,10 @@
     <string name="show_group_in_notification">在通知中顯示組名</string>
     <string name="reset_connections">重置連線</string>
     <string name="remove_duplicate">刪除重複的伺服器</string>
+    <string name="no_duplicate_profiles">未發現重複的伺服器</string>
+    <string name="duplicate_profiles_removed">已清理 %1$d 個重複的伺服器</string>
+    <string name="traffic_available">可用流量: %s</string>
+    <string name="traffic_used">已用流量: %s</string>
     <string name="mtu_help">長按設定項以設定自定義 MTU。</string>
     <string name="log_level_help">長按設定項以設定緩衝區大小。</string>
     <string name="tls_camouflage_settings">TLS 偽裝設定</string>

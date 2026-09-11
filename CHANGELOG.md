@@ -1,4 +1,17 @@
-﻿# OwnBox for Android 更新日志 (Changelog)
+# OwnBox for Android 更新日志 (Changelog)
+
+# OwnBox for Android v2.5.1 预览版 (v2.5.1-preview)
+
+## 核心修复与稳定性
+
+* **分组标签滑动防回弹**：彻底修复在 VPN 运行中或启用负载均衡时，主页顶部左右滑动切换订阅分组被后台轮询与状态变更强制回弹原分组的问题，保障标签滑动顺畅自如。
+* **状态卡片三行紧凑排版**：全面重构主页底部 Landing IP 状态栏为紧凑三行式布局，消除小屏或长地名下 HTTPS 握手延迟被文字截断或省略号遮挡的缺陷。
+* **Hysteria2 与 TUIC 测速修复**：修复 Hysteria2 与 TUIC 协议节点在 HTTPS 测速下因 ALPN/H2 升级异常而错误显示 Unavailable 的缺陷，支持 UDP Fragment 与平滑回退。
+* **UDP 协议 TCP Ping 探测支持**：针对 Hysteria2、TUIC 等纯 UDP 协议，新增 QUIC Version Negotiation 握手探测与物理 RTT 测算，并在超时后平滑兜底，彻底解决 TCP Ping 3000ms 超时报错。
+* **去重功能深度修复**：彻底修复主页右上角菜单“去除重复的服务器”点击无响应的 Bug，剥离节点名称差异比较协议核心连接指纹，精准定位当前浏览分组并提供友好操作反馈。
+* **订阅资产卡片与 UA 同步**：重构订阅资产卡片为三行对称排版，分离并完整展示“可用流量”与“已用流量”；打通节点回退提取与 Room 数据库双向持久化，消除主页卡片与抽屉分组数据脱节；内置预设新增推荐 UA（`NekoBox/Android/1.4.2 (Prefer ClashMeta Format)`）。
+* **URL Test 测速算法官方对齐**：对标 NekoBox 官方测速核心，实施 TTFB（首包 Header 到达）即刻截断并切断 Body 读取，消除原本五六百至上千毫秒的虚高延迟，还原节点最真实网络质量。
+* **机场名称智能识别**：完善订阅导入与更新时的机场名称提取逻辑，优先解析 RFC 5987 文件名与 User-Agent/URL 标识，彻底杜绝残留的“MY GROUP”默认分组名。
 
 # OwnBox for Android v2.5.0
 

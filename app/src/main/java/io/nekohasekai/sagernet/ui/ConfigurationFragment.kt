@@ -302,12 +302,20 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
     }
 
+    private var isUserInteractingWithPager = false
+
     val updateSelectedCallback = object : ViewPager2.OnPageChangeCallback() {
-        override fun onPageScrolled(
-            position: Int, positionOffset: Float, positionOffsetPixels: Int
-        ) {
+        override fun onPageScrollStateChanged(state: Int) {
+            isUserInteractingWithPager = (state == ViewPager2.SCROLL_STATE_DRAGGING || state == ViewPager2.SCROLL_STATE_SETTLING)
+        }
+
+        override fun onPageSelected(position: Int) {
             if (adapter.groupList.size > position) {
-                DataStore.selectedGroup = adapter.groupList[position].id
+                val newGroupId = adapter.groupList[position].id
+                adapter.selectedGroupIndex = position
+                if (DataStore.selectedGroup != newGroupId) {
+                    DataStore.selectedGroup = newGroupId
+                }
             }
         }
     }
@@ -509,13 +517,15 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     override fun onPreferenceDataStoreChanged(store: PreferenceDataStore, key: String) {
         runOnMainDispatcher {
-            // editingGroup
-            if (key == Key.PROFILE_GROUP) {
+            // 只响应外部设置显式更改 editingGroup 的事件，阻断 configurationStore 的自触发，且用户正在拖拽时不打断
+            if (store === DataStore.profileCacheStore && key == Key.PROFILE_GROUP) {
+                if (isUserInteractingWithPager) return@runOnMainDispatcher
                 val targetId = DataStore.editingGroup
                 if (targetId > 0 && targetId != DataStore.selectedGroup) {
                     DataStore.selectedGroup = targetId
                     val targetIndex = adapter.groupList.indexOfFirst { it.id == targetId }
                     if (targetIndex >= 0) {
+                        adapter.selectedGroupIndex = targetIndex
                         groupPager.setCurrentItem(targetIndex, false)
                     } else {
                         adapter.reload()
@@ -876,7 +886,8 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             R.id.action_remove_duplicate -> {
                 runOnDefaultDispatcher {
-                    val profiles = SagerDatabase.proxyDao.getByGroup(DataStore.currentGroupId())
+                    val targetGroupId = DataStore.selectedGroup
+                    val profiles = SagerDatabase.proxyDao.getByGroup(targetGroupId)
                     val toClear = mutableListOf<ProxyEntity>()
                     val uniqueProxies = LinkedHashSet<Protocols.Deduplication>()
                     for (pf in profiles) {
@@ -885,8 +896,10 @@ class ConfigurationFragment @JvmOverloads constructor(
                             toClear += pf
                         }
                     }
-                    if (toClear.isNotEmpty()) {
-                        onMainDispatcher {
+                    onMainDispatcher {
+                        if (toClear.isEmpty()) {
+                            snackbar(getString(R.string.no_duplicate_profiles)).show()
+                        } else {
                             MaterialAlertDialogBuilder(requireContext()).setTitle(R.string.confirm)
                                 .setMessage(
                                     getString(R.string.delete_confirm_prompt) + "\n" +
@@ -901,8 +914,9 @@ class ConfigurationFragment @JvmOverloads constructor(
                                             }.joinToString("\n")
                                 )
                                 .setPositiveButton(R.string.yes) { _, _ ->
+                                    val count = toClear.size
                                     for (profile in toClear) {
-                                        adapter.groupFragments[DataStore.selectedGroup]?.adapter?.apply {
+                                        adapter.groupFragments[targetGroupId]?.adapter?.apply {
                                             val index = configurationIdList.indexOf(profile.id)
                                             if (index >= 0) {
                                                 configurationIdList.removeAt(index)
@@ -916,6 +930,9 @@ class ConfigurationFragment @JvmOverloads constructor(
                                             ProfileManager.deleteProfile2(
                                                 profile.groupId, profile.id
                                             )
+                                        }
+                                        onMainDispatcher {
+                                            snackbar(getString(R.string.duplicate_profiles_removed, count)).show()
                                         }
                                     }
                                 }
@@ -1551,15 +1568,25 @@ class ConfigurationFragment @JvmOverloads constructor(
 
                 if (generation != reloadGeneration.get()) return@runOnDefaultDispatcher
 
-                var selectedGroup = selectedItem?.groupId ?: DataStore.currentGroupId()
+                val browsingGroupId = if (selectedGroupIndex in 0 until groupList.size) {
+                    groupList[selectedGroupIndex].id
+                } else {
+                    DataStore.selectedGroup
+                }
+                var selectedGroup = if (browsingGroupId > 0L && newGroupList.any { it.id == browsingGroupId }) {
+                    browsingGroupId
+                } else {
+                    selectedItem?.groupId ?: DataStore.currentGroupId()
+                }
                 var newSelectedGroupIndex: Int? = null
                 if (selectedGroup > 0L) {
                     newSelectedGroupIndex = newGroupList.indexOfFirst { it.id == selectedGroup }
-                } else if (groupList.size == 1) {
-                    selectedGroup = groupList[0].id
+                } else if (newGroupList.size == 1) {
+                    selectedGroup = newGroupList[0].id
                     if (DataStore.selectedGroup != selectedGroup) {
                         DataStore.selectedGroup = selectedGroup
                     }
+                    newSelectedGroupIndex = 0
                 }
 
                 val runFunc = if (now) activity?.let { it::runOnUiThread } else groupPager::post
@@ -1582,7 +1609,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                                 newSelectedGroupIndex?.let { selectedGroupIndex = it }
                                 groupList = newGroupList
                                 notifyDataSetChanged()
-                                if (newSelectedGroupIndex != null) {
+                                if (!isUserInteractingWithPager && newSelectedGroupIndex != null && groupPager.currentItem != selectedGroupIndex) {
                                     groupPager.setCurrentItem(selectedGroupIndex, false)
                                 }
                                 val hideTab = groupList.size < 2
@@ -2065,6 +2092,40 @@ class ConfigurationFragment @JvmOverloads constructor(
                         if (m != null) {
                             fallbackUsedStr = m.groupValues[1].trim()
                         }
+                    }
+                }
+            }
+
+            if (fallbackExpireStr != null || fallbackTrafficStr != null || fallbackUsedStr != null) {
+                fun parseFallbackBytes(s: String): Long {
+                    val u = s.uppercase()
+                    val num = u.filter { it.isDigit() || it == '.' }.toDoubleOrNull() ?: return 0L
+                    return when {
+                        u.contains("TB") || u.contains("T") -> (num * 1024 * 1024 * 1024 * 1024).toLong()
+                        u.contains("GB") || u.contains("G") -> (num * 1024 * 1024 * 1024).toLong()
+                        u.contains("MB") || u.contains("M") -> (num * 1024 * 1024).toLong()
+                        u.contains("KB") || u.contains("K") -> (num * 1024).toLong()
+                        u.contains("B") -> num.toLong()
+                        else -> 0L
+                    }
+                }
+                var modified = false
+                if ((sub.bytesRemaining == null || sub.bytesRemaining <= 0L) && fallbackTrafficStr != null) {
+                    sub.bytesRemaining = parseFallbackBytes(fallbackTrafficStr)
+                    modified = true
+                }
+                if ((sub.bytesUsed == null || sub.bytesUsed <= 0L) && fallbackUsedStr != null) {
+                    sub.bytesUsed = parseFallbackBytes(fallbackUsedStr)
+                    modified = true
+                }
+                if ((sub.expiryDate == null || sub.expiryDate <= 0) && expireMillis > 0L) {
+                    sub.expiryDate = (expireMillis / 1000L).toInt()
+                    modified = true
+                }
+                if (modified) {
+                    runOnDefaultDispatcher {
+                        proxyGroup.subscription = sub
+                        SagerDatabase.groupDao.updateGroup(proxyGroup)
                     }
                 }
             }

@@ -551,7 +551,9 @@ func urlTestFull(instance *BoxInstance, tracker adapter.ConnectionTracker, link 
 		TLSClientConfig: &tls.Config{
 			ServerName:         hostname,
 			InsecureSkipVerify: true,
+			NextProtos:         []string{"http/1.1"},
 		},
+		TLSNextProto:      make(map[string]func(string, *tls.Conn) http.RoundTripper),
 		ForceAttemptHTTP2: false,
 		DisableKeepAlives: true,
 	}
@@ -571,18 +573,18 @@ func urlTestFull(instance *BoxInstance, tracker adapter.ConnectionTracker, link 
 	req.Header.Set("User-Agent", browserUserAgent)
 	req.Header.Set("Accept", "*/*")
 
+	reqStarted := time.Now()
 	resp, err := client.Do(req)
 	if err != nil {
-		instance.urlTestTrace("full-request", "failed elapsed=%s error=%v", time.Since(totalStarted), err)
+		instance.urlTestTrace("full-request", "failed elapsed=%s error=%v", time.Since(reqStarted), err)
 		return 0, err
 	}
-	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
+	elapsed := int32(time.Since(reqStarted).Milliseconds())
 	_ = resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		return 0, E.New("unexpected status: ", resp.Status)
 	}
 
-	elapsed := int32(time.Since(totalStarted).Milliseconds())
 	if elapsed <= 0 {
 		elapsed = 1
 	}
@@ -650,7 +652,10 @@ func urlTest(instance *BoxInstance, tracker adapter.ConnectionTracker, link stri
 			TLSClientConfig: &tls.Config{
 				ServerName:         hostname,
 				InsecureSkipVerify: true,
+				NextProtos:         []string{"http/1.1"},
 			},
+			TLSNextProto:      make(map[string]func(string, *tls.Conn) http.RoundTripper),
+			ForceAttemptHTTP2: false,
 		},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
@@ -670,7 +675,6 @@ func urlTest(instance *BoxInstance, tracker adapter.ConnectionTracker, link stri
 		if err != nil {
 			return err
 		}
-		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
 		_ = resp.Body.Close()
 		if resp.StatusCode >= 400 {
 			return E.New("unexpected status: ", resp.Status)

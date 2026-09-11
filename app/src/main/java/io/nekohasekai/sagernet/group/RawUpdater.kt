@@ -300,6 +300,60 @@ object RawUpdater : GroupUpdater() {
             Logs.e("Exist profiles: $existCount, new profiles: ${proxies.size}")
         }
 
+        // 补充节点文本回退提取机制（正则匹配 剩余流量 / 已用流量 / 套餐到期 并持久化到 subscription 实体）
+        if (subscription.bytesRemaining == null || subscription.bytesRemaining <= 0L ||
+            subscription.expiryDate == null || subscription.expiryDate <= 0
+        ) {
+            var extractedExpireStr: String? = null
+            var extractedTrafficStr: String? = null
+            var extractedUsedStr: String? = null
+            val expireRegex = Regex(".*(?:套餐到期|到期时间|过期时间|到期)[：:]\\s*([0-9]{4}[-/][0-9]{2}[-/][0-9]{2})", RegexOption.IGNORE_CASE)
+            val trafficRegex = Regex(".*(?:剩余流量|可用流量|剩余)[：:]\\s*([0-9.]+\\s*[KMGT]?B|无限|不限|不限量)", RegexOption.IGNORE_CASE)
+            val usedRegex = Regex(".*(?:已用流量|已用|已使用)[：:]\\s*([0-9.]+\\s*[KMGT]?B)", RegexOption.IGNORE_CASE)
+            for (p in proxies) {
+                val n = p.displayName()
+                if (extractedExpireStr == null) {
+                    val m = expireRegex.find(n)
+                    if (m != null) extractedExpireStr = m.groupValues[1]
+                }
+                if (extractedTrafficStr == null) {
+                    val m = trafficRegex.find(n)
+                    if (m != null) extractedTrafficStr = m.groupValues[1].trim()
+                }
+                if (extractedUsedStr == null) {
+                    val m = usedRegex.find(n)
+                    if (m != null) extractedUsedStr = m.groupValues[1].trim()
+                }
+            }
+            fun parseBytes(s: String): Long {
+                val u = s.uppercase()
+                val num = u.filter { it.isDigit() || it == '.' }.toDoubleOrNull() ?: return 0L
+                return when {
+                    u.contains("TB") -> (num * 1024L * 1024L * 1024L * 1024L).toLong()
+                    u.contains("GB") -> (num * 1024L * 1024L * 1024L).toLong()
+                    u.contains("MB") -> (num * 1024L * 1024L).toLong()
+                    u.contains("KB") -> (num * 1024L).toLong()
+                    u.contains("B") -> num.toLong()
+                    else -> 0L
+                }
+            }
+            if (extractedTrafficStr != null && (subscription.bytesRemaining == null || subscription.bytesRemaining <= 0L)) {
+                val b = parseBytes(extractedTrafficStr)
+                if (b > 0L) subscription.bytesRemaining = b
+            }
+            if (extractedUsedStr != null && (subscription.bytesUsed == null || subscription.bytesUsed <= 0L)) {
+                val b = parseBytes(extractedUsedStr)
+                if (b > 0L) subscription.bytesUsed = b
+            }
+            if (extractedExpireStr != null && (subscription.expiryDate == null || subscription.expiryDate <= 0)) {
+                try {
+                    val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                    val t = sdf.parse(extractedExpireStr.replace('/', '-'))?.time ?: 0L
+                    if (t > 0L) subscription.expiryDate = (t / 1000L).toInt()
+                } catch (_: Throwable) {}
+            }
+        }
+
         subscription.lastUpdated = (System.currentTimeMillis() / 1000).toInt()
         SagerDatabase.groupDao.updateGroup(proxyGroup)
         GroupManager.postUpdate(proxyGroup)
@@ -1017,6 +1071,7 @@ object RawUpdater : GroupUpdater() {
         if (currentName.isEmpty()) return true
         val defaultKeywords = listOf(
             "My group",
+            "MY GROUP",
             "我的分组",
             "Group",
             "分组",
@@ -1025,7 +1080,10 @@ object RawUpdater : GroupUpdater() {
             "Default",
             "默认",
             "Ungrouped",
-            "未分组"
+            "未分组",
+            "PROXY",
+            "Proxy",
+            "节点选择"
         )
         if (defaultKeywords.any { currentName.equals(it, ignoreCase = true) }) return true
         if (currentName.startsWith("Subscription #") ||
@@ -1045,9 +1103,20 @@ object RawUpdater : GroupUpdater() {
         // 1. HTTP 响应头
         // 1.1 content-disposition 中的 filename
         if (!filenameHeader.isNullOrBlank()) {
-            val decoded = Util.decodeFilename(filenameHeader).trim()
-            val cleanName = decoded.replace(Regex("\\.(ya?ml|txt|json|conf|sub)$", RegexOption.IGNORE_CASE), "").trim()
-            if (cleanName.isNotBlank() && !cleanName.equals("subscription", ignoreCase = true) && !cleanName.equals("clash", ignoreCase = true)) {
+            var extracted: String? = null
+            if (filenameHeader.contains("filename*=", ignoreCase = true)) {
+                val starPart = filenameHeader.substringAfter("filename*=", "").substringBefore(";").trim()
+                val rawEncoded = starPart.substringAfter("''", starPart)
+                try {
+                    extracted = java.net.URLDecoder.decode(rawEncoded.replace("\"", ""), "UTF-8").trim()
+                } catch (_: Throwable) {}
+            }
+            if (extracted.isNullOrBlank()) {
+                extracted = Util.decodeFilename(filenameHeader).trim()
+            }
+            val cleanName = extracted.replace(Regex("\\.(ya?ml|txt|json|conf|sub)$", RegexOption.IGNORE_CASE), "").trim()
+            val genericNames = setOf("subscription", "clash", "sub", "config", "nodes", "default", "proxies", "subscribe")
+            if (cleanName.isNotBlank() && !genericNames.contains(cleanName.lowercase())) {
                 return cleanName
             }
         }

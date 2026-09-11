@@ -333,6 +333,7 @@ fun buildSingBoxOutboundHysteriaBean(bean: HysteriaBean): SingBoxOptions.SingBox
             }
 //            disable_mtu_discovery = bean.disableMtuDiscovery
             password = bean.authPayload
+            udp_fragment = true
 //            if (bean.streamReceiveWindow > 0) {
 //                recv_window_conn = bean.streamReceiveWindow.toLong()
 //            }

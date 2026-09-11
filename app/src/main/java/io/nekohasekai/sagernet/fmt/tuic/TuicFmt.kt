@@ -81,6 +81,7 @@ fun buildSingBoxOutboundTuicBean(bean: TuicBean): SingBoxOptions.Outbound_TUICOp
             "quic" -> udp_relay_mode = "quic"
         }
         zero_rtt_handshake = bean.reduceRTT
+        udp_fragment = true
         tls = SingBoxOptions.OutboundTLSOptions().apply {
             if (bean.sni.isNotBlank()) {
                 server_name = bean.sni

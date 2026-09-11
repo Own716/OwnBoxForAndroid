@@ -21,20 +21,35 @@ object Protocols {
             if (bean is ConfigBean) {
                 return bean.config
             }
+            val port = if (bean.finalPort != 0) {
+                bean.finalPort
+            } else if (bean is io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean) {
+                io.nekohasekai.sagernet.fmt.hysteria.getFirstPort(bean.serverPorts ?: "443")
+            } else {
+                bean.serverPort ?: 443
+            }
             val extra = when (bean) {
                 is io.nekohasekai.sagernet.fmt.v2ray.StandardV2RayBean ->
-                    "${bean.uuid}/${bean.path}/${bean.sni}/${bean.realityPubKey}/${bean.security}/${bean.name}"
+                    "${bean.uuid}/${bean.path}/${bean.sni}/${bean.realityPubKey}/${bean.security}"
                 is io.nekohasekai.sagernet.fmt.shadowsocks.ShadowsocksBean ->
-                    "${bean.password}/${bean.method}/${bean.plugin}/${bean.name}"
+                    "${bean.password}/${bean.method}/${bean.plugin}"
                 is io.nekohasekai.sagernet.fmt.trojan.TrojanBean ->
-                    "${bean.password}/${bean.sni}/${bean.name}"
+                    "${bean.password}/${bean.sni}"
                 is io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean ->
-                    "${bean.authPayload}/${bean.sni}/${bean.name}"
+                    "${bean.authPayload}/${bean.sni}/${bean.protocolVersion}"
                 is io.nekohasekai.sagernet.fmt.tuic.TuicBean ->
-                    "${bean.token}/${bean.uuid}/${bean.sni}/${bean.name}"
-                else -> bean.name
+                    "${bean.token}/${bean.uuid}/${bean.sni}"
+                is io.nekohasekai.sagernet.fmt.wireguard.WireGuardBean ->
+                    "${bean.privateKey}/${bean.peerPublicKey}/${bean.localAddress}"
+                is io.nekohasekai.sagernet.fmt.ssh.SSHBean ->
+                    "${bean.username}/${bean.password}/${bean.privateKey}"
+                is io.nekohasekai.sagernet.fmt.http.HttpBean ->
+                    "${bean.username}/${bean.password}"
+                is io.nekohasekai.sagernet.fmt.socks.SOCKSBean ->
+                    "${bean.username}/${bean.password}"
+                else -> "${bean.serverAddress}:$port"
             }
-            return "${bean.serverAddress}:${bean.serverPort}/$type/$extra"
+            return "${bean.serverAddress}:$port/$type/$extra"
         }
 
         override fun hashCode(): Int {
