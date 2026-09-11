@@ -1,4 +1,4 @@
-# Own for Android (原 OwnBox)
+# Own (原 OwnBox)
 
 <p align="center">
   <img src="docs/logo.png" width="128" height="128" alt="Own Logo">
