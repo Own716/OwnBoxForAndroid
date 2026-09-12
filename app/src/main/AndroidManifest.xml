@@ -627,6 +627,11 @@
             android:configChanges="uiMode"
             android:label="@string/tool_connectivity_test" />
 
+        <activity
+            android:name="io.nekohasekai.sagernet.ui.DashboardActivity"
+            android:configChanges="uiMode"
+            android:label="@string/menu_dashboard" />
+
     </application>
 
 </manifest>

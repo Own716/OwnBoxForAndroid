@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/coordinatorLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?android:attr/colorBackground">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/appBarLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?android:attr/colorBackground"
+        app:elevation="0dp">
+
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            app:navigationIcon="@drawable/ic_navigation_close"
+            app:title="@string/menu_dashboard"
+            app:titleTextAppearance="?attr/textAppearanceHeadlineSmall"
+            app:titleTextColor="?attr/primaryOrTextPrimary" />
+
+        <!-- Status & Stats Summary Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardTopStats"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp"
+            android:layout_marginBottom="8dp"
+            app:cardCornerRadius="14dp"
+            app:cardElevation="0dp"
+            app:strokeColor="#20808080"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="12dp">
+
+                <!-- Line 1: Port Status & Actions -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <View
+                        android:id="@+id/statusDot"
+                        android:layout_width="8dp"
+                        android:layout_height="8dp"
+                        android:background="@drawable/bg_status_dot_green" />
+
+                    <TextView
+                        android:id="@+id/tvPortStatus"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1"
+                        android:ellipsize="end"
+                        android:singleLine="true"
+                        android:text="@string/dashboard_port_connected"
+                        android:textAppearance="?attr/textAppearanceBodySmall"
+                        android:textColor="?attr/primaryOrTextSecondary" />
+
+                    <!-- Quick Toolbar Buttons -->
+                    <ImageView
+                        android:id="@+id/btnPauseResume"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="@string/dashboard_pause"
+                        android:padding="5dp"
+                        android:src="@drawable/ic_dashboard_pause"
+                        app:tint="?attr/primaryOrTextPrimary" />
+
+                    <ImageView
+                        android:id="@+id/btnManualRefresh"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:layout_marginStart="4dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="@string/dashboard_refresh"
+                        android:padding="5dp"
+                        android:src="@drawable/ic_baseline_refresh_24"
+                        app:tint="?attr/primaryOrTextPrimary" />
+
+                    <ImageView
+                        android:id="@+id/btnClearClosed"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:layout_marginStart="4dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="@string/dashboard_clear_closed"
+                        android:padding="5dp"
+                        android:src="@drawable/baseline_delete_sweep_24"
+                        app:tint="?attr/primaryOrTextPrimary" />
+
+                    <ImageView
+                        android:id="@+id/btnBatchClose"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:layout_marginStart="4dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="@string/dashboard_batch_close"
+                        android:padding="5dp"
+                        android:src="@drawable/ic_dashboard_batch_close"
+                        app:tint="?attr/primaryOrTextPrimary" />
+
+                    <ImageView
+                        android:id="@+id/btnSettings"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:layout_marginStart="4dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="@string/dashboard_settings"
+                        android:padding="5dp"
+                        android:src="@drawable/ic_action_settings"
+                        app:tint="?attr/primaryOrTextPrimary" />
+
+                </LinearLayout>
+
+                <!-- Line 2: Speed & Traffic Rates -->
+                <LinearLayout
+                    android:id="@+id/layoutSpeedStats"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:baselineAligned="false"
+                    android:orientation="horizontal">
+
+                    <!-- Speed block -->
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/tvSpeedUp"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="↑ 0 B/s"
+                            android:textAppearance="?attr/textAppearanceLabelMedium"
+                            android:textColor="#3B82F6"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvSpeedDown"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:text="↓ 0 B/s"
+                            android:textAppearance="?attr/textAppearanceLabelMedium"
+                            android:textColor="#10B981"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <!-- Total traffic block -->
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="end|center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/tvTotalTraffic"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="总计: ↑ 0 B | ↓ 0 B"
+                            android:textAppearance="?attr/textAppearanceBodySmall"
+                            android:textColor="?attr/primaryOrTextSecondary" />
+                    </LinearLayout>
+                </LinearLayout>
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <!-- Content Container -->
+    <FrameLayout
+        android:id="@+id/contentContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginBottom="?attr/actionBarSize"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+        <!-- Connections Layout -->
+        <include
+            android:id="@+id/viewConnections"
+            layout="@layout/layout_dashboard_connections"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="visible" />
+
+        <!-- Rules Layout -->
+        <include
+            android:id="@+id/viewRules"
+            layout="@layout/layout_dashboard_rules"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
+
+        <!-- Logs Layout -->
+        <include
+            android:id="@+id/viewLogs"
+            layout="@layout/layout_dashboard_logs"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
+
+    </FrameLayout>
+
+    <!-- Dashboard Exclusive Bottom Navigation Bar -->
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/dashboardBottomNav"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="?android:attr/colorBackground"
+        app:elevation="8dp"
+        app:labelVisibilityMode="labeled"
+        app:menu="@menu/menu_dashboard_bottom" />
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

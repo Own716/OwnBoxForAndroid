@@ -180,6 +180,7 @@ class MainActivity : ThemedActivity(),
 
         checkClipboardOnResume()
         binding.stats.refreshDisplay()
+        refreshNavMenu(DataStore.enableClashAPI)
     }
 
     private var lastPromptedClipboard: String = ""
@@ -279,6 +280,7 @@ class MainActivity : ThemedActivity(),
     }
 
     fun refreshNavMenu(clashApi: Boolean) {
+        navigation.menu.findItem(R.id.nav_dashboard)?.isVisible = clashApi
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -532,6 +534,10 @@ class MainActivity : ThemedActivity(),
             }
             R.id.nav_connectivity_test -> {
                 startActivity(Intent(this, ConnectivityTestActivity::class.java))
+                return false
+            }
+            R.id.nav_dashboard -> {
+                startActivity(Intent(this, DashboardActivity::class.java))
                 return false
             }
             R.id.nav_tools -> displayFragment(ToolsFragment())

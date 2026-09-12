@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/nav_dash_connections"
+        android:icon="@drawable/ic_dashboard"
+        android:title="@string/dashboard_tab_connections" />
+    <item
+        android:id="@+id/nav_dash_rules"
+        android:icon="@drawable/ic_dashboard_rule"
+        android:title="@string/dashboard_tab_rules" />
+    <item
+        android:id="@+id/nav_dash_logs"
+        android:icon="@drawable/ic_dashboard_log"
+        android:title="@string/dashboard_tab_logs" />
+</menu>

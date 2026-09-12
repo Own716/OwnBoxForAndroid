@@ -37,6 +37,10 @@
                 android:id="@+id/nav_connectivity_test"
                 android:icon="@drawable/ic_tool_connectivity"
                 android:title="@string/tool_connectivity_test" />
+            <item
+                android:id="@+id/nav_dashboard"
+                android:icon="@drawable/ic_dashboard"
+                android:title="@string/menu_dashboard" />
         </menu>
     </item>
 
