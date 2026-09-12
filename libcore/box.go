@@ -434,23 +434,35 @@ func UrlTest(i *BoxInstance, link string, timeout int32) (latency int32, err err
 		i = mainInstance
 	}
 	boxPlatformLogWriter.WriteMessage(sblog.LevelDebug, fmt.Sprintf("box.UrlTest link=%s timeout=%dms instance=%v", link, timeout, i != nil))
+
+	primaryTimeout := timeout
+	fallbackTimeout := timeout
+	if timeout >= 3000 {
+		primaryTimeout = timeout * 3 / 5
+		fallbackTimeout = timeout - primaryTimeout + 500
+		if fallbackTimeout < 2000 {
+			fallbackTimeout = 2000
+		}
+	}
+
 	if i == nil {
 		// 无实例：直连测试（单 GET，计时含拨号）
-		client := &http.Client{Timeout: time.Duration(timeout) * time.Millisecond}
+		client := &http.Client{Timeout: time.Duration(primaryTimeout) * time.Millisecond}
 		latency, err = urlTestDirect(client, link)
 		if err != nil {
 			fallback := getFallbackLink(link)
 			boxPlatformLogWriter.WriteMessage(sblog.LevelDebug, fmt.Sprintf("box.UrlTest direct failed: %v, trying fallback: %s", err, fallback))
-			latency, err = urlTestDirect(client, fallback)
+			fbClient := &http.Client{Timeout: time.Duration(fallbackTimeout) * time.Millisecond}
+			latency, err = urlTestDirect(fbClient, fallback)
 		}
 	} else {
-		latency, err = urlTest(i, link, timeout)
+		latency, err = urlTest(i, link, primaryTimeout)
 		if err != nil {
 			primaryErr := err
 			fallback := getFallbackLink(link)
 			boxPlatformLogWriter.WriteMessage(sblog.LevelDebug, fmt.Sprintf("box.UrlTest primary failed: %v, trying fallback: %s", err, fallback))
 			var fbErr error
-			latency, fbErr = urlTest(i, fallback, timeout)
+			latency, fbErr = urlTest(i, fallback, fallbackTimeout)
 			if fbErr != nil {
 				err = primaryErr
 			} else {
@@ -469,8 +481,9 @@ func UrlTestFull(i *BoxInstance, link string, timeout int32) (latency int32, err
 
 // urlTest 对齐 Throne 及业界基准（两阶段 Keep-Alive 预热探测）：
 // 阶段一（预热）：通过 outbound 建立代理隧道并完成目标端 HTTP 握手，将保活长连接推入连接池；
-// 阶段二（测量）：复用连接池中已就绪的长连接发送 HTTP HEAD 探测，测得纯 1-RTT 网络往返时延（~100-180ms），
-// 彻底消除冷启动握手与 TLS 重建带来的额外虚高延迟。
+// 若中转/CDN 对 HEAD 请求不兼容（返回 EOF/405/403/400+ 等），自动以 GET 请求重试预热；
+// 阶段二（测量）：复用连接池中已就绪的长连接发送探测，测得纯 1-RTT 网络往返时延（~150-250ms），
+// 彻底消除冷启动握手与 TLS 重建带来的额外虚高延迟，且严格保持真实低延迟水平不退化。
 func urlTest(instance *BoxInstance, link string, timeout int32) (int32, error) {
 	outbound := instance.Outbound().Default()
 	if outbound == nil {
@@ -510,7 +523,7 @@ func urlTest(instance *BoxInstance, link string, timeout int32) (int32, error) {
 		},
 	}
 
-	// 阶段一：预热（建链与握手）
+	methodUsed := http.MethodHead
 	req1, err := http.NewRequestWithContext(ctx, http.MethodHead, link, nil)
 	if err != nil {
 		return 0, err
@@ -519,23 +532,46 @@ func urlTest(instance *BoxInstance, link string, timeout int32) (int32, error) {
 
 	start1 := time.Now()
 	resp1, err := client.Do(req1)
+	if err == nil {
+		_, _ = io.Copy(io.Discard, resp1.Body)
+		_ = resp1.Body.Close()
+		if resp1.StatusCode >= 400 {
+			err = fmt.Errorf("HTTP error %d", resp1.StatusCode)
+		}
+	}
+
+	// 若 HEAD 被中转拦截或报错 (如 EOF/405/403/400+)，且超时未结束，靶向以 GET 请求重试预热
+	if err != nil && ctx.Err() == nil {
+		req1Get, errGet := http.NewRequestWithContext(ctx, http.MethodGet, link, nil)
+		if errGet == nil {
+			req1Get.Header.Set("User-Agent", browserUserAgent)
+			start1 = time.Now()
+			resp1Get, errGetDo := client.Do(req1Get)
+			if errGetDo == nil {
+				_, _ = io.Copy(io.Discard, resp1Get.Body)
+				_ = resp1Get.Body.Close()
+				if resp1Get.StatusCode < 400 {
+					err = nil
+					methodUsed = http.MethodGet
+				} else {
+					err = fmt.Errorf("HTTP error %d", resp1Get.StatusCode)
+				}
+			}
+		}
+	}
+
 	if err != nil {
 		return 0, err
 	}
-	_, _ = io.Copy(io.Discard, resp1.Body)
-	_ = resp1.Body.Close()
-	if resp1.StatusCode >= 400 {
-		return 0, fmt.Errorf("HTTP error %d", resp1.StatusCode)
-	}
 	pass1 := time.Since(start1)
 
-	// 阶段二：复用保活连接，测得纯 1-RTT
-	req2, err := http.NewRequestWithContext(ctx, http.MethodHead, link, nil)
-	if err == nil {
+	// 阶段二：复用保活连接，测得纯 1-RTT 真实低延迟
+	req2, err2 := http.NewRequestWithContext(ctx, methodUsed, link, nil)
+	if err2 == nil {
 		req2.Header.Set("User-Agent", browserUserAgent)
 		start2 := time.Now()
-		resp2, err2 := client.Do(req2)
-		if err2 == nil {
+		resp2, err2Do := client.Do(req2)
+		if err2Do == nil {
 			_, _ = io.Copy(io.Discard, resp2.Body)
 			_ = resp2.Body.Close()
 			if resp2.StatusCode < 400 {
@@ -558,6 +594,7 @@ func urlTest(instance *BoxInstance, link string, timeout int32) (int32, error) {
 
 // urlTestDirect 为直连测速：同样采用两阶段 Keep-Alive 探测纯 RTT。
 func urlTestDirect(client *http.Client, link string) (int32, error) {
+	methodUsed := http.MethodHead
 	req1, err := http.NewRequest(http.MethodHead, link, nil)
 	if err != nil {
 		return 0, err
@@ -565,17 +602,39 @@ func urlTestDirect(client *http.Client, link string) (int32, error) {
 	req1.Header.Set("User-Agent", browserUserAgent)
 	start1 := time.Now()
 	resp1, err := client.Do(req1)
+	if err == nil {
+		_, _ = io.Copy(io.Discard, resp1.Body)
+		_ = resp1.Body.Close()
+		if resp1.StatusCode >= 400 {
+			err = fmt.Errorf("HTTP error %d", resp1.StatusCode)
+		}
+	}
+
+	if err != nil {
+		req1Get, errGet := http.NewRequest(http.MethodGet, link, nil)
+		if errGet == nil {
+			req1Get.Header.Set("User-Agent", browserUserAgent)
+			start1 = time.Now()
+			resp1Get, errGetDo := client.Do(req1Get)
+			if errGetDo == nil {
+				_, _ = io.Copy(io.Discard, resp1Get.Body)
+				_ = resp1Get.Body.Close()
+				if resp1Get.StatusCode < 400 {
+					err = nil
+					methodUsed = http.MethodGet
+				} else {
+					err = fmt.Errorf("HTTP error %d", resp1Get.StatusCode)
+				}
+			}
+		}
+	}
+
 	if err != nil {
 		return 0, err
 	}
-	_, _ = io.Copy(io.Discard, resp1.Body)
-	_ = resp1.Body.Close()
-	if resp1.StatusCode >= 400 {
-		return 0, fmt.Errorf("HTTP error %d", resp1.StatusCode)
-	}
 	pass1 := time.Since(start1)
 
-	req2, err := http.NewRequest(http.MethodHead, link, nil)
+	req2, err := http.NewRequest(methodUsed, link, nil)
 	if err == nil {
 		req2.Header.Set("User-Agent", browserUserAgent)
 		start2 := time.Now()

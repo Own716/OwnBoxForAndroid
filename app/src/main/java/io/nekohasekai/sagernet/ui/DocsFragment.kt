@@ -3,7 +3,6 @@ package io.nekohasekai.sagernet.ui
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
-import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.core.view.ViewCompat
@@ -119,16 +118,16 @@ class DocsFragment : ToolbarFragment(R.layout.layout_docs) {
         allItems.clear()
 
         // 1. 用户界面设置
-        allItems.add(DocListItem.Header("1. 用户界面设置 (UI Settings)", "控制主页呈现、测速展示、资产卡片及系统主题视觉风格"))
+        allItems.add(DocListItem.Header("1. 用户界面设置 (UI Settings)", "控制主页呈现、通知栏网速、资产卡片、桌面图标及系统主题视觉风格"))
         allItems.add(
             DocListItem.Item(
                 category = "用户界面设置",
-                title = "显示直接测速延迟 (showDirectSpeed)",
+                title = "显示直连的速度 (showDirectSpeed)",
                 badge = "推荐: 开启",
-                desc = "在主页节点卡片上直接渲染最近一次测得的真实网络往返时延（RTT），无需逐一手动点击节点进行测速。",
-                prosCons = "【利】直观掌握所有节点的网络连通性与健康状况，防止误连失联节点；【弊】节点列表卡片占用高度微量增加。",
-                recommendation = "【最稳推荐：开启】实时掌控节点可用状态，大幅提升选点效率。",
-                keywords = "测速 延迟 rtt ping 速度",
+                desc = "在通知中也显示不经过代理的流量速度。提示：该功能是在“手机通知中心”里显示直连速度，方便随时观察直连应用的后台流量动向。",
+                prosCons = "【利】在手机下拉通知中心中，不仅能实时查看代理出站网速，还能同步洞察国内直连应用（如微信、网银、国内视频等）的真实数据吞吐，一览全局后台流量，防范个别应用在后台偷跑流量；【弊】通知栏网速展示区域文本长度略微增加。",
+                recommendation = "【最稳推荐：开启】在通知中心全景感知手机双向网络吞吐，防范后台偷跑。",
+                keywords = "直连速度 速度 通知中心 通知栏 showDirectSpeed 网速 偷跑",
             )
         )
         allItems.add(
@@ -206,6 +205,17 @@ class DocsFragment : ToolbarFragment(R.layout.layout_docs) {
                 prosCons = "【利】打开主页即可一览机场剩余资产，避免突发欠费断网；【弊】若仅使用自建单节点该卡片不适用。",
                 recommendation = "【最稳推荐：开启】机场订阅用户最受好评的实用资产感知功能。",
                 keywords = "订阅 资产 流量 剩余 到期 机场 卡片",
+            )
+        )
+        allItems.add(
+            DocListItem.Item(
+                category = "用户界面设置",
+                title = "桌面应用图标定制 (customIcon)",
+                badge = "推荐: 按个人偏好",
+                desc = "支持切换 APP 在手机启动器桌面上的应用图标外观（经典、极简纯白、纯黑深色、跟随 Android 12+ Material You 莫奈动态取色及自定义图标包）。",
+                prosCons = "【利】满足个性化桌面搭配审美需求，莫奈图标与壁纸浑然一体，桌面更加美观且具备隐蔽性；【弊】修改后部分国产系统桌面需 1~2 秒重新加载缓存。",
+                recommendation = "【最稳推荐：自由选用】对网络代理与核心性能零影响，按个人视觉喜好随心定制。",
+                keywords = "图标 桌面 图标包 莫奈 换图标 自定义 icon pack",
             )
         )
         allItems.add(
@@ -440,12 +450,12 @@ class DocsFragment : ToolbarFragment(R.layout.layout_docs) {
         allItems.add(
             DocListItem.Item(
                 category = "核心设置",
-                title = "规则集更新地址与间隔 (rulesProvider / rulesGeositeUrl / rulesGeoipUrl)",
+                title = "规则集更新地址与间隔 (rulesProvider / rulesGeositeUrl / rulesGeoipUrl / rulesUpdateInterval)",
                 badge = "推荐: 官方默认源，间隔 0 (手动)",
                 desc = "配置精准分流所依赖的 Geosite（域名库）和 GeoIP（IP 分布库）数据库下载链接与自动定时更新频率。",
                 prosCons = "【利】定期更新能收录最新国内直连白名单；【弊】若自动更新间隔太短在后台频繁下载几十兆大文件容易浪费流量。",
                 recommendation = "【最稳推荐：保持官方源，间隔设为 0（手动按需更新）】每隔一两个月手动点一次更新最稳妥省流。",
-                keywords = "规则 geosite geoip 数据库 更新 间隔",
+                keywords = "规则 geosite geoip 数据库 更新 间隔 rulesUpdateInterval",
             )
         )
 
@@ -532,11 +542,11 @@ class DocsFragment : ToolbarFragment(R.layout.layout_docs) {
             )
         )
 
-        // 7. 连接观测设置
-        allItems.add(DocListItem.Header("7. 连接观测设置 (Observatory Settings)", "节点测速、健康检查与不可用节点过滤配置"))
+        // 7. 连接观测与负载均衡
+        allItems.add(DocListItem.Header("7. 连接观测与负载均衡 (Observatory & Balancer)", "节点测速、健康检查与多节点智能轮询优选配置"))
         allItems.add(
             DocListItem.Item(
-                category = "连接观测设置",
+                category = "连接观测与负载均衡",
                 title = "连通性测试 URL (connectionTestURL)",
                 badge = "推荐: 保持默认 Cloudflare 204",
                 desc = "节点测速时用于发起探测的目标网址（默认 https://cp.cloudflare.com/generate_204）。",
@@ -547,7 +557,7 @@ class DocsFragment : ToolbarFragment(R.layout.layout_docs) {
         )
         allItems.add(
             DocListItem.Item(
-                category = "连接观测设置",
+                category = "连接观测与负载均衡",
                 title = "自动隐藏不可用节点 (hideUnavailableProfiles)",
                 badge = "推荐: 关闭",
                 desc = "批量测速后，自动在列表中折叠或隐藏检测到超时与无法连通的节点。",
@@ -558,7 +568,7 @@ class DocsFragment : ToolbarFragment(R.layout.layout_docs) {
         )
         allItems.add(
             DocListItem.Item(
-                category = "连接观测设置",
+                category = "连接观测与负载均衡",
                 title = "测速模式 (speedTestMode)",
                 badge = "推荐: HTTP RTT (默认)",
                 desc = "测速算法标准：HTTP RTT（测量首包往返真实延迟）、TCP Ping（纯三次握手时间）、Download（下载真实速度）。",
@@ -569,13 +579,24 @@ class DocsFragment : ToolbarFragment(R.layout.layout_docs) {
         )
         allItems.add(
             DocListItem.Item(
-                category = "连接观测设置",
+                category = "连接观测与负载均衡",
                 title = "测速超时时间 (speedTestTimeoutMs)",
                 badge = "推荐: 5000ms (5秒)",
                 desc = "单个节点测速等待目标响应的最大时限。",
                 prosCons = "【利】5000ms 既能容忍轻微网络抖动，又不会让整队列陷入漫长卡死；【弊】超时设置过短（如 1000ms）容易将高延迟但可用的节点误判为失联。",
                 recommendation = "【最稳推荐：保持默认 5000ms】最科学的超时判定标准。",
                 keywords = "超时 timeout 5000ms 测速等待",
+            )
+        )
+        allItems.add(
+            DocListItem.Item(
+                category = "连接观测与负载均衡",
+                title = "负载均衡策略与自动优选 (balancerStrategy)",
+                badge = "推荐: 最低延迟优先",
+                desc = "在负载均衡器中聚合多个节点，并配置“最低延迟优先 (round-robin + probe)”、“轮询 (round-robin)”或“随机 (random)”调度策略，支持自定义测试 URL 与观测间隔 (s)。",
+                prosCons = "【利】“最低延迟优先”能在后台全自动监测节点健康度并无缝漂移到最快可用节点，实现 100% 高可用断线自愈；【弊】高频探活在大量节点场景下会轻量消耗测试流量。",
+                recommendation = "【最稳推荐：推荐使用“最低延迟优先”，观测间隔保持 300s】兼顾断线毫秒级自愈与节约套餐流量。",
+                keywords = "负载均衡 策略组 最低延迟 轮询 随机 balancer strategy 自动切换 间隔",
             )
         )
 
@@ -656,6 +677,110 @@ class DocsFragment : ToolbarFragment(R.layout.layout_docs) {
                 prosCons = "【利】当误改某些高级参数导致网络异常或断网时，一秒回滚到最稳定基准；【弊】自定义的个性化开关需要重新开启一次。",
                 recommendation = "【最稳推荐：出现网络异常但排除节点原因时，随时使用“重置设置”一键自愈】",
                 keywords = "重置 还原 恢复出厂 设置 异常 自愈",
+            )
+        )
+
+        // 9. 侧边栏网络工具
+        allItems.add(
+            DocListItem.Header(
+                "9. 侧边栏网络工具 (Network Tools)",
+                "侧边栏一键全息体检工具集（提示：受公网 API 波动及多方数据库差异影响，所有网络工具测试结果仅供参考）"
+            )
+        )
+        allItems.add(
+            DocListItem.Item(
+                category = "侧边栏网络工具",
+                title = "连通性测试 (tool_connectivity_test)",
+                badge = "仅供参考",
+                desc = "对当前激活的网络连接进行全链路综合体检：依次测试网络接口状态、本地 DNS 解析、核心出站代理隧道、国内知名服务（百度、B站、微信）以及海外骨干节点（Google、Cloudflare、GitHub）的连通性。醒目标注：【本功能仅供参考】！各探针测试易受公网接口限流与机场防火墙干扰，结果仅供参考，不代表网络绝对故障。",
+                prosCons = "【利】一键分段诊断是手机无网、DNS 污染、代理断流还是外部网站异常，大幅缩短排错耗时；【弊】部分机场安全策略可能主动拦截特定自动化探针，偶发局部标红误报。",
+                recommendation = "【最稳推荐：测试结果仅供参考，不作为绝对网络评判标准】若测试中个别项显示异常但实际网页、视频与 App 访问通畅，以实际日常体验为准。",
+                keywords = "连通性 连通性测试 网络诊断 诊断 体检 仅供参考 tool_connectivity_test",
+            )
+        )
+        allItems.add(
+            DocListItem.Item(
+                category = "侧边栏网络工具",
+                title = "流媒体解锁检测 (tool_media_unlock)",
+                badge = "仅供参考",
+                desc = "批量探测当前代理出站 IP 针对全球主流流媒体与 AI 服务平台的版权区域解锁状态（涵盖 Netflix 原生/自制剧解锁、YouTube Premium 区域、Disney+、ChatGPT、TikTok 等）。醒目标注：【本功能仅供参考】！各大版权方风控策略动态变化，本工具仅供参考。",
+                prosCons = "【利】一目了然确认节点能否观看 Netflix 非自制剧、是否支持流畅注册与使用 ChatGPT，避免错选不支持的节点；【弊】流媒体平台封锁规则频繁更迭（结合客户端设备指纹、网络抖动等），单一探针难以 100% 覆盖所有客户端表现。",
+                recommendation = "【最稳推荐：测试结果仅供参考】若检测显示未解锁但官方客户端能正常播放高清视频或对话，以实际客户端使用为准。",
+                keywords = "流媒体 解锁 netflix youtube premium disney chatgpt tiktok 仅供参考 tool_media_unlock",
+            )
+        )
+        allItems.add(
+            DocListItem.Item(
+                category = "侧边栏网络工具",
+                title = "IP 纯净度检测 (tool_ip_purity)",
+                badge = "仅供参考",
+                desc = "深度查询当前出站落地 IP 的机房/家宽原生属性、ASN 运营商归属、黑名单历史记录、欺诈评分（Fraud Score）与风控等级。醒目标注：【本功能仅供参考】！各大商业风控数据库算法差异巨大，本功能仅供参考。",
+                prosCons = "【利】获知节点 IP 属于机房托管（Hosting/DataCenter）还是原生住宅宽带（Residential），辅助评估注册海外严控服务的成功率；【弊】不同风控库打分规则不一，机房 IP 绝不等于无法正常科学上网。",
+                recommendation = "【最稳推荐：测试结果仅供参考，切勿盲目追求 0 欺诈分】只要节点日常访问网页流畅、无频繁人机验证验证码即可安心使用。",
+                keywords = "ip 纯净度 欺诈分 风险 家宽 机房 原生 仅供参考 tool_ip_purity",
+            )
+        )
+
+        // 10. 附加工具与备份同步
+        allItems.add(
+            DocListItem.Header(
+                "10. 附加工具与备份同步 (Additional Tools & Backup)",
+                "数据灾备、多端云同步、网络质量深度排查与诊断辅助"
+            )
+        )
+        allItems.add(
+            DocListItem.Item(
+                category = "附加工具与备份同步",
+                title = "本地配置备份与恢复 (localBackup)",
+                badge = "推荐: 定期备份",
+                desc = "支持将应用中所有节点、分组、分流路由规则及全局自定义偏好设置一键打包导出为带时间戳的 JSON 备份压缩文件，或通过系统剪贴板导出与快速导入。",
+                prosCons = "【利】在更换手机、刷机重装或配置调优遇到不可逆问题时，一键满血还原所有数据；【弊】若将含有私有自建 VPS 密码的备份文件分享给他人可能泄露凭据。",
+                recommendation = "【最稳推荐：重要配置调优完成后立即导出一次本地备份并妥善保存】私密备份切勿上传公开网络。",
+                keywords = "备份 恢复 导出 导入 迁移 换机 json zip localBackup",
+            )
+        )
+        allItems.add(
+            DocListItem.Item(
+                category = "附加工具与备份同步",
+                title = "WebDAV 云端备份与同步 (webdavBackup)",
+                badge = "推荐: 多设备用户推荐",
+                desc = "通过行业标准 WebDAV 协议（坚果云、Nextcloud、群晖 Synology 等），将本机的全部节点配置与规则一键安全上传加密备份到私有云，并支持随时从云端拉取恢复。",
+                prosCons = "【利】实现手机、平板、备用机之间配置多端云同步，无需通过微信/QQ中转文件；【弊】初次使用需在“附加工具 - WebDAV 设置”中填入服务器 URL、账户及应用授权密码。",
+                recommendation = "【最稳推荐：国内用户推荐使用坚果云 WebDAV】配置简单，稳定可靠，多设备切换极其省心。",
+                keywords = "webdav 云备份 同步 坚果云 nextcloud 群晖 云端 webdavBackup",
+            )
+        )
+        allItems.add(
+            DocListItem.Item(
+                category = "附加工具与备份同步",
+                title = "实时流量图表 (trafficChart)",
+                badge = "推荐: 流量监测",
+                desc = "以可视化动态波形图表实时渲染出站各节点的上行/下行速率与累计吞吐走势，支持按时间窗口缩放查看。",
+                prosCons = "【利】直观捕捉网络突发大流量、测速峰值带宽及异常流量抖动；【弊】图表高频刷新微量增加前台渲染能耗，离开页面即销毁。",
+                recommendation = "【最稳推荐：日常按需查看】用于检测节点极限真实带宽与稳定性压测。",
+                keywords = "流量 图表 速率 监控 波形 峰值 trafficChart",
+            )
+        )
+        allItems.add(
+            DocListItem.Item(
+                category = "附加工具与备份同步",
+                title = "NAT 类型与 STUN 穿透探测 (stunTest)",
+                badge = "推荐: 游戏/P2P 用户",
+                desc = "利用 RFC 3489 / RFC 5389 STUN 协议，探测当前 VPN 网络出站环境下的 NAT 拓扑类型（Full Cone 全锥形、Restricted Cone 受限锥形、Port Restricted 端口受限锥形、Symmetric 对称形 NAT）。",
+                prosCons = "【利】精准诊断当前节点是否支持 Full Cone NAT，判断是否适合用于 Nintendo Switch / PS5 联机联麦（NAT Type A/B）以及 BT/PT / BitTorrent P2P 穿透加速；【弊】普通网页浏览用户无需关心此指标。",
+                recommendation = "【最稳推荐：联机游戏与 P2P 优先选用 Full Cone 节点】普通科学上网无需纠结 NAT 类型。",
+                keywords = "nat stun 穿透 锥形 full cone 对称 联机 switch ps5 stunTest",
+            )
+        )
+        allItems.add(
+            DocListItem.Item(
+                category = "附加工具与备份同步",
+                title = "DNS 泄漏与 Fake-IP 状态检测 (dnsLeakTest)",
+                badge = "推荐: 隐私安全体检",
+                desc = "一键检测本地海外域名是否成功被内核 Fake-IP 虚拟地址池接管，同时通过公共安全探针检测公网出口 IP 与真实 DNS 链路是否存在旁路泄漏。",
+                prosCons = "【利】即时验证“严格路由”与“FakeDNS”是否正常运转，确保真实地理位置与运营商 DNS 绝对不泄漏；【弊】检测时会发起一次对安全检测接口的请求。",
+                recommendation = "【最稳推荐：开启 VPN 后建议执行一次检测】确认 Fake-IP 生效且无 DNS 泄漏后即可安心上网。",
+                keywords = "dns 泄漏 fakeip 假ip 隐私 安全 探针 dnsLeakTest",
             )
         )
     }

@@ -1442,7 +1442,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                         )
 
                         try {
-                            val result = kotlinx.coroutines.withTimeoutOrNull(DataStore.connectionTestTimeout + 1500L) {
+                            val result = kotlinx.coroutines.withTimeoutOrNull(DataStore.connectionTestTimeout * 2 + 2500L) {
                                 urlTest.doTest(profile)
                             } ?: throw java.util.concurrent.TimeoutException("URL test timeout")
                             profile.status = 1
