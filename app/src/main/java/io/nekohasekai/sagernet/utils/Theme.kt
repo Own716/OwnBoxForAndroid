@@ -5,6 +5,7 @@ import android.content.res.Configuration
 import android.graphics.Color
 import android.os.Build
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.graphics.ColorUtils
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.ktx.app
@@ -201,13 +202,29 @@ object Theme {
     }
 
     fun getPrimaryColor(context: Context): Int {
-        return if (isWhiteTheme()) {
-            Color.parseColor("#212121")
-        } else if (DataStore.appTheme == CUSTOM) {
-            DataStore.customThemeColor or 0xFF000000.toInt()
-        } else {
-            context.getColorAttr(R.attr.colorPrimary)
+        if (isWhiteTheme()) {
+            return Color.parseColor("#212121")
         }
+        val isNight = usingNightMode()
+        if (DataStore.appTheme == CUSTOM) {
+            val color = DataStore.customThemeColor or 0xFF000000.toInt()
+            if (isNight && ColorUtils.calculateLuminance(color) < 0.25) {
+                return context.getColorAttr(R.attr.primaryOrTextPrimary)
+            }
+            return color
+        }
+        if (DataStore.appTheme == BLACK) {
+            return if (isNight) {
+                context.getColorAttr(R.attr.primaryOrTextPrimary)
+            } else {
+                context.getColorAttr(R.attr.colorPrimary)
+            }
+        }
+        val primary = context.getColorAttr(R.attr.colorPrimary)
+        if (isNight && ColorUtils.calculateLuminance(primary) < 0.25) {
+            return context.getColorAttr(R.attr.primaryOrTextPrimary)
+        }
+        return primary
     }
 
     var currentNightMode = -1

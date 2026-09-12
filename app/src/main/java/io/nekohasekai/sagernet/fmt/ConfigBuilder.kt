@@ -1039,7 +1039,7 @@ fun buildConfig(
                 )
             } else if (useLoadBalance && tagMap.isNotEmpty()) {
                 outbounds.add(0, buildLoadBalanceOutbound(tagMap.values.toList(), customTag = TAG_PROXY))
-                balancerMemberMap[proxy.id] = list.map { it.id }
+                balancerMemberMap[proxy.id] = list.mapNotNull { it.id.takeIf { id -> id != proxy.id } }
             } else {
                 outbounds.add(0, buildSelectorOutbound(tagMap[proxy.id], tagMap.values.toList(), customTag = TAG_PROXY))
             }

@@ -58,7 +58,7 @@
                     android:background="@drawable/bg_spinner_dropdown"
                     android:paddingHorizontal="6dp"
                     android:paddingVertical="1dp"
-                    android:textColor="?attr/colorPrimary"
+                    android:textColor="?attr/primaryOrTextPrimary"
                     android:textSize="10sp"
                     android:textStyle="bold"
                     tools:text="TCP" />
@@ -98,7 +98,7 @@
                     android:id="@+id/conn_traffic"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textColor="?attr/colorPrimary"
+                    android:textColor="?attr/primaryOrTextPrimary"
                     android:textSize="11sp"
                     android:textStyle="bold"
                     tools:text="▲ 12 KB  ▼ 840 KB" />
@@ -112,7 +112,7 @@
                 android:layout_marginTop="2dp"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:textColor="?attr/colorPrimary"
+                android:textColor="?attr/primaryOrTextPrimary"
                 android:textSize="10sp"
                 tools:text="Chains: Proxy » Direct" />
 

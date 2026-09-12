@@ -166,7 +166,7 @@
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:text="@string/traffic_chart_monitor_active"
-                            android:textColor="?attr/colorPrimary"
+                            android:textColor="?attr/primaryOrTextPrimary"
                             android:textSize="13sp"
                             android:textStyle="bold" />
 
@@ -303,11 +303,11 @@
                     android:layout_marginEnd="8dp"
                     android:paddingHorizontal="10dp"
                     android:text="@string/traffic_chart_refresh"
-                    android:textColor="?attr/colorPrimary"
+                    android:textColor="?attr/primaryOrTextPrimary"
                     android:textSize="12sp"
                     app:icon="@drawable/ic_action_cached"
                     app:iconSize="14dp"
-                    app:iconTint="?attr/colorPrimary"
+                    app:iconTint="?attr/primaryOrTextPrimary"
                     app:strokeColor="@color/card_stroke" />
 
                 <com.google.android.material.button.MaterialButton

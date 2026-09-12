@@ -43,7 +43,7 @@
                 android:paddingEnd="8dp"
                 android:paddingBottom="3dp"
                 android:textAppearance="?attr/textAppearanceCaption"
-                android:textColor="?attr/colorPrimary"
+                android:textColor="?attr/primaryOrTextPrimary"
                 android:textStyle="bold" />
 
         </LinearLayout>
@@ -61,7 +61,7 @@
             android:layout_height="wrap_content"
             android:text="📘 功能说明"
             android:textAppearance="?attr/textAppearanceCaption"
-            android:textColor="?attr/colorPrimary"
+            android:textColor="?attr/primaryOrTextPrimary"
             android:textStyle="bold" />
 
         <TextView
@@ -79,7 +79,7 @@
             android:layout_height="wrap_content"
             android:text="⚖️ 优劣分析"
             android:textAppearance="?attr/textAppearanceCaption"
-            android:textColor="?attr/colorPrimary"
+            android:textColor="?attr/primaryOrTextPrimary"
             android:textStyle="bold" />
 
         <TextView
@@ -97,7 +97,7 @@
             android:layout_height="wrap_content"
             android:text="💡 设置推荐（以最稳定为绝对核心）"
             android:textAppearance="?attr/textAppearanceCaption"
-            android:textColor="?attr/colorPrimary"
+            android:textColor="?attr/primaryOrTextPrimary"
             android:textStyle="bold" />
 
         <TextView

@@ -21,7 +21,7 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:textAppearance="?attr/textAppearanceTitleMedium"
-        android:textColor="?attr/colorPrimary"
+        android:textColor="?attr/primaryOrTextPrimary"
         android:textSize="16sp"
         android:textStyle="bold"
         tools:text="用户界面设置" />
@@ -32,7 +32,7 @@
         android:layout_height="24dp"
         android:layout_marginStart="8dp"
         android:src="@drawable/ic_baseline_keyboard_arrow_down_24"
-        app:tint="?attr/colorPrimary"
+        app:tint="?attr/primaryOrTextPrimary"
         tools:ignore="ContentDescription" />
 
 </LinearLayout>

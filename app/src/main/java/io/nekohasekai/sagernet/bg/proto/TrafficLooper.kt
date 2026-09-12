@@ -186,6 +186,7 @@ class TrafficLooper
             val snapshot = withStateLock {
                 if (trafficUpdater == null) {
                     idMap.clear()
+                    tagMap.clear()
                     idMap[-1] = itemBypass
                     //
                     val tags = hashSetOf(TAG_PROXY, TAG_BYPASS)
@@ -205,7 +206,7 @@ class TrafficLooper
                             Logs.d("traffic count $tag to ${ent.id}")
                         }
                     }
-                    if (proxy.config.selectorGroupId >= 0L || idMap.containsKey(proxy.config.mainEntId)) {
+                    if (proxy.config.selectorGroupId >= 0L) {
                         selectMainLocked(proxy.config.mainEntId)
                     } else {
                         proxy.config.balancerMemberMap.values.forEach { memberIds ->
@@ -225,7 +226,7 @@ class TrafficLooper
                 // Accumulate member traffic into Balancer entity
                 proxy.config.balancerMemberMap.forEach { (balancerId, memberIds) ->
                     val balancerItem = idMap[balancerId] ?: return@forEach
-                    val members = memberIds.mapNotNull { idMap[it] }
+                    val members = memberIds.filter { it != balancerId }.mapNotNull { idMap[it] }
                     if (members.isNotEmpty()) {
                         var sumTxRate = 0L
                         var sumRxRate = 0L
@@ -233,6 +234,7 @@ class TrafficLooper
                         var sumRxDelta = 0L
                         var hasDelta = false
                         for (m in members) {
+                            if (m === balancerItem) continue
                             sumTxRate += m.txRate
                             sumRxRate += m.rxRate
                             sumTxDelta += (m.tx - m.txBase)
@@ -258,11 +260,11 @@ class TrafficLooper
                 var mainRxRate = 0L
                 var mainTx = 0L
                 var mainRx = 0L
-                val balancerItems = proxy.config.balancerMemberMap.keys.mapNotNull { idMap[it] }.toSet()
-                val balancerMemberItems = proxy.config.balancerMemberMap.values.flatten().mapNotNull { idMap[it] }.toSet()
-                val activeBalancer = idMap[selectorNowId]?.takeIf { it in balancerItems }
-                tagMap.forEach { (_, it) ->
-                    if (it !in balancerMemberItems && (it !in balancerItems || it === activeBalancer)) {
+                val balancerMemberIds = proxy.config.balancerMemberMap.entries.flatMap { (bId, mIds) ->
+                    mIds.filter { it != bId }
+                }.toSet()
+                idMap.forEach { (id, it) ->
+                    if (id > 0L && id !in balancerMemberIds) {
                         if (!it.ignore) {
                             mainTxRate += it.txRate
                             mainRxRate += it.rxRate

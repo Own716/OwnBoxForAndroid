@@ -668,6 +668,9 @@
         <item name="accentOrTextPrimary">?android:textColorPrimary</item>
         <item name="primaryOrTextSecondary">?android:textColorSecondary</item>
         <item name="primaryOrTextPrimary">?android:textColorPrimary</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorOnSurface">?android:textColorPrimary</item>
+        <item name="colorOnSurfaceVariant">?android:textColorSecondary</item>
     </style>
 
     <style name="Theme.SagerNet.Dialog.VerdantMint" parent="Theme.SagerNet.Dialog">
@@ -719,6 +722,10 @@
         <item name="colorOnSurface">@color/white</item>
         <item name="colorOnSurfaceVariant">#B3FFFFFF</item>
         <item name="colorOnPrimary">@color/white</item>
+        <item name="primaryOrTextPrimary">@color/white</item>
+        <item name="primaryOrTextSecondary">#B3FFFFFF</item>
+        <item name="accentOrTextPrimary">@color/white</item>
+        <item name="accentOrTextSecondary">#B3FFFFFF</item>
     </style>
 
 
