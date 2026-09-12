@@ -203,10 +203,10 @@ fun Project.setupApp() {
                 outputFileName = if (isPreview) {
                     outputFileName.replace(
                         project.name,
-                        "Ownbox-" + requireMetadata().getProperty("PRE_VERSION_NAME")
+                        "Own-" + requireMetadata().getProperty("PRE_VERSION_NAME")
                     ).replace("-preview", "")
                 } else {
-                    outputFileName.replace(project.name, "Ownbox-$versionName")
+                    outputFileName.replace(project.name, "Own-$versionName")
                         .replace("-release", "")
                         .replace("-oss", "")
                 }

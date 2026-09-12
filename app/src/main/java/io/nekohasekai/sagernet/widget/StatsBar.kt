@@ -137,6 +137,19 @@ class StatsBar @JvmOverloads constructor(
             btnIpDetail?.setOnClickListener {
                 onIpDetailClicked()
             }
+            btnIpDetail?.setOnLongClickListener {
+                val cached = LandingIpManager.getCachedInfo()
+                val activity = context as? Activity
+                if (cached != null && activity != null) {
+                    LandingIpBottomSheet.show(activity, cached) {
+                        refreshLandingIp(forceRefresh = true)
+                        retestLatencyInPlace()
+                    }
+                    true
+                } else {
+                    false
+                }
+            }
             if (io.nekohasekai.sagernet.utils.Theme.isWhiteTheme()) {
                 backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.WHITE)
                 txText.setTextColor(android.graphics.Color.parseColor("#757575"))
@@ -151,17 +164,12 @@ class StatsBar @JvmOverloads constructor(
     }
 
     fun onIpDetailClicked() {
-        val cached = LandingIpManager.getCachedInfo()
-        val activity = context as? Activity ?: return
-        if (cached != null) {
-            LandingIpBottomSheet.show(activity, cached) {
-                refreshLandingIp(forceRefresh = true)
-                testConnection(silent = false)
-            }
-        } else {
-            refreshLandingIp(forceRefresh = true)
-            testConnection(silent = false)
+        // 就地静默刷新：点击按钮时立刻通过当前实际出口重新发起握手与 IP 查询，绝不弹窗
+        (btnIpDetail as? android.widget.ImageView)?.apply {
+            animate().rotationBy(360f).setDuration(600).start()
         }
+        refreshLandingIp(forceRefresh = true)
+        retestLatencyInPlace()
     }
 
     fun retestLatencyInPlace() {

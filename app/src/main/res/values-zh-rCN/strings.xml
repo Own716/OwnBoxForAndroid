@@ -816,8 +816,8 @@
     <string name="balancer_strategy_least_ping">最低延迟优先 (leastPing)</string>
     <string name="balancer_strategy_least_load">最低负载轮询 (leastLoad)</string>
     <string name="balancer_custom_url">自定义测试 URL</string>
-    <string name="balancer_custom_url_sum">针对此负载均衡节点的独立探测地址（留空使用全局默认）</string>
-    <string name="balancer_interval">观测间隔</string>
+    <string name="balancer_interval">观测间隔 (秒)</string>
+    <string name="balancer_interval_sum">负载均衡后台定期健康检查与测速的观测间隔 (秒)，默认 300 秒</string>
     <string name="balancer_select_group">选择分组</string>
     <string name="show_subscription_info_card">置顶显示机场资产信息卡片</string>
     <string name="show_subscription_info_card_summary">在订阅分组顶部展示流量配额、剩余与到期时间等资产卡片</string>

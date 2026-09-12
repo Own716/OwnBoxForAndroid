@@ -40,8 +40,9 @@
         <EditTextPreference
             app:defaultValue="300"
             app:key="balancerInterval"
+            app:summary="@string/balancer_interval_sum"
             app:title="@string/balancer_interval"
-            app:useSimpleSummaryProvider="true" />
+            app:useSimpleSummaryProvider="false" />
 
     </PreferenceCategory>
 

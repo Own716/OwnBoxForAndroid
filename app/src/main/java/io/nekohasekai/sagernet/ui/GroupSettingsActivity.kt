@@ -381,6 +381,9 @@ class GroupSettingsActivity(
                 entity.subscription?.subscriptionUserinfo = "";
             }
             GroupManager.updateGroup(entity.apply { serialize() })
+            if (DataStore.serviceState.canStop) {
+                SagerNet.reloadService()
+            }
         }
 
         finish()

@@ -252,7 +252,9 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
     }
 
     override fun selector_OnProxySelected(selectorTag: String, tag: String) {
-        if (selectorTag != "proxy") {
+        val currentGroup = DataStore.currentGroup()
+        val validTags = setOf("proxy", currentGroup.name?.trim() ?: "")
+        if (selectorTag !in validTags && selectorTag != "proxy") {
             Logs.d("other selector: $selectorTag")
             return
         }

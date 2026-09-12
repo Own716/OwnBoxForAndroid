@@ -154,6 +154,7 @@ class VpnService : BaseVpnService(),
         builder.addAddress(PRIVATE_VLAN4_CLIENT, 30)
         builder.addAddress(PRIVATE_VLAN6_CLIENT, 126)
         builder.addDnsServer(PRIVATE_VLAN4_ROUTER)
+        builder.addDnsServer(PRIVATE_VLAN6_ROUTER)
 
         // route
         if (DataStore.bypassLan) {

@@ -260,6 +260,14 @@ func newSingBoxInstance(config string, localTransport LocalDNSTransport, platfor
 			b.selector = selector
 		}
 	}
+	if b.selector == nil {
+		for _, outbound := range b.Outbound().Outbounds() {
+			if selector, ok := outbound.(*group.Selector); ok {
+				b.selector = selector
+				break
+			}
+		}
+	}
 
 	return b, nil
 }
@@ -516,6 +524,9 @@ func urlTest(instance *BoxInstance, link string, timeout int32) (int32, error) {
 	}
 	_, _ = io.Copy(io.Discard, resp1.Body)
 	_ = resp1.Body.Close()
+	if resp1.StatusCode >= 400 {
+		return 0, fmt.Errorf("HTTP error %d", resp1.StatusCode)
+	}
 	pass1 := time.Since(start1)
 
 	// 阶段二：复用保活连接，测得纯 1-RTT
@@ -527,11 +538,13 @@ func urlTest(instance *BoxInstance, link string, timeout int32) (int32, error) {
 		if err2 == nil {
 			_, _ = io.Copy(io.Discard, resp2.Body)
 			_ = resp2.Body.Close()
-			latency := int32(time.Since(start2).Milliseconds())
-			if latency <= 0 {
-				latency = 1
+			if resp2.StatusCode < 400 {
+				latency := int32(time.Since(start2).Milliseconds())
+				if latency <= 0 {
+					latency = 1
+				}
+				return latency, nil
 			}
-			return latency, nil
 		}
 	}
 
@@ -557,6 +570,9 @@ func urlTestDirect(client *http.Client, link string) (int32, error) {
 	}
 	_, _ = io.Copy(io.Discard, resp1.Body)
 	_ = resp1.Body.Close()
+	if resp1.StatusCode >= 400 {
+		return 0, fmt.Errorf("HTTP error %d", resp1.StatusCode)
+	}
 	pass1 := time.Since(start1)
 
 	req2, err := http.NewRequest(http.MethodHead, link, nil)
@@ -567,11 +583,13 @@ func urlTestDirect(client *http.Client, link string) (int32, error) {
 		if err2 == nil {
 			_, _ = io.Copy(io.Discard, resp2.Body)
 			_ = resp2.Body.Close()
-			latency := int32(time.Since(start2).Milliseconds())
-			if latency <= 0 {
-				latency = 1
+			if resp2.StatusCode < 400 {
+				latency := int32(time.Since(start2).Milliseconds())
+				if latency <= 0 {
+					latency = 1
+				}
+				return latency, nil
 			}
-			return latency, nil
 		}
 	}
 

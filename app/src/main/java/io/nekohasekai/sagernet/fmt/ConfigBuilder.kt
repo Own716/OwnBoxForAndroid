@@ -154,7 +154,7 @@ internal fun buildUrlTestOutbound(
         url = testUrl?.takeIf { it.isNotBlank() }
             ?: DataStore.connectionTestURL.takeIf { it.isNotBlank() }
             ?: "https://cp.cloudflare.com/generate_204"
-        val iv = intervalSec?.takeIf { it > 0 } ?: 300L
+        val iv = (intervalSec?.takeIf { it > 0 } ?: 300L).coerceAtLeast(10L)
         interval = "${iv}s"
         tolerance = toleranceMs?.takeIf { it > 0 } ?: 50
         idleTimeoutStr?.takeIf { it.isNotBlank() }?.let {
@@ -590,6 +590,9 @@ fun buildConfig(
             if (ipv6Mode == IPv6Mode.DISABLE) {
                 return "ipv4_only"
             }
+            if (ipv6Mode == IPv6Mode.ONLY) {
+                return "ipv6_only"
+            }
             if (s.isNotEmpty()) {
                 return s
             }
@@ -733,7 +736,7 @@ fun buildConfig(
             val chainTag = "c-$chainId"
             var muxApplied = false
 
-            val defaultServerDomainStrategy = if (ipv6Mode == IPv6Mode.DISABLE) "ipv4_only" else SingBoxOptionsUtil.domainStrategy("server")
+            val defaultServerDomainStrategy = if (ipv6Mode == IPv6Mode.DISABLE) "ipv4_only" else if (ipv6Mode == IPv6Mode.ONLY) "ipv6_only" else SingBoxOptionsUtil.domainStrategy("server")
 
             profileList.forEachIndexed { index, proxyEntity ->
                 val bean = proxyEntity.requireBean()
@@ -1031,13 +1034,13 @@ fun buildConfig(
                         toleranceMs = toleranceVal,
                         idleTimeoutStr = idleTimeoutVal,
                         interruptExist = interruptVal,
-                        customTag = groupTag
+                        customTag = TAG_PROXY
                     )
                 )
             } else if (useLoadBalance && tagMap.isNotEmpty()) {
-                outbounds.add(0, buildLoadBalanceOutbound(tagMap.values.toList(), customTag = groupTag))
+                outbounds.add(0, buildLoadBalanceOutbound(tagMap.values.toList(), customTag = TAG_PROXY))
             } else {
-                outbounds.add(0, buildSelectorOutbound(tagMap[proxy.id], tagMap.values.toList(), customTag = groupTag))
+                outbounds.add(0, buildSelectorOutbound(tagMap[proxy.id], tagMap.values.toList(), customTag = TAG_PROXY))
             }
         } else {
             val mainTag = buildChain(0, proxy)
@@ -1048,7 +1051,7 @@ fun buildConfig(
             tagMap[key] = buildChain(key, p)
         }
 
-        val mainProxyTag = (if (buildSelector || useAutoSelect || useLoadBalance) groupTag else tagMap[proxy.id]) ?: groupTag
+        val mainProxyTag = (if (buildSelector || useAutoSelect || useLoadBalance) TAG_PROXY else tagMap[proxy.id]) ?: TAG_PROXY
 
         // 在应用用户规则之前检查全局模式
         if (!forTest && DataStore.globalMode) {
@@ -1311,6 +1314,11 @@ fun buildConfig(
                     // Keep MTU unchanged and switch only the Android dialer path.
                     _hack_config_map["network_strategy"] = "default"
                 }
+                if (ipv6Mode == IPv6Mode.DISABLE) {
+                    _hack_config_map["domain_strategy"] = "ipv4_only"
+                } else if (ipv6Mode == IPv6Mode.ONLY) {
+                    _hack_config_map["domain_strategy"] = "ipv6_only"
+                }
             })
         }
 
@@ -1367,19 +1375,17 @@ fun buildConfig(
             )
         )
 
-        if (!forTest) {
-            val remoteAddress = remoteDns.firstOrNull()?.takeIf { it.isNotBlank() } ?: "https://dns.google/dns-query"
-            val normalizedRemote = normalizeRemoteDnsAddress(remoteAddress)
-            dns.servers.add(
-                buildDnsServer(
-                    address = normalizedRemote,
-                    tag = "dns-remote",
-                    detour = mainProxyTag,
-                    domainResolver = "dns-direct",
-                    domainStrategy = autoDnsDomainStrategy(SingBoxOptionsUtil.domainStrategy("dns-remote"))
-                )
+        val remoteAddress = remoteDns.firstOrNull()?.takeIf { it.isNotBlank() } ?: "https://dns.google/dns-query"
+        val normalizedRemote = normalizeRemoteDnsAddress(remoteAddress)
+        dns.servers.add(
+            buildDnsServer(
+                address = normalizedRemote,
+                tag = "dns-remote",
+                detour = mainProxyTag,
+                domainResolver = "dns-direct",
+                domainStrategy = autoDnsDomainStrategy(SingBoxOptionsUtil.domainStrategy("dns-remote"))
             )
-        }
+        )
         if (dnsHosts.isNotEmpty()) {
             dns.servers.add(DNSServerOptions().apply {
                 type = "hosts"
@@ -1388,9 +1394,11 @@ fun buildConfig(
             })
         }
 
-        dns.final_ = if (forTest) "dns-direct" else "dns-remote"
+        dns.final_ = "dns-remote"
         if (ipv6Mode == IPv6Mode.DISABLE) {
             dns.strategy = "ipv4_only"
+        } else if (ipv6Mode == IPv6Mode.ONLY) {
+            dns.strategy = "ipv6_only"
         }
 
         // dns object user rules
@@ -1405,7 +1413,19 @@ fun buildConfig(
         }
 
         if (forTest) {
-            dns.rules = listOf()
+            dns.rules = if (ipv6Mode == IPv6Mode.DISABLE) {
+                listOf(DNSRule_DefaultOptions().apply {
+                    query_type = listOf("AAAA")
+                    action = "reject"
+                })
+            } else if (ipv6Mode == IPv6Mode.ONLY) {
+                listOf(DNSRule_DefaultOptions().apply {
+                    query_type = listOf("A")
+                    action = "reject"
+                })
+            } else {
+                listOf()
+            }
         } else {
             // built-in DNS rules
             if (ipv6Mode == IPv6Mode.DISABLE) {
@@ -1415,6 +1435,15 @@ fun buildConfig(
                 })
                 route.rules.add(0, Rule_DefaultOptions().apply {
                     ip_version = 6
+                    action = "reject"
+                })
+            } else if (ipv6Mode == IPv6Mode.ONLY) {
+                dns.rules.add(0, DNSRule_DefaultOptions().apply {
+                    query_type = listOf("A")
+                    action = "reject"
+                })
+                route.rules.add(0, Rule_DefaultOptions().apply {
+                    ip_version = 4
                     action = "reject"
                 })
             }
@@ -1427,7 +1456,8 @@ fun buildConfig(
                 action = "hijack-dns"
             })
             // sing-box 1.13：sniff / 解析目标地址迁移为路由规则动作（须位于规则最前）。
-            if (DataStore.resolveDestination) route.rules.add(0, Rule_DefaultOptions().apply {
+            // 启用 resolve 动作：当开启 resolveDestination 或处于 IPv6 禁用/仅 IPv6 模式时强制单栈解析，杜绝远端 VPS 建立异构双栈连接导致泄漏。
+            if (DataStore.resolveDestination || ipv6Mode == IPv6Mode.DISABLE || ipv6Mode == IPv6Mode.ONLY) route.rules.add(0, Rule_DefaultOptions().apply {
                 action = "resolve"
                 strategy = genDomainStrategy(true)
             })
@@ -1508,6 +1538,11 @@ fun buildConfig(
         if (!forTest && ipv6Mode == IPv6Mode.DISABLE) {
             dns.rules.add(0, DNSRule_DefaultOptions().apply {
                 query_type = listOf("AAAA")
+                action = "reject"
+            })
+        } else if (!forTest && ipv6Mode == IPv6Mode.ONLY) {
+            dns.rules.add(0, DNSRule_DefaultOptions().apply {
+                query_type = listOf("A")
                 action = "reject"
             })
         }

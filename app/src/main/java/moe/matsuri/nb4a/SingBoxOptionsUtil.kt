@@ -12,6 +12,9 @@ object SingBoxOptionsUtil {
         if (DataStore.ipv6Mode == io.nekohasekai.sagernet.IPv6Mode.DISABLE) {
             return "ipv4_only"
         }
+        if (DataStore.ipv6Mode == io.nekohasekai.sagernet.IPv6Mode.ONLY) {
+            return "ipv6_only"
+        }
         fun auto2(key: String, newS: String): String {
             return (DataStore.configurationStore.getString(key) ?: "").replace("auto", newS)
         }

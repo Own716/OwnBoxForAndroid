@@ -727,4 +727,6 @@
     <string name="observatory_settings">連線觀測設定 (Observatory)</string>
     <string name="advanced_settings">進階設定</string>
     <string name="widget_toggle">点击切换连接</string>
+    <string name="balancer_interval">觀測間隔 (秒)</string>
+    <string name="balancer_interval_sum">負載均衡後台定期健康檢查與測速的觀測間隔 (秒)，預設 300 秒</string>
 </resources>

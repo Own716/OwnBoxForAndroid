@@ -2862,18 +2862,7 @@ class ConfigurationFragment @JvmOverloads constructor(
 
                 btnDelete.setOnClickListener {
                     dialog.dismiss()
-                    if (isConnected) {
-                        alert(getString(R.string.cannot_delete_active_profile)).tryToShow()
-                    } else {
-                        MaterialAlertDialogBuilder(context)
-                            .setTitle(R.string.delete)
-                            .setMessage(getString(R.string.delete_confirm_prompt))
-                            .setPositiveButton(R.string.yes) { _, _ ->
-                                removeProfile(proxyEntity)
-                            }
-                            .setNegativeButton(R.string.no, null)
-                            .show()
-                    }
+                    removeProfile(proxyEntity)
                 }
 
                 dialog.show()
@@ -2911,6 +2900,13 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             private fun removeProfile(proxyEntity: ProxyEntity) {
                 if (select) return
+                val pf = parentFragment as? ConfigurationFragment
+                val isSelected = pf?.isSelectedProfile(proxyEntity.id) == true
+                val isConnected = DataStore.serviceState.started && (proxyEntity.id == DataStore.currentProfile || (isSelected && pf?.isCurrentProfile(proxyEntity.id) == true))
+                if (isConnected) {
+                    alert(getString(R.string.cannot_delete_active_profile)).tryToShow()
+                    return
+                }
                 val currentAdapter = adapter ?: return
                 val index = currentAdapter.configurationIdList.indexOf(proxyEntity.id)
                 if (index < 0) return
@@ -2919,8 +2915,9 @@ class ConfigurationFragment @JvmOverloads constructor(
                     undoManager.remove(index to proxyEntity)
                 }
                 if (DataStore.confirmProfileDelete) {
-                    AlertDialog.Builder(requireContext())
-                        .setTitle(R.string.delete_confirm_prompt)
+                    MaterialAlertDialogBuilder(requireContext())
+                        .setTitle(R.string.delete)
+                        .setMessage(R.string.delete_confirm_prompt)
                         .setPositiveButton(R.string.yes) { _, _ -> removeAction() }
                         .setNegativeButton(R.string.no, null)
                         .show()

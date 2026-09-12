@@ -900,7 +900,8 @@
     <string name="balancer_strategy_least_load">Lowest Load (leastLoad)</string>
     <string name="balancer_custom_url">Custom Test URL</string>
     <string name="balancer_custom_url_sum">Custom probe URL for this Balancer (leave blank to use global default)</string>
-    <string name="balancer_interval">Probe Interval</string>
+    <string name="balancer_interval">Probe Interval (seconds)</string>
+    <string name="balancer_interval_sum">Periodic health-check and observation interval in seconds, default 300s</string>
     <string name="balancer_select_group">Select Group</string>
     <string name="show_subscription_info_card">Subscription Asset Info Card</string>
     <string name="show_subscription_info_card_summary">Display subscription traffic and expiry card at top of subscription groups</string>

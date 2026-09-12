@@ -72,7 +72,10 @@ object LandingIpManager {
         profileId: Long,
         forceRefresh: Boolean = false,
     ): Result<LandingIpInfo> = withContext(Dispatchers.IO) {
-        if (!forceRefresh && currentCache != null && cachedProfileId == profileId) {
+        if (forceRefresh) {
+            currentCache = null
+            cachedProfileId = -1L
+        } else if (currentCache != null && cachedProfileId == profileId) {
             return@withContext Result.success(currentCache!!)
         }
 
@@ -82,12 +85,14 @@ object LandingIpManager {
 
         isQuerying = true
         val startTime = System.currentTimeMillis()
+        var client: libcore.HTTPClient? = null
 
         try {
-            val client = Libcore.newHttpClient().apply {
+            val c = Libcore.newHttpClient().apply {
                 modernTLS()
                 tryProxyOutbound()
             }
+            client = c
 
             // Primary query: ip-api.com
             var info: LandingIpInfo? = null
@@ -175,6 +180,7 @@ object LandingIpManager {
         } catch (e: Throwable) {
             Result.failure(e)
         } finally {
+            runCatching { client?.close() }
             isQuerying = false
         }
     }

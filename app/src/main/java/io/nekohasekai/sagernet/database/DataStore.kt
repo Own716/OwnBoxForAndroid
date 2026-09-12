@@ -387,7 +387,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
         set(value) {
             rawGroupUrlTestUrl = value.trim()
         }
-    var groupUrlTestInterval by profileCacheStore.stringToInt("groupUrlTestInterval") { 180 }
+    var groupUrlTestInterval by profileCacheStore.stringToInt("groupUrlTestInterval") { 300 }
     var groupUrlTestTolerance by profileCacheStore.stringToInt("groupUrlTestTolerance") { 50 }
     var groupUrlTestIdleTimeout by profileCacheStore.string("groupUrlTestIdleTimeout") { "30m" }
     var groupUrlTestInterruptExist by profileCacheStore.boolean("groupUrlTestInterruptExist")
@@ -423,7 +423,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     }
 
     fun groupUrlTestInterval(groupId: Long): Long =
-        configurationStore.getString("group_${groupId}_urlTestInterval", "180")?.toLongOrNull() ?: 180L
+        configurationStore.getString("group_${groupId}_urlTestInterval", "300")?.toLongOrNull() ?: 300L
     fun setGroupUrlTestInterval(groupId: Long, value: Long) {
         configurationStore.putString("group_${groupId}_urlTestInterval", value.toString())
     }
