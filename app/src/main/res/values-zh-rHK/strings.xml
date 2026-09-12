@@ -214,6 +214,8 @@
     <string name="observatory_settings">連線觀測設定 (Observatory)</string>
     <string name="advanced_settings">進階設定</string>
     <string name="widget_toggle">点击切换连接</string>
-    <string name="balancer_interval">觀測間隔 (秒)</string>
+    <string name="balancer_custom_url_sum">針對此負載均衡節點的獨立探測地址（留空使用全域預設）</string>
+    <string name="balancer_interval">觀測間隔 (s)</string>
     <string name="balancer_interval_sum">負載均衡後台定期健康檢查與測速的觀測間隔 (秒)，預設 300 秒</string>
+    <string name="menu_documentation">教學文檔</string>
 </resources>

@@ -61,6 +61,10 @@
             android:icon="@drawable/baseline_send_24"
             android:title="@string/menu_community" />
         <item
+            android:id="@+id/nav_docs"
+            android:icon="@drawable/ic_baseline_import_contacts_24"
+            android:title="@string/menu_documentation" />
+        <item
             android:id="@+id/nav_about"
             android:icon="@drawable/ic_baseline_info_24"
             android:title="@string/menu_about" />

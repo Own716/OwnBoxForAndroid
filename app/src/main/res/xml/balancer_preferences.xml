@@ -34,13 +34,12 @@
 
         <EditTextPreference
             app:key="balancerTestUrl"
-            app:summary="@string/balancer_custom_url_sum"
-            app:title="@string/balancer_custom_url" />
+            app:title="@string/balancer_custom_url"
+            app:useSimpleSummaryProvider="false" />
 
         <EditTextPreference
             app:defaultValue="300"
             app:key="balancerInterval"
-            app:summary="@string/balancer_interval_sum"
             app:title="@string/balancer_interval"
             app:useSimpleSummaryProvider="false" />
 

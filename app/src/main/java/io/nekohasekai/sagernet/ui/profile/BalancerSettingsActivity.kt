@@ -9,6 +9,8 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.isVisible
+import androidx.preference.EditTextPreference
+import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -91,6 +93,26 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
             true
         }
 
+        val urlPref = findPreference<EditTextPreference>("balancerTestUrl")
+        urlPref?.summaryProvider = Preference.SummaryProvider<EditTextPreference> { pref ->
+            if (pref.text.isNullOrBlank()) {
+                getString(R.string.balancer_custom_url_sum)
+            } else {
+                pref.text
+            }
+        }
+
+        val intervalPref = findPreference<EditTextPreference>("balancerInterval")
+        intervalPref?.summaryProvider = Preference.SummaryProvider<EditTextPreference> { pref ->
+            val text = pref.text?.trim()
+            val value = text?.toIntOrNull()
+            if (value != null && value > 0) {
+                "${value}s"
+            } else {
+                "300s"
+            }
+        }
+
         updateTypeVisibility(DataStore.balancerType)
     }
 
@@ -150,7 +172,8 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
 
     override fun PreferenceFragmentCompat.viewCreated(view: View, savedInstanceState: Bundle?) {
         view.rootView.findViewById<RecyclerView>(R.id.recycler_view)?.apply {
-            (layoutParams ?: LinearLayout.LayoutParams(-1, -2)).apply {
+            isNestedScrollingEnabled = false
+            (layoutParams ?: ViewGroup.LayoutParams(-1, -2)).apply {
                 height = -2
                 layoutParams = this
             }

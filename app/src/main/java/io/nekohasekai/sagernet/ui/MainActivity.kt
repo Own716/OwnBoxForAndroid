@@ -541,6 +541,8 @@ class MainActivity : ThemedActivity(),
                 return false
             }
 
+            R.id.nav_docs -> displayFragment(DocsFragment())
+
             R.id.nav_about -> displayFragment(AboutFragment())
 
             else -> return false
