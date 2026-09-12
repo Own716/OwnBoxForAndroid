@@ -101,11 +101,6 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
             Theme.applyNightTheme()
             true
         }
-        findPreference<SwitchPreference>("amoledTheme")?.setOnPreferenceChangeListener { _, newValue ->
-            DataStore.amoledTheme = newValue as Boolean
-            activity?.recreate()
-            true
-        }
         val appLanguage = findPreference<SimpleMenuPreference>(Key.APP_LANGUAGE)!!
         appLanguage.setOnPreferenceChangeListener { _, newValue ->
             AppLocale.apply(newValue as String)

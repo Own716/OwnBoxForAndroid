@@ -677,7 +677,14 @@ fun buildConfig(
             if (entity.type == ProxyEntity.TYPE_BALANCER) {
                 val balancerBean = entity.balancerBean ?: (entity.requireBean() as? BalancerBean) ?: BalancerBean()
                 val memberEntities = (if (balancerBean.balancerType == BalancerBean.TYPE_GROUP) {
-                    SagerDatabase.proxyDao.getByGroup(balancerBean.targetGroupId)
+                    val targetGids = when {
+                        balancerBean.targetGroupIds.isNotEmpty() -> balancerBean.targetGroupIds
+                        balancerBean.targetGroupId > 0L -> listOf(balancerBean.targetGroupId)
+                        else -> emptyList()
+                    }
+                    targetGids.flatMap { gid ->
+                        SagerDatabase.proxyDao.getByGroup(gid)
+                    }.distinctBy { it.id }
                 } else {
                     val rawEntities = SagerDatabase.proxyDao.getEntities(balancerBean.proxies).associateBy { it.id }
                     balancerBean.proxies.mapNotNull { rawEntities[it] }
@@ -690,13 +697,16 @@ fun buildConfig(
                 val balancerTag = readableTag(entity.displayName())
 
                 val balancerOutbound: SingBoxOption = if (balancerBean.strategy == "leastPing") {
+                    val iv = balancerBean.interval.toLong().coerceAtLeast(10L)
                     buildUrlTestOutbound(
                         memberTags = memberTags,
                         testUrl = balancerBean.testUrl,
-                        intervalSec = balancerBean.interval.toLong()
-                    ).apply {
-                        tag = balancerTag
-                    }
+                        intervalSec = iv,
+                        toleranceMs = 1,
+                        idleTimeoutStr = "${iv}s",
+                        interruptExist = true,
+                        customTag = balancerTag
+                    )
                 } else {
                     buildLoadBalanceOutbound(memberTags, balancerBean.strategy).apply {
                         tag = balancerTag

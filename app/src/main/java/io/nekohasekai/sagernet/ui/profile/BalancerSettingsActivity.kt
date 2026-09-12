@@ -43,7 +43,13 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
     override fun BalancerBean.init() {
         DataStore.profileName = name
         DataStore.balancerType = balancerType
-        DataStore.balancerTargetGroup = targetGroupId
+        val gids = if (targetGroupIds != null && targetGroupIds.isNotEmpty()) {
+            targetGroupIds
+        } else if (targetGroupId > 0L) {
+            listOf(targetGroupId)
+        } else emptyList()
+        DataStore.balancerTargetGroups = gids.joinToString(",")
+        DataStore.balancerTargetGroup = gids.firstOrNull() ?: 0L
         DataStore.balancerStrategy = strategy
         DataStore.balancerTestUrl = testUrl
         DataStore.balancerInterval = interval
@@ -53,7 +59,11 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
     override fun BalancerBean.serialize() {
         name = DataStore.profileName
         balancerType = DataStore.balancerType
-        targetGroupId = DataStore.balancerTargetGroup
+        val gids = DataStore.balancerTargetGroups.split(",")
+            .mapNotNull { it.trim().toLongOrNull() }
+            .filter { it > 0L }
+        targetGroupIds = ArrayList(gids)
+        targetGroupId = gids.firstOrNull() ?: 0L
         strategy = DataStore.balancerStrategy
         testUrl = DataStore.balancerTestUrl
         interval = DataStore.balancerInterval
@@ -67,15 +77,51 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
     ) {
         addPreferencesFromResource(R.xml.balancer_preferences)
 
-        val groupPref = findPreference<SimpleMenuPreference>("balancerTargetGroup")
+        val groupPref = findPreference<Preference>("balancerTargetGroup")
         val allGroups = runCatching { SagerDatabase.groupDao.allGroups() }.getOrDefault(emptyList())
-        if (allGroups.isNotEmpty()) {
-            groupPref?.entries = allGroups.map { it.displayName() }.toTypedArray()
-            groupPref?.entryValues = allGroups.map { it.id.toString() }.toTypedArray()
-            if (DataStore.balancerTargetGroup == 0L || allGroups.none { it.id == DataStore.balancerTargetGroup }) {
-                DataStore.balancerTargetGroup = allGroups.first().id
+
+        fun updateGroupSummary() {
+            val selectedGids = DataStore.balancerTargetGroups.split(",")
+                .mapNotNull { it.trim().toLongOrNull() }
+                .filter { it > 0L }
+                .toSet()
+            val matchedGroups = allGroups.filter { selectedGids.contains(it.id) }
+            groupPref?.summary = when {
+                matchedGroups.isEmpty() -> getString(androidx.preference.R.string.not_set)
+                matchedGroups.size <= 2 -> matchedGroups.joinToString(", ") { it.displayName() }
+                else -> "${matchedGroups.size} 个分组: " + matchedGroups.take(2).joinToString(", ") { it.displayName() } + "..."
             }
-            groupPref?.value = DataStore.balancerTargetGroup.toString()
+        }
+        updateGroupSummary()
+
+        groupPref?.setOnPreferenceClickListener {
+            val currentSelected = DataStore.balancerTargetGroups.split(",")
+                .mapNotNull { it.trim().toLongOrNull() }
+                .filter { it > 0L }
+                .toMutableSet()
+            if (currentSelected.isEmpty() && DataStore.balancerTargetGroup > 0L) {
+                currentSelected.add(DataStore.balancerTargetGroup)
+            }
+            val groupNames = allGroups.map { g ->
+                val count = runCatching { SagerDatabase.proxyDao.getByGroup(g.id).size }.getOrDefault(0)
+                "${g.displayName()} ($count)"
+            }.toTypedArray()
+            val checkedStates = allGroups.map { currentSelected.contains(it.id) }.toBooleanArray()
+
+            MaterialAlertDialogBuilder(this@BalancerSettingsActivity)
+                .setTitle(R.string.balancer_select_group)
+                .setMultiChoiceItems(groupNames, checkedStates) { _, which, isChecked ->
+                    checkedStates[which] = isChecked
+                }
+                .setPositiveButton(android.R.string.ok) { _, _ ->
+                    val newGids = allGroups.filterIndexed { index, _ -> checkedStates[index] }.map { it.id }
+                    DataStore.balancerTargetGroups = newGids.joinToString(",")
+                    DataStore.balancerTargetGroup = newGids.firstOrNull() ?: 0L
+                    updateGroupSummary()
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+            true
         }
 
         fun updateTypeVisibility(type: Int) {

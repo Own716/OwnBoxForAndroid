@@ -104,6 +104,9 @@ class SagerNet : Application(),
 
         if (isMainProcess) {
             Theme.apply(this)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && DataStore.useSystemTheme) {
+                com.google.android.material.color.DynamicColors.applyToActivitiesIfAvailable(this)
+            }
             Theme.applyNightTheme()
             AppLocale.apply()
             AppIconManager.init(this)

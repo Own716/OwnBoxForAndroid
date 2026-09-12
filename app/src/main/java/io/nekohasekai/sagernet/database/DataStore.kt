@@ -120,7 +120,6 @@ object DataStore : OnPreferenceDataStoreChangeListener {
 
     var bypassLan by configurationStore.boolean(Key.BYPASS_LAN)
     var bypassLanInCore by configurationStore.boolean(Key.BYPASS_LAN_IN_CORE)
-    var amoledTheme by configurationStore.boolean("amoledTheme")
     var concurrentDial by configurationStore.boolean(Key.CONCURRENT_DIAL)
     var dualNetworkAcceleration by configurationStore.boolean(Key.DUAL_NETWORK_ACCELERATION)
     var autoSelectLowestLatency by configurationStore.boolean(Key.AUTO_SELECT_LOWEST_LATENCY)
@@ -361,6 +360,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
 
     var balancerType by profileCacheStore.stringToInt("balancerType") { 0 }
     var balancerTargetGroup by profileCacheStore.stringToLong("balancerTargetGroup") { 0L }
+    var balancerTargetGroups by profileCacheStore.string("balancerTargetGroups") { "" }
     var balancerStrategy by profileCacheStore.string("balancerStrategy") { "random" }
     var balancerTestUrl by profileCacheStore.string("balancerTestUrl") { "" }
     var balancerInterval by profileCacheStore.stringToInt("balancerInterval") { 300 }

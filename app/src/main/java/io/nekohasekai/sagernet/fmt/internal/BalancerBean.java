@@ -24,6 +24,7 @@ public class BalancerBean extends InternalBean {
 
     public int balancerType = TYPE_LIST; // 0 = list, 1 = group
     public long targetGroupId = 0L;
+    public List<Long> targetGroupIds = new ArrayList<>();
     public List<Long> proxies = new ArrayList<>();
     public String strategy = STRATEGY_RANDOM;
     public String testUrl = "";
@@ -42,7 +43,8 @@ public class BalancerBean extends InternalBean {
     public String displayAddress() {
         String stratStr = strategy != null ? strategy : STRATEGY_RANDOM;
         if (balancerType == TYPE_GROUP) {
-            return "[分组] 策略: " + stratStr;
+            int gCount = targetGroupIds != null && !targetGroupIds.isEmpty() ? targetGroupIds.size() : (targetGroupId > 0 ? 1 : 0);
+            return "[分组 (" + gCount + ")] 策略: " + stratStr;
         } else {
             int count = proxies != null ? proxies.size() : 0;
             return "[列表 (" + count + ")] 策略: " + stratStr;
@@ -54,6 +56,7 @@ public class BalancerBean extends InternalBean {
         super.initializeDefaultValues();
         if (name == null) name = "";
         if (proxies == null) proxies = new ArrayList<>();
+        if (targetGroupIds == null) targetGroupIds = new ArrayList<>();
         if (strategy == null || strategy.isEmpty()) strategy = STRATEGY_RANDOM;
         if (testUrl == null) testUrl = "";
         if (interval <= 0) interval = 300;
@@ -61,7 +64,7 @@ public class BalancerBean extends InternalBean {
 
     @Override
     public void serialize(ByteBufferOutput output) {
-        output.writeInt(1); // version
+        output.writeInt(2); // version
         output.writeInt(balancerType);
         output.writeLong(targetGroupId);
         output.writeString(strategy);
@@ -71,6 +74,14 @@ public class BalancerBean extends InternalBean {
         output.writeInt(proxies.size());
         for (Long proxy : proxies) {
             output.writeLong(proxy);
+        }
+
+        if (targetGroupIds == null) {
+            targetGroupIds = new ArrayList<>();
+        }
+        output.writeInt(targetGroupIds.size());
+        for (Long gid : targetGroupIds) {
+            output.writeLong(gid);
         }
     }
 
@@ -88,6 +99,16 @@ public class BalancerBean extends InternalBean {
             proxies = new ArrayList<>();
             for (int i = 0; i < length; i++) {
                 proxies.add(input.readLong());
+            }
+
+            targetGroupIds = new ArrayList<>();
+            if (version >= 2) {
+                int gCount = input.readInt();
+                for (int i = 0; i < gCount; i++) {
+                    targetGroupIds.add(input.readLong());
+                }
+            } else if (targetGroupId > 0L) {
+                targetGroupIds.add(targetGroupId);
             }
         }
     }

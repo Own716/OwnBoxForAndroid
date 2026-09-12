@@ -17,12 +17,9 @@
             app:title="@string/balancer_type"
             app:useSimpleSummaryProvider="true" />
 
-        <moe.matsuri.nb4a.ui.SimpleMenuPreference
-            app:entries="@array/empty_array"
-            app:entryValues="@array/empty_array"
+        <Preference
             app:key="balancerTargetGroup"
-            app:title="@string/balancer_select_group"
-            app:useSimpleSummaryProvider="true" />
+            app:title="@string/balancer_select_group" />
 
         <moe.matsuri.nb4a.ui.SimpleMenuPreference
             app:defaultValue="random"

@@ -1,5 +1,6 @@
 package io.nekohasekai.sagernet.utils
 
+import android.app.WallpaperManager
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Color
@@ -90,26 +91,48 @@ object Theme {
         return closestTheme
     }
 
+    fun getSystemWallpaperColor(context: Context): Int? {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                val wallpaperManager = WallpaperManager.getInstance(context)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                    val colors = wallpaperManager?.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
+                    val primary = colors?.primaryColor?.toArgb()
+                    if (primary != null && primary != 0) {
+                        return primary
+                    }
+                }
+                val sysAccent = context.getColor(android.R.color.system_accent1_600)
+                if (sysAccent != 0) return sysAccent
+            } catch (_: Throwable) {
+            }
+        }
+        return null
+    }
+
     fun apply(context: Context) {
         context.setTheme(getTheme())
         if (!isWhiteTheme() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && DataStore.useSystemTheme && context is android.app.Activity) {
             com.google.android.material.color.DynamicColors.applyIfAvailable(context)
         }
-        if (DataStore.amoledTheme && usingNightMode()) {
-            context.theme.applyStyle(R.style.Theme_SagerNet_Amoled, true)
-        }
     }
 
     fun applyDialog(context: Context) {
         context.setTheme(getDialogTheme())
-        if (DataStore.amoledTheme && usingNightMode()) {
-            context.theme.applyStyle(R.style.Theme_SagerNet_Amoled, true)
+        if (!isWhiteTheme() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && DataStore.useSystemTheme && context is android.app.Activity) {
+            com.google.android.material.color.DynamicColors.applyIfAvailable(context)
         }
     }
 
     fun getTheme(): Int {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && DataStore.useSystemTheme) {
-            getTheme(MONET)
+            val wallpaperColor = getSystemWallpaperColor(app)
+            if (wallpaperColor != null) {
+                val closest = getClosestThemeForColor(wallpaperColor)
+                if (closest == WHITE) R.style.Theme_SagerNet_White else getTheme(closest)
+            } else {
+                getTheme(MONET)
+            }
         } else {
             getTheme(DataStore.appTheme)
         }
@@ -117,7 +140,13 @@ object Theme {
 
     fun getDialogTheme(): Int {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && DataStore.useSystemTheme) {
-            getDialogTheme(MONET)
+            val wallpaperColor = getSystemWallpaperColor(app)
+            if (wallpaperColor != null) {
+                val closest = getClosestThemeForColor(wallpaperColor)
+                if (closest == WHITE) R.style.Theme_SagerNet_Dialog_White else getDialogTheme(closest)
+            } else {
+                getDialogTheme(MONET)
+            }
         } else {
             getDialogTheme(DataStore.appTheme)
         }
@@ -206,6 +235,15 @@ object Theme {
             return Color.parseColor("#212121")
         }
         val isNight = usingNightMode()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && DataStore.useSystemTheme) {
+            val wallpaperColor = getSystemWallpaperColor(context)
+            if (wallpaperColor != null) {
+                if (isNight && ColorUtils.calculateLuminance(wallpaperColor) < 0.25) {
+                    return context.getColorAttr(R.attr.primaryOrTextPrimary)
+                }
+                return wallpaperColor
+            }
+        }
         if (DataStore.appTheme == CUSTOM) {
             val color = DataStore.customThemeColor or 0xFF000000.toInt()
             if (isNight && ColorUtils.calculateLuminance(color) < 0.25) {

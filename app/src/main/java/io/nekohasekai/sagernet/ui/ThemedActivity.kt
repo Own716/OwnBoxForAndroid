@@ -26,13 +26,13 @@ abstract class ThemedActivity : AppCompatActivity {
     var uiMode = 0
     open val isDialog = false
     private var lastUseSystemTheme: Boolean = false
-    private var lastAmoledTheme: Boolean = false
+    private var lastWallpaperColor: Int? = null
     private var lastAppTheme: Int = 0
     private var lastCustomThemeColor: Int = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         lastUseSystemTheme = DataStore.useSystemTheme
-        lastAmoledTheme = DataStore.amoledTheme
+        lastWallpaperColor = if (DataStore.useSystemTheme) Theme.getSystemWallpaperColor(this) else null
         lastAppTheme = DataStore.appTheme
         lastCustomThemeColor = DataStore.customThemeColor
 
@@ -56,12 +56,11 @@ abstract class ThemedActivity : AppCompatActivity {
             val primaryColor = Theme.getPrimaryColor(this)
             val isLightPrimary = ColorUtils.calculateLuminance(primaryColor) > 0.45
             val isNight = Theme.usingNightMode()
-            val isAmoled = DataStore.amoledTheme && isNight
 
             if (isWhiteTheme) {
                 insetController.isAppearanceLightStatusBars = true
                 insetController.isAppearanceLightNavigationBars = true
-            } else if (isAmoled || (isBlackTheme && isNight)) {
+            } else if (isBlackTheme && isNight) {
                 insetController.isAppearanceLightStatusBars = false
                 insetController.isAppearanceLightNavigationBars = false
             } else {
@@ -89,8 +88,9 @@ abstract class ThemedActivity : AppCompatActivity {
 
     override fun onResume() {
         super.onResume()
+        val currentWallpaperColor = if (DataStore.useSystemTheme) Theme.getSystemWallpaperColor(this) else null
         if (lastUseSystemTheme != DataStore.useSystemTheme ||
-            lastAmoledTheme != DataStore.amoledTheme ||
+            (DataStore.useSystemTheme && lastWallpaperColor != currentWallpaperColor) ||
             (!DataStore.useSystemTheme && (lastAppTheme != DataStore.appTheme || (DataStore.appTheme == Theme.CUSTOM && lastCustomThemeColor != DataStore.customThemeColor)))) {
             ActivityCompat.recreate(this)
         }
