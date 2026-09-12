@@ -16,9 +16,18 @@
         <item name="colorOnSurface">?android:attr/textColorPrimary</item>
         <item name="colorOnSurfaceVariant">?android:attr/textColorSecondary</item>
         <item name="colorSurfaceVariant">?android:attr/colorBackground</item>
-        <item name="textAppearanceBodyMedium">?attr/textAppearanceBody2</item>
+        <item name="textAppearanceHeadlineLarge">?attr/textAppearanceHeadline4</item>
+        <item name="textAppearanceHeadlineMedium">?attr/textAppearanceHeadline5</item>
+        <item name="textAppearanceHeadlineSmall">?attr/textAppearanceHeadline6</item>
+        <item name="textAppearanceTitleLarge">?attr/textAppearanceHeadline6</item>
+        <item name="textAppearanceTitleMedium">?attr/textAppearanceSubtitle1</item>
+        <item name="textAppearanceTitleSmall">?attr/textAppearanceSubtitle2</item>
         <item name="textAppearanceBodyLarge">?attr/textAppearanceBody1</item>
+        <item name="textAppearanceBodyMedium">?attr/textAppearanceBody2</item>
         <item name="textAppearanceBodySmall">?attr/textAppearanceCaption</item>
+        <item name="textAppearanceLabelLarge">?attr/textAppearanceButton</item>
+        <item name="textAppearanceLabelMedium">?attr/textAppearanceButton</item>
+        <item name="textAppearanceLabelSmall">?attr/textAppearanceCaption</item>
 
         <!-- 立体卡片提升表面色，默认 = Pink；各配色变体在下方各自覆盖 -->
         <item name="cardElevatedSurfaceColor">@color/card_elevated_pink</item>
@@ -83,9 +92,18 @@
         <item name="colorOnSurface">?android:attr/textColorPrimary</item>
         <item name="colorOnSurfaceVariant">?android:attr/textColorSecondary</item>
         <item name="colorSurfaceVariant">?android:attr/colorBackground</item>
-        <item name="textAppearanceBodyMedium">?attr/textAppearanceBody2</item>
+        <item name="textAppearanceHeadlineLarge">?attr/textAppearanceHeadline4</item>
+        <item name="textAppearanceHeadlineMedium">?attr/textAppearanceHeadline5</item>
+        <item name="textAppearanceHeadlineSmall">?attr/textAppearanceHeadline6</item>
+        <item name="textAppearanceTitleLarge">?attr/textAppearanceHeadline6</item>
+        <item name="textAppearanceTitleMedium">?attr/textAppearanceSubtitle1</item>
+        <item name="textAppearanceTitleSmall">?attr/textAppearanceSubtitle2</item>
         <item name="textAppearanceBodyLarge">?attr/textAppearanceBody1</item>
+        <item name="textAppearanceBodyMedium">?attr/textAppearanceBody2</item>
         <item name="textAppearanceBodySmall">?attr/textAppearanceCaption</item>
+        <item name="textAppearanceLabelLarge">?attr/textAppearanceButton</item>
+        <item name="textAppearanceLabelMedium">?attr/textAppearanceButton</item>
+        <item name="textAppearanceLabelSmall">?attr/textAppearanceCaption</item>
 
         <!-- 立体卡片提升表面色，默认 = Pink；各配色变体在下方各自覆盖 -->
         <item name="cardElevatedSurfaceColor">@color/card_elevated_pink</item>
@@ -736,5 +754,11 @@
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowAnimationStyle">@android:style/Animation.Dialog</item>
+    </style>
+
+    <style name="TextAppearance.OwnBox.Dashboard.Tab" parent="TextAppearance.Design.Tab">
+        <item name="android:textSize">13sp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textStyle">bold</item>
     </style>
 </resources>

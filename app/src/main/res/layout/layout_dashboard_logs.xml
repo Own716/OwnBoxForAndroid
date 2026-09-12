@@ -32,7 +32,7 @@
 
                 <com.google.android.material.chip.Chip
                     android:id="@+id/chipLogInfo"
-                    style="@style/Widget.Material3.Chip.Filter"
+                    style="@style/Widget.MaterialComponents.Chip.Filter"
                     android:layout_width="wrap_content"
                     android:layout_height="32dp"
                     android:checked="true"
@@ -40,21 +40,21 @@
 
                 <com.google.android.material.chip.Chip
                     android:id="@+id/chipLogWarn"
-                    style="@style/Widget.Material3.Chip.Filter"
+                    style="@style/Widget.MaterialComponents.Chip.Filter"
                     android:layout_width="wrap_content"
                     android:layout_height="32dp"
                     android:text="WARN" />
 
                 <com.google.android.material.chip.Chip
                     android:id="@+id/chipLogError"
-                    style="@style/Widget.Material3.Chip.Filter"
+                    style="@style/Widget.MaterialComponents.Chip.Filter"
                     android:layout_width="wrap_content"
                     android:layout_height="32dp"
                     android:text="ERROR" />
 
                 <com.google.android.material.chip.Chip
                     android:id="@+id/chipLogDebug"
-                    style="@style/Widget.Material3.Chip.Filter"
+                    style="@style/Widget.MaterialComponents.Chip.Filter"
                     android:layout_width="wrap_content"
                     android:layout_height="32dp"
                     android:text="DEBUG" />

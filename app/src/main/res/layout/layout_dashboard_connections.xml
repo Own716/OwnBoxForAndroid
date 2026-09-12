@@ -74,7 +74,7 @@
             app:tabMode="fixed"
             app:tabRippleColor="?attr/colorControlHighlight"
             app:tabSelectedTextColor="?attr/colorPrimary"
-            app:tabTextAppearance="?attr/textAppearanceLabelMedium"
+            app:tabTextAppearance="@style/TextAppearance.OwnBox.Dashboard.Tab"
             app:tabTextColor="?attr/primaryOrTextSecondary">
 
             <com.google.android.material.tabs.TabItem
@@ -97,7 +97,7 @@
         <!-- Search Input Bar -->
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/searchLayout"
-            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
@@ -137,7 +137,7 @@
 
                 <com.google.android.material.chip.Chip
                     android:id="@+id/chipProtocol"
-                    style="@style/Widget.Material3.Chip.Assist.Elevated"
+                    style="@style/Widget.MaterialComponents.Chip.Action"
                     android:layout_width="wrap_content"
                     android:layout_height="32dp"
                     android:text="@string/dashboard_filter_all_proto"
@@ -146,7 +146,7 @@
 
                 <com.google.android.material.chip.Chip
                     android:id="@+id/chipOutbound"
-                    style="@style/Widget.Material3.Chip.Assist.Elevated"
+                    style="@style/Widget.MaterialComponents.Chip.Action"
                     android:layout_width="wrap_content"
                     android:layout_height="32dp"
                     android:text="@string/dashboard_filter_all_outbounds"
@@ -155,7 +155,7 @@
 
                 <com.google.android.material.chip.Chip
                     android:id="@+id/chipSort"
-                    style="@style/Widget.Material3.Chip.Assist.Elevated"
+                    style="@style/Widget.MaterialComponents.Chip.Action"
                     android:layout_width="wrap_content"
                     android:layout_height="32dp"
                     android:text="@string/dashboard_sort_time_desc"

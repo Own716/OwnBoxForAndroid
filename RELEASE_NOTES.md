@@ -1,6 +1,6 @@
-# Own for Android v2.6.8 预览版 (v2.6.8-preview)
+# Own for Android v2.6.9 预览版 (v2.6.9-preview)
 
-* 新增 Sing-box 实时仪表盘与 Clash API 侧边栏联动
-* 支持连接多维排序、正则搜索与单条/批量断开控制
-* 引入已关闭连接快照比对与历史内存淘汰队列
-* 集成仪表盘专属底栏，支持路由规则与实时日志流式查看
+* 修复仪表盘 TabLayout 因缺失 TextAppearance 导致的启动崩溃问题
+* 补充完善全局 MaterialComponents 样式兼容映射
+* 全面适配深色模式、纯黑主题与动态主题色下的正常渲染
+
