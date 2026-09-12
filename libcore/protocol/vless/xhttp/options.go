@@ -65,6 +65,18 @@ func (c *V2RayXHTTPBaseOptions) GetNormalizedPath() string {
 	return path
 }
 
+func (c *V2RayXHTTPBaseOptions) GetStreamOnePath() string {
+	pathAndQuery := strings.SplitN(c.Path, "?", 2)
+	path := pathAndQuery[0]
+	if path == "" {
+		return "/"
+	}
+	if path[0] != '/' {
+		path = "/" + path
+	}
+	return path
+}
+
 func (c *V2RayXHTTPBaseOptions) GetNormalizedQuery() string {
 	pathAndQuery := strings.SplitN(c.Path, "?", 2)
 	query := ""
@@ -79,14 +91,14 @@ func (c *V2RayXHTTPBaseOptions) GetRequestHeader(rawURL string) http.Header {
 	for k, v := range c.Headers {
 		header.Add(k, v)
 	}
-	u, _ := url.Parse(rawURL)
-	// https://www.rfc-editor.org/rfc/rfc7541.html#appendix-B
-	// h2's HPACK Header Compression feature employs a huffman encoding using a static table.
-	// 'X' is assigned an 8 bit code, so HPACK compression won't change actual padding length on the wire.
-	// https://www.rfc-editor.org/rfc/rfc9204.html#section-4.1.2-2
-	// h3's similar QPACK feature uses the same huffman table.
-	u.RawQuery = "x_padding=" + strings.Repeat("X", int(c.GetNormalizedXPaddingBytes().Rand()))
-	header.Set("Referer", u.String())
+	paddingLen := int(c.GetNormalizedXPaddingBytes().Rand())
+	if paddingLen > 0 {
+		paddingStr := strings.Repeat("X", paddingLen)
+		u, _ := url.Parse(rawURL)
+		u.RawQuery = "x_padding=" + paddingStr
+		header.Set("Referer", u.String())
+		header.Set("X-Padding", paddingStr)
+	}
 	return header
 }
 

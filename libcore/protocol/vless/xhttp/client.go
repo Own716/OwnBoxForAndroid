@@ -188,12 +188,12 @@ func (c *Client) DialContext(ctx context.Context) (net.Conn, error) {
 	}
 	var err error
 	if mode == "stream-one" {
-		requestURL.Path = options.GetNormalizedPath()
+		requestURL.Path = options.GetStreamOnePath()
 		if xmuxClient != nil {
 			xmuxClient.LeftRequests.Add(-1)
 		}
 		conn.reader, conn.remoteAddr, conn.localAddr, err = httpClient.OpenStream(ctx, requestURL.String(), reader, false)
-		if err != nil { // browser dialer only
+		if err != nil {
 			return nil, err
 		}
 		return &conn, nil

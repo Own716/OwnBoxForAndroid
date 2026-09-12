@@ -45,7 +45,7 @@ func (c *DefaultDialerClient) OpenStream(ctx context.Context, url string, body i
 	// and we can unblock the Dial function and print correct net addresses in
 	// logs
 	gotConn := done.New()
-	ctx = httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{
+	ctxTrace := httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{
 		GotConn: func(connInfo httptrace.GotConnInfo) {
 			remoteAddr = connInfo.Conn.RemoteAddr()
 			localAddr = connInfo.Conn.LocalAddr()
@@ -56,34 +56,66 @@ func (c *DefaultDialerClient) OpenStream(ctx context.Context, url string, body i
 	if body != nil {
 		method = "POST" // stream-up/one
 	}
-	req, _ := http.NewRequestWithContext(context.WithoutCancel(ctx), method, url, body)
+	req, _ := http.NewRequestWithContext(context.WithoutCancel(ctxTrace), method, url, body)
 	req.Header = c.options.GetRequestHeader(url)
 	if method == "POST" && !c.options.NoGRPCHeader {
 		req.Header.Set("Content-Type", "application/grpc")
 	}
-	wrc = &WaitReadCloser{Wait: make(chan struct{})}
+	waitReader := &WaitReadCloser{Wait: make(chan struct{})}
+	wrc = waitReader
+
+	var doErr error
+	var doErrMu sync.Mutex
+	setDoErr := func(e error) {
+		doErrMu.Lock()
+		if doErr == nil {
+			doErr = e
+		}
+		doErrMu.Unlock()
+	}
+
 	go func() {
-		resp, err := c.client.Do(req)
-		if err != nil {
+		resp, dErr := c.client.Do(req)
+		if dErr != nil {
 			if !uploadOnly { // stream-down is enough
 				c.closed = true
 			}
+			setDoErr(dErr)
+			waitReader.SetErr(dErr)
 			gotConn.Close()
-			wrc.Close()
+			waitReader.Close()
 			return
 		}
 		if resp.StatusCode != 200 || uploadOnly { // stream-up
 			if resp.StatusCode != 200 {
 				c.closed = true
+				statusErr := fmt.Errorf("bad status code: %s", resp.Status)
+				setDoErr(statusErr)
+				waitReader.SetErr(statusErr)
 			}
 			io.Copy(io.Discard, resp.Body)
 			resp.Body.Close() // if it is called immediately, the upload will be interrupted also
-			wrc.Close()
+			waitReader.Close()
 			return
 		}
-		wrc.(*WaitReadCloser).Set(resp.Body)
+		waitReader.Set(resp.Body)
 	}()
-	<-gotConn.Wait()
+
+	select {
+	case <-gotConn.Wait():
+	case <-ctx.Done():
+		c.closed = true
+		waitReader.SetErr(ctx.Err())
+		waitReader.Close()
+		return nil, nil, nil, ctx.Err()
+	}
+
+	doErrMu.Lock()
+	err = doErr
+	doErrMu.Unlock()
+	if err != nil {
+		return nil, nil, nil, err
+	}
 	return
 }
 
@@ -180,10 +212,11 @@ func (c *DefaultDialerClient) PostPacket(ctx context.Context, url string, body i
 }
 
 type WaitReadCloser struct {
-	Wait chan struct{}
+	Wait   chan struct{}
 	io.ReadCloser
-	mu   sync.Mutex
-	once sync.Once
+	err    error
+	mu     sync.Mutex
+	once   sync.Once
 	closed bool
 }
 
@@ -205,17 +238,34 @@ func (w *WaitReadCloser) Set(rc io.ReadCloser) {
 	w.notify()
 }
 
+func (w *WaitReadCloser) SetErr(err error) {
+	w.mu.Lock()
+	if w.err == nil {
+		w.err = err
+	}
+	w.mu.Unlock()
+	w.notify()
+}
+
 func (w *WaitReadCloser) Read(b []byte) (int, error) {
 	w.mu.Lock()
 	rc := w.ReadCloser
+	err := w.err
 	w.mu.Unlock()
 
 	if rc == nil {
+		if err != nil {
+			return 0, err
+		}
 		<-w.Wait
 		w.mu.Lock()
 		rc = w.ReadCloser
+		err = w.err
 		w.mu.Unlock()
 		if rc == nil {
+			if err != nil {
+				return 0, err
+			}
 			return 0, io.ErrClosedPipe
 		}
 	}

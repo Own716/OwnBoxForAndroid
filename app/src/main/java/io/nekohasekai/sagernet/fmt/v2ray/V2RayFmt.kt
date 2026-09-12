@@ -831,11 +831,12 @@ fun buildSingBoxOutboundStreamSettings(bean: StandardV2RayBean): V2RayTransportO
 }
 
 fun buildSingBoxOutboundTLS(bean: StandardV2RayBean): OutboundTLSOptions? {
-    if (bean !is TrojanBean && bean.security != "tls") return null
+    if (bean !is TrojanBean && bean.security != "tls" && bean.security != "reality" && bean.realityPubKey.isBlank()) return null
     return OutboundTLSOptions().apply {
         enabled = true
         insecure = bean.allowInsecure || DataStore.globalAllowInsecure
-        server_name = bean.sni.takeIf { it.isNotBlank() } ?: bean.serverAddress
+        val trimmedSni = bean.sni?.trim()
+        server_name = trimmedSni.takeIf { !it.isNullOrBlank() } ?: bean.serverAddress?.trim()
         if (bean.alpn.isNotBlank()) {
             // 当传输协议为WebSocket时，过滤掉h2和h3
             val alpnList = bean.alpn.listByLineOrComma()
@@ -847,16 +848,18 @@ fun buildSingBoxOutboundTLS(bean: StandardV2RayBean): OutboundTLSOptions? {
             }
         }
         if (bean.certificates.isNotBlank()) certificate = bean.certificates
-        var fp = bean.utlsFingerprint
+        var fp = bean.utlsFingerprint?.trim()?.lowercase()
         if (bean.realityPubKey.isNotBlank()) {
             reality = OutboundRealityOptions().apply {
                 enabled = true
-                public_key = bean.realityPubKey
-                short_id = bean.realityShortId
+                public_key = bean.realityPubKey.trim()
+                short_id = bean.realityShortId?.trim()?.lowercase() ?: ""
             }
-            if (fp.isNullOrBlank()) fp = "chrome"
+            if (fp.isNullOrBlank() || fp == "none" || fp == "random" || fp == "randomized") {
+                fp = "chrome"
+            }
         }
-        if (fp.isNotBlank()) {
+        if (!fp.isNullOrBlank()) {
             utls = OutboundUTLSOptions().apply {
                 enabled = true
                 fingerprint = fp

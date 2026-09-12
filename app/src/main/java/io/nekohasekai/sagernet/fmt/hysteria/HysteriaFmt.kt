@@ -321,9 +321,15 @@ fun buildSingBoxOutboundHysteriaBean(bean: HysteriaBean): SingBoxOptions.SingBox
             if (port != null) {
                 server_port = port
             } else {
-                server_ports = hopPortsToSingboxList(bean.serverPorts)
+                val hopList = hopPortsToSingboxList(bean.serverPorts)
+                if (hopList.isNotEmpty()) {
+                    server_ports = hopList
+                    val interval = if (bean.hopInterval != null && bean.hopInterval >= 15) bean.hopInterval else 30
+                    hop_interval = "${interval}s"
+                } else {
+                    server_port = getFirstPort(bean.serverPorts)
+                }
             }
-            hop_interval = "${bean.hopInterval}s"
             up_mbps = bean.uploadMbps
             down_mbps = bean.downloadMbps
             if (bean.obfuscation.isNotBlank()) {
@@ -332,15 +338,23 @@ fun buildSingBoxOutboundHysteriaBean(bean: HysteriaBean): SingBoxOptions.SingBox
                     password = bean.obfuscation
                 }
             }
-//            disable_mtu_discovery = bean.disableMtuDiscovery
             password = bean.authPayload
             udp_fragment = true
-//            if (bean.streamReceiveWindow > 0) {
-//                recv_window_conn = bean.streamReceiveWindow.toLong()
-//            }
-//            if (bean.connectionReceiveWindow > 0) {
-//                recv_window_conn = bean.connectionReceiveWindow.toLong()
-//            }
+
+            // QUIC & Mobile network resilience optimizations:
+            keep_alive_period = "15s"
+            idle_timeout = "30s"
+            if (bean.disableMtuDiscovery) {
+                disable_path_mtu_discovery = true
+            }
+            if (bean.streamReceiveWindow != null && bean.streamReceiveWindow > 0) {
+                stream_receive_window = bean.streamReceiveWindow.toLong()
+            }
+            if (bean.connectionReceiveWindow != null && bean.connectionReceiveWindow > 0) {
+                connection_receive_window = bean.connectionReceiveWindow.toLong()
+            }
+            bbr_profile = "standard"
+
             tls = SingBoxOptions.OutboundTLSOptions().apply {
                 val effectiveSni = bean.sni.takeIf { it.isNotBlank() } ?: bean.serverAddress
                 if (effectiveSni.isNotBlank()) {

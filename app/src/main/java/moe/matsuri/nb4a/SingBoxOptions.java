@@ -4562,6 +4562,18 @@ public class SingBoxOptions {
 
         public String hop_interval;
 
+        public String idle_timeout;
+
+        public String keep_alive_period;
+
+        public Long stream_receive_window;
+
+        public Long connection_receive_window;
+
+        public Boolean disable_path_mtu_discovery;
+
+        public String bbr_profile;
+
     }
 
     public static class Outbound_SelectorOptions extends Outbound {

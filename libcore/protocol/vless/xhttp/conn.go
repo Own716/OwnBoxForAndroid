@@ -39,7 +39,7 @@ func (c *splitConn) Close() error {
 	}
 
 	if err2 != nil {
-		return err
+		return err2
 	}
 
 	return nil

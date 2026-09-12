@@ -24,14 +24,14 @@ fun buildSingBoxOutboundAnyTLSBean(bean: AnyTLSBean): SingBoxOptions.Outbound_An
             bean.certificates.blankAsNull()?.let {
                 certificate = it
             }
-            var fingerprint = bean.utlsFingerprint.blankAsNull()
+            var fingerprint = bean.utlsFingerprint.blankAsNull()?.trim()?.lowercase()
             if (!bean.realityPubKey.isNullOrBlank()) {
                 reality = SingBoxOptions.OutboundRealityOptions().apply {
                     enabled = true
-                    public_key = bean.realityPubKey
-                    short_id = bean.realityShortId
+                    public_key = bean.realityPubKey.trim()
+                    short_id = bean.realityShortId?.trim()?.lowercase() ?: ""
                 }
-                if (fingerprint.isNullOrBlank()) {
+                if (fingerprint.isNullOrBlank() || fingerprint == "none" || fingerprint == "random" || fingerprint == "randomized") {
                     fingerprint = "chrome"
                 }
             }

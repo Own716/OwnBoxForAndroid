@@ -115,6 +115,9 @@ fun parseSingBoxOutbound(json: JSONObject): AbstractBean? {
             json.optJSONObject("obfs")?.let {
                 obfuscation = it.getStr("password") ?: ""
             }
+            json.getIntNya("stream_receive_window")?.let { streamReceiveWindow = it }
+            json.getIntNya("connection_receive_window")?.let { connectionReceiveWindow = it }
+            disableMtuDiscovery = json.optBoolean("disable_path_mtu_discovery", false)
             parseSingBoxHopInterval(json)?.let { hopInterval = it }
             if (tls != null) {
                 sni = tls.sni
