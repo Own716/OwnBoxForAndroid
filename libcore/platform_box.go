@@ -67,8 +67,9 @@ func (w *boxPlatformInterfaceWrapper) AutoDetectInterfaceControl(fd int) error {
 	// call protect_path
 	if !isBgProcess {
 		var err error
+		protectPath := GetProtectSocketPath()
 		for attempt := 0; attempt < 3; attempt++ {
-			err = sendFdToProtect(fd, "protect_path")
+			err = sendFdToProtect(fd, protectPath)
 			if err == nil {
 				w.urlTestTrace("protect", "ok fd=%d elapsed=%s via=protect_path attempt=%d", fd, time.Since(started), attempt+1)
 				return nil

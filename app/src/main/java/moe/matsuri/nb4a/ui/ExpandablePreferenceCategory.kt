@@ -96,5 +96,11 @@ class ExpandablePreferenceCategory @JvmOverloads constructor(
                 else R.drawable.ic_baseline_keyboard_arrow_down_24
             )
         }
+
+        holder.itemView.isClickable = true
+        holder.itemView.isFocusable = true
+        holder.itemView.setOnClickListener {
+            toggle()
+        }
     }
 }

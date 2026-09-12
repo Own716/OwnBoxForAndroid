@@ -16,7 +16,17 @@ import (
 )
 
 //go:linkname resourcePaths github.com/sagernet/sing-box/constant.resourcePaths
-var resourcePaths []string
+var (
+	resourcePaths     []string
+	protectSocketPath string
+)
+
+func GetProtectSocketPath() string {
+	if protectSocketPath != "" {
+		return protectSocketPath
+	}
+	return "protect_path"
+}
 
 func NekoLogPrintln(s string) {
 	log.Println(s)
@@ -46,6 +56,7 @@ func InitCore(process, cachePath, internalAssets, externalAssets string,
 	tmp := filepath.Join(cachePath, "../no_backup")
 	os.MkdirAll(tmp, 0755)
 	os.Chdir(tmp)
+	protectSocketPath = filepath.Join(tmp, "protect_path")
 
 	// sing-box fs
 	resourcePaths = append(resourcePaths, externalAssets)

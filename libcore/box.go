@@ -436,13 +436,12 @@ func UrlTest(i *BoxInstance, link string, timeout int32) (latency int32, err err
 	boxPlatformLogWriter.WriteMessage(sblog.LevelDebug, fmt.Sprintf("box.UrlTest link=%s timeout=%dms instance=%v", link, timeout, i != nil))
 
 	primaryTimeout := timeout
-	fallbackTimeout := timeout
-	if timeout >= 3000 {
-		primaryTimeout = timeout * 3 / 5
-		fallbackTimeout = timeout - primaryTimeout + 500
-		if fallbackTimeout < 2000 {
-			fallbackTimeout = 2000
-		}
+	fallbackTimeout := int32(2000)
+	if timeout > 3500 {
+		primaryTimeout = timeout - 1500
+		fallbackTimeout = 2000
+	} else if timeout < 2000 {
+		fallbackTimeout = timeout
 	}
 
 	if i == nil {
@@ -523,8 +522,7 @@ func urlTest(instance *BoxInstance, link string, timeout int32) (int32, error) {
 		},
 	}
 
-	methodUsed := http.MethodHead
-	req1, err := http.NewRequestWithContext(ctx, http.MethodHead, link, nil)
+	req1, err := http.NewRequestWithContext(ctx, http.MethodGet, link, nil)
 	if err != nil {
 		return 0, err
 	}
@@ -533,30 +531,10 @@ func urlTest(instance *BoxInstance, link string, timeout int32) (int32, error) {
 	start1 := time.Now()
 	resp1, err := client.Do(req1)
 	if err == nil {
-		_, _ = io.Copy(io.Discard, resp1.Body)
+		_, _ = io.CopyN(io.Discard, resp1.Body, 8192)
 		_ = resp1.Body.Close()
 		if resp1.StatusCode >= 400 {
 			err = fmt.Errorf("HTTP error %d", resp1.StatusCode)
-		}
-	}
-
-	// 若 HEAD 被中转拦截或报错 (如 EOF/405/403/400+)，且超时未结束，靶向以 GET 请求重试预热
-	if err != nil && ctx.Err() == nil {
-		req1Get, errGet := http.NewRequestWithContext(ctx, http.MethodGet, link, nil)
-		if errGet == nil {
-			req1Get.Header.Set("User-Agent", browserUserAgent)
-			start1 = time.Now()
-			resp1Get, errGetDo := client.Do(req1Get)
-			if errGetDo == nil {
-				_, _ = io.Copy(io.Discard, resp1Get.Body)
-				_ = resp1Get.Body.Close()
-				if resp1Get.StatusCode < 400 {
-					err = nil
-					methodUsed = http.MethodGet
-				} else {
-					err = fmt.Errorf("HTTP error %d", resp1Get.StatusCode)
-				}
-			}
 		}
 	}
 
@@ -566,13 +544,13 @@ func urlTest(instance *BoxInstance, link string, timeout int32) (int32, error) {
 	pass1 := time.Since(start1)
 
 	// 阶段二：复用保活连接，测得纯 1-RTT 真实低延迟
-	req2, err2 := http.NewRequestWithContext(ctx, methodUsed, link, nil)
+	req2, err2 := http.NewRequestWithContext(ctx, http.MethodGet, link, nil)
 	if err2 == nil {
 		req2.Header.Set("User-Agent", browserUserAgent)
 		start2 := time.Now()
 		resp2, err2Do := client.Do(req2)
 		if err2Do == nil {
-			_, _ = io.Copy(io.Discard, resp2.Body)
+			_, _ = io.CopyN(io.Discard, resp2.Body, 8192)
 			_ = resp2.Body.Close()
 			if resp2.StatusCode < 400 {
 				latency := int32(time.Since(start2).Milliseconds())
@@ -667,7 +645,7 @@ func goServeProtect(start bool) {
 		protectCloser = nil
 	}
 	if start {
-		protectCloser = serveProtect("protect_path", func(fd int) {
+		protectCloser = serveProtect(GetProtectSocketPath(), func(fd int) {
 			intfBox.AutoDetectInterfaceControl(int32(fd))
 		})
 	}

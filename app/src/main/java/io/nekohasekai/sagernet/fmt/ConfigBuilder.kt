@@ -1413,19 +1413,24 @@ fun buildConfig(
         }
 
         if (forTest) {
-            dns.rules = if (ipv6Mode == IPv6Mode.DISABLE) {
-                listOf(DNSRule_DefaultOptions().apply {
+            val testRules = mutableListOf<DNSRule_DefaultOptions>()
+            if (ipv6Mode == IPv6Mode.DISABLE) {
+                testRules.add(DNSRule_DefaultOptions().apply {
                     query_type = listOf("AAAA")
                     action = "reject"
                 })
             } else if (ipv6Mode == IPv6Mode.ONLY) {
-                listOf(DNSRule_DefaultOptions().apply {
+                testRules.add(DNSRule_DefaultOptions().apply {
                     query_type = listOf("A")
                     action = "reject"
                 })
-            } else {
-                listOf()
             }
+            // avoid loopback: outbound server domains must resolve directly
+            testRules.add(DNSRule_DefaultOptions().apply {
+                outbound = mutableListOf("any")
+                server = "dns-direct"
+            })
+            dns.rules = testRules
         } else {
             // built-in DNS rules
             if (ipv6Mode == IPv6Mode.DISABLE) {

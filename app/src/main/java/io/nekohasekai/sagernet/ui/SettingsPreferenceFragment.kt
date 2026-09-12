@@ -241,18 +241,14 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
 
         val categoryCore = findPreference<ExpandablePreferenceCategory>("categoryCore")
         val rulesProvider = findPreference<SimpleMenuPreference>(Key.RULES_PROVIDER)!!
-        val rulesGeositeUrl = findPreference<EditTextPreference>(Key.RULES_GEOSITE_URL)!!
-        val rulesGeoipUrl = findPreference<EditTextPreference>(Key.RULES_GEOIP_URL)!!
         categoryCore?.setChildVisibilityRule(Key.RULES_GEOSITE_URL) { DataStore.rulesProvider == 4 }
         categoryCore?.setChildVisibilityRule(Key.RULES_GEOIP_URL) { DataStore.rulesProvider == 4 }
-        rulesGeositeUrl.isVisible = DataStore.rulesProvider == 4
-        rulesGeoipUrl.isVisible = DataStore.rulesProvider == 4
         rulesProvider.setOnPreferenceChangeListener { _, newValue ->
             val provider = (newValue as String).toInt()
+            categoryCore?.setChildVisibilityRule(Key.RULES_GEOSITE_URL) { provider == 4 }
+            categoryCore?.setChildVisibilityRule(Key.RULES_GEOIP_URL) { provider == 4 }
             categoryCore?.updateChildVisibility(Key.RULES_GEOSITE_URL)
             categoryCore?.updateChildVisibility(Key.RULES_GEOIP_URL)
-            rulesGeositeUrl.isVisible = provider == 4
-            rulesGeoipUrl.isVisible = provider == 4
             true
         }
 

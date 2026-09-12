@@ -184,6 +184,12 @@ class BaseService {
             }
         }
 
+        override fun postNotificationSpeed(speed: io.nekohasekai.sagernet.aidl.SpeedDisplayData) {
+            launch {
+                data?.notification?.postNotificationSpeedUpdate(speed)
+            }
+        }
+
         fun stateChanged(s: State, msg: String?) = launch {
             val profileName = profileName
             broadcast { it.stateChanged(s.ordinal, profileName, msg) }

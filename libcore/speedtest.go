@@ -820,13 +820,21 @@ func runSimpleDownload(
 			copyErr := <-done
 			total := transferred.Load()
 			rate := calculateSpeedTestRate(total, time.Since(started))
+			progress(speedTestProgress{
+				stage:                 SpeedTestStageDownload,
+				downloadBitsPerSecond: rate,
+				downloadBytes:         total,
+			})
 			if err := ctx.Err(); err != nil {
 				return rate, total, err
 			}
 			if copyErr != nil && !errors.Is(copyErr, context.DeadlineExceeded) && !errors.Is(copyErr, context.Canceled) {
 				return rate, total, copyErr
 			}
-			return rate, total, downloadCtx.Err()
+			if total == 0 {
+				return rate, total, fmt.Errorf("simple download transferred no data: %w", downloadCtx.Err())
+			}
+			return rate, total, nil
 		}
 	}
 }

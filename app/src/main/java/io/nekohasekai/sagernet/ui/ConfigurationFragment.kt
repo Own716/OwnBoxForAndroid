@@ -1102,6 +1102,24 @@ class ConfigurationFragment @JvmOverloads constructor(
                     binding.progress.text = "0 / ${profiles.size}"
                 }
                 runner.run(profiles) { index, total, sample ->
+                    val rxBytes = sample.downloadBitsPerSecond / 8
+                    val txBytes = sample.uploadBitsPerSecond / 8
+                    runOnMainDispatcher {
+                        (activity as? MainActivity)?.binding?.stats?.updateSpeed(txBytes, rxBytes)
+                        try {
+                            (activity as? MainActivity)?.connection?.service?.postNotificationSpeed(
+                                io.nekohasekai.sagernet.aidl.SpeedDisplayData(
+                                    txRateProxy = txBytes,
+                                    rxRateProxy = rxBytes,
+                                    txTotal = sample.uploadBytes,
+                                    rxTotal = sample.downloadBytes,
+                                )
+                            )
+                        } catch (_: Exception) {}
+                        adapter.groupFragments.values.forEach { fragment ->
+                            fragment.adapter?.updateSpeedTestLive(sample.profileId, sample)
+                        }
+                    }
                     val outcome = SpeedTestOutcome.completedOrNull(
                         mode = sample.mode,
                         stage = sample.stage,
@@ -1111,16 +1129,28 @@ class ConfigurationFragment @JvmOverloads constructor(
                         downloadBitsPerSecond = sample.downloadBitsPerSecond,
                         uploadBitsPerSecond = sample.uploadBitsPerSecond,
                     )
-                    if (outcome != null && SagerDatabase.proxyDao.updateSpeedTestResult(
-                            proxyId = sample.profileId,
-                            mode = outcome.mode,
-                            downloadBitsPerSecond = outcome.downloadBitsPerSecond,
-                            uploadBitsPerSecond = outcome.uploadBitsPerSecond,
-                        ) > 0
-                    ) {
-                        runOnMainDispatcher {
-                            adapter.groupFragments.values.forEach { fragment ->
-                                fragment.adapter?.updateSpeedTestResult(sample.profileId, outcome)
+                    if (outcome != null) {
+                        if (SagerDatabase.proxyDao.updateSpeedTestResult(
+                                proxyId = sample.profileId,
+                                mode = outcome.mode,
+                                downloadBitsPerSecond = outcome.downloadBitsPerSecond,
+                                uploadBitsPerSecond = outcome.uploadBitsPerSecond,
+                            ) > 0
+                        ) {
+                            runOnMainDispatcher {
+                                adapter.groupFragments.values.forEach { fragment ->
+                                    fragment.adapter?.updateSpeedTestResult(sample.profileId, outcome)
+                                }
+                            }
+                        }
+                    } else if (sample.done && sample.error.isNotBlank()) {
+                        runOnDefaultDispatcher {
+                            val p = SagerDatabase.proxyDao.getById(sample.profileId)
+                            if (p != null) {
+                                p.status = 3
+                                p.error = sample.error
+                                SagerDatabase.proxyDao.updateProxy(p)
+                                ProfileManager.postUpdate(sample.profileId)
                             }
                         }
                     }
@@ -1145,6 +1175,17 @@ class ConfigurationFragment @JvmOverloads constructor(
                     }
                 }
             } finally {
+                runOnMainDispatcher {
+                    (activity as? MainActivity)?.binding?.stats?.updateSpeed(0, 0)
+                    try {
+                        (activity as? MainActivity)?.connection?.service?.postNotificationSpeed(
+                            io.nekohasekai.sagernet.aidl.SpeedDisplayData(0, 0, 0, 0, 0, 0)
+                        )
+                    } catch (_: Exception) {}
+                    adapter.groupFragments.values.forEach { fragment ->
+                        fragment.adapter?.clearSpeedTestLive()
+                    }
+                }
                 speedTestNotification?.updateNotification(0, 0, true)
                 speedTestNotification = null
                 speedTestDialog = null
@@ -1214,6 +1255,24 @@ class ConfigurationFragment @JvmOverloads constructor(
                     binding.progress.text = "0 / 1"
                 }
                 runner.run(profiles) { index, total, sample ->
+                    val rxBytes = sample.downloadBitsPerSecond / 8
+                    val txBytes = sample.uploadBitsPerSecond / 8
+                    runOnMainDispatcher {
+                        (activity as? MainActivity)?.binding?.stats?.updateSpeed(txBytes, rxBytes)
+                        try {
+                            (activity as? MainActivity)?.connection?.service?.postNotificationSpeed(
+                                io.nekohasekai.sagernet.aidl.SpeedDisplayData(
+                                    txRateProxy = txBytes,
+                                    rxRateProxy = rxBytes,
+                                    txTotal = sample.uploadBytes,
+                                    rxTotal = sample.downloadBytes,
+                                )
+                            )
+                        } catch (_: Exception) {}
+                        adapter.groupFragments.values.forEach { fragment ->
+                            fragment.adapter?.updateSpeedTestLive(sample.profileId, sample)
+                        }
+                    }
                     val outcome = SpeedTestOutcome.completedOrNull(
                         mode = sample.mode,
                         stage = sample.stage,
@@ -1223,16 +1282,28 @@ class ConfigurationFragment @JvmOverloads constructor(
                         downloadBitsPerSecond = sample.downloadBitsPerSecond,
                         uploadBitsPerSecond = sample.uploadBitsPerSecond,
                     )
-                    if (outcome != null && SagerDatabase.proxyDao.updateSpeedTestResult(
-                            proxyId = sample.profileId,
-                            mode = outcome.mode,
-                            downloadBitsPerSecond = outcome.downloadBitsPerSecond,
-                            uploadBitsPerSecond = outcome.uploadBitsPerSecond,
-                        ) > 0
-                    ) {
-                        runOnMainDispatcher {
-                            adapter.groupFragments.values.forEach { fragment ->
-                                fragment.adapter?.updateSpeedTestResult(sample.profileId, outcome)
+                    if (outcome != null) {
+                        if (SagerDatabase.proxyDao.updateSpeedTestResult(
+                                proxyId = sample.profileId,
+                                mode = outcome.mode,
+                                downloadBitsPerSecond = outcome.downloadBitsPerSecond,
+                                uploadBitsPerSecond = outcome.uploadBitsPerSecond,
+                            ) > 0
+                        ) {
+                            runOnMainDispatcher {
+                                adapter.groupFragments.values.forEach { fragment ->
+                                    fragment.adapter?.updateSpeedTestResult(sample.profileId, outcome)
+                                }
+                            }
+                        }
+                    } else if (sample.done && sample.error.isNotBlank()) {
+                        runOnDefaultDispatcher {
+                            val p = SagerDatabase.proxyDao.getById(sample.profileId)
+                            if (p != null) {
+                                p.status = 3
+                                p.error = sample.error
+                                SagerDatabase.proxyDao.updateProxy(p)
+                                ProfileManager.postUpdate(sample.profileId)
                             }
                         }
                     }
@@ -1262,6 +1333,15 @@ class ConfigurationFragment @JvmOverloads constructor(
                 }
             } finally {
                 runOnMainDispatcher {
+                    (activity as? MainActivity)?.binding?.stats?.updateSpeed(0, 0)
+                    try {
+                        (activity as? MainActivity)?.connection?.service?.postNotificationSpeed(
+                            io.nekohasekai.sagernet.aidl.SpeedDisplayData(0, 0, 0, 0, 0, 0)
+                        )
+                    } catch (_: Exception) {}
+                    adapter.groupFragments.values.forEach { fragment ->
+                        fragment.adapter?.clearSpeedTestLive()
+                    }
                     if (speedTestDialog === dialog) {
                         speedTestDialog = null
                     }
@@ -2516,8 +2596,23 @@ class ConfigurationFragment @JvmOverloads constructor(
                 reloadProfiles()
             }
 
+            val liveSpeedTests = HashMap<Long, SpeedTestSnapshot>()
+
+            fun updateSpeedTestLive(profileId: Long, sample: SpeedTestSnapshot) {
+                liveSpeedTests[profileId] = sample
+                val index = configurationIdList.indexOf(profileId)
+                if (index >= 0) notifyItemChanged(index)
+            }
+
+            fun clearSpeedTestLive() {
+                liveSpeedTests.clear()
+                notifyDataSetChanged()
+            }
+
             fun updateSpeedTestResult(profileId: Long, outcome: SpeedTestOutcome) {
-                val profile = configurationList[profileId] ?: return
+                liveSpeedTests.remove(profileId)
+                val profile = configurationList[profileId] ?: ProfileManager.getProfile(profileId) ?: return
+                configurationList[profileId] = profile
                 profile.speedTestMode = outcome.mode
                 profile.speedTestDownloadBitsPerSecond = outcome.downloadBitsPerSecond
                 profile.speedTestUploadBitsPerSecond = outcome.uploadBitsPerSecond
@@ -2553,7 +2648,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
 
             override suspend fun onAdd(profile: ProxyEntity) {
-                if (profile.groupId != proxyGroup.id) return
+                if (profile.groupId != proxyGroup.id && !configurationIdList.contains(profile.id)) return
 
                 configurationListView.post {
                     if (::undoManager.isInitialized) {
@@ -2574,7 +2669,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
 
             override suspend fun onUpdated(profile: ProxyEntity, noTraffic: Boolean) {
-                if (profile.groupId != proxyGroup.id) return
+                if (profile.groupId != proxyGroup.id && !configurationIdList.contains(profile.id)) return
                 if (noTraffic) {
                     (parentFragment as? ConfigurationFragment)?.refreshProfileState()
                 }
@@ -3067,7 +3162,15 @@ class ConfigurationFragment @JvmOverloads constructor(
 
                 val rx = proxyEntity.rx
                 val tx = proxyEntity.tx
-                val speedTestText = speedTestResultText(proxyEntity)
+                val live = adapter?.liveSpeedTests?.get(proxyEntity.id)
+                val liveText = if (live != null && !live.done) {
+                    when (live.stage) {
+                        SpeedTestQueueRunner.STAGE_DOWNLOAD -> "↓ ${getString(R.string.speed_test_rate_mbps, live.downloadBitsPerSecond / 1_000_000.0)}"
+                        SpeedTestQueueRunner.STAGE_UPLOAD -> "↑ ${getString(R.string.speed_test_rate_mbps, live.uploadBitsPerSecond / 1_000_000.0)}"
+                        else -> null
+                    }
+                } else null
+                val speedTestText = liveText ?: speedTestResultText(proxyEntity)
 
                 val showTraffic = rx + tx != 0L
                 trafficText.isVisible = showTraffic

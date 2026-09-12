@@ -25,7 +25,7 @@ func (p *protectServer) Close() error {
 	return err
 }
 
-// serveProtect 监听 unix socket path（相对路径，位于 no_backup 工作目录下）。
+// serveProtect 监听 unix socket path（位于 no_backup 目录下）。
 // listen 失败时返回 nil（调用方按不可 protect 降级处理）。
 func serveProtect(path string, callback func(fd int)) io.Closer {
 	_ = os.Remove(path)
@@ -34,6 +34,7 @@ func serveProtect(path string, callback func(fd int)) io.Closer {
 		log.Println("serveProtect listen failed:", err)
 		return nil
 	}
+	_ = os.Chmod(path, 0666)
 	server := &protectServer{listener: listener, done: make(chan struct{})}
 	go server.loop(callback)
 	return server

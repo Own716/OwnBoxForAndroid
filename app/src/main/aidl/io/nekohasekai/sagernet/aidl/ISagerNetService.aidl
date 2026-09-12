@@ -1,6 +1,7 @@
 package io.nekohasekai.sagernet.aidl;
 
 import io.nekohasekai.sagernet.aidl.ISagerNetServiceCallback;
+import io.nekohasekai.sagernet.aidl.SpeedDisplayData;
 
 interface ISagerNetService {
   int getState();
@@ -12,4 +13,5 @@ interface ISagerNetService {
 
   int urlTest();
   int urlTestCustomUrl(String url, int timeoutMs);
+  oneway void postNotificationSpeed(in SpeedDisplayData speed);
 }
