@@ -60,52 +60,46 @@
                 android:background="?android:attr/selectableItemBackground"
                 android:orientation="vertical"
                 android:paddingHorizontal="14dp"
-                android:paddingVertical="14dp">
+                android:paddingVertical="10dp">
 
-                <!-- Row 1: 左侧 tx / rx (左肩)，中央 FAB 凹槽安全隔离，右侧 status 与 btn_ip_detail (右肩) -->
+                <!-- Row 1: 左侧 tx / rx (左肩垂直排布独享全宽)，中央 FAB 凹槽安全隔离，右侧 status 与 btn_ip_detail (右肩) -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
-                    <!-- 左肩：tx / rx 速率区域（合理分配权重与内边距，启用自适应缩放防截断） -->
+                    <!-- 左肩：tx / rx 速率区域（纵向排列各自独享全宽，自适应缩放彻底杜绝大字体截断） -->
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1.15"
+                        android:layout_weight="1"
                         android:gravity="center_vertical|start"
-                        android:orientation="horizontal">
+                        android:orientation="vertical">
 
                         <TextView
                             android:id="@+id/tx"
-                            android:layout_width="0dp"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_weight="1"
                             android:ellipsize="end"
                             android:maxLines="1"
-                            android:singleLine="true"
-                            android:textColor="@color/white"
-                            android:textSize="13sp"
+                            android:textSize="12sp"
                             app:autoSizeMaxTextSize="13sp"
-                            app:autoSizeMinTextSize="8sp"
+                            app:autoSizeMinTextSize="9sp"
                             app:autoSizeStepGranularity="0.5sp"
                             app:autoSizeTextType="uniform"
                             tools:text="▲ 0 B/s" />
 
                         <TextView
                             android:id="@+id/rx"
-                            android:layout_width="0dp"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="3dp"
-                            android:layout_weight="1.25"
+                            android:layout_marginTop="2dp"
                             android:ellipsize="end"
                             android:maxLines="1"
-                            android:singleLine="true"
-                            android:textColor="@color/white"
-                            android:textSize="13sp"
+                            android:textSize="12sp"
                             app:autoSizeMaxTextSize="13sp"
-                            app:autoSizeMinTextSize="8sp"
+                            app:autoSizeMinTextSize="9sp"
                             app:autoSizeStepGranularity="0.5sp"
                             app:autoSizeTextType="uniform"
                             tools:text="▼ 0 B/s" />
@@ -114,7 +108,7 @@
 
                     <!-- 中央：FAB 悬浮球凹槽物理安全隔离空间 -->
                     <Space
-                        android:layout_width="52dp"
+                        android:layout_width="48dp"
                         android:layout_height="1dp" />
 
                     <!-- 右肩：status 延迟与重测刷新按钮（规整靠右对齐，上下两行排版防大字体截断） -->
@@ -139,8 +133,6 @@
                                 android:ellipsize="end"
                                 android:gravity="end"
                                 android:maxLines="1"
-                                android:singleLine="true"
-                                android:textColor="@color/white"
                                 android:textSize="11sp"
                                 android:visibility="gone"
                                 app:autoSizeMaxTextSize="11sp"
@@ -157,8 +149,6 @@
                                 android:ellipsize="end"
                                 android:gravity="end"
                                 android:maxLines="1"
-                                android:singleLine="true"
-                                android:textColor="@color/white"
                                 android:textSize="13sp"
                                 android:textStyle="bold"
                                 app:autoSizeMaxTextSize="13sp"
@@ -179,26 +169,27 @@
                             android:padding="2dp"
                             android:src="@drawable/ic_baseline_refresh_24"
                             android:visibility="gone"
-                            app:tint="@color/white"
                             tools:visibility="visible" />
 
                     </LinearLayout>
 
                 </LinearLayout>
 
-                <!-- Row 2: 出站落地 IP 独占整行展示 -->
+                <!-- Row 2: 出站落地 IP 独占整行展示，支持大字体自适应与双行弹性折行 -->
                 <TextView
                     android:id="@+id/status_ip"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
                     android:ellipsize="end"
-                    android:maxLines="1"
-                    android:singleLine="true"
-                    android:textColor="@color/white"
-                    android:textSize="14sp"
+                    android:maxLines="2"
+                    android:textSize="13sp"
                     android:textStyle="bold"
                     android:visibility="gone"
+                    app:autoSizeMaxTextSize="14sp"
+                    app:autoSizeMinTextSize="10sp"
+                    app:autoSizeStepGranularity="0.5sp"
+                    app:autoSizeTextType="uniform"
                     tools:text="🇰🇷 KR 118.218.10.157"
                     tools:visibility="visible" />
 

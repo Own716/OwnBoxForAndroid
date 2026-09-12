@@ -2,12 +2,16 @@ package io.nekohasekai.sagernet.widget
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.text.format.Formatter
 import android.util.AttributeSet
 import android.view.View
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.widget.TooltipCompat
 import androidx.coordinatorlayout.widget.CoordinatorLayout
+import androidx.core.graphics.ColorUtils
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.whenStarted
 import com.google.android.material.bottomappbar.BottomAppBar
@@ -15,10 +19,11 @@ import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.bg.BaseService
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.ktx.*
-import io.nekohasekai.sagernet.ui.MainActivity
-import kotlin.math.abs
 import android.app.Activity
+import io.nekohasekai.sagernet.ui.MainActivity
 import io.nekohasekai.sagernet.utils.LandingIpManager
+import io.nekohasekai.sagernet.utils.Theme
+import kotlin.math.abs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -150,17 +155,46 @@ class StatsBar @JvmOverloads constructor(
                     false
                 }
             }
-            if (io.nekohasekai.sagernet.utils.Theme.isWhiteTheme()) {
-                backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.WHITE)
-                txText.setTextColor(android.graphics.Color.parseColor("#757575"))
-                rxText.setTextColor(android.graphics.Color.parseColor("#757575"))
-                statusIpText.setTextColor(android.graphics.Color.parseColor("#212121"))
-                statusTitleText.setTextColor(android.graphics.Color.parseColor("#757575"))
-                statusText.setTextColor(android.graphics.Color.parseColor("#212121"))
-                (btnIpDetail as? android.widget.ImageView)?.imageTintList =
-                    android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#212121"))
-            }
+            updateThemeColors()
         }
+    }
+
+    fun updateThemeColors() {
+        if (!this::statusText.isInitialized) return
+        val currentContext = context ?: return
+        if (Theme.isWhiteTheme()) {
+            backgroundTintList = ColorStateList.valueOf(Color.WHITE)
+        }
+        val effectiveBgColor = backgroundTintList?.defaultColor
+            ?: currentContext.getColorAttr(R.attr.colorPrimary)
+
+        val isLightBg = ColorUtils.calculateLuminance(effectiveBgColor) > 0.45
+
+        if (isLightBg) {
+            val primaryTextColor = Color.parseColor("#1E293B")
+            val secondaryTextColor = Color.parseColor("#64748B")
+            txText.setTextColor(secondaryTextColor)
+            rxText.setTextColor(secondaryTextColor)
+            statusIpText.setTextColor(primaryTextColor)
+            statusTitleText.setTextColor(secondaryTextColor)
+            statusText.setTextColor(primaryTextColor)
+            (btnIpDetail as? ImageView)?.imageTintList = ColorStateList.valueOf(primaryTextColor)
+        } else {
+            val primaryTextColor = Color.WHITE
+            val secondaryTextColor = Color.parseColor("#CCFFFFFF")
+            txText.setTextColor(secondaryTextColor)
+            rxText.setTextColor(secondaryTextColor)
+            statusIpText.setTextColor(primaryTextColor)
+            statusTitleText.setTextColor(secondaryTextColor)
+            statusText.setTextColor(primaryTextColor)
+            (btnIpDetail as? ImageView)?.imageTintList = ColorStateList.valueOf(primaryTextColor)
+        }
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        initViews()
+        updateThemeColors()
     }
 
     fun onIpDetailClicked() {
@@ -398,6 +432,7 @@ class StatsBar @JvmOverloads constructor(
     }
 
     fun refreshDisplay() {
+        updateThemeColors()
         if (currentState == BaseService.State.Connected) {
             btnIpDetail?.visibility = if (DataStore.showLandingIp) View.VISIBLE else View.GONE
             updateStatusViews()

@@ -19,6 +19,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/net/http2"
+
 	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/experimental/v2rayapi"
 	"github.com/sagernet/sing-box/protocol/group"
@@ -508,11 +510,14 @@ func urlTest(instance *BoxInstance, link string, timeout int32) (int32, error) {
 		TLSClientConfig: &tls.Config{
 			ServerName:         hostname,
 			InsecureSkipVerify: true,
+			NextProtos:         []string{"h2", "http/1.1"},
 		},
+		ForceAttemptHTTP2: true,
 		DisableKeepAlives: false,
 		MaxIdleConns:      5,
 		IdleConnTimeout:   10 * time.Second,
 	}
+	_ = http2.ConfigureTransport(transport)
 	defer transport.CloseIdleConnections()
 
 	client := &http.Client{
@@ -533,7 +538,7 @@ func urlTest(instance *BoxInstance, link string, timeout int32) (int32, error) {
 	if err == nil {
 		_, _ = io.CopyN(io.Discard, resp1.Body, 8192)
 		_ = resp1.Body.Close()
-		if resp1.StatusCode >= 400 {
+		if resp1.StatusCode >= 500 {
 			err = fmt.Errorf("HTTP error %d", resp1.StatusCode)
 		}
 	}
@@ -552,7 +557,7 @@ func urlTest(instance *BoxInstance, link string, timeout int32) (int32, error) {
 		if err2Do == nil {
 			_, _ = io.CopyN(io.Discard, resp2.Body, 8192)
 			_ = resp2.Body.Close()
-			if resp2.StatusCode < 400 {
+			if resp2.StatusCode < 500 {
 				latency := int32(time.Since(start2).Milliseconds())
 				if latency <= 0 {
 					latency = 1
@@ -583,7 +588,7 @@ func urlTestDirect(client *http.Client, link string) (int32, error) {
 	if err == nil {
 		_, _ = io.Copy(io.Discard, resp1.Body)
 		_ = resp1.Body.Close()
-		if resp1.StatusCode >= 400 {
+		if resp1.StatusCode >= 500 {
 			err = fmt.Errorf("HTTP error %d", resp1.StatusCode)
 		}
 	}
@@ -597,7 +602,7 @@ func urlTestDirect(client *http.Client, link string) (int32, error) {
 			if errGetDo == nil {
 				_, _ = io.Copy(io.Discard, resp1Get.Body)
 				_ = resp1Get.Body.Close()
-				if resp1Get.StatusCode < 400 {
+				if resp1Get.StatusCode < 500 {
 					err = nil
 					methodUsed = http.MethodGet
 				} else {
@@ -620,7 +625,7 @@ func urlTestDirect(client *http.Client, link string) (int32, error) {
 		if err2 == nil {
 			_, _ = io.Copy(io.Discard, resp2.Body)
 			_ = resp2.Body.Close()
-			if resp2.StatusCode < 400 {
+			if resp2.StatusCode < 500 {
 				latency := int32(time.Since(start2).Milliseconds())
 				if latency <= 0 {
 					latency = 1

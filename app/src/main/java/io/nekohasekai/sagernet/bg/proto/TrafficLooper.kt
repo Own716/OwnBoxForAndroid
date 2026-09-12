@@ -205,7 +205,7 @@ class TrafficLooper
                             Logs.d("traffic count $tag to ${ent.id}")
                         }
                     }
-                    if (proxy.config.selectorGroupId >= 0L) {
+                    if (proxy.config.selectorGroupId >= 0L || idMap.containsKey(proxy.config.mainEntId)) {
                         selectMainLocked(proxy.config.mainEntId)
                     } else {
                         proxy.config.balancerMemberMap.values.forEach { memberIds ->
@@ -239,12 +239,16 @@ class TrafficLooper
                             sumRxDelta += (m.rx - m.rxBase)
                             if (m.hasTrafficDelta) hasDelta = true
                         }
-                        balancerItem.txRate = sumTxRate
-                        balancerItem.rxRate = sumRxRate
-                        balancerItem.tx = balancerItem.txBase + sumTxDelta
-                        balancerItem.rx = balancerItem.rxBase + sumRxDelta
-                        if (hasDelta) {
-                            balancerItem.hasTrafficDelta = true
+                        if (sumTxRate > 0L || sumRxRate > 0L || sumTxDelta > 0L || sumRxDelta > 0L) {
+                            balancerItem.txRate = sumTxRate
+                            balancerItem.rxRate = sumRxRate
+                            balancerItem.tx = balancerItem.txBase + sumTxDelta
+                            balancerItem.rx = balancerItem.rxBase + sumRxDelta
+                            if (hasDelta) {
+                                balancerItem.hasTrafficDelta = true
+                            }
+                        } else if (balancerItem.tag == TAG_PROXY || balancerId == selectorNowId) {
+                            // Active Balancer proxy: keep real rates queried from TAG_PROXY
                         }
                     }
                 }
@@ -255,8 +259,10 @@ class TrafficLooper
                 var mainTx = 0L
                 var mainRx = 0L
                 val balancerItems = proxy.config.balancerMemberMap.keys.mapNotNull { idMap[it] }.toSet()
+                val balancerMemberItems = proxy.config.balancerMemberMap.values.flatten().mapNotNull { idMap[it] }.toSet()
+                val activeBalancer = idMap[selectorNowId]?.takeIf { it in balancerItems }
                 tagMap.forEach { (_, it) ->
-                    if (it !in balancerItems) {
+                    if (it !in balancerMemberItems && (it !in balancerItems || it === activeBalancer)) {
                         if (!it.ignore) {
                             mainTxRate += it.txRate
                             mainRxRate += it.rxRate

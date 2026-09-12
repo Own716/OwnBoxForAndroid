@@ -36,6 +36,7 @@
         <item name="tabIndicatorColor">@color/white</item>
         <item name="tabRippleColor">@color/white</item>
         <item name="whiteOrTextPrimary">@color/white</item>
+        <item name="colorOnPrimary">@color/white</item>
 
         <item name="windowActionModeOverlay">true</item>
 
@@ -608,6 +609,9 @@
         <item name="accentOrTextPrimary">?android:textColorPrimary</item>
         <item name="primaryOrTextSecondary">?android:textColorSecondary</item>
         <item name="primaryOrTextPrimary">?android:textColorPrimary</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorOnSurface">?android:textColorPrimary</item>
+        <item name="colorOnSurfaceVariant">?android:textColorSecondary</item>
     </style>
 
     <style name="Theme.SagerNet.VerdantMint" parent="Theme.SagerNet">
@@ -627,6 +631,7 @@
         <item name="colorMaterial300">@color/color_white_theme_material_300</item>
         <item name="cardElevatedSurfaceColor">@color/color_white_theme_surface</item>
         <item name="colorSurface">@color/color_white_theme_surface</item>
+        <item name="colorOnPrimary">@color/color_white_theme_text_primary</item>
         <item name="colorOnSurface">@color/color_white_theme_text_primary</item>
         <item name="colorOnSurfaceVariant">@color/color_white_theme_text_secondary</item>
         <item name="android:textColorPrimary">@color/color_white_theme_text_primary</item>
@@ -708,6 +713,12 @@
         <item name="android:windowBackground">@color/black</item>
         <item name="colorSurface">@color/black</item>
         <item name="cardElevatedSurfaceColor">#0D0D0D</item>
+        <item name="android:textColorPrimary">@color/white</item>
+        <item name="android:textColorSecondary">#B3FFFFFF</item>
+        <item name="android:textColorTertiary">#80FFFFFF</item>
+        <item name="colorOnSurface">@color/white</item>
+        <item name="colorOnSurfaceVariant">#B3FFFFFF</item>
+        <item name="colorOnPrimary">@color/white</item>
     </style>
 
 

@@ -357,6 +357,10 @@ fun buildConfig(
             rule.outbound.takeIf { it > 0 && it != proxy.id }
         }.toHashSet().toList()).associateBy { it.id }
     val buildSelector = !forTest && group?.isSelector == true && !forExport
+    val isGroupUrlTest = group?.let { DataStore.isGroupUrlTest(it.id) } == true
+    val isGroupLoadBalance = group?.let { DataStore.isGroupLoadBalance(it.id) } == true
+    val useAutoSelect = !forTest && !forExport && isGroupUrlTest
+    val useLoadBalance = !forTest && !forExport && isGroupLoadBalance
     val userDNSRuleList = mutableListOf<DNSRule_DefaultOptions>()
     val domainListDNSDirectForce = mutableListOf<String>()
     val bypassDNSBeans = hashSetOf<AbstractBean>()
@@ -1002,10 +1006,6 @@ fun buildConfig(
             return chainTagOut
         }
 
-        val isGroupUrlTest = group?.let { DataStore.isGroupUrlTest(it.id) } == true
-        val isGroupLoadBalance = group?.let { DataStore.isGroupLoadBalance(it.id) } == true
-        val useAutoSelect = !forTest && !forExport && isGroupUrlTest
-        val useLoadBalance = !forTest && !forExport && isGroupLoadBalance
         // build outbounds
         if (buildSelector || useAutoSelect || useLoadBalance) {
             val list = if (group != null && group.id != 0L) {
@@ -1039,9 +1039,11 @@ fun buildConfig(
                 )
             } else if (useLoadBalance && tagMap.isNotEmpty()) {
                 outbounds.add(0, buildLoadBalanceOutbound(tagMap.values.toList(), customTag = TAG_PROXY))
+                balancerMemberMap[proxy.id] = list.map { it.id }
             } else {
                 outbounds.add(0, buildSelectorOutbound(tagMap[proxy.id], tagMap.values.toList(), customTag = TAG_PROXY))
             }
+            trafficMap[TAG_PROXY] = listOf(proxy)
         } else {
             val mainTag = buildChain(0, proxy)
             tagMap[proxy.id] = mainTag
@@ -1638,7 +1640,7 @@ fun buildConfig(
             proxy.id,
             trafficMap,
             tagMap,
-            if (buildSelector) group.id else -1L,
+            if (buildSelector || useAutoSelect || useLoadBalance) group?.id ?: 0L else -1L,
             balancerMemberMap
         )
     }

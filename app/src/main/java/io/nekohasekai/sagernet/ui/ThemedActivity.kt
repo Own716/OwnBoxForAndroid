@@ -7,6 +7,7 @@ import android.widget.TextView
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.core.graphics.ColorUtils
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -52,15 +53,19 @@ abstract class ThemedActivity : AppCompatActivity {
             val insetController = WindowCompat.getInsetsController(window, window.decorView)
             val isWhiteTheme = Theme.isWhiteTheme()
             val isBlackTheme = DataStore.appTheme == Theme.BLACK
+            val primaryColor = Theme.getPrimaryColor(this)
+            val isLightPrimary = ColorUtils.calculateLuminance(primaryColor) > 0.45
+            val isNight = Theme.usingNightMode()
+            val isAmoled = DataStore.amoledTheme && isNight
 
             if (isWhiteTheme) {
                 insetController.isAppearanceLightStatusBars = true
                 insetController.isAppearanceLightNavigationBars = true
-            } else if (isBlackTheme) {
-                insetController.isAppearanceLightStatusBars = !Theme.usingNightMode()
+            } else if (isAmoled || (isBlackTheme && isNight)) {
+                insetController.isAppearanceLightStatusBars = false
                 insetController.isAppearanceLightNavigationBars = false
             } else {
-                insetController.isAppearanceLightStatusBars = false
+                insetController.isAppearanceLightStatusBars = isLightPrimary && !isNight
                 insetController.isAppearanceLightNavigationBars = false
             }
         }
