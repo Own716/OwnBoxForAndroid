@@ -410,7 +410,7 @@ class DocsFragment : ToolbarFragment(R.layout.layout_docs) {
                 badge = "推荐: 开启",
                 desc = "在内核路由判定前，将嗅探或接收到的域名预先解析为 IP 地址，以匹配更完备的 GeoIP 规则。",
                 prosCons = "【利】大幅增强基于 IP 归属地分流的准确度；【弊】配合不当可能触发额外 DNS 请求。",
-                recommendation = "【最稳推荐：开启】Own 内部已内置单栈防穿透过滤，开启可保障分流准确性最大化。",
+                recommendation = "【最稳推荐：开启】OwnBox 内部已内置单栈防穿透过滤，开启可保障分流准确性最大化。",
                 keywords = "解析目标地址 resolveDestination geoip 分流",
             )
         )
