@@ -38,8 +38,8 @@
         <item name="textAppearanceLabelMedium">?attr/textAppearanceButton</item>
         <item name="textAppearanceLabelSmall">?attr/textAppearanceCaption</item>
 
-        <!-- 立体卡片提升表面色，默认 = Pink；各配色变体在下方各自覆盖 -->
-        <item name="cardElevatedSurfaceColor">@color/card_elevated_pink</item>
+        <!-- 立体卡片提升表面色，默认遵循 MD3 规范使用标准表面色 -->
+        <item name="cardElevatedSurfaceColor">@color/md3_surface</item>
 
         <item name="accentOrTextSecondary">?colorAccent</item>
         <item name="accentOrTextPrimary">?colorAccent</item>
@@ -126,8 +126,8 @@
         <item name="textAppearanceLabelMedium">?attr/textAppearanceButton</item>
         <item name="textAppearanceLabelSmall">?attr/textAppearanceCaption</item>
 
-        <!-- 立体卡片提升表面色，默认 = Pink；各配色变体在下方各自覆盖 -->
-        <item name="cardElevatedSurfaceColor">@color/card_elevated_pink</item>
+        <!-- 立体卡片提升表面色，默认遵循 MD3 规范使用标准表面色 -->
+        <item name="cardElevatedSurfaceColor">@color/md3_surface</item>
 
         <item name="accentOrTextSecondary">?colorAccent</item>
         <item name="accentOrTextPrimary">?colorAccent</item>

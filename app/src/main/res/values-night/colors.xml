@@ -19,29 +19,29 @@
     <color name="color_route_proxy">#42A5F5</color>   <!-- 代理：浅蓝 -->
     <color name="color_route_config">#AB47BC</color>  <!-- 配置：浅紫 -->
 
-    <!-- 立体卡片色调提升表面色（深色，#121212 底 + 各 primary 11% 染色） -->
-    <color name="card_elevated_pink">#2A131B</color>
-    <color name="card_elevated_pink_ssr">#2C1D21</color>
-    <color name="card_elevated_amber">#2C2511</color>
-    <color name="card_elevated_blue">#14212B</color>
-    <color name="card_elevated_blue_grey">#1B1E1F</color>
-    <color name="card_elevated_brown">#1D1918</color>
-    <color name="card_elevated_cyan">#102527</color>
-    <color name="card_elevated_deep_orange">#2C1A14</color>
-    <color name="card_elevated_deep_purple">#1B1624</color>
-    <color name="card_elevated_green">#182319</color>
-    <color name="card_elevated_grey">#212121</color>
-    <color name="card_elevated_indigo">#171924</color>
-    <color name="card_elevated_light_blue">#10232B</color>
-    <color name="card_elevated_light_green">#1F2518</color>
-    <color name="card_elevated_lime">#272816</color>
-    <color name="card_elevated_orange">#2C2110</color>
-    <color name="card_elevated_purple">#211423</color>
-    <color name="card_elevated_red">#2B1716</color>
-    <color name="card_elevated_teal">#10211F</color>
-    <color name="card_elevated_yellow">#2C2A17</color>
-    <color name="card_elevated_black">#151515</color>
-    <color name="card_elevated_verdant_mint">#10241C</color>
+    <!-- 立体卡片色调提升表面色（遵循 MD3 标准，夜间统一采用中性表面色） -->
+    <color name="card_elevated_pink">@color/md3_surface</color>
+    <color name="card_elevated_pink_ssr">@color/md3_surface</color>
+    <color name="card_elevated_amber">@color/md3_surface</color>
+    <color name="card_elevated_blue">@color/md3_surface</color>
+    <color name="card_elevated_blue_grey">@color/md3_surface</color>
+    <color name="card_elevated_brown">@color/md3_surface</color>
+    <color name="card_elevated_cyan">@color/md3_surface</color>
+    <color name="card_elevated_deep_orange">@color/md3_surface</color>
+    <color name="card_elevated_deep_purple">@color/md3_surface</color>
+    <color name="card_elevated_green">@color/md3_surface</color>
+    <color name="card_elevated_grey">@color/md3_surface</color>
+    <color name="card_elevated_indigo">@color/md3_surface</color>
+    <color name="card_elevated_light_blue">@color/md3_surface</color>
+    <color name="card_elevated_light_green">@color/md3_surface</color>
+    <color name="card_elevated_lime">@color/md3_surface</color>
+    <color name="card_elevated_orange">@color/md3_surface</color>
+    <color name="card_elevated_purple">@color/md3_surface</color>
+    <color name="card_elevated_red">@color/md3_surface</color>
+    <color name="card_elevated_teal">@color/md3_surface</color>
+    <color name="card_elevated_yellow">@color/md3_surface</color>
+    <color name="card_elevated_black">@color/md3_surface</color>
+    <color name="card_elevated_verdant_mint">@color/md3_surface</color>
 
     <!-- 纯黑主题在深色模式下的颜色映射 -->
     <color name="color_ng_black_accent">#FFFFFF</color>

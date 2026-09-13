@@ -3065,6 +3065,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             private fun applySelected(selected: Boolean) {
                 val ctx = card.context
                 val surface = ctx.getColorAttr(R.attr.colorSurface)
+                card.setCardBackgroundColor(surface)
                 if (DataStore.profileCardStyle == 1) {
                     val primary = ctx.getColorAttr(R.attr.colorPrimary)
                     selectedIndicator.isVisible = false
@@ -3075,30 +3076,11 @@ class ConfigurationFragment @JvmOverloads constructor(
                     )
                     card.strokeColor =
                         if (selected) primary else ctx.getColour(R.color.card_stroke)
-                    card.setCardBackgroundColor(
-                        if (selected) {
-                            ColorUtils.compositeColors(
-                                ColorUtils.setAlphaComponent(primary, 26), surface
-                            )
-                        } else {
-                            surface
-                        }
-                    )
                 } else {
-                    val primary = ctx.getColorAttr(R.attr.selectedColorPrimary)
                     selectedIndicator.isVisible = selected
                     card.strokeWidth = 0
                     card.cardElevation =
                         ctx.resources.getDimension(R.dimen.profile_card_elevation_classic)
-                    card.setCardBackgroundColor(
-                        if (selected) {
-                            ColorUtils.compositeColors(
-                                ColorUtils.setAlphaComponent(primary, 20), surface
-                            )
-                        } else {
-                            surface
-                        }
-                    )
                 }
             }
 
