@@ -241,10 +241,10 @@
 
     <style name="Widget.SagerNet.TabLayout" parent="Widget.MaterialComponents.TabLayout">
         <item name="tabTextAppearance">@style/Widget.SagerNet.TabLayout.TextAppearance</item>
-        <item name="tabTextColor">?android:attr/textColorSecondary</item>
-        <item name="tabSelectedTextColor">?colorPrimary</item>
-        <item name="tabIndicatorColor">?colorPrimary</item>
-        <item name="tabRippleColor">?colorPrimary</item>
+        <item name="tabTextColor">?attr/tabTextColor</item>
+        <item name="tabSelectedTextColor">?attr/tabSelectedTextColor</item>
+        <item name="tabIndicatorColor">?attr/tabIndicatorColor</item>
+        <item name="tabRippleColor">?attr/tabRippleColor</item>
         <item name="tabIndicatorHeight">3dp</item>
         <item name="tabIndicatorFullWidth">false</item>
     </style>
@@ -685,7 +685,7 @@
         <item name="colorMaterial100">#1E1E1E</item>
         <item name="colorMaterial300">#2C2C2C</item>
         <item name="selectedColorPrimary">@color/white</item>
-        <item name="fabColorBackground">#2C2C2E</item>
+        <item name="fabColorBackground">@color/black</item>
         <item name="itemShapeFillColor">#2C2C2E</item>
         <item name="tabTextColor">#CAC4D0</item>
         <item name="tabSelectedTextColor">@color/white</item>
@@ -775,7 +775,7 @@
         <item name="colorMaterial300">#2C2C2C</item>
         <item name="cardElevatedSurfaceColor">#121212</item>
         <item name="selectedColorPrimary">@color/white</item>
-        <item name="fabColorBackground">#2C2C2E</item>
+        <item name="fabColorBackground">@color/black</item>
         <item name="itemShapeFillColor">#2C2C2E</item>
         <item name="accentOrTextSecondary">?android:textColorSecondary</item>
         <item name="accentOrTextPrimary">?android:textColorPrimary</item>

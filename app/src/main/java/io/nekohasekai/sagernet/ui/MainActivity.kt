@@ -87,13 +87,18 @@ class MainActivity : ThemedActivity(),
         binding.fab.initProgress(binding.fabProgress)
         val isNight = Theme.usingNightMode()
         val fabBgColor = when {
+            Theme.isBlackTheme() -> Color.BLACK
             Theme.isWhiteTheme() -> Color.parseColor("#212121")
             Theme.isLightGrayTheme() -> Color.parseColor("#1F2937")
-            Theme.isBlackTheme() -> if (isNight) Color.parseColor("#2C2C2E") else Color.parseColor("#2B2B2B")
             else -> {
                 val bg = getColorAttr(R.attr.fabColorBackground)
-                if (isNight && ColorUtils.calculateLuminance(bg) > 0.85) {
-                    getColorAttr(R.attr.colorPrimary)
+                if (isNight && ColorUtils.calculateLuminance(bg) > 0.75) {
+                    val primary = getColorAttr(R.attr.colorPrimary)
+                    if (ColorUtils.calculateLuminance(primary) > 0.75) {
+                        Color.parseColor("#2C2C2E")
+                    } else {
+                        primary
+                    }
                 } else {
                     bg
                 }

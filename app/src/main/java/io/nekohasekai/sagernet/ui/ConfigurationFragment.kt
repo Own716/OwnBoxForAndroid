@@ -2911,6 +2911,10 @@ class ConfigurationFragment @JvmOverloads constructor(
                     popup.menu.removeItem(R.id.action_group_clipboard)
                 }
 
+                if (select) {
+                    popup.menu.removeItem(R.id.action_delete)
+                }
+
                 popup.setOnMenuItemClickListener(this)
                 popup.setOnDismissListener {
                     if (activeNodePopupMenu === popup) {
@@ -3288,6 +3292,23 @@ class ConfigurationFragment @JvmOverloads constructor(
                     when (item.itemId) {
                         R.id.action_test_profile_speed -> {
                             (parentFragment as? ConfigurationFragment)?.speedTestSingle(entity)
+                        }
+                        R.id.action_edit -> {
+                            val pf = parentFragment as? ConfigurationFragment
+                            val isSelected = pf?.isSelectedProfile(entity.id) == true
+                            val isConnected = DataStore.serviceState.started && (entity.id == DataStore.currentProfile || (isSelected && pf?.isCurrentProfile(entity.id) == true))
+                            if (isConnected) {
+                                alert(getString(R.string.cannot_edit_active_profile)).tryToShow()
+                            } else {
+                                view.context.startActivity(
+                                    entity.settingIntent(
+                                        view.context, proxyGroup.type == GroupType.SUBSCRIPTION
+                                    )
+                                )
+                            }
+                        }
+                        R.id.action_delete -> {
+                            removeProfile(entity)
                         }
                         R.id.action_standard_qr -> {
                             val hasStd = entity.haveStandardLink()
