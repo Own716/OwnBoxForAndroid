@@ -201,7 +201,7 @@
 
     <com.google.android.material.navigation.NavigationView
         android:id="@+id/nav_view"
-        style="@style/Widget.Design.NavigationView"
+        style="@style/Widget.MaterialComponents.NavigationView"
         app:insetForeground="@android:color/transparent"
         android:layout_width="wrap_content"
         android:layout_height="match_parent"
@@ -218,7 +218,7 @@
 
     <com.google.android.material.navigation.NavigationView
         android:id="@+id/nav_view_black"
-        style="@style/Widget.Design.NavigationView"
+        style="@style/Widget.MaterialComponents.NavigationView"
         app:insetForeground="@android:color/transparent"
         android:layout_width="wrap_content"
         android:layout_height="match_parent"

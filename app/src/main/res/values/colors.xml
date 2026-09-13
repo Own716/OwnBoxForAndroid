@@ -368,4 +368,25 @@
     <color name="color_light_gray_tab_unselected">#6B7280</color>
     <color name="color_light_gray_tab_selected">#1F2937</color>
     <color name="color_light_gray_ripple">#1A1F2937</color>
+
+    <!-- 纯黑 (AMOLED Black) 主题专用调色盘 -->
+    <color name="color_black_theme_primary">#FFFFFF</color>
+    <color name="color_black_theme_primary_dark">#121212</color>
+    <color name="color_black_theme_surface">#000000</color>
+    <color name="color_black_theme_bg">#000000</color>
+    <color name="color_black_theme_card_elevated">#121212</color>
+    <color name="color_black_theme_text_primary">#FFFFFF</color>
+    <color name="color_black_theme_text_secondary">#CAC4D0</color>
+    <color name="color_black_theme_text_tertiary">#80FFFFFF</color>
+    <color name="color_black_theme_material_100">#1E1E1E</color>
+    <color name="color_black_theme_material_300">#2C2C2C</color>
+    <color name="color_black_theme_item_shape">#2C2C2E</color>
+    <color name="color_black_theme_tab_unselected">#CAC4D0</color>
+    <color name="color_black_theme_tab_selected">#FFFFFF</color>
+    <color name="color_black_theme_tab_ripple">#33FFFFFF</color>
+
+    <!-- AMOLED 专用调色盘 -->
+    <color name="color_amoled_card_elevated">#0D0D0D</color>
+    <color name="color_amoled_text_secondary">#B3FFFFFF</color>
+    <color name="color_amoled_text_tertiary">#80FFFFFF</color>
 </resources>

@@ -56,6 +56,7 @@
 
         <!-- MD3 Tab 默认样式（高对比、沉浸底色、首字母大写） -->
         <item name="tabStyle">@style/Widget.SagerNet.TabLayout</item>
+        <item name="tabTextAppearance">@style/Widget.SagerNet.TabLayout.TextAppearance</item>
         <item name="tabTextColor">?android:attr/textColorSecondary</item>
         <item name="tabSelectedTextColor">?colorPrimary</item>
         <item name="tabIndicatorColor">?colorPrimary</item>
@@ -227,7 +228,7 @@
     </style>
 
     <style name="Widget.SagerNet.Toolbar" parent="Widget.MaterialComponents.Toolbar.Surface">
-        <item name="android:background">?attr/colorSurface</item>
+        <item name="android:background">@android:color/transparent</item>
         <item name="titleTextColor">?android:attr/textColorPrimary</item>
         <item name="subtitleTextColor">?android:attr/textColorSecondary</item>
         <item name="navigationIconTint">?android:attr/textColorPrimary</item>
@@ -237,6 +238,8 @@
     <style name="ThemeOverlay.SagerNet.Toolbar" parent="ThemeOverlay.MaterialComponents.Toolbar.Surface">
         <item name="colorControlNormal">?android:attr/textColorPrimary</item>
         <item name="actionMenuTextColor">?android:attr/textColorPrimary</item>
+        <item name="colorSurface">@color/md3_surface</item>
+        <item name="android:colorBackground">@color/md3_surface</item>
     </style>
 
     <style name="Widget.SagerNet.TabLayout" parent="Widget.MaterialComponents.TabLayout">
@@ -249,7 +252,7 @@
         <item name="tabIndicatorFullWidth">false</item>
     </style>
 
-    <style name="Widget.SagerNet.TabLayout.TextAppearance" parent="TextAppearance.Design.Tab">
+    <style name="Widget.SagerNet.TabLayout.TextAppearance" parent="TextAppearance.MaterialComponents.Button">
         <item name="android:textAllCaps">false</item>
         <item name="textAllCaps">false</item>
         <item name="android:textSize">14sp</item>
@@ -672,29 +675,29 @@
         <item name="android:colorBackground">@color/black</item>
         <item name="android:windowBackground">@color/black</item>
         <item name="colorSurface">@color/black</item>
-        <item name="cardElevatedSurfaceColor">#121212</item>
+        <item name="cardElevatedSurfaceColor">@color/color_black_theme_card_elevated</item>
         <item name="android:textColorPrimary">@color/white</item>
-        <item name="android:textColorSecondary">#CAC4D0</item>
-        <item name="android:textColorTertiary">#80FFFFFF</item>
+        <item name="android:textColorSecondary">@color/color_black_theme_text_secondary</item>
+        <item name="android:textColorTertiary">@color/color_black_theme_text_tertiary</item>
         <item name="colorOnSurface">@color/white</item>
-        <item name="colorOnSurfaceVariant">#CAC4D0</item>
+        <item name="colorOnSurfaceVariant">@color/color_black_theme_text_secondary</item>
         <item name="colorOnPrimary">@color/black</item>
         <item name="colorPrimary">@color/white</item>
-        <item name="colorPrimaryDark">#121212</item>
+        <item name="colorPrimaryDark">@color/color_black_theme_primary_dark</item>
         <item name="colorAccent">@color/white</item>
-        <item name="colorMaterial100">#1E1E1E</item>
-        <item name="colorMaterial300">#2C2C2C</item>
+        <item name="colorMaterial100">@color/color_black_theme_material_100</item>
+        <item name="colorMaterial300">@color/color_black_theme_material_300</item>
         <item name="selectedColorPrimary">@color/white</item>
         <item name="fabColorBackground">@color/black</item>
-        <item name="itemShapeFillColor">#2C2C2E</item>
-        <item name="tabTextColor">#CAC4D0</item>
+        <item name="itemShapeFillColor">@color/color_black_theme_item_shape</item>
+        <item name="tabTextColor">@color/color_black_theme_tab_unselected</item>
         <item name="tabSelectedTextColor">@color/white</item>
         <item name="tabIndicatorColor">@color/white</item>
-        <item name="tabRippleColor">#33FFFFFF</item>
+        <item name="tabRippleColor">@color/color_black_theme_tab_ripple</item>
         <item name="primaryOrTextPrimary">@color/white</item>
-        <item name="primaryOrTextSecondary">#CAC4D0</item>
+        <item name="primaryOrTextSecondary">@color/color_black_theme_text_secondary</item>
         <item name="accentOrTextPrimary">@color/white</item>
-        <item name="accentOrTextSecondary">#CAC4D0</item>
+        <item name="accentOrTextSecondary">@color/color_black_theme_text_secondary</item>
         <item name="whiteOrTextPrimary">@color/white</item>
     </style>
 
@@ -769,14 +772,14 @@
 
     <style name="Theme.SagerNet.Dialog.Black" parent="Theme.SagerNet.Dialog">
         <item name="colorPrimary">@color/white</item>
-        <item name="colorPrimaryDark">#121212</item>
+        <item name="colorPrimaryDark">@color/color_black_theme_primary_dark</item>
         <item name="colorAccent">@color/white</item>
-        <item name="colorMaterial100">#1E1E1E</item>
-        <item name="colorMaterial300">#2C2C2C</item>
-        <item name="cardElevatedSurfaceColor">#121212</item>
+        <item name="colorMaterial100">@color/color_black_theme_material_100</item>
+        <item name="colorMaterial300">@color/color_black_theme_material_300</item>
+        <item name="cardElevatedSurfaceColor">@color/color_black_theme_card_elevated</item>
         <item name="selectedColorPrimary">@color/white</item>
         <item name="fabColorBackground">@color/black</item>
-        <item name="itemShapeFillColor">#2C2C2E</item>
+        <item name="itemShapeFillColor">@color/color_black_theme_item_shape</item>
         <item name="accentOrTextSecondary">?android:textColorSecondary</item>
         <item name="accentOrTextPrimary">?android:textColorPrimary</item>
         <item name="primaryOrTextSecondary">?android:textColorSecondary</item>
@@ -843,17 +846,20 @@
         <item name="android:colorBackground">@color/black</item>
         <item name="android:windowBackground">@color/black</item>
         <item name="colorSurface">@color/black</item>
-        <item name="cardElevatedSurfaceColor">#0D0D0D</item>
+        <item name="cardElevatedSurfaceColor">@color/color_amoled_card_elevated</item>
         <item name="android:textColorPrimary">@color/white</item>
-        <item name="android:textColorSecondary">#B3FFFFFF</item>
-        <item name="android:textColorTertiary">#80FFFFFF</item>
+        <item name="android:textColorSecondary">@color/color_amoled_text_secondary</item>
+        <item name="android:textColorTertiary">@color/color_amoled_text_tertiary</item>
         <item name="colorOnSurface">@color/white</item>
-        <item name="colorOnSurfaceVariant">#B3FFFFFF</item>
+        <item name="colorOnSurfaceVariant">@color/color_amoled_text_secondary</item>
         <item name="colorOnPrimary">@color/white</item>
+        <item name="colorPrimary">@color/white</item>
+        <item name="colorAccent">@color/white</item>
+        <item name="selectedColorPrimary">@color/white</item>
         <item name="primaryOrTextPrimary">@color/white</item>
-        <item name="primaryOrTextSecondary">#B3FFFFFF</item>
+        <item name="primaryOrTextSecondary">@color/color_amoled_text_secondary</item>
         <item name="accentOrTextPrimary">@color/white</item>
-        <item name="accentOrTextSecondary">#B3FFFFFF</item>
+        <item name="accentOrTextSecondary">@color/color_amoled_text_secondary</item>
     </style>
 
 
@@ -865,9 +871,10 @@
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowAnimationStyle">@android:style/Animation.Dialog</item>
         <item name="tabStyle">@style/Widget.SagerNet.TabLayout</item>
+        <item name="tabTextAppearance">@style/Widget.SagerNet.TabLayout.TextAppearance</item>
     </style>
 
-    <style name="TextAppearance.OwnBox.Dashboard.Tab" parent="TextAppearance.Design.Tab">
+    <style name="TextAppearance.OwnBox.Dashboard.Tab" parent="TextAppearance.MaterialComponents.Button">
         <item name="android:textSize">13sp</item>
         <item name="android:textAllCaps">false</item>
         <item name="android:textStyle">bold</item>

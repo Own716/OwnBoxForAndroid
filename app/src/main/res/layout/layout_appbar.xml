@@ -12,7 +12,7 @@
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:background="?attr/colorSurface"
+        android:background="@android:color/transparent"
         android:theme="?actionBarTheme"
         android:touchscreenBlocksFocus="false"
         app:titleTextColor="?android:attr/textColorPrimary"

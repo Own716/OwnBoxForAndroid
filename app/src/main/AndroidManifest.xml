@@ -630,7 +630,8 @@
         <activity
             android:name="io.nekohasekai.sagernet.ui.DashboardActivity"
             android:configChanges="uiMode"
-            android:label="@string/menu_dashboard" />
+            android:label="@string/menu_dashboard"
+            android:theme="@style/Theme.SagerNet" />
 
     </application>
 
