@@ -32,12 +32,16 @@ func (c *splitConn) Close() error {
 		c.onClose()
 	}
 
-	err := c.writer.Close()
-	err2 := c.reader.Close()
+	var err, err2 error
+	if c.writer != nil {
+		err = c.writer.Close()
+	}
+	if c.reader != nil {
+		err2 = c.reader.Close()
+	}
 	if err != nil {
 		return err
 	}
-
 	if err2 != nil {
 		return err2
 	}

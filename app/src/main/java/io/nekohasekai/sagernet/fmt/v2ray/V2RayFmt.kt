@@ -181,7 +181,7 @@ fun parseV2Ray(link: String): StandardV2RayBean {
                     bean.xhttpMode = normalizeXhttpMode(it)
                 }
                 url.queryParameter("extra")?.let {
-                    bean.xhttpExtra = XhttpExtraConverter.xrayToSingBox(it)
+                    bean.xhttpExtra = runCatching { XhttpExtraConverter.xrayToSingBox(it) }.getOrDefault(it)
                 }
             }
         }
@@ -774,6 +774,7 @@ fun buildSingBoxOutboundStreamSettings(bean: StandardV2RayBean): V2RayTransportO
                 mode = normalizeXhttpMode(bean.xhttpMode)
                 host = bean.host.takeIf { it.isNotBlank() }
                 path = bean.path.takeIf { it.isNotBlank() } ?: "/"
+                no_grpc_header = com.google.gson.JsonPrimitive(true)
             }
             
             // Merge xhttpExtra JSON config if present
@@ -846,6 +847,8 @@ fun buildSingBoxOutboundTLS(bean: StandardV2RayBean): OutboundTLSOptions? {
             } else {
                 alpn = alpnList
             }
+        } else if (bean.type == "xhttp" || bean.type == "splithttp") {
+            alpn = listOf("h2", "http/1.1")
         }
         if (bean.certificates.isNotBlank()) certificate = bean.certificates
         var fp = bean.utlsFingerprint?.trim()?.lowercase()

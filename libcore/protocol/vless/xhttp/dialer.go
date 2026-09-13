@@ -58,8 +58,24 @@ func (c *DefaultDialerClient) OpenStream(ctx context.Context, url string, body i
 	}
 	req, _ := http.NewRequestWithContext(context.WithoutCancel(ctxTrace), method, url, body)
 	req.Header = c.options.GetRequestHeader(url)
-	if method == "POST" && !c.options.NoGRPCHeader {
-		req.Header.Set("Content-Type", "application/grpc")
+	if req.Header.Get("X-Accel-Buffering") == "" {
+		req.Header.Set("X-Accel-Buffering", "no")
+	}
+	if req.Header.Get("Cache-Control") == "" {
+		req.Header.Set("Cache-Control", "no-store, no-cache, must-revalidate")
+	}
+	if method == "GET" {
+		if !c.options.NoSSEHeader && req.Header.Get("Accept") == "" {
+			req.Header.Set("Accept", "text/event-stream")
+		}
+	} else if method == "POST" {
+		if req.Header.Get("Content-Type") == "" {
+			if !c.options.NoGRPCHeader {
+				req.Header.Set("Content-Type", "application/grpc")
+			} else {
+				req.Header.Set("Content-Type", "application/octet-stream")
+			}
+		}
 	}
 	waitReader := &WaitReadCloser{Wait: make(chan struct{})}
 	wrc = waitReader
@@ -83,6 +99,9 @@ func (c *DefaultDialerClient) OpenStream(ctx context.Context, url string, body i
 			setDoErr(dErr)
 			waitReader.SetErr(dErr)
 			gotConn.Close()
+			if closer, ok := body.(io.Closer); ok {
+				closer.Close()
+			}
 			waitReader.Close()
 			return
 		}
@@ -92,8 +111,11 @@ func (c *DefaultDialerClient) OpenStream(ctx context.Context, url string, body i
 				statusErr := fmt.Errorf("bad status code: %s", resp.Status)
 				setDoErr(statusErr)
 				waitReader.SetErr(statusErr)
+				if closer, ok := body.(io.Closer); ok {
+					closer.Close()
+				}
 			}
-			io.Copy(io.Discard, resp.Body)
+			io.Copy(io.Discard, io.LimitReader(resp.Body, 32*1024))
 			resp.Body.Close() // if it is called immediately, the upload will be interrupted also
 			waitReader.Close()
 			return
@@ -101,13 +123,28 @@ func (c *DefaultDialerClient) OpenStream(ctx context.Context, url string, body i
 		waitReader.Set(resp.Body)
 	}()
 
-	select {
-	case <-gotConn.Wait():
-	case <-ctx.Done():
-		c.closed = true
-		waitReader.SetErr(ctx.Err())
-		waitReader.Close()
-		return nil, nil, nil, ctx.Err()
+	if body == nil {
+		select {
+		case <-waitReader.Wait:
+		case <-ctx.Done():
+			c.closed = true
+			waitReader.SetErr(ctx.Err())
+			waitReader.Close()
+			return nil, nil, nil, ctx.Err()
+		}
+	} else {
+		select {
+		case <-gotConn.Wait():
+		case <-waitReader.Wait:
+		case <-ctx.Done():
+			c.closed = true
+			waitReader.SetErr(ctx.Err())
+			waitReader.Close()
+			if closer, ok := body.(io.Closer); ok {
+				closer.Close()
+			}
+			return nil, nil, nil, ctx.Err()
+		}
 	}
 
 	doErrMu.Lock()
@@ -126,13 +163,26 @@ func (c *DefaultDialerClient) PostPacket(ctx context.Context, url string, body i
 	}
 	req.ContentLength = contentLength
 	req.Header = c.options.GetRequestHeader(url)
+	if req.Header.Get("X-Accel-Buffering") == "" {
+		req.Header.Set("X-Accel-Buffering", "no")
+	}
+	if req.Header.Get("Cache-Control") == "" {
+		req.Header.Set("Cache-Control", "no-store, no-cache, must-revalidate")
+	}
+	if req.Header.Get("Content-Type") == "" {
+		if !c.options.NoGRPCHeader {
+			req.Header.Set("Content-Type", "application/grpc")
+		} else {
+			req.Header.Set("Content-Type", "application/octet-stream")
+		}
+	}
 	if c.httpVersion != "1.1" {
 		resp, err := c.client.Do(req)
 		if err != nil {
 			c.closed = true
 			return err
 		}
-		_, copyErr := io.Copy(io.Discard, resp.Body)
+		_, copyErr := io.Copy(io.Discard, io.LimitReader(resp.Body, 32*1024))
 		closeErr := resp.Body.Close()
 		if resp.StatusCode != 200 {
 			c.closed = true
@@ -171,38 +221,45 @@ func (c *DefaultDialerClient) PostPacket(ctx context.Context, url string, body i
 				uploadConn = h1UploadConn
 			} else {
 				h1UploadConn = uploadConn.(*H1Conn)
-
-				// TODO: Replace 0 here with a config value later
-				// Or add some other condition for optimization purposes
-				if h1UploadConn.UnreadedResponsesCount > 0 {
-					resp, err := http.ReadResponse(h1UploadConn.RespBufReader, req)
-					if err != nil {
-						c.closed = true
-						return fmt.Errorf("error while reading response: %s", err.Error())
-					}
-					_, copyErr := io.Copy(io.Discard, resp.Body)
-					closeErr := resp.Body.Close()
-					if resp.StatusCode != 200 {
-						c.closed = true
-						return fmt.Errorf("got non-200 error response code: %d", resp.StatusCode)
-					}
-					if copyErr != nil {
-						return copyErr
-					}
-					if closeErr != nil {
-						return closeErr
-					}
-				}
 			}
 			_, err := h1UploadConn.Write(requestBuff.Bytes())
-			// if the write failed, we try another connection from
-			// the pool, until the write on a new connection fails.
-			// failed writes to a pooled connection are normal when
-			// the connection has been closed in the meantime.
 			if err == nil {
+				h1UploadConn.UnreadedResponsesCount++
 				break
-			} else if newConnection {
+			}
+			h1UploadConn.Close()
+			if newConnection {
 				return err
+			}
+		}
+		for h1UploadConn.UnreadedResponsesCount > 0 {
+			resp, err := http.ReadResponse(h1UploadConn.RespBufReader, req)
+			if err != nil {
+				c.closed = true
+				h1UploadConn.Close()
+				return fmt.Errorf("error while reading response: %s", err.Error())
+			}
+			_, copyErr := io.Copy(io.Discard, io.LimitReader(resp.Body, 32*1024))
+			closeErr := resp.Body.Close()
+			h1UploadConn.UnreadedResponsesCount--
+			if resp.StatusCode != 200 {
+				c.closed = true
+				h1UploadConn.Close()
+				if copyErr != nil {
+					return copyErr
+				}
+				if closeErr != nil {
+					return closeErr
+				}
+				return fmt.Errorf("got non-200 error response code: %d", resp.StatusCode)
+			}
+			if copyErr != nil {
+				h1UploadConn.Close()
+				return copyErr
+			}
+			if closeErr != nil {
+				h1UploadConn.Close()
+				return closeErr
 			}
 		}
 		c.uploadRawPool.Put(uploadConn)
@@ -283,10 +340,10 @@ func (w *WaitReadCloser) Close() error {
 	w.ReadCloser = nil
 	w.mu.Unlock()
 
+	w.notify()
 	if rc != nil {
 		return rc.Close()
 	}
 
-	w.notify()
 	return nil
 }

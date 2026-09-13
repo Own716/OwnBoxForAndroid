@@ -194,6 +194,7 @@ func (c *Client) DialContext(ctx context.Context) (net.Conn, error) {
 		}
 		conn.reader, conn.remoteAddr, conn.localAddr, err = httpClient.OpenStream(ctx, requestURL.String(), reader, false)
 		if err != nil {
+			conn.Close()
 			return nil, err
 		}
 		return &conn, nil
@@ -203,6 +204,7 @@ func (c *Client) DialContext(ctx context.Context) (net.Conn, error) {
 		}
 		conn.reader, conn.remoteAddr, conn.localAddr, err = httpClient2.OpenStream(ctx, requestURL2.String(), nil, false)
 		if err != nil { // browser dialer only
+			conn.Close()
 			return nil, err
 		}
 	}
@@ -212,6 +214,7 @@ func (c *Client) DialContext(ctx context.Context) (net.Conn, error) {
 		}
 		_, _, _, err = httpClient.OpenStream(ctx, requestURL.String(), reader, true)
 		if err != nil { // browser dialer only
+			conn.Close()
 			return nil, err
 		}
 		return &conn, nil
@@ -313,12 +316,25 @@ func decideHTTPVersion(tlsConfig tls.Config) string {
 
 	if len(nextProtos) == 0 {
 		tlsConfig.SetNextProtos([]string{http2.NextProtoTLS, "http/1.1"})
+		nextProtos = tlsConfig.NextProtos()
 	}
-	
-	if len(nextProtos) > 0 && nextProtos[0] == "h3" {
-		return "3"
+
+	for _, proto := range nextProtos {
+		if proto == "h3" {
+			return "3"
+		}
 	}
-	if len(nextProtos) > 0 && nextProtos[0] == "http/1.1" {
+	hasH2 := false
+	hasH1 := false
+	for _, proto := range nextProtos {
+		if proto == "h2" {
+			hasH2 = true
+		}
+		if proto == "http/1.1" {
+			hasH1 = true
+		}
+	}
+	if !hasH2 && hasH1 {
 		return "1.1"
 	}
 	return "2"
@@ -417,6 +433,8 @@ func createHTTPClient(dest M.Socksaddr, dialer N.Dialer, options *V2RayXHTTPBase
 			},
 			IdleConnTimeout: net.ConnIdleTimeout,
 			ReadIdleTimeout: keepAlivePeriod,
+			PingTimeout:     15 * time.Second,
+			AllowHTTP:       true,
 		}
 	default:
 		httpDialContext := func(ctxInner context.Context, network string, addr string) (net.Conn, error) {

@@ -94,9 +94,14 @@ func (c *V2RayXHTTPBaseOptions) GetRequestHeader(rawURL string) http.Header {
 	paddingLen := int(c.GetNormalizedXPaddingBytes().Rand())
 	if paddingLen > 0 {
 		paddingStr := strings.Repeat("X", paddingLen)
-		u, _ := url.Parse(rawURL)
-		u.RawQuery = "x_padding=" + paddingStr
-		header.Set("Referer", u.String())
+		if u, err := url.Parse(rawURL); err == nil {
+			if u.RawQuery != "" {
+				u.RawQuery += "&x_padding=" + paddingStr
+			} else {
+				u.RawQuery = "x_padding=" + paddingStr
+			}
+			header.Set("Referer", u.String())
+		}
 		header.Set("X-Padding", paddingStr)
 	}
 	return header
