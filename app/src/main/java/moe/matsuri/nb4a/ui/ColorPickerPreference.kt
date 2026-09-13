@@ -7,9 +7,7 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
-import android.text.Editable
-import android.text.InputFilter
-import android.text.TextWatcher
+import android.graphics.drawable.LayerDrawable
 import android.util.AttributeSet
 import android.view.Gravity
 import android.view.View
@@ -24,7 +22,7 @@ import androidx.core.view.setPadding
 import androidx.core.widget.NestedScrollView
 import androidx.preference.Preference
 import androidx.preference.PreferenceViewHolder
-import com.google.android.material.button.MaterialButton
+import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.DataStore
@@ -33,16 +31,20 @@ import io.nekohasekai.sagernet.ktx.getColorAttr
 import io.nekohasekai.sagernet.utils.Theme
 import kotlin.math.roundToInt
 
-class ColorPickerPreference
-@JvmOverloads constructor(
+class ColorPickerPreference @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null, defStyle: Int = TypedArrayUtils.getAttr(
         context,
         androidx.preference.R.attr.editTextPreferenceStyle,
         android.R.attr.editTextPreferenceStyle
     )
-) : Preference(
-    context, attrs, defStyle
-) {
+) : Preference(context, attrs, defStyle) {
+
+    data class PresetTheme(
+        val id: Int,
+        val name: String,
+        val color: Int,
+        val subtitle: String? = null
+    )
 
     override fun onBindViewHolder(holder: PreferenceViewHolder) {
         super.onBindViewHolder(holder)
@@ -50,56 +52,54 @@ class ColorPickerPreference
         val widgetFrame = holder.findViewById(android.R.id.widget_frame) as LinearLayout
         widgetFrame.removeAllViews()
 
-        val displayColor = if (DataStore.appTheme == Theme.CUSTOM) {
-            DataStore.customThemeColor or 0xFF000000.toInt()
-        } else {
-            context.getColorAttr(R.attr.colorPrimary)
+        val displayColor = when {
+            Theme.isWhiteTheme() -> Color.WHITE
+            Theme.isLightGrayTheme() -> Color.parseColor("#F5F5F7")
+            Theme.isBlackTheme() -> Color.BLACK
+            else -> context.getColorAttr(R.attr.colorPrimary)
         }
 
         val factor = context.resources.displayMetrics.density
-        val size = (48 * factor).roundToInt()
+        val size = (44 * factor).roundToInt()
         val widgetIv = ImageView(context).apply {
             layoutParams = ViewGroup.LayoutParams(size, size)
-            setImageDrawable(getBorderedColorDrawable(context.resources, displayColor))
+            setImageDrawable(getColorBadgeDrawable(context.resources, displayColor, false))
         }
         widgetFrame.addView(widgetIv)
         widgetFrame.visibility = View.VISIBLE
     }
 
-    fun getNekoImageViewAtColor(color: Int, sizeDp: Int, paddingDp: Int): ImageView {
-        val factor = context.resources.displayMetrics.density
-        val size = (sizeDp * factor).roundToInt()
-        val paddingSize = (paddingDp * factor).roundToInt()
-
-        return ImageView(context).apply {
-            layoutParams = ViewGroup.LayoutParams(size, size)
-            setPadding(paddingSize)
-            setImageDrawable(getNekoAtColor(resources, color))
+    private fun getColorBadgeDrawable(res: Resources, color: Int, isSelected: Boolean): Drawable {
+        val factor = res.displayMetrics.density
+        val strokeColor = when (color) {
+            Color.WHITE -> Color.parseColor("#CCCCCC")
+            Color.parseColor("#F5F5F7") -> Color.parseColor("#CBD5E1")
+            Color.BLACK -> Color.parseColor("#444444")
+            else -> Color.parseColor("#33000000")
         }
-    }
 
-    fun getNekoAtColor(res: Resources, color: Int): Drawable {
-        val neko = ResourcesCompat.getDrawable(
-            res,
-            R.drawable.ic_baseline_fiber_manual_record_24,
-            null
-        )!!
-        DrawableCompat.setTint(neko.mutate(), color)
-        return neko
-    }
+        val circle = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(color)
+            setStroke((1.5f * factor).roundToInt().coerceAtLeast(1), strokeColor)
+        }
 
-    fun getBorderedColorDrawable(res: Resources, color: Int): Drawable {
-        val isWhite = (color and 0x00FFFFFF) == 0x00FFFFFF
-        return if (isWhite) {
-            val factor = res.displayMetrics.density
-            GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(Color.WHITE)
-                setStroke((1 * factor).roundToInt().coerceAtLeast(1), Color.parseColor("#E0E0E0"))
-            }
+        if (!isSelected) {
+            return circle
+        }
+
+        val checkmark = ResourcesCompat.getDrawable(res, R.drawable.ic_baseline_check_circle_24, null)!!.mutate()
+        val checkTint = if (color == Color.WHITE || color == Color.parseColor("#F5F5F7")) {
+            Color.parseColor("#212121")
         } else {
-            getNekoAtColor(res, color)
+            Color.WHITE
         }
+        DrawableCompat.setTint(checkmark, checkTint)
+
+        val checkInset = (8 * factor).roundToInt()
+        val layer = LayerDrawable(arrayOf(circle, checkmark))
+        layer.setLayerInset(1, checkInset, checkInset, checkInset, checkInset)
+        return layer
     }
 
     override fun onClick() {
@@ -109,36 +109,101 @@ class ColorPickerPreference
 
         val rootLayout = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp2px(16), dp2px(8), dp2px(16), dp2px(16))
+            setPadding(dp2px(16), dp2px(10), dp2px(16), dp2px(16))
         }
 
         val scroll = NestedScrollView(context).apply {
             addView(rootLayout)
         }
 
-        // 1. Preset colors grid
-        val grid = GridLayout(context).apply {
-            columnCount = 4
-            val colors = context.resources.getIntArray(R.array.material_colors)
-            var i = 0
+        val currentThemeId = if (DataStore.appTheme == Theme.CUSTOM) Theme.GREEN else DataStore.appTheme
 
-            for (color in colors) {
-                i++ // Theme.kt
-                val themeId = i
-                val view = getNekoImageViewAtColor(color, 56, 4).apply {
-                    setOnClickListener {
-                        persistInt(themeId)
-                        dialog.dismiss()
-                        callChangeListener(themeId)
-                        (context as? Activity)?.let {
-                            ActivityCompat.recreate(it)
-                        }
-                    }
-                }
-                addView(view)
+        fun applyTheme(themeId: Int) {
+            persistInt(themeId)
+            DataStore.appTheme = themeId
+            dialog.dismiss()
+            callChangeListener(themeId)
+            (context as? Activity)?.let {
+                ActivityCompat.recreate(it)
             }
         }
-        rootLayout.addView(grid)
+
+        // 1. Core Base Themes Section
+        val baseTitle = TextView(context).apply {
+            text = "核心基础规范主题"
+            textSize = 13f
+            setTextColor(context.getColorAttr(R.attr.primaryOrTextSecondary))
+            setTypeface(null, Typeface.BOLD)
+            setPadding(dp2px(4), dp2px(4), 0, dp2px(8))
+        }
+        rootLayout.addView(baseTitle)
+
+        val baseThemes = listOf(
+            PresetTheme(Theme.BLACK, "纯黑 (AMOLED Black)", Color.BLACK, "纯黑底色 #000000 · 极致省电高对比"),
+            PresetTheme(Theme.WHITE, "纯白 (Pure White)", Color.WHITE, "纯白底色 #FFFFFF · 极简黑白高反差"),
+            PresetTheme(Theme.LIGHT_GRAY, "浅灰 (Light Gray)", Color.parseColor("#F5F5F7"), "柔灰底色 #F5F5F7 · 优雅层次悬浮感")
+        )
+
+        for (base in baseThemes) {
+            val isSelected = currentThemeId == base.id
+            val card = MaterialCardView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    setMargins(0, 0, 0, dp2px(8))
+                }
+                radius = dp2px(12).toFloat()
+                cardElevation = 0f
+                strokeWidth = if (isSelected) dp2px(2) else dp2px(1)
+                strokeColor = if (isSelected) context.getColorAttr(R.attr.colorPrimary) else Color.parseColor("#25888888")
+                setCardBackgroundColor(if (isSelected) Color.parseColor("#0F2196F3") else Color.TRANSPARENT)
+                isClickable = true
+                isFocusable = true
+                setOnClickListener {
+                    applyTheme(base.id)
+                }
+
+                val row = LinearLayout(context).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding(dp2px(12), dp2px(10), dp2px(12), dp2px(10))
+
+                    val iv = ImageView(context).apply {
+                        val sz = dp2px(36)
+                        layoutParams = LinearLayout.LayoutParams(sz, sz).apply {
+                            marginEnd = dp2px(12)
+                        }
+                        setImageDrawable(getColorBadgeDrawable(context.resources, base.color, isSelected))
+                    }
+                    addView(iv)
+
+                    val textCol = LinearLayout(context).apply {
+                        orientation = LinearLayout.VERTICAL
+                        layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+
+                        val titleView = TextView(context).apply {
+                            text = base.name
+                            textSize = 14f
+                            setTypeface(null, if (isSelected) Typeface.BOLD else Typeface.NORMAL)
+                            setTextColor(context.getColorAttr(android.R.attr.textColorPrimary))
+                        }
+                        addView(titleView)
+
+                        val subtitleView = TextView(context).apply {
+                            text = base.subtitle
+                            textSize = 11.5f
+                            setTextColor(context.getColorAttr(android.R.attr.textColorSecondary))
+                            setPadding(0, dp2px(2), 0, 0)
+                        }
+                        addView(subtitleView)
+                    }
+                    addView(textCol)
+                }
+                addView(row)
+            }
+            rootLayout.addView(card)
+        }
 
         // 2. Divider
         val divider = View(context).apply {
@@ -146,245 +211,86 @@ class ColorPickerPreference
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp2px(1)
             ).apply {
-                setMargins(0, dp2px(16), 0, dp2px(12))
+                setMargins(0, dp2px(12), 0, dp2px(12))
             }
-            setBackgroundColor(0x33888888)
+            setBackgroundColor(Color.parseColor("#22888888"))
         }
         rootLayout.addView(divider)
 
-        // 3. Custom Color Header
-        val customTitle = TextView(context).apply {
-            text = context.getString(R.string.custom_color_title)
-            textSize = 14f
+        // 3. Vetted Color Themes Section
+        val colorTitle = TextView(context).apply {
+            text = "精选经典色彩预设"
+            textSize = 13f
+            setTextColor(context.getColorAttr(R.attr.primaryOrTextSecondary))
             setTypeface(null, Typeface.BOLD)
-            setPadding(0, 0, 0, dp2px(8))
+            setPadding(dp2px(4), dp2px(4), 0, dp2px(8))
         }
-        rootLayout.addView(customTitle)
+        rootLayout.addView(colorTitle)
 
-        // Quick Preset Chips (White, Dark, Emerald, Cyan, Blue, Purple, Amber, Red)
-        val quickPresetColors = intArrayOf(
-            0xFFFFFFFF.toInt(), // Pure White
-            0xFF1E293B.toInt(), // Dark Slate
-            0xFF00E676.toInt(), // Emerald Mint
-            0xFF00BCD4.toInt(), // Cyan
-            0xFF2196F3.toInt(), // Material Blue
-            0xFF9C27B0.toInt(), // Purple
-            0xFFFFC107.toInt(), // Amber
-            0xFFF44336.toInt()  // Red
+        val presetColors = listOf(
+            PresetTheme(Theme.BLUE, "经典蓝", Color.parseColor("#2196F3")),
+            PresetTheme(Theme.VERDANT_MINT, "薄荷绿", Color.parseColor("#00E676")),
+            PresetTheme(Theme.CYAN, "青色", Color.parseColor("#00BCD4")),
+            PresetTheme(Theme.PINK_SSR, "樱花粉", Color.parseColor("#FF4081")),
+            PresetTheme(Theme.ORANGE, "活力橙", Color.parseColor("#FF9800")),
+            PresetTheme(Theme.AMBER, "琥珀金", Color.parseColor("#FFC107")),
+            PresetTheme(Theme.DEEP_PURPLE, "深紫", Color.parseColor("#673AB7")),
+            PresetTheme(Theme.LIGHT_BLUE, "晴空蓝", Color.parseColor("#03A9F4")),
+            PresetTheme(Theme.GREEN, "自然绿", Color.parseColor("#4CAF50")),
+            PresetTheme(Theme.RED, "热情红", Color.parseColor("#F44336")),
+            PresetTheme(Theme.BLUE_GREY, "蓝灰", Color.parseColor("#607D8B")),
+            PresetTheme(Theme.TEAL, "鸭翅绿", Color.parseColor("#009688"))
         )
-        val quickRow = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            setPadding(0, 0, 0, dp2px(12))
-        }
-        rootLayout.addView(quickRow)
 
-        // Initial custom color
-        var curColor = DataStore.customThemeColor or 0xFF000000.toInt()
-        var curR = Color.red(curColor)
-        var curG = Color.green(curColor)
-        var curB = Color.blue(curColor)
-        val initialHsv = FloatArray(3)
-        Color.colorToHSV(curColor, initialHsv)
-        var curH = initialHsv[0]
-        var curS = initialHsv[1]
-        var curV = initialHsv[2]
-
-        // Preview & Hex row (Current vs New preview)
-        val previewRow = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, 0, 0, dp2px(10))
-        }
-
-        val factor = context.resources.displayMetrics.density
-        val originalImage = ImageView(context).apply {
-            val size = (40 * factor).roundToInt()
-            val paddingSize = (2 * factor).roundToInt()
-            layoutParams = ViewGroup.LayoutParams(size, size)
-            setPadding(paddingSize)
-            setImageDrawable(getBorderedColorDrawable(context.resources, curColor))
-        }
-        val arrowText = TextView(context).apply {
-            text = " → "
-            textSize = 16f
-            setPadding(dp2px(4), 0, dp2px(4), 0)
-        }
-        val previewImage = ImageView(context).apply {
-            val size = (44 * factor).roundToInt()
-            val paddingSize = (2 * factor).roundToInt()
-            layoutParams = ViewGroup.LayoutParams(size, size)
-            setPadding(paddingSize)
-            setImageDrawable(getBorderedColorDrawable(context.resources, curColor))
-        }
-        previewRow.addView(originalImage)
-        previewRow.addView(arrowText)
-        previewRow.addView(previewImage)
-
-        var updatingFromCode = false
-
-        val hexInput = EditText(context).apply {
-            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
-                marginStart = dp2px(12)
-            }
-            hint = context.getString(R.string.custom_color_hex_hint)
-            filters = arrayOf(InputFilter.LengthFilter(7))
-            setText(String.format("#%02X%02X%02X", curR, curG, curB))
-            textSize = 14f
-        }
-        previewRow.addView(hexInput)
-        rootLayout.addView(previewRow)
-
-        // Sliders
-        fun createSlider(label: String, maxVal: Int, initialValue: Int): Pair<TextView, SeekBar> {
-            val labelView = TextView(context).apply {
-                text = "$label: $initialValue"
-                textSize = 12f
-                setPadding(0, dp2px(3), 0, 0)
-            }
-            val seekBar = SeekBar(context).apply {
-                max = maxVal
-                progress = initialValue
-            }
-            rootLayout.addView(labelView)
-            rootLayout.addView(seekBar)
-            return Pair(labelView, seekBar)
-        }
-
-        // HSV Sliders
-        val (hLabel, hSeek) = createSlider("色相 (Hue)", 360, curH.roundToInt())
-        val (sLabel, sSeek) = createSlider("饱和度 (Saturation)", 100, (curS * 100f).roundToInt())
-        val (vLabel, vSeek) = createSlider("明度 (Brightness)", 100, (curV * 100f).roundToInt())
-
-        // RGB Sliders
-        val (rLabel, rSeek) = createSlider("R (红)", 255, curR)
-        val (gLabel, gSeek) = createSlider("G (绿)", 255, curG)
-        val (bLabel, bSeek) = createSlider("B (蓝)", 255, curB)
-
-        fun syncAllUI(fromRgb: Boolean) {
-            if (fromRgb) {
-                curColor = Color.rgb(curR, curG, curB)
-                val hsv = FloatArray(3)
-                Color.colorToHSV(curColor, hsv)
-                curH = hsv[0]
-                curS = hsv[1]
-                curV = hsv[2]
-            } else {
-                curColor = Color.HSVToColor(floatArrayOf(curH, curS, curV))
-                curR = Color.red(curColor)
-                curG = Color.green(curColor)
-                curB = Color.blue(curColor)
-            }
-
-            previewImage.setImageDrawable(getBorderedColorDrawable(context.resources, curColor))
-            hLabel.text = "色相 (Hue): ${curH.roundToInt()}°"
-            sLabel.text = "饱和度 (Saturation): ${(curS * 100f).roundToInt()}%"
-            vLabel.text = "明度 (Brightness): ${(curV * 100f).roundToInt()}%"
-            rLabel.text = "R (红): $curR"
-            gLabel.text = "G (绿): $curG"
-            bLabel.text = "B (蓝): $curB"
-
-            if (!updatingFromCode) {
-                updatingFromCode = true
-                hSeek.progress = curH.roundToInt()
-                sSeek.progress = (curS * 100f).roundToInt()
-                vSeek.progress = (curV * 100f).roundToInt()
-                rSeek.progress = curR
-                gSeek.progress = curG
-                bSeek.progress = curB
-                hexInput.setText(String.format("#%02X%02X%02X", curR, curG, curB))
-                updatingFromCode = false
-            }
-        }
-
-        for (qColor in quickPresetColors) {
-            val size = (34 * factor).roundToInt()
-            val paddingSize = (3 * factor).roundToInt()
-            val qView = ImageView(context).apply {
-                layoutParams = ViewGroup.LayoutParams(size, size)
-                setPadding(paddingSize)
-                setImageDrawable(getBorderedColorDrawable(context.resources, qColor))
-                setOnClickListener {
-                    curR = Color.red(qColor)
-                    curG = Color.green(qColor)
-                    curB = Color.blue(qColor)
-                    syncAllUI(true)
-                }
-            }
-            quickRow.addView(qView)
-        }
-
-        val hsvSeekListener = object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (fromUser && !updatingFromCode) {
-                    curH = hSeek.progress.toFloat()
-                    curS = sSeek.progress / 100f
-                    curV = vSeek.progress / 100f
-                    syncAllUI(false)
-                }
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        }
-        hSeek.setOnSeekBarChangeListener(hsvSeekListener)
-        sSeek.setOnSeekBarChangeListener(hsvSeekListener)
-        vSeek.setOnSeekBarChangeListener(hsvSeekListener)
-
-        val rgbSeekListener = object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (fromUser && !updatingFromCode) {
-                    curR = rSeek.progress
-                    curG = gSeek.progress
-                    curB = bSeek.progress
-                    syncAllUI(true)
-                }
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        }
-        rSeek.setOnSeekBarChangeListener(rgbSeekListener)
-        gSeek.setOnSeekBarChangeListener(rgbSeekListener)
-        bSeek.setOnSeekBarChangeListener(rgbSeekListener)
-
-        hexInput.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-            override fun afterTextChanged(s: Editable?) {
-                if (updatingFromCode) return
-                val str = s?.toString()?.trim().orEmpty()
-                if (str.matches(Regex("^#[0-9a-fA-F]{6}$"))) {
-                    try {
-                        val parsed = Color.parseColor(str)
-                        curR = Color.red(parsed)
-                        curG = Color.green(parsed)
-                        curB = Color.blue(parsed)
-                        syncAllUI(true)
-                    } catch (_: Throwable) {}
-                }
-            }
-        })
-
-        // Apply Button
-        val applyBtn = MaterialButton(context).apply {
+        val grid = GridLayout(context).apply {
+            columnCount = 4
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                topMargin = dp2px(12)
-            }
-            text = context.getString(R.string.custom_color_apply)
-            setOnClickListener {
-                val finalColor = Color.rgb(curR, curG, curB)
-                DataStore.customThemeColor = finalColor
-                persistInt(Theme.CUSTOM)
-                dialog.dismiss()
-                callChangeListener(Theme.CUSTOM)
-                (context as? Activity)?.let {
-                    ActivityCompat.recreate(it)
+            )
+
+            for (preset in presetColors) {
+                val isSelected = currentThemeId == preset.id
+                val itemLayout = LinearLayout(context).apply {
+                    orientation = LinearLayout.VERTICAL
+                    gravity = Gravity.CENTER_HORIZONTAL
+                    setPadding(dp2px(4), dp2px(8), dp2px(4), dp2px(8))
+                    isClickable = true
+                    isFocusable = true
+                    setBackgroundResource(android.R.drawable.list_selector_background)
+                    setOnClickListener {
+                        applyTheme(preset.id)
+                    }
+
+                    val badge = ImageView(context).apply {
+                        val sz = dp2px(44)
+                        layoutParams = LinearLayout.LayoutParams(sz, sz)
+                        setImageDrawable(getColorBadgeDrawable(context.resources, preset.color, isSelected))
+                    }
+                    addView(badge)
+
+                    val label = TextView(context).apply {
+                        text = preset.name
+                        textSize = 11.5f
+                        gravity = Gravity.CENTER
+                        setTextColor(
+                            if (isSelected) context.getColorAttr(R.attr.colorPrimary)
+                            else context.getColorAttr(android.R.attr.textColorPrimary)
+                        )
+                        setTypeface(null, if (isSelected) Typeface.BOLD else Typeface.NORMAL)
+                        setPadding(0, dp2px(5), 0, 0)
+                    }
+                    addView(label)
                 }
+
+                val gridParams = GridLayout.LayoutParams().apply {
+                    width = 0
+                    columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
+                }
+                addView(itemLayout, gridParams)
             }
         }
-        rootLayout.addView(applyBtn)
+        rootLayout.addView(grid)
 
         dialog = MaterialAlertDialogBuilder(context)
             .setTitle(title)

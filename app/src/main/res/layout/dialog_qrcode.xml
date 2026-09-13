@@ -74,13 +74,13 @@
         android:layout_marginTop="12dp"
         android:background="@android:color/transparent"
         app:tabGravity="fill"
-        app:tabIndicatorColor="?attr/colorPrimary"
+        app:tabIndicatorColor="?attr/tabIndicatorColor"
         app:tabIndicatorFullWidth="false"
         app:tabIndicatorHeight="3dp"
         app:tabMode="fixed"
-        app:tabSelectedTextColor="?attr/colorPrimary"
+        app:tabSelectedTextColor="?attr/tabSelectedTextColor"
         app:tabTextAppearance="@style/Widget.SagerNet.TabLayout.TextAppearance"
-        app:tabTextColor="?android:attr/textColorSecondary" />
+        app:tabTextColor="?attr/tabTextColor" />
 
     <!-- QR Code White Safe Container -->
     <com.google.android.material.card.MaterialCardView

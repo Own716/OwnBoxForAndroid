@@ -404,24 +404,75 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
         }
 
-        if (Theme.isWhiteTheme()) {
-            view.findViewById<View>(R.id.appbar)?.setBackgroundColor(Color.WHITE)
-            toolbar.setBackgroundColor(Color.WHITE)
-            toolbar.setTitleTextColor(Color.parseColor("#212121"))
-            tabLayout.setBackgroundColor(Color.WHITE)
-            tabLayout.setSelectedTabIndicatorColor(Color.parseColor("#212121"))
-            tabLayout.setTabTextColors(Color.parseColor("#8A000000"), Color.parseColor("#212121"))
-            toolbar.navigationIcon?.let {
-                val tinted = it.mutate()
-                DrawableCompat.setTint(tinted, Color.parseColor("#212121"))
-                toolbar.navigationIcon = tinted
+        when {
+            Theme.isWhiteTheme() -> {
+                view.findViewById<View>(R.id.appbar)?.setBackgroundColor(Color.WHITE)
+                toolbar.setBackgroundColor(Color.WHITE)
+                toolbar.setTitleTextColor(Color.parseColor("#212121"))
+                tabLayout.setBackgroundColor(Color.WHITE)
+                tabLayout.setSelectedTabIndicatorColor(Color.parseColor("#212121"))
+                tabLayout.setTabTextColors(Color.parseColor("#8A000000"), Color.parseColor("#212121"))
+                toolbar.navigationIcon?.let {
+                    val tinted = it.mutate()
+                    DrawableCompat.setTint(tinted, Color.parseColor("#212121"))
+                    toolbar.navigationIcon = tinted
+                }
+                toolbar.overflowIcon?.let {
+                    val tinted = it.mutate()
+                    DrawableCompat.setTint(tinted, Color.parseColor("#212121"))
+                    toolbar.overflowIcon = tinted
+                }
+                tintMenuIcons(toolbar.menu, Color.parseColor("#212121"))
             }
-            toolbar.overflowIcon?.let {
-                val tinted = it.mutate()
-                DrawableCompat.setTint(tinted, Color.parseColor("#212121"))
-                toolbar.overflowIcon = tinted
+            Theme.isLightGrayTheme() -> {
+                val bg = Color.parseColor("#F5F5F7")
+                val textPrimary = Color.parseColor("#1F2937")
+                val textSecondary = Color.parseColor("#6B7280")
+                view.findViewById<View>(R.id.appbar)?.setBackgroundColor(bg)
+                toolbar.setBackgroundColor(bg)
+                toolbar.setTitleTextColor(textPrimary)
+                tabLayout.setBackgroundColor(bg)
+                tabLayout.setSelectedTabIndicatorColor(textPrimary)
+                tabLayout.setTabTextColors(textSecondary, textPrimary)
+                toolbar.navigationIcon?.let {
+                    val tinted = it.mutate()
+                    DrawableCompat.setTint(tinted, textPrimary)
+                    toolbar.navigationIcon = tinted
+                }
+                toolbar.overflowIcon?.let {
+                    val tinted = it.mutate()
+                    DrawableCompat.setTint(tinted, textPrimary)
+                    toolbar.overflowIcon = tinted
+                }
+                tintMenuIcons(toolbar.menu, textPrimary)
             }
-            tintMenuIcons(toolbar.menu, Color.parseColor("#212121"))
+            Theme.isBlackTheme() -> {
+                val bg = Color.BLACK
+                view.findViewById<View>(R.id.appbar)?.setBackgroundColor(bg)
+                toolbar.setBackgroundColor(bg)
+                toolbar.setTitleTextColor(Color.WHITE)
+                tabLayout.setBackgroundColor(bg)
+                tabLayout.setSelectedTabIndicatorColor(Color.WHITE)
+                tabLayout.setTabTextColors(Color.parseColor("#CAC4D0"), Color.WHITE)
+                toolbar.navigationIcon?.let {
+                    val tinted = it.mutate()
+                    DrawableCompat.setTint(tinted, Color.WHITE)
+                    toolbar.navigationIcon = tinted
+                }
+                toolbar.overflowIcon?.let {
+                    val tinted = it.mutate()
+                    DrawableCompat.setTint(tinted, Color.WHITE)
+                    toolbar.overflowIcon = tinted
+                }
+                tintMenuIcons(toolbar.menu, Color.WHITE)
+            }
+            else -> {
+                val tabIndicatorColor = requireContext().getColorAttr(R.attr.tabIndicatorColor)
+                val tabSelectedTextColor = requireContext().getColorAttr(R.attr.tabSelectedTextColor)
+                val tabUnselectedTextColor = requireContext().getColorAttr(R.attr.tabTextColor)
+                tabLayout.setSelectedTabIndicatorColor(tabIndicatorColor)
+                tabLayout.setTabTextColors(tabUnselectedTextColor, tabSelectedTextColor)
+            }
         }
 
         val searchView = toolbar.findViewById<SearchView>(R.id.action_search)

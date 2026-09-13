@@ -164,6 +164,10 @@ class StatsBar @JvmOverloads constructor(
         val currentContext = context ?: return
         if (Theme.isWhiteTheme()) {
             backgroundTintList = ColorStateList.valueOf(Color.WHITE)
+        } else if (Theme.isLightGrayTheme()) {
+            backgroundTintList = ColorStateList.valueOf(Color.parseColor("#F5F5F7"))
+        } else if (Theme.isBlackTheme()) {
+            backgroundTintList = ColorStateList.valueOf(Color.BLACK)
         }
         val effectiveBgColor = backgroundTintList?.defaultColor
             ?: currentContext.getColorAttr(R.attr.colorPrimary)

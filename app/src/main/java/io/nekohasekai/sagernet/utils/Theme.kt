@@ -38,6 +38,7 @@ object Theme {
     const val BLACK = 21
     const val VERDANT_MINT = 22
     const val WHITE = 23
+    const val LIGHT_GRAY = 24
     const val CUSTOM = 99
 
     private fun defaultTheme() = GREEN
@@ -49,16 +50,15 @@ object Theme {
         val sat = hsv[1]
         val value = hsv[2]
 
-        // 1. 无色相/极端灰阶处理 (White, Gray, Black)
         if (sat < 0.18f) {
             return when {
-                value >= 0.80f -> WHITE // 纯白极简黑白高对比反色模式
-                value <= 0.25f -> BLACK // 纯黑/暗夜黑
-                else -> GREY // 纯中性灰
+                value >= 0.88f -> WHITE
+                value >= 0.70f -> LIGHT_GRAY
+                value <= 0.25f -> BLACK
+                else -> GREY
             }
         }
 
-        // 2. 有彩色处理：在 HSV 色相环空间上匹配真实色相，彻底解决黄色/琥珀色退回问题
         val colors = app.resources.getIntArray(R.array.material_colors)
         var minDistance = Double.MAX_VALUE
         var closestTheme = GREEN
@@ -71,14 +71,11 @@ object Theme {
             val tSat = targetHsv[1]
             val tVal = targetHsv[2]
 
-            // 跳过灰黑等无色相预设，专注于色相匹配
             if (tSat < 0.18f) continue
 
-            // 环形色相距离 (0 ~ 180 度)
             val hueDiff = kotlin.math.abs(hue - tHue)
             val circularHueDiff = kotlin.math.min(hueDiff, 360f - hueDiff)
 
-            // 色相权重最大，辅以饱和度与明度微调
             val dist = circularHueDiff * circularHueDiff * 3.0 +
                     (sat - tSat) * (sat - tSat) * 10000.0 +
                     (value - tVal) * (value - tVal) * 5000.0
@@ -112,14 +109,14 @@ object Theme {
 
     fun apply(context: Context) {
         context.setTheme(getTheme())
-        if (!isWhiteTheme() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && DataStore.useSystemTheme && context is android.app.Activity) {
+        if (!isWhiteTheme() && !isLightGrayTheme() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && DataStore.useSystemTheme && context is android.app.Activity) {
             com.google.android.material.color.DynamicColors.applyIfAvailable(context)
         }
     }
 
     fun applyDialog(context: Context) {
         context.setTheme(getDialogTheme())
-        if (!isWhiteTheme() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && DataStore.useSystemTheme && context is android.app.Activity) {
+        if (!isWhiteTheme() && !isLightGrayTheme() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && DataStore.useSystemTheme && context is android.app.Activity) {
             com.google.android.material.color.DynamicColors.applyIfAvailable(context)
         }
     }
@@ -178,9 +175,10 @@ object Theme {
             BLACK -> R.style.Theme_SagerNet_Black
             VERDANT_MINT -> R.style.Theme_SagerNet_VerdantMint
             WHITE -> R.style.Theme_SagerNet_White
+            LIGHT_GRAY -> R.style.Theme_SagerNet_LightGray
             CUSTOM -> {
-                val closest = getClosestThemeForColor(DataStore.customThemeColor)
-                if (closest == WHITE) R.style.Theme_SagerNet_White else getTheme(closest)
+                DataStore.appTheme = defaultTheme()
+                getTheme(defaultTheme())
             }
             else -> getTheme(defaultTheme())
         }
@@ -212,57 +210,36 @@ object Theme {
             BLACK -> R.style.Theme_SagerNet_Dialog_Black
             VERDANT_MINT -> R.style.Theme_SagerNet_Dialog_VerdantMint
             WHITE -> R.style.Theme_SagerNet_Dialog_White
+            LIGHT_GRAY -> R.style.Theme_SagerNet_Dialog_LightGray
             CUSTOM -> {
-                val closest = getClosestThemeForColor(DataStore.customThemeColor)
-                if (closest == WHITE) R.style.Theme_SagerNet_Dialog_White else getDialogTheme(closest)
+                DataStore.appTheme = defaultTheme()
+                getDialogTheme(defaultTheme())
             }
             else -> getDialogTheme(defaultTheme())
         }
     }
 
-    fun isWhiteTheme(): Boolean {
-        if (DataStore.appTheme == WHITE) return true
-        if (DataStore.appTheme == CUSTOM) {
-            val hsv = FloatArray(3)
-            Color.colorToHSV(DataStore.customThemeColor, hsv)
-            return hsv[1] < 0.18f && hsv[2] >= 0.80f
-        }
-        return false
-    }
+    fun isWhiteTheme(): Boolean = DataStore.appTheme == WHITE
+    fun isLightGrayTheme(): Boolean = DataStore.appTheme == LIGHT_GRAY
+    fun isBlackTheme(): Boolean = DataStore.appTheme == BLACK
 
     fun getPrimaryColor(context: Context): Int {
         if (isWhiteTheme()) {
             return Color.parseColor("#212121")
         }
-        val isNight = usingNightMode()
+        if (isLightGrayTheme()) {
+            return Color.parseColor("#1F2937")
+        }
+        if (isBlackTheme()) {
+            return Color.WHITE
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && DataStore.useSystemTheme) {
             val wallpaperColor = getSystemWallpaperColor(context)
             if (wallpaperColor != null) {
-                if (isNight && ColorUtils.calculateLuminance(wallpaperColor) < 0.25) {
-                    return context.getColorAttr(R.attr.primaryOrTextPrimary)
-                }
                 return wallpaperColor
             }
         }
-        if (DataStore.appTheme == CUSTOM) {
-            val color = DataStore.customThemeColor or 0xFF000000.toInt()
-            if (isNight && ColorUtils.calculateLuminance(color) < 0.25) {
-                return context.getColorAttr(R.attr.primaryOrTextPrimary)
-            }
-            return color
-        }
-        if (DataStore.appTheme == BLACK) {
-            return if (isNight) {
-                context.getColorAttr(R.attr.primaryOrTextPrimary)
-            } else {
-                context.getColorAttr(R.attr.colorPrimary)
-            }
-        }
-        val primary = context.getColorAttr(R.attr.colorPrimary)
-        if (isNight && ColorUtils.calculateLuminance(primary) < 0.25) {
-            return context.getColorAttr(R.attr.primaryOrTextPrimary)
-        }
-        return primary
+        return context.getColorAttr(R.attr.colorPrimary)
     }
 
     var currentNightMode = -1
@@ -283,7 +260,8 @@ object Theme {
     }
 
     fun usingNightMode(): Boolean {
-        if (isWhiteTheme()) return false
+        if (isWhiteTheme() || isLightGrayTheme()) return false
+        if (isBlackTheme()) return true
         return when (DataStore.nightTheme) {
             1 -> true
             2 -> false
@@ -292,8 +270,12 @@ object Theme {
     }
 
     fun applyNightTheme() {
-        if (isWhiteTheme()) {
+        if (isWhiteTheme() || isLightGrayTheme()) {
             AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+            return
+        }
+        if (isBlackTheme()) {
+            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
             return
         }
         AppCompatDelegate.setDefaultNightMode(getNightMode())

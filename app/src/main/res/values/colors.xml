@@ -27,6 +27,7 @@
         <item>@color/material_light_black</item>
         <item>@color/color_verdant_mint</item>
         <item>@color/white</item>
+        <item>@color/color_light_gray_bg</item>
     </integer-array>
 
     <color name="material_amber_100">#FFECB3</color>
@@ -347,10 +348,24 @@
     <color name="color_white_theme_material_100">#F5F5F5</color>
     <color name="color_white_theme_material_300">#E0E0E0</color>
     <color name="color_white_theme_surface">#FFFFFF</color>
-    <color name="color_white_theme_bg">#F8F9FA</color>
+    <color name="color_white_theme_bg">#FFFFFF</color>
     <color name="color_white_theme_text_primary">#212121</color>
     <color name="color_white_theme_text_secondary">#424242</color>
     <color name="color_white_theme_tab_unselected">#8A000000</color>
     <color name="color_white_theme_tab_selected">#000000</color>
     <color name="color_white_theme_ripple">#1F000000</color>
+
+    <!-- 浅灰主题专用调色盘 -->
+    <color name="color_light_gray_primary">#1F2937</color>
+    <color name="color_light_gray_primary_dark">#E5E7EB</color>
+    <color name="color_light_gray_accent">#2563EB</color>
+    <color name="color_light_gray_material_100">#F3F4F6</color>
+    <color name="color_light_gray_material_300">#E5E7EB</color>
+    <color name="color_light_gray_surface">#FFFFFF</color>
+    <color name="color_light_gray_bg">#F5F5F7</color>
+    <color name="color_light_gray_text_primary">#1F2937</color>
+    <color name="color_light_gray_text_secondary">#6B7280</color>
+    <color name="color_light_gray_tab_unselected">#6B7280</color>
+    <color name="color_light_gray_tab_selected">#1F2937</color>
+    <color name="color_light_gray_ripple">#1A1F2937</color>
 </resources>

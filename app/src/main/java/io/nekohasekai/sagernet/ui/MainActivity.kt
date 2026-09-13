@@ -48,6 +48,7 @@ import io.nekohasekai.sagernet.fmt.PluginEntry
 import io.nekohasekai.sagernet.group.GroupInterfaceAdapter
 import io.nekohasekai.sagernet.group.GroupUpdater
 import io.nekohasekai.sagernet.ktx.deduplicateProxies
+import io.nekohasekai.sagernet.ktx.getColorAttr
 import io.nekohasekai.sagernet.ktx.alert
 import io.nekohasekai.sagernet.ktx.deduplicateProxies
 import io.nekohasekai.sagernet.ktx.isPlay
@@ -84,13 +85,22 @@ class MainActivity : ThemedActivity(),
 
         binding = LayoutMainBinding.inflate(layoutInflater)
         binding.fab.initProgress(binding.fabProgress)
-        val primaryColor = Theme.getPrimaryColor(this)
-        if (Theme.isWhiteTheme()) {
-            binding.fab.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#212121"))
-            binding.fab.imageTintList = ColorStateList.valueOf(Color.WHITE)
-        } else {
-            binding.fab.backgroundTintList = ColorStateList.valueOf(primaryColor)
+        val isNight = Theme.usingNightMode()
+        val fabBgColor = when {
+            Theme.isWhiteTheme() -> Color.parseColor("#212121")
+            Theme.isLightGrayTheme() -> Color.parseColor("#1F2937")
+            Theme.isBlackTheme() -> if (isNight) Color.parseColor("#2C2C2E") else Color.parseColor("#2B2B2B")
+            else -> {
+                val bg = getColorAttr(R.attr.fabColorBackground)
+                if (isNight && ColorUtils.calculateLuminance(bg) > 0.85) {
+                    getColorAttr(R.attr.colorPrimary)
+                } else {
+                    bg
+                }
+            }
         }
+        binding.fab.backgroundTintList = ColorStateList.valueOf(fabBgColor)
+        binding.fab.imageTintList = ColorStateList.valueOf(Color.WHITE)
         if (themeResId !in intArrayOf(
                 R.style.Theme_SagerNet_Black
             )

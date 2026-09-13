@@ -44,6 +44,6 @@
     <color name="card_elevated_verdant_mint">#10241C</color>
 
     <!-- 纯黑主题在深色模式下的颜色映射 -->
-    <color name="color_ng_black_accent">#E0E0E0</color>
-    <color name="color_ng_black_primary">#1E1E1E</color>
+    <color name="color_ng_black_accent">#FFFFFF</color>
+    <color name="color_ng_black_primary">#2C2C2E</color>
 </resources>

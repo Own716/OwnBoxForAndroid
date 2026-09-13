@@ -19,15 +19,15 @@
         android:background="?android:attr/colorBackground"
         android:elevation="0dp"
         android:visibility="gone"
-        app:tabIndicatorColor="?attr/colorPrimary"
+        app:tabIndicatorColor="?attr/tabIndicatorColor"
         app:tabIndicatorHeight="3dp"
         app:tabIndicatorFullWidth="false"
         app:tabMode="scrollable"
         app:tabPaddingStart="16dp"
         app:tabPaddingEnd="16dp"
         app:tabRippleColor="?tabRippleColor"
-        app:tabSelectedTextColor="?attr/colorPrimary"
-        app:tabTextColor="?android:attr/textColorSecondary"
+        app:tabSelectedTextColor="?attr/tabSelectedTextColor"
+        app:tabTextColor="?attr/tabTextColor"
         app:tabTextAppearance="@style/Widget.SagerNet.TabLayout.TextAppearance"
         app:tabUnboundedRipple="false" />
 

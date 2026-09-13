@@ -73,9 +73,10 @@
             app:tabIndicatorHeight="3dp"
             app:tabMode="fixed"
             app:tabRippleColor="?attr/colorControlHighlight"
-            app:tabSelectedTextColor="?attr/colorPrimary"
+            app:tabIndicatorColor="?attr/tabIndicatorColor"
+            app:tabSelectedTextColor="?attr/tabSelectedTextColor"
             app:tabTextAppearance="@style/TextAppearance.OwnBox.Dashboard.Tab"
-            app:tabTextColor="?attr/primaryOrTextSecondary">
+            app:tabTextColor="?attr/tabTextColor">
 
             <com.google.android.material.tabs.TabItem
                 android:layout_width="wrap_content"
