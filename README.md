@@ -53,3 +53,14 @@ Please visit the official Releases page to download officially signed APK packag
 
 * **x86_64 / x86**：适用于主流 PC 电脑安卓模拟器。
 * **x86_64 / x86**: Suitable for mainstream Android emulators running on PC.
+
+---
+
+## 💬 反馈与建议 / Issues & Feedback
+
+遇到任何使用问题、连接异常或有新的功能建议，欢迎前往仓库议题页面提交反馈：
+
+If you encounter any issues, connection errors, or have feature requests, please feel free to submit an issue:
+
+👉 **[前往提交议题 / Submit an Issue on GitHub](https://github.com/Own716/OwnBoxForAndroid/issues)**
+
