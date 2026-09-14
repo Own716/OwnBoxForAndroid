@@ -40,6 +40,20 @@
             app:title="@string/balancer_interval"
             app:useSimpleSummaryProvider="false" />
 
+        <EditTextPreference
+            app:defaultValue="300"
+            app:key="balancerTolerance"
+            app:title="@string/balancer_tolerance"
+            app:useSimpleSummaryProvider="false" />
+
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:defaultValue="ms"
+            app:entries="@array/tolerance_unit_entries"
+            app:entryValues="@array/tolerance_unit_values"
+            app:key="balancerToleranceUnit"
+            app:title="@string/balancer_tolerance_unit"
+            app:useSimpleSummaryProvider="true" />
+
     </PreferenceCategory>
 
 </PreferenceScreen>

@@ -789,17 +789,24 @@ fun buildConfig(
 
                 val balancerOutbound: SingBoxOption = if (balancerBean.strategy == "leastPing") {
                     val iv = balancerBean.interval.toLong().coerceAtLeast(10L)
+                    val toleranceMs = balancerBean.calculateToleranceMs().coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
                     buildUrlTestOutbound(
                         memberTags = memberTags,
                         testUrl = balancerBean.testUrl,
                         intervalSec = iv,
-                        toleranceMs = 1,
+                        toleranceMs = toleranceMs,
                         idleTimeoutStr = "${iv}s",
-                        interruptExist = true,
+                        interruptExist = false,
                         customTag = balancerTag
                     )
                 } else {
-                    buildLoadBalanceOutbound(memberTags, balancerBean.strategy).apply {
+                    val strat = when (balancerBean.strategy) {
+                        "consistent_hash", "leastLoad" -> "consistent_hash"
+                        "round_robin", "roundRobin" -> "round_robin"
+                        "random" -> "random"
+                        else -> balancerBean.strategy
+                    }
+                    buildLoadBalanceOutbound(memberTags, strat).apply {
                         tag = balancerTag
                     }
                 }

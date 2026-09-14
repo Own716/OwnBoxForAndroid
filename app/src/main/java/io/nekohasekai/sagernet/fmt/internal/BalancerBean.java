@@ -21,6 +21,7 @@ public class BalancerBean extends InternalBean {
     public static final String STRATEGY_RANDOM = "random";
     public static final String STRATEGY_LEAST_PING = "leastPing";
     public static final String STRATEGY_LEAST_LOAD = "leastLoad";
+    public static final String STRATEGY_CONSISTENT_HASH = "consistent_hash";
 
     public int balancerType = TYPE_LIST; // 0 = list, 1 = group
     public long targetGroupId = 0L;
@@ -29,6 +30,19 @@ public class BalancerBean extends InternalBean {
     public String strategy = STRATEGY_RANDOM;
     public String testUrl = "";
     public int interval = 300;
+    public int tolerance = 300;
+    public String toleranceUnit = "ms";
+
+    public long calculateToleranceMs() {
+        long value = tolerance;
+        if (value < 0L) {
+            value = 0L;
+        }
+        if ("s".equalsIgnoreCase(toleranceUnit)) {
+            return Math.min(value * 1000L, (long) Integer.MAX_VALUE);
+        }
+        return Math.min(value, (long) Integer.MAX_VALUE);
+    }
 
     @Override
     public String displayName() {
@@ -60,11 +74,13 @@ public class BalancerBean extends InternalBean {
         if (strategy == null || strategy.isEmpty()) strategy = STRATEGY_RANDOM;
         if (testUrl == null) testUrl = "";
         if (interval <= 0) interval = 300;
+        if (tolerance < 0) tolerance = 300;
+        if (toleranceUnit == null || toleranceUnit.isEmpty()) toleranceUnit = "ms";
     }
 
     @Override
     public void serialize(ByteBufferOutput output) {
-        output.writeInt(2); // version
+        output.writeInt(3); // version
         output.writeInt(balancerType);
         output.writeLong(targetGroupId);
         output.writeString(strategy);
@@ -83,6 +99,8 @@ public class BalancerBean extends InternalBean {
         for (Long gid : targetGroupIds) {
             output.writeLong(gid);
         }
+        output.writeInt(tolerance);
+        output.writeString(toleranceUnit != null ? toleranceUnit : "ms");
     }
 
     @Override
@@ -109,6 +127,14 @@ public class BalancerBean extends InternalBean {
                 }
             } else if (targetGroupId > 0L) {
                 targetGroupIds.add(targetGroupId);
+            }
+
+            if (version >= 3) {
+                tolerance = input.readInt();
+                toleranceUnit = input.readString();
+            } else {
+                tolerance = 300;
+                toleranceUnit = "ms";
             }
         }
     }

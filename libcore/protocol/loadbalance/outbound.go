@@ -77,10 +77,43 @@ func (s *LoadBalance) Start() error {
 	return nil
 }
 
+func hashDestination(dest M.Socksaddr) uint32 {
+	var key string
+	if dest.Fqdn != "" {
+		key = dest.Fqdn
+	} else if dest.IsIP() {
+		key = dest.Addr.String()
+	} else {
+		key = dest.String()
+	}
+	var h uint32 = 2166136261
+	for i := 0; i < len(key); i++ {
+		h ^= uint32(key[i])
+		h *= 16777619
+	}
+	return h
+}
+
 func (s *LoadBalance) pick() adapter.Outbound {
 	n := len(s.outbounds)
 	if n == 0 {
 		return nil
+	}
+	if s.strategy == "random" {
+		return s.outbounds[rand.Intn(n)]
+	}
+	idx := atomic.AddUint64(&s.counter, 1) % uint64(n)
+	return s.outbounds[idx]
+}
+
+func (s *LoadBalance) pickByDestination(dest M.Socksaddr) adapter.Outbound {
+	n := len(s.outbounds)
+	if n == 0 {
+		return nil
+	}
+	if s.strategy == "consistent_hash" || s.strategy == "leastLoad" || s.strategy == "sticky" {
+		idx := int(hashDestination(dest) % uint32(n))
+		return s.outbounds[idx]
 	}
 	if s.strategy == "random" {
 		return s.outbounds[rand.Intn(n)]
@@ -95,7 +128,9 @@ func (s *LoadBalance) DialContext(ctx context.Context, network string, destinati
 		return nil, E.New("no outbounds available")
 	}
 	var startIdx int
-	if s.strategy == "random" {
+	if s.strategy == "consistent_hash" || s.strategy == "leastLoad" || s.strategy == "sticky" {
+		startIdx = int(hashDestination(destination) % uint32(n))
+	} else if s.strategy == "random" {
 		startIdx = rand.Intn(n)
 	} else {
 		startIdx = int(atomic.AddUint64(&s.counter, 1) % uint64(n))
@@ -118,7 +153,9 @@ func (s *LoadBalance) ListenPacket(ctx context.Context, destination M.Socksaddr)
 		return nil, E.New("no outbounds available")
 	}
 	var startIdx int
-	if s.strategy == "random" {
+	if s.strategy == "consistent_hash" || s.strategy == "leastLoad" || s.strategy == "sticky" {
+		startIdx = int(hashDestination(destination) % uint32(n))
+	} else if s.strategy == "random" {
 		startIdx = rand.Intn(n)
 	} else {
 		startIdx = int(atomic.AddUint64(&s.counter, 1) % uint64(n))
@@ -137,7 +174,7 @@ func (s *LoadBalance) ListenPacket(ctx context.Context, destination M.Socksaddr)
 
 func (s *LoadBalance) NewConnection(ctx context.Context, conn net.Conn, metadata adapter.InboundContext, onClose N.CloseHandlerFunc) {
 	ctx = interrupt.ContextWithIsExternalConnection(ctx)
-	selected := s.pick()
+	selected := s.pickByDestination(metadata.Destination)
 	if selected == nil {
 		conn.Close()
 		return
@@ -151,7 +188,7 @@ func (s *LoadBalance) NewConnection(ctx context.Context, conn net.Conn, metadata
 
 func (s *LoadBalance) NewPacketConnection(ctx context.Context, conn N.PacketConn, metadata adapter.InboundContext, onClose N.CloseHandlerFunc) {
 	ctx = interrupt.ContextWithIsExternalConnection(ctx)
-	selected := s.pick()
+	selected := s.pickByDestination(metadata.Destination)
 	if selected == nil {
 		conn.Close()
 		return

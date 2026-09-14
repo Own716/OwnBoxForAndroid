@@ -53,6 +53,8 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         DataStore.balancerStrategy = strategy
         DataStore.balancerTestUrl = testUrl
         DataStore.balancerInterval = interval
+        DataStore.balancerTolerance = tolerance
+        DataStore.balancerToleranceUnit = if (toleranceUnit.isNullOrBlank()) "ms" else toleranceUnit
         DataStore.serverProtocol = proxies.joinToString(",")
     }
 
@@ -67,6 +69,8 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         strategy = DataStore.balancerStrategy
         testUrl = DataStore.balancerTestUrl
         interval = DataStore.balancerInterval
+        tolerance = DataStore.balancerTolerance
+        toleranceUnit = DataStore.balancerToleranceUnit
         proxies = proxyList.map { it.id }
         initializeDefaultValues()
     }
@@ -157,6 +161,39 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
             } else {
                 "300s"
             }
+        }
+
+        val tolerancePref = findPreference<EditTextPreference>("balancerTolerance")
+        val toleranceUnitPref = findPreference<SimpleMenuPreference>("balancerToleranceUnit")
+
+        fun updateToleranceSummary() {
+            val text = tolerancePref?.text?.trim()
+            val unit = DataStore.balancerToleranceUnit
+            val value = text?.toIntOrNull()
+            tolerancePref?.summary = when {
+                value != null && value >= 0 -> "$value $unit"
+                unit == "s" -> "1 s"
+                else -> "300 ms"
+            }
+        }
+        updateToleranceSummary()
+
+        tolerancePref?.setOnPreferenceChangeListener { _, newValue ->
+            val str = (newValue as? String)?.trim().orEmpty()
+            val v = str.toIntOrNull()
+            if (v != null && v >= 0) {
+                DataStore.balancerTolerance = v
+                tolerancePref.text = v.toString()
+                updateToleranceSummary()
+            }
+            true
+        }
+
+        toleranceUnitPref?.setOnPreferenceChangeListener { _, newValue ->
+            val unit = (newValue as? String) ?: "ms"
+            DataStore.balancerToleranceUnit = unit
+            updateToleranceSummary()
+            true
         }
 
         updateTypeVisibility(DataStore.balancerType)
@@ -356,7 +393,24 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
             binding.profileName.text = profile.displayName()
             binding.profileType.text = proxyEntity.displayType()
             binding.profileType.setTextColor(getProtocolColor(proxyEntity.type))
-            binding.profileAddress.text = profile.displayAddress()
+
+            val serverAddress = profile.displayAddress().trim()
+            val group = if (proxyEntity.groupId > 0L) {
+                runCatching { SagerDatabase.groupDao.getById(proxyEntity.groupId) }.getOrNull()
+            } else null
+            val groupName = group?.takeIf { !it.ungrouped }?.name?.trim()?.takeIf {
+                it.isNotBlank() && it != "null" && it != "[]"
+            }
+
+            val detailText = if (groupName != null) {
+                if (serverAddress.isNotBlank()) "$serverAddress [$groupName]" else "[$groupName]"
+            } else {
+                serverAddress
+            }
+
+            binding.profileAddress.text = detailText
+            binding.profileAddress.isSelected = true
+            (binding.profileAddress.parent as View).isVisible = detailText.isNotBlank()
 
             binding.edit.setImageResource(R.drawable.ic_image_edit)
             binding.edit.setOnClickListener {

@@ -3186,11 +3186,8 @@ class ConfigurationFragment @JvmOverloads constructor(
                 var address = if (pf.alwaysShowAddress && bean.name.isNotBlank()) {
                     bean.displayAddress()
                 } else ""
-                if (showTraffic && address.length >= 30) {
-                    address = address.substring(0, 27) + "..."
-                }
-
                 profileAddress.text = address
+                profileAddress.isSelected = true
                 val trafficRowEmpty =
                     (!showTraffic || proxyEntity.status <= 0) && address.isBlank()
                 (trafficText.parent as View).visibility = when {
