@@ -873,10 +873,4 @@
         <item name="tabStyle">@style/Widget.SagerNet.TabLayout</item>
         <item name="tabTextAppearance">@style/Widget.SagerNet.TabLayout.TextAppearance</item>
     </style>
-
-    <style name="TextAppearance.OwnBox.Dashboard.Tab" parent="TextAppearance.MaterialComponents.Button">
-        <item name="android:textSize">13sp</item>
-        <item name="android:textAllCaps">false</item>
-        <item name="android:textStyle">bold</item>
-    </style>
 </resources>

@@ -9,6 +9,7 @@ import android.webkit.*
 import android.widget.EditText
 import androidx.appcompat.widget.Toolbar
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.snackbar.Snackbar
 import io.nekohasekai.sagernet.BuildConfig
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.DataStore
@@ -49,6 +50,10 @@ class WebviewFragment : ToolbarFragment(R.layout.layout_webview), Toolbar.OnMenu
             }
         }
         mWebView.loadUrl(DataStore.yacdURL)
+
+        if (!DataStore.serviceState.connected) {
+            Snackbar.make(view, "提示：请先连接代理服务以获取实时仪表盘数据", Snackbar.LENGTH_LONG).show()
+        }
     }
 
     @SuppressLint("CheckResult")
@@ -72,6 +77,7 @@ class WebviewFragment : ToolbarFragment(R.layout.layout_webview), Toolbar.OnMenu
                 mWebView.onPause()
                 mWebView.removeAllViews()
                 mWebView.destroy()
+                (activity as? MainActivity)?.displayFragmentWithId(R.id.nav_configuration)
             }
         }
         return true

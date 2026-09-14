@@ -555,10 +555,7 @@ class MainActivity : ThemedActivity(),
                 startActivity(Intent(this, ConnectivityTestActivity::class.java))
                 return false
             }
-            R.id.nav_dashboard -> {
-                startActivity(Intent(this, DashboardActivity::class.java))
-                return false
-            }
+            R.id.nav_dashboard -> displayFragment(WebviewFragment())
             R.id.nav_tools -> displayFragment(ToolsFragment())
             R.id.nav_logcat -> displayFragment(LogcatFragment())
             R.id.nav_faq -> {
