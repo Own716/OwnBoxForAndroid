@@ -61,6 +61,10 @@ class TileService : BaseTileService(), SagerConnection.Callback {
         qsTile?.apply {
             val currentIcon = getTileIcon()
             icon = currentIcon
+
+            // 防御性空值与空白字符串过滤
+            val validProfileName = profileName?.trim()?.takeIf { it.isNotEmpty() && !it.equals("null", ignoreCase = true) }
+
             when (serviceState) {
                 BaseService.State.Idle -> error("serviceState")
                 BaseService.State.Connecting -> {
@@ -70,7 +74,7 @@ class TileService : BaseTileService(), SagerConnection.Callback {
 
                 BaseService.State.Connected -> {
                     state = Tile.STATE_ACTIVE
-                    label = profileName ?: getString(R.string.app_name)
+                    label = getString(R.string.tile_connected)
                 }
 
                 BaseService.State.Stopping -> {
@@ -85,12 +89,16 @@ class TileService : BaseTileService(), SagerConnection.Callback {
             }
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
                 setSubtitle(when (serviceState) {
-                    BaseService.State.Connected -> profileName ?: getString(R.string.vpn_connected)
-                    BaseService.State.Connecting -> getString(R.string.connecting)
-                    BaseService.State.Stopping -> getString(R.string.stopping)
+                    BaseService.State.Connected -> validProfileName
+                    BaseService.State.Connecting -> validProfileName
+                    BaseService.State.Stopping -> null
                     BaseService.State.Stopped -> getString(R.string.not_connected)
                     else -> null
                 })
+            } else {
+                if (serviceState == BaseService.State.Connected && validProfileName != null) {
+                    label = validProfileName
+                }
             }
             updateTile()
         }

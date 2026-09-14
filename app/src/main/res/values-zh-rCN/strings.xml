@@ -159,6 +159,7 @@
     <!-- status -->
     <string name="connecting">正在连接…</string>
     <string name="vpn_connected">已连接 , 点击此处测试连接</string>
+    <string name="tile_connected">已连接</string>
     <string name="not_connected">未连接</string>
     <!-- subscriptions -->
     <string name="subscriptions">订阅</string>
