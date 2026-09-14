@@ -48,7 +48,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="@string/custom_icon_import"
-                        android:textColor="?whiteOrTextPrimary"
+                        android:textColor="?attr/colorOnPrimary"
                         app:cornerRadius="24dp" />
 
                     <Space
@@ -205,7 +205,7 @@
             android:layout_marginHorizontal="16dp"
             android:layout_marginVertical="12dp"
             android:text="@string/custom_icon_apply_pack"
-            android:textColor="?whiteOrTextPrimary"
+            android:textColor="?attr/colorOnPrimary"
             app:cornerRadius="24dp" />
 
     </LinearLayout>

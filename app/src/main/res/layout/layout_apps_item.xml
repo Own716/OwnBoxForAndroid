@@ -42,7 +42,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:ellipsize="end"
-                android:textColor="?android:attr/textColorSecondary"
+                android:textColor="?android:attr/textColorPrimary"
                 android:textSize="18sp"
                 tools:text="Package label" />
 
@@ -52,7 +52,7 @@
                 android:layout_height="wrap_content"
                 android:breakStrategy="high_quality"
                 android:ellipsize="end"
-                android:textColor="?android:attr/textColorTertiary"
+                android:textColor="?android:attr/textColorSecondary"
                 android:textSize="12sp"
                 tools:text="com.package.name (10000)" />
 

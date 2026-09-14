@@ -1,8 +1,11 @@
 package io.nekohasekai.sagernet.ui
 
 import android.content.res.Configuration
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
+import android.view.View
+import android.view.ViewGroup
 import android.widget.TextView
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatActivity
@@ -16,6 +19,7 @@ import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.snackbar.Snackbar
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.DataStore
+import io.nekohasekai.sagernet.ktx.getColorAttr
 import io.nekohasekai.sagernet.utils.Theme
 
 abstract class ThemedActivity : AppCompatActivity {
@@ -44,27 +48,30 @@ abstract class ThemedActivity : AppCompatActivity {
         super.onCreate(savedInstanceState)
 
         uiMode = resources.configuration.uiMode
-        
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            WindowCompat.setDecorFitsSystemWindows(window, false)
-            
-            val insetController = WindowCompat.getInsetsController(window, window.decorView)
-            val isWhiteTheme = Theme.isWhiteTheme()
-            val isBlackTheme = DataStore.appTheme == Theme.BLACK
-            val primaryColor = Theme.getPrimaryColor(this)
-            val isLightPrimary = ColorUtils.calculateLuminance(primaryColor) > 0.45
-            val isNight = Theme.usingNightMode()
 
-            if (isNight) {
-                insetController.isAppearanceLightStatusBars = false
-                insetController.isAppearanceLightNavigationBars = false
-            } else {
-                insetController.isAppearanceLightStatusBars = true
-                insetController.isAppearanceLightNavigationBars = true
-            }
+        window.statusBarColor = Color.TRANSPARENT
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isStatusBarContrastEnforced = false
+            window.isNavigationBarContrastEnforced = false
         }
 
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content)) { _, insets ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+
+            val insetController = WindowCompat.getInsetsController(window, window.decorView)
+            val surfaceColor = getColorAttr(R.attr.colorSurface)
+            val isLightSurface = ColorUtils.calculateLuminance(surfaceColor) > 0.45
+
+            insetController.isAppearanceLightStatusBars = isLightSurface
+            insetController.isAppearanceLightNavigationBars = isLightSurface
+        }
+
+        applyAppBarInsets()
+    }
+
+    fun applyAppBarInsets() {
+        val content = findViewById<View>(android.R.id.content) ?: return
+        ViewCompat.setOnApplyWindowInsetsListener(content) { _, insets ->
             val bars = insets.getInsets(
                 WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
             )
@@ -73,6 +80,22 @@ abstract class ThemedActivity : AppCompatActivity {
             }
             insets
         }
+        ViewCompat.requestApplyInsets(content)
+    }
+
+    override fun setContentView(view: View?) {
+        super.setContentView(view)
+        applyAppBarInsets()
+    }
+
+    override fun setContentView(layoutResID: Int) {
+        super.setContentView(layoutResID)
+        applyAppBarInsets()
+    }
+
+    override fun setContentView(view: View?, params: ViewGroup.LayoutParams?) {
+        super.setContentView(view, params)
+        applyAppBarInsets()
     }
 
     override fun setTheme(resId: Int) {
