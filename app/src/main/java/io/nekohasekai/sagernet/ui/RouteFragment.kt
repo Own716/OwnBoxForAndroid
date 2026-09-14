@@ -358,7 +358,7 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
         inner class DocumentHolder(binding: LayoutEmptyRouteBinding) : RecyclerView.ViewHolder(binding.root) {
             fun bind() {
                 itemView.setOnClickListener {
-                    it.context.launchCustomTab("https://t.me/KarenOwn")
+                    it.context.launchCustomTab("https://t.me/OwnBoxs")
                 }
             }
         }

@@ -443,7 +443,7 @@ class MainActivity : ThemedActivity(),
             }
             .setNeutralButton(android.R.string.cancel, null)
             .setNeutralButton(R.string.action_learn_more) { _, _ ->
-                launchCustomTab("https://t.me/KarenOwn")
+                launchCustomTab("https://t.me/OwnBoxs")
             }
             .show()
     }
@@ -562,7 +562,7 @@ class MainActivity : ThemedActivity(),
             R.id.nav_tools -> displayFragment(ToolsFragment())
             R.id.nav_logcat -> displayFragment(LogcatFragment())
             R.id.nav_faq -> {
-                launchCustomTab("https://t.me/KarenOwn")
+                launchCustomTab("https://t.me/OwnBoxs")
                 return false
             }
 
