@@ -13,6 +13,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.RemoteException
 import android.view.KeyEvent
+import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import androidx.activity.addCallback
@@ -125,7 +126,9 @@ class MainActivity : ThemedActivity(),
                 supportFragmentManager.findFragmentById(R.id.fragment_holder) as? ToolbarFragment
         }
         onBackPressedDispatcher.addCallback {
-            if (supportFragmentManager.findFragmentById(R.id.fragment_holder) is ConfigurationFragment) {
+            val fragment = supportFragmentManager.findFragmentById(R.id.fragment_holder) as? ToolbarFragment
+            if (fragment?.onBackPressed() == true) return@addCallback
+            if (fragment is ConfigurationFragment) {
                 moveTaskToBack(true)
             } else {
                 displayFragmentWithId(R.id.nav_configuration)
@@ -477,11 +480,44 @@ class MainActivity : ThemedActivity(),
             .show()
     }
 
-    override fun onNavigationItemSelected(item: MenuItem): Boolean {
-        if (item.isChecked) binding.drawerLayout.closeDrawers() else {
-            return displayFragmentWithId(item.itemId)
+    fun isCurrentFragment(@IdRes id: Int): Boolean {
+        val current = currentMainFragment
+            ?: supportFragmentManager.findFragmentById(R.id.fragment_holder)
+        return when (id) {
+            R.id.nav_configuration -> current is ConfigurationFragment
+            R.id.nav_group -> current is GroupFragment
+            R.id.nav_route -> current is RouteFragment
+            R.id.nav_settings -> current is SettingsFragment
+            R.id.nav_dashboard -> current is WebviewFragment
+            R.id.nav_tools -> current is ToolsFragment
+            R.id.nav_logcat -> current is LogcatFragment
+            R.id.nav_docs -> current is DocsFragment
+            R.id.nav_about -> current is AboutFragment
+            else -> false
         }
-        return true
+    }
+
+    fun setCheckedItem(@IdRes id: Int) {
+        val menu = navigation.menu
+        fun uncheckAll(m: Menu) {
+            for (i in 0 until m.size()) {
+                val item = m.getItem(i)
+                if (item.hasSubMenu()) {
+                    item.subMenu?.let { uncheckAll(it) }
+                }
+                item.isChecked = false
+            }
+        }
+        uncheckAll(menu)
+        menu.findItem(id)?.isChecked = true
+    }
+
+    override fun onNavigationItemSelected(item: MenuItem): Boolean {
+        if (isCurrentFragment(item.itemId)) {
+            binding.drawerLayout.closeDrawers()
+            return true
+        }
+        return displayFragmentWithId(item.itemId)
     }
 
 
@@ -569,7 +605,7 @@ class MainActivity : ThemedActivity(),
 
             else -> return false
         }
-        navigation.menu.findItem(id).isChecked = true
+        setCheckedItem(id)
         return true
     }
 

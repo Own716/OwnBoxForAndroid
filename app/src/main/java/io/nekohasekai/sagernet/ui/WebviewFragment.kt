@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.text.InputType
 import android.view.MenuItem
 import android.view.View
+import android.view.ViewGroup
 import android.webkit.*
 import android.widget.EditText
 import androidx.appcompat.widget.Toolbar
@@ -14,6 +15,7 @@ import io.nekohasekai.sagernet.BuildConfig
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.databinding.LayoutWebviewBinding
+import io.nekohasekai.sagernet.ktx.Logs
 import moe.matsuri.nb4a.utils.WebViewUtil
 
 // Fragment必须有一个无参public的构造函数，否则在数据恢复的时候，会报crash
@@ -56,6 +58,29 @@ class WebviewFragment : ToolbarFragment(R.layout.layout_webview), Toolbar.OnMenu
         }
     }
 
+    override fun onBackPressed(): Boolean {
+        if (::mWebView.isInitialized && mWebView.canGoBack()) {
+            mWebView.goBack()
+            return true
+        }
+        return false
+    }
+
+    override fun onDestroyView() {
+        if (::mWebView.isInitialized) {
+            try {
+                mWebView.stopLoading()
+                mWebView.loadUrl("about:blank")
+                mWebView.clearHistory()
+                (mWebView.parent as? ViewGroup)?.removeView(mWebView)
+                mWebView.destroy()
+            } catch (e: Exception) {
+                Logs.w("Failed to destroy WebView: ${e.message}")
+            }
+        }
+        super.onDestroyView()
+    }
+
     @SuppressLint("CheckResult")
     override fun onMenuItemClick(item: MenuItem): Boolean {
         when (item.itemId) {
@@ -74,9 +99,6 @@ class WebviewFragment : ToolbarFragment(R.layout.layout_webview), Toolbar.OnMenu
                     .show()
             }
             R.id.close -> {
-                mWebView.onPause()
-                mWebView.removeAllViews()
-                mWebView.destroy()
                 (activity as? MainActivity)?.displayFragmentWithId(R.id.nav_configuration)
             }
         }
