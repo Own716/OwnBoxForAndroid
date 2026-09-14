@@ -28,7 +28,7 @@
         app:icon="@drawable/ic_baseline_folder_open_24"
         android:title="@string/webdav_path"
         android:singleLine="true"
-        android:defaultValue="Throne"
+        android:defaultValue="OwnBox"
         android:summary="%s" />
 
     <Preference

@@ -117,7 +117,7 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
                 )
                 onMainDispatcher {
                     startFilesForResult(
-                        exportSettings, "throne_backup_${Date().toLocaleString()}.json"
+                        exportSettings, "OwnBox_backup_${Date().toLocaleString()}.json"
                     )
                 }
             }
@@ -132,7 +132,7 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
                 )
                 app.cacheDir.mkdirs()
                 val cacheFile = File(
-                    app.cacheDir, "throne_backup_${Date().toLocaleString()}.json"
+                    app.cacheDir, "OwnBox_backup_${Date().toLocaleString()}.json"
                 )
                 cacheFile.writeBytes(backupData)
                 onMainDispatcher {
@@ -206,12 +206,12 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
 
                 // 规范化 URL
                 val baseUrl = DataStore.webdavServer!!.trimEnd('/')
-                val path = DataStore.webdavPath?.trim('/')?.takeIf { it.isNotEmpty() } ?: "Throne"
+                val path = DataStore.webdavPath?.trim('/')?.takeIf { it.isNotEmpty() } ?: "OwnBox"
 
                 // 使用英文格式的时间戳作为文件名，修改后缀为 .zip
                 val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
                 val version = BuildConfig.VERSION_NAME
-                val fileName = "throne_backup_${version}_$timestamp.zip"
+                val fileName = "OwnBox_backup_${version}_$timestamp.zip"
 
                 // 确保 baseUrl 是有效的 URL
                 if (!baseUrl.startsWith("http://") && !baseUrl.startsWith("https://")) {
@@ -382,9 +382,9 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
                     Logs.d("WebDAV restore - Directory listing: $responseBody")
                     
                     val patterns = listOf(
-                        """<D:href>[^<]*?throne_backup_[^<]*?\d{8}_\d{6}\.(json|zip)</D:href>""".toRegex(),
-                        """<d:href>[^<]*?throne_backup_[^<]*?\d{8}_\d{6}\.(json|zip)</d:href>""".toRegex(),
-                        """<href>[^<]*?throne_backup_[^<]*?\d{8}_\d{6}\.(json|zip)</href>""".toRegex()
+                        """<D:href>[^<]*?(?:OwnBox|ownbox|throne)_backup_[^<]*?\d{8}_\d{6}\.(json|zip)</D:href>""".toRegex(RegexOption.IGNORE_CASE),
+                        """<d:href>[^<]*?(?:OwnBox|ownbox|throne)_backup_[^<]*?\d{8}_\d{6}\.(json|zip)</d:href>""".toRegex(RegexOption.IGNORE_CASE),
+                        """<href>[^<]*?(?:OwnBox|ownbox|throne)_backup_[^<]*?\d{8}_\d{6}\.(json|zip)</href>""".toRegex(RegexOption.IGNORE_CASE)
                     )
                     
                     val backupFiles = mutableListOf<String>()
@@ -394,7 +394,7 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
                         matches.forEach { match ->
                             val href = match.value
                             Logs.d("WebDAV restore - Found backup file with pattern ${pattern.pattern}: $href")
-                            val fileName = """throne_backup_[^<]*?\d{8}_\d{6}\.(json|zip)""".toRegex()
+                            val fileName = """(?:OwnBox|ownbox|throne)_backup_[^<]*?\d{8}_\d{6}\.(json|zip)""".toRegex(RegexOption.IGNORE_CASE)
                                 .find(href)?.value
                             if (fileName != null) {
                                 backupFiles.add(fileName)
@@ -578,7 +578,7 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
                 ZipOutputStream(bos).use { zos ->
                     zos.setLevel(Deflater.BEST_COMPRESSION)
                     
-                    val entry = ZipEntry("throne_backup.json").apply {
+                    val entry = ZipEntry("OwnBox_backup.json").apply {
                         method = ZipEntry.DEFLATED
                     }
                     
