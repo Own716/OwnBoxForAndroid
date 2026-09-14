@@ -25,6 +25,7 @@ import kotlinx.coroutines.sync.withLock
 import libcore.Libcore
 import moe.matsuri.nb4a.Protocols
 import moe.matsuri.nb4a.utils.Util
+import java.io.File
 import java.net.UnknownHostException
 
 class BaseService {
@@ -46,6 +47,7 @@ class BaseService {
         var state = State.Stopped
         var proxy: ProxyInstance? = null
         var notification: ServiceNotification? = null
+        var cacheRecoveryAttempts = 0
 
         val receiver = broadcastReceiver { ctx, intent ->
             when (intent.action) {
@@ -259,6 +261,44 @@ class BaseService {
             else startService(Intent(this, javaClass))
         }
 
+        fun deleteCorruptedCacheDb() {
+            val context = this as Context
+            val candidates = mutableListOf<File>()
+
+            runCatching {
+                candidates.add(File(context.cacheDir, "cache.db"))
+                context.cacheDir.listFiles { f -> f.name.startsWith("cache.db") }?.let { candidates.addAll(it) }
+            }
+            runCatching {
+                candidates.add(File(context.filesDir, "cache.db"))
+                context.filesDir.listFiles { f -> f.name.startsWith("cache.db") }?.let { candidates.addAll(it) }
+            }
+            runCatching {
+                candidates.add(File(context.noBackupFilesDir, "cache.db"))
+                context.noBackupFilesDir.listFiles { f -> f.name.startsWith("cache.db") }?.let { candidates.addAll(it) }
+            }
+            runCatching {
+                context.filesDir.parentFile?.let { parent ->
+                    val parentCache = File(parent, "cache")
+                    if (parentCache.exists()) {
+                        candidates.add(File(parentCache, "cache.db"))
+                        parentCache.listFiles { f -> f.name.startsWith("cache.db") }?.let { candidates.addAll(it) }
+                    }
+                }
+            }
+
+            candidates.distinctBy { it.absolutePath }.forEach { file ->
+                runCatching {
+                    if (file.exists()) {
+                        val deleted = file.delete()
+                        Logs.i("Auto-recovery: delete cache file ${file.absolutePath}, success=$deleted")
+                    }
+                }.onFailure {
+                    Logs.w("Auto-recovery: failed to delete ${file.absolutePath}", it)
+                }
+            }
+        }
+
         suspend fun killProcesses(): Throwable? {
             val proxy = data.proxy
             val serviceId = Integer.toHexString(System.identityHashCode(data))
@@ -281,7 +321,9 @@ class BaseService {
                     "profileId=${proxy?.profile?.id ?: -1L} stage=kill begin"
             )
             try {
-                proxy?.close()
+                withContext(Dispatchers.IO) {
+                    proxy?.close()
+                }
                 Logs.i(
                     "ServiceLifecycleTrace serviceId=$serviceId proxyId=$proxyId " +
                         "profileId=${proxy?.profile?.id ?: -1L} stage=proxy-close success"
@@ -316,6 +358,9 @@ class BaseService {
             DataStore.baseService = null
             DataStore.vpnService = null
             DataStore.mixedInboundAuthed = false
+            if (!restart) {
+                data.cacheRecoveryAttempts = 0
+            }
 
             val serviceId = Integer.toHexString(System.identityHashCode(data))
             val proxy = data.proxy
@@ -410,7 +455,10 @@ class BaseService {
 
                 try {
                     // stop the service if nothing has bound to it
-                    if (restart) startRunner() else {
+                    if (restart) {
+                        delay(100)
+                        startRunner()
+                    } else {
                         stopSelf()
                     }
                 } catch (error: Throwable) {
@@ -529,6 +577,7 @@ class BaseService {
 
                     startProcesses()
                     data.changeState(State.Connected)
+                    data.cacheRecoveryAttempts = 0
 
                     lateInit()
                 } catch (_: CancellationException) { // if the job was cancelled, it is canceller's responsibility to call stopRunner
@@ -540,6 +589,29 @@ class BaseService {
                     data.binder.missingPlugin(e.plugin)
                     stopRunner(false, null)
                 } catch (exc: Throwable) {
+                    val msg = exc.readableMessage
+                    val isCacheCorrupt = msg.contains("invalid freelist page", ignoreCase = true) ||
+                            msg.contains("initialize cache-file: timeout", ignoreCase = true) ||
+                            msg.contains("initialize cache-file", ignoreCase = true) ||
+                            msg.contains("freelist", ignoreCase = true) ||
+                            (msg.contains("cache.db", ignoreCase = true) && msg.contains("panic", ignoreCase = true))
+
+                    if (isCacheCorrupt && data.cacheRecoveryAttempts < 1) {
+                        data.cacheRecoveryAttempts++
+                        Logs.w("Auto-recovery: detected corrupted cache database ($msg). Purging cache.db and retrying once...")
+                        deleteCorruptedCacheDb()
+                        runCatching {
+                            withContext(Dispatchers.IO) {
+                                proxy.close()
+                            }
+                        }
+                        data.proxy = null
+                        delay(200)
+                        startRunner()
+                        return@runOnMainDispatcher
+                    }
+                    data.cacheRecoveryAttempts = 0
+
                     if (exc.javaClass.name.endsWith("proxyerror")) {
                         // error from golang
                         Logs.w(exc.readableMessage)

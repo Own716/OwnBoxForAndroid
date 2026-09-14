@@ -599,6 +599,17 @@ class DocsFragment : ToolbarFragment(R.layout.layout_docs) {
                 keywords = "负载均衡 策略组 最低延迟 轮询 随机 balancer strategy 自动切换 间隔",
             )
         )
+        allItems.add(
+            DocListItem.Item(
+                category = "连接观测与负载均衡",
+                title = "负载均衡切换容差与单位 (balancerTolerance / balancerToleranceUnit)",
+                badge = "推荐: 300ms 或 0.3s (默认)",
+                desc = "配置基于最低延迟优选 (leastPing) 或 URLTest 策略时的节点切换容差阈值与时间单位（毫秒 ms / 秒 s）。底层根据选定单位自动精准换算为内核毫秒级容差参数。",
+                prosCons = "【利】核心防抖动防断流机制！在 leastPing 算法中，当备用节点的实测延迟仅比当前节点低一点点时（未超过设定的容差差值），调度器绝不会盲目切换，从而彻底消除公共网络微小抖动导致的频繁切节点、网页重连与音视频会议瞬间断流；【弊】若将容差设为过大（如 > 2000ms），会导致当前节点性能严重劣变时切换迟钝。",
+                recommendation = "【最稳推荐：保持默认 300ms 或 0.3s】完美过滤网络正常微幅波动，同时在节点发生真实故障或严重拥堵时仍能果断切换到高速节点。",
+                keywords = "容差 tolerance 切换容差 容差单位 balancerTolerance 毫秒 秒 ms s leastping 抖动 断流 防抖动 负载均衡",
+            )
+        )
 
         // 8. 进阶设置
         allItems.add(DocListItem.Header("8. 进阶设置 (Advanced Settings)", "内核长连接自愈、安全策略、唤醒锁与日志调试"))
@@ -703,10 +714,10 @@ class DocsFragment : ToolbarFragment(R.layout.layout_docs) {
                 category = "侧边栏网络工具",
                 title = "Sing-box 仪表盘 (menu_dashboard)",
                 badge = "核心工具",
-                desc = "深度集成 Sing-box Clash API (127.0.0.1:9090) 的原生实时数据仪表盘。需在「设置 - 进阶设置」中开启「启用 Clash API」后方在侧边栏显示。提供活跃连接与历史关闭连接的多维排序（时间、速率、上传、下载、主机）、正则/关键字实时过滤、单条/批量断开、实时上行下行速率统计，并内置路由规则（Rules）与实时日志（Logs）流式查看面板。",
-                prosCons = "【利】毫秒级捕获每个应用与域名的连接、路由与流量，一键排查跑流量元凶与规则命中走向；【弊】高频轮询（如 1 秒）会增加微量 CPU 运算，离开仪表盘页面会自动停止轮询以保障续航。",
-                recommendation = "【推荐：按需开启】日常在进阶设置中开启 Clash API，连接异常或需要监控抓包时随时从侧边栏进入仪表盘查看。",
-                keywords = "仪表盘 仪表板 sing-box clash api 活跃连接 连接 规则 日志 监控 抓包 menu_dashboard",
+                desc = "1:1 完整移植的官方纯正 sing-box 实时网络仪表盘。需在「设置 - 进阶设置」中开启「启用 Clash API」后，即可随时从侧边栏快捷进入。全面提供“概览、代理、规则、连接、配置、日志”多 Tab 导航视图，支持实时上传/下载流量动态图表、内核内存占用监控、策略组出站实时切换、活跃与历史连接多维过滤及一键断开等全套网络排查工具。",
+                prosCons = "【利】全景掌控内核网络运行脉络，毫秒级捕捉每个应用与域名的连接路由决策、命中规则与吞吐速率，精准诊断跑流量、解析异常与断流节点；【弊】前台图表与连接高频轮询会占用微量 CPU 运算，退出仪表盘页面即刻自动挂起停止轮询，完全不损耗日常电量。",
+                recommendation = "【推荐：调试必备】日常使用建议常驻开启 Clash API，遇到网络卡顿、分流疑难或需要监控抓包时随时从侧边栏进入仪表盘全景透视。",
+                keywords = "仪表盘 仪表板 sing-box clash api 概览 代理 规则 活跃连接 连接 日志 内存 监控 抓包 menu_dashboard",
             )
         )
         allItems.add(

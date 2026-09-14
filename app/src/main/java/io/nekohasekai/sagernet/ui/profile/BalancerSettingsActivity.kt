@@ -6,8 +6,8 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
-import android.widget.LinearLayout
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.view.isGone
 import androidx.core.view.isVisible
 import androidx.preference.EditTextPreference
 import androidx.preference.Preference
@@ -403,7 +403,7 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
             }
 
             val detailText = if (groupName != null) {
-                if (serverAddress.isNotBlank()) "$serverAddress [$groupName]" else "[$groupName]"
+                if (serverAddress.isNotBlank()) "$serverAddress      [$groupName]" else "[$groupName]"
             } else {
                 serverAddress
             }
@@ -411,6 +411,8 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
             binding.profileAddress.text = detailText
             binding.profileAddress.isSelected = true
             (binding.profileAddress.parent as View).isVisible = detailText.isNotBlank()
+            binding.trafficText.text = ""
+            binding.trafficText.isGone = true
 
             binding.edit.setImageResource(R.drawable.ic_image_edit)
             binding.edit.setOnClickListener {
