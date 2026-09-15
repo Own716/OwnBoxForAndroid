@@ -37,6 +37,7 @@ import (
 
 var mainInstance *BoxInstance
 var boxInstanceSequence atomic.Uint64
+var lastUrlTestGc atomic.Int64
 
 type boxLifecycleState uint8
 
@@ -351,6 +352,16 @@ func (b *BoxInstance) Close() (err error) {
 		err = b.closeBox()
 	} else if b.Box != nil {
 		err = b.Box.Close()
+	}
+	if b.isURLTest {
+		now := time.Now().UnixMilli()
+		if now-lastUrlTestGc.Load() > 2000 {
+			lastUrlTestGc.Store(now)
+			go func() {
+				runtime.GC()
+				debug.FreeOSMemory()
+			}()
+		}
 	}
 	return err
 }

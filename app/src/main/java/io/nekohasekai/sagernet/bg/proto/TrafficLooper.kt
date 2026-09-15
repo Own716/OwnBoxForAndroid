@@ -1,5 +1,6 @@
 package io.nekohasekai.sagernet.bg.proto
 
+import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.aidl.SpeedDisplayData
 import io.nekohasekai.sagernet.aidl.TrafficData
 import io.nekohasekai.sagernet.aidl.TrafficDataBatch
@@ -12,6 +13,7 @@ import io.nekohasekai.sagernet.fmt.TAG_PROXY
 import io.nekohasekai.sagernet.ktx.Logs
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
+import libcore.Libcore
 
 class TrafficLooper
     (
@@ -23,6 +25,14 @@ class TrafficLooper
     }
 
     private var job: Job? = null
+    private var lastSpeedSnapshot: SpeedDisplayData? = null
+
+    suspend fun postLastSnapshotSpeed() {
+        val speed = lastSpeedSnapshot ?: return
+        data.notification?.apply {
+            if (listenPostSpeed) postNotificationSpeedUpdate(speed)
+        }
+    }
     private val idMap = mutableMapOf<Long, TrafficUpdater.TrafficLooperData>() // id to 1 data
     private val tagMap = mutableMapOf<String, TrafficUpdater.TrafficLooperData>() // tag to 1 data
     private val stateMutex = Mutex()
@@ -167,18 +177,24 @@ class TrafficLooper
     }
 
     private suspend fun loop() {
-        val delayMs = DataStore.speedInterval.toLong()
+        val baseDelayMs = DataStore.speedInterval.toLong()
         val showDirectSpeed = DataStore.showDirectSpeed
         val profileTrafficStatistics = DataStore.profileTrafficStatistics
-        if (delayMs == 0L) return
+        if (baseDelayMs == 0L) return
 
         // for display
         val itemBypass = TrafficUpdater.TrafficLooperData(tag = TAG_BYPASS)
+        var idleSeconds = 0
 
         while (currentCoroutineContext().isActive) {
+            val isForegroundUI = data.binder.callbackIdMap.containsValue(
+                SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_FOREGROUND
+            )
+            val isInteractive = SagerNet.power.isInteractive
+
             val proxy = data.proxy
             if (proxy == null) {
-                delay(delayMs)
+                delay(if (isForegroundUI) baseDelayMs else 3000L)
                 continue
             }
             if (!proxy.isInitialized()) continue
@@ -315,12 +331,33 @@ class TrafficLooper
             }
             currentCoroutineContext().ensureActive()
 
-            // ServiceNotification
+            lastSpeedSnapshot = snapshot.speed
+
+            // ServiceNotification: Only post if screen is interactive (saves CPU wakeups while screen is off)
             data.notification?.apply {
-                if (listenPostSpeed) postNotificationSpeedUpdate(snapshot.speed)
+                if (listenPostSpeed && isInteractive) {
+                    postNotificationSpeedUpdate(snapshot.speed)
+                }
             }
 
-            delay(delayMs)
+            // Periodic idle memory reclaim: when idle in background, return memory to OS
+            if (!isForegroundUI && snapshot.speed.txRateProxy == 0L && snapshot.speed.rxRateProxy == 0L) {
+                idleSeconds += 5
+                if (idleSeconds >= 60) {
+                    idleSeconds = 0
+                    Libcore.forceGc()
+                }
+            } else {
+                idleSeconds = 0
+            }
+
+            val nextDelay = when {
+                isForegroundUI -> baseDelayMs
+                !isInteractive -> 10000L
+                data.notification?.listenPostSpeed == true -> 3000L
+                else -> 5000L
+            }
+            delay(nextDelay)
         }
     }
 }

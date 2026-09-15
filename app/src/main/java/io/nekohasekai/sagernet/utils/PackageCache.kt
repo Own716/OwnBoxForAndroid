@@ -36,25 +36,31 @@ object PackageCache {
 
     @SuppressLint("InlinedApi")
     fun reload() {
-        val rawPackageInfo = app.packageManager.getInstalledPackages(
-            PackageManager.MATCH_UNINSTALLED_PACKAGES
-                    or PackageManager.GET_PERMISSIONS
-                    or PackageManager.GET_PROVIDERS
-                    or PackageManager.GET_META_DATA
-        )
+        val installed = if (SagerNet.application.isBgProcess) {
+            installedPackages = emptyMap()
+            installedPluginPackages = emptyMap()
+            app.packageManager.getInstalledApplications(0)
+        } else {
+            val rawPackageInfo = app.packageManager.getInstalledPackages(
+                PackageManager.MATCH_UNINSTALLED_PACKAGES
+                        or PackageManager.GET_PERMISSIONS
+                        or PackageManager.GET_PROVIDERS
+                        or PackageManager.GET_META_DATA
+            )
 
-        installedPackages = rawPackageInfo.filter {
-            when (it.packageName) {
-                "android" -> true
-                else -> it.requestedPermissions?.contains(Manifest.permission.INTERNET) == true
-            }
-        }.associateBy { it.packageName }
+            installedPackages = rawPackageInfo.filter {
+                when (it.packageName) {
+                    "android" -> true
+                    else -> it.requestedPermissions?.contains(Manifest.permission.INTERNET) == true
+                }
+            }.associateBy { it.packageName }
 
-        installedPluginPackages = rawPackageInfo.filter {
-            Plugins.isExe(it)
-        }.associateBy { it.packageName }
+            installedPluginPackages = rawPackageInfo.filter {
+                Plugins.isExe(it)
+            }.associateBy { it.packageName }
 
-        val installed = app.packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
+            app.packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
+        }
         installedApps = installed.associateBy { it.packageName }
         packageMap = installed.associate { it.packageName to it.uid }
         uidMap.clear()

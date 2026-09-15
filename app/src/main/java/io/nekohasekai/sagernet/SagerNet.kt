@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.app.*
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.ComponentCallbacks2
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
@@ -147,6 +148,10 @@ class SagerNet : Application(),
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
 
+        if (level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN && isMainProcess) {
+            cleanWebview()
+            System.gc()
+        }
         Libcore.forceGc()
     }
 

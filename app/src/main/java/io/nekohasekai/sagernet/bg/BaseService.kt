@@ -57,7 +57,11 @@ class BaseService {
                 PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED -> {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                         if (SagerNet.power.isDeviceIdleMode) {
-                            proxy?.box?.sleep()
+                            // Doze mode: do NOT call proxy?.box?.sleep() / pauseManager.DevicePause().
+                            // Pausing TUN inbound during Doze blocks background push notifications & sync,
+                            // causing disconnects and socket timeouts when phone is idle for hours.
+                            // Instead, only run a memory trim while keeping TUN/network completely alive.
+                            Libcore.forceGc()
                         } else {
                             proxy?.box?.wake()
                             if (DataStore.wakeResetConnections) {
@@ -76,9 +80,17 @@ class BaseService {
                     }
                 }
 
+                Intent.ACTION_SCREEN_OFF -> {
+                    // Screen turned off: reclaim OS memory to keep background RSS minimal
+                    Libcore.forceGc()
+                }
+
                 Intent.ACTION_SCREEN_ON,
                 Intent.ACTION_USER_PRESENT -> {
                     proxy?.box?.wake()
+                    runOnDefaultDispatcher {
+                        proxy?.looper?.postLastSnapshotSpeed()
+                    }
                     if (DataStore.wakeResetConnections) {
                         Libcore.resetAllConnections(true)
                     }
@@ -539,6 +551,7 @@ class BaseService {
                     }
                     addAction(Action.RESET_UPSTREAM_CONNECTIONS)
                     addAction(Intent.ACTION_SCREEN_ON)
+                    addAction(Intent.ACTION_SCREEN_OFF)
                     addAction(Intent.ACTION_USER_PRESENT)
                 }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
