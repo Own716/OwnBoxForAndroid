@@ -158,11 +158,31 @@ internal fun buildUrlTestOutbound(
             ?: "https://cp.cloudflare.com/generate_204"
         val iv = (intervalSec?.takeIf { it > 0 } ?: 300L).coerceAtLeast(10L)
         interval = "${iv}s"
+        // 50ms tolerance: prevents micro-jitter (< 50ms delta) from triggering node switch.
+        // This is independent of the memory profile toggle — always active for leastPing stability.
         tolerance = toleranceMs?.takeIf { it > 0 } ?: 50
-        idleTimeoutStr?.takeIf { it.isNotBlank() }?.let {
-            idle_timeout = if (it.all { c -> c.isDigit() }) "${it}s" else it
+        // Enforce minimum 10-minute idle_timeout regardless of memory mode.
+        // This guarantees Telegram file uploads (which can take many minutes) are never
+        // interrupted by the kernel reclaiming an "idle" leastPing connection pool.
+        // DO NOT lower this threshold for any memory optimization — violates stability contract.
+        val rawIdleTimeout = idleTimeoutStr?.takeIf { it.isNotBlank() }
+        if (rawIdleTimeout != null) {
+            val parsed = if (rawIdleTimeout.all { c -> c.isDigit() }) "${rawIdleTimeout}s" else rawIdleTimeout
+            // Parse minutes from string like "3m", "5m", "10m"; enforce minimum 10m
+            val minSecs = 10 * 60
+            val parsedSecs = when {
+                parsed.endsWith("m") -> (parsed.dropLast(1).toLongOrNull() ?: 0L) * 60
+                parsed.endsWith("s") -> parsed.dropLast(1).toLongOrNull() ?: 0L
+                else -> 0L
+            }
+            idle_timeout = if (parsedSecs < minSecs) "10m" else parsed
+        } else {
+            idle_timeout = "10m"
         }
-        interrupt_exist_connections = interruptExist ?: false
+        // CRITICAL: Never interrupt active connections on node switch.
+        // interrupt_exist_connections=true would instantly kill Telegram upload streams on any
+        // 5ms latency fluctuation. This must always be false — it is NOT overridden by memory mode.
+        interrupt_exist_connections = false
     }
 
 private fun endpointTag(value: Any?): String? {

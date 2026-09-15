@@ -51,22 +51,25 @@ func InitCore(process, cachePath, internalAssets, externalAssets string,
 	defer device.DeferPanicToError("InitCore", func(err error) { log.Println(err) })
 	isBgProcess = strings.HasSuffix(process, ":bg")
 
-	// Tune Go runtime memory footprint for mobile environments:
-	// - Set GC percentage to 80 (default 100) to balance collection efficiency and prevent throughput choking.
-	// - Set soft memory limit to 512 MiB to avoid GC thrashing under multi-node load balancing & high-speed uploads.
-	debug.SetGCPercent(80)
-	debug.SetMemoryLimit(512 * 1024 * 1024)
+	// Apply memory profile based on user preference flag file written by Android before initCore.
+	// File noBackup/perf_mode exists → high-performance mode; absent → extreme low-memory mode.
+	// This avoids needing a new JNI binding for runtime memory tuning.
+	tmp := filepath.Join(cachePath, "../no_backup")
+	os.MkdirAll(tmp, 0755)
+	os.Chdir(tmp)
+	protectSocketPath = filepath.Join(tmp, "protect_path")
+
+	perfModeFile := filepath.Join(tmp, "perf_mode")
+	if _, err := os.Stat(perfModeFile); err == nil {
+		SetMemoryProfile(true)
+	} else {
+		SetMemoryProfile(false)
+	}
 
 	intfNB4A = if1
 	intfBox = if2
 	useProcfs = intfBox.UseProcFS()
 	gLocalDNSTransport = newPlatformTransport(if3, "", option.LocalDNSServerOptions{})
-
-	// Working dir
-	tmp := filepath.Join(cachePath, "../no_backup")
-	os.MkdirAll(tmp, 0755)
-	os.Chdir(tmp)
-	protectSocketPath = filepath.Join(tmp, "protect_path")
 
 	// sing-box fs
 	resourcePaths = append(resourcePaths, externalAssets)
@@ -130,4 +133,24 @@ func sendFdToProtect(fd int, path string) error {
 		return fmt.Errorf("socket closed unexpectedly")
 	}
 	return nil
+}
+
+// SetMemoryProfile dynamically switches the Go runtime GC profile.
+// Called from Android at VPN service start based on user's "性能优先模式" toggle.
+//   - performancePriority=false (default): extreme low-memory mode — GOGC=20, limit=128MB.
+//     Go GC runs aggressively; RSS stays minimal in background. Safe for most users.
+//   - performancePriority=true: high-performance mode — GOGC=100, no memory limit.
+//     Maximises throughput for power users at the cost of higher background RAM.
+//
+// NOTE: interrupt_exist_connections and tolerance for leastPing are NOT affected by this switch.
+func SetMemoryProfile(performancePriority bool) {
+	if performancePriority {
+		// High-perf: let Go runtime grow freely (same as upstream default)
+		debug.SetGCPercent(100)
+		debug.SetMemoryLimit(-1) // -1 = math.MaxInt64, disables the soft limit
+	} else {
+		// Low-mem: aggressively reclaim; cap at 128 MiB to prevent GC thrash while staying lean
+		debug.SetGCPercent(20)
+		debug.SetMemoryLimit(128 * 1024 * 1024)
+	}
 }

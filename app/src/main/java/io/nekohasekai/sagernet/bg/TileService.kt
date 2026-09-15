@@ -74,7 +74,9 @@ class TileService : BaseTileService(), SagerConnection.Callback {
 
                 BaseService.State.Connected -> {
                     state = Tile.STATE_ACTIVE
-                    label = getString(R.string.tile_connected)
+                    // Primary label = node name so single-line devices (ColorOS etc.) show the node.
+                    // If profile name is unavailable, fall back to "已连接".
+                    label = validProfileName ?: getString(R.string.tile_connected)
                 }
 
                 BaseService.State.Stopping -> {
@@ -89,16 +91,15 @@ class TileService : BaseTileService(), SagerConnection.Callback {
             }
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
                 setSubtitle(when (serviceState) {
-                    BaseService.State.Connected -> validProfileName
+                    // Subtitle = connection status text (secondary row, shown on double-line devices)
+                    BaseService.State.Connected -> getString(R.string.tile_connected)
                     BaseService.State.Connecting -> validProfileName
                     BaseService.State.Stopping -> null
                     BaseService.State.Stopped -> getString(R.string.not_connected)
                     else -> null
                 })
             } else {
-                if (serviceState == BaseService.State.Connected && validProfileName != null) {
-                    label = validProfileName
-                }
+                // Pre-Q: no subtitle API; label already shows node name from Connected branch above
             }
             updateTile()
         }

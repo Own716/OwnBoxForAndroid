@@ -4817,6 +4817,17 @@ public class SingBoxOptions {
 
     }
 
+    /**
+     * sing-box new kernel requires {\"from\": N, \"to\": N} range objects for sc_* XHTTP fields.
+     * Plain integers are rejected with "cannot unmarshal number into Go struct field".
+     */
+    public static class XHTTPRangeValue {
+        public Integer from;
+        public Integer to;
+        public XHTTPRangeValue() {}
+        public XHTTPRangeValue(int value) { this.from = value; this.to = value; }
+    }
+
     public static class V2RayTransportOptions_XHTTPOptions extends V2RayTransportOptions {
 
         public String mode;
@@ -4832,10 +4843,11 @@ public class SingBoxOptions {
         public com.google.gson.JsonElement x_padding_bytes;
         public com.google.gson.JsonElement no_grpc_header;
         public com.google.gson.JsonElement no_sse_header;
-        public com.google.gson.JsonElement sc_max_each_post_bytes;
-        public com.google.gson.JsonElement sc_min_posts_interval_ms;
-        public com.google.gson.JsonElement sc_max_buffered_posts;
-        public com.google.gson.JsonElement sc_stream_up_server_secs;
+        // Range fields: new kernel requires {"from": N, "to": N} — use XHTTPRangeValue, not JsonElement
+        public XHTTPRangeValue sc_max_each_post_bytes;
+        public XHTTPRangeValue sc_min_posts_interval_ms;
+        public XHTTPRangeValue sc_max_buffered_posts;
+        public XHTTPRangeValue sc_stream_up_server_secs;
         public com.google.gson.JsonElement x_padding_obfs_mode;
         public com.google.gson.JsonElement x_padding_key;
         public com.google.gson.JsonElement x_padding_header;

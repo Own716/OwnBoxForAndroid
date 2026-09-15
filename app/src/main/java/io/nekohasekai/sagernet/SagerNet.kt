@@ -72,6 +72,13 @@ class SagerNet : Application(),
                     ?.forEach { it.delete() }
             }
             Seq.setContext(this)
+            // Write performance mode flag so Go's InitCore can read it and apply correct GC settings.
+            // Using a flag file avoids needing a new JNI binding for SetMemoryProfile.
+            runCatching {
+                File(noBackupFilesDir, "perf_mode").apply {
+                    if (DataStore.performancePriorityMode) writeText("1") else delete()
+                }
+            }
             Libcore.initCore(
                 process,
                 cacheDir.absolutePath + "/",
@@ -152,7 +159,11 @@ class SagerNet : Application(),
             cleanWebview()
             System.gc()
         }
-        Libcore.forceGc()
+        // In low-memory mode, aggressively free Go heap when OS asks us to trim.
+        // In high-performance mode, skip this to preserve warm connection pools.
+        if (!DataStore.performancePriorityMode) {
+            Libcore.forceGc()
+        }
     }
 
     @SuppressLint("InlinedApi")

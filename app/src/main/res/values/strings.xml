@@ -594,6 +594,8 @@
     <string name="acquire_wake_lock">Acquire WakeLock</string>
     <string name="release_wake_lock">Release WakeLock</string>
     <string name="acquire_wake_lock_summary">Keep the CPU on</string>
+    <string name="performance_priority_mode">性能优先模式</string>
+    <string name="performance_priority_mode_summary">开启后内核不限内存，速度更快但后台 RAM 占用增大；关闭时 Go 运行时积极回收内存（推荐默认关闭）</string>
     <string name="hide_from_recent_apps">Hide from recent tasks</string>
     <string name="hide_from_recent_apps_summary">Hide the app from recent tasks when running in background</string>
     <string name="action_switch">Switch</string>

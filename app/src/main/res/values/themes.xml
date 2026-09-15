@@ -222,9 +222,25 @@
     </style>
 
     <!-- MD3 Immersive AppBar & Toolbar styles -->
+    <!-- AppBarLayout is transparent: the window background (theme-specific) shows through
+         to the status bar padding area, eliminating the black-line artifact when using
+         colorful preset themes (mint, blue, etc.). Black/White/LightGray themes override
+         this below with their own opaque surface color. -->
     <style name="Widget.SagerNet.AppBarLayout" parent="Widget.MaterialComponents.AppBarLayout.Surface">
-        <item name="android:background">?attr/colorSurface</item>
+        <item name="android:background">@android:color/transparent</item>
         <item name="elevation">0dp</item>
+    </style>
+
+    <!-- Neutral-theme AppBarLayout overrides: keep opaque surface so transparent window
+         background doesn't cause visual bleed on black/white/gray themes. -->
+    <style name="Widget.SagerNet.AppBarLayout.Black">
+        <item name="android:background">@color/black</item>
+    </style>
+    <style name="Widget.SagerNet.AppBarLayout.White">
+        <item name="android:background">@color/md3_surface</item>
+    </style>
+    <style name="Widget.SagerNet.AppBarLayout.LightGray">
+        <item name="android:background">@color/md3_surface</item>
     </style>
 
     <style name="Widget.SagerNet.Toolbar" parent="Widget.MaterialComponents.Toolbar.Surface">
@@ -699,6 +715,7 @@
         <item name="accentOrTextPrimary">@color/white</item>
         <item name="accentOrTextSecondary">@color/color_black_theme_text_secondary</item>
         <item name="whiteOrTextPrimary">@color/white</item>
+        <item name="appBarLayoutStyle">@style/Widget.SagerNet.AppBarLayout.Black</item>
     </style>
 
     <style name="Theme.SagerNet.VerdantMint" parent="Theme.SagerNet">
@@ -738,8 +755,8 @@
         <item name="accentOrTextPrimary">?android:textColorPrimary</item>
         <item name="primaryOrTextSecondary">?android:textColorSecondary</item>
         <item name="primaryOrTextPrimary">?android:textColorPrimary</item>
+        <item name="appBarLayoutStyle">@style/Widget.SagerNet.AppBarLayout.White</item>
     </style>
-
     <style name="Theme.SagerNet.LightGray" parent="Theme.SagerNet">
         <item name="colorPrimary">@color/color_light_gray_primary</item>
         <item name="colorPrimaryDark">@color/color_light_gray_primary_dark</item>
@@ -768,8 +785,8 @@
         <item name="accentOrTextPrimary">?android:textColorPrimary</item>
         <item name="primaryOrTextSecondary">?android:textColorSecondary</item>
         <item name="primaryOrTextPrimary">?android:textColorPrimary</item>
+        <item name="appBarLayoutStyle">@style/Widget.SagerNet.AppBarLayout.LightGray</item>
     </style>
-
     <style name="Theme.SagerNet.Dialog.Black" parent="Theme.SagerNet.Dialog">
         <item name="colorPrimary">@color/white</item>
         <item name="colorPrimaryDark">@color/color_black_theme_primary_dark</item>

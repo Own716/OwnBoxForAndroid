@@ -232,6 +232,8 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var httpProxyBypass by configurationStore.string(Key.HTTP_PROXY_BYPASS) { "" }
     var dnsHosts by configurationStore.string(Key.DNS_HOSTS) { "" }
     var strictRoute by configurationStore.boolean(Key.STRICT_ROUTE) { true }
+    // false = extreme low memory GC mode (default); true = high performance, allow high RAM
+    var performancePriorityMode by configurationStore.boolean(Key.PERFORMANCE_PRIORITY_MODE) { false }
     private var rawConnectionTestURL by configurationStore.string(Key.CONNECTION_TEST_URL) {
         SagerNet.application.getString(R.string.default_connection_test_url)
     }

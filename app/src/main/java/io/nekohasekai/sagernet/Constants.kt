@@ -91,6 +91,9 @@ object Key {
 
     const val ALLOW_INSECURE_ON_REQUEST = "allowInsecureOnRequest"
 
+    // Memory & performance mode: false = extreme low memory (default); true = high perf / high RAM
+    const val PERFORMANCE_PRIORITY_MODE = "performancePriorityMode"
+
     const val TUN_IMPLEMENTATION = "tunImplementation"
     const val PROFILE_TRAFFIC_STATISTICS = "profileTrafficStatistics"
 

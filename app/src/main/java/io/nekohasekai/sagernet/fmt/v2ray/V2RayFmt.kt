@@ -811,9 +811,36 @@ fun buildSingBoxOutboundStreamSettings(bean: StandardV2RayBean): V2RayTransportO
                         "uplink_data_key",
                         "uplink_chunk_size"
                     )
+                    val RANGE_KEYS = setOf(
+                        "sc_max_each_post_bytes",
+                        "sc_min_posts_interval_ms",
+                        "sc_max_buffered_posts",
+                        "sc_stream_up_server_secs"
+                    )
+                    // "encryption" was removed in sing-box 1.12+; drop it silently to avoid unknown field error
+                    val BLOCKED_KEYS = setOf("encryption")
                     allowedKeys.forEach { key ->
-                        if (extraJson.has(key)) {
-                            baseJson.put(key, extraJson.get(key))
+                        if (key in BLOCKED_KEYS) return@forEach
+                        if (!extraJson.has(key)) return@forEach
+                        val raw = extraJson.get(key)
+                        if (key in RANGE_KEYS) {
+                            // If already a JSONObject with "from" key, use as-is
+                            if (raw is org.json.JSONObject && raw.has("from")) {
+                                baseJson.put(key, raw)
+                            } else {
+                                // Plain number: wrap to {"from": N, "to": N} for new kernel compatibility
+                                val num = try { raw.toString().toDoubleOrNull()?.toInt() } catch (e: Exception) { null }
+                                if (num != null) {
+                                    baseJson.put(key, org.json.JSONObject().apply {
+                                        put("from", num)
+                                        put("to", num)
+                                    })
+                                } else {
+                                    baseJson.put(key, raw)
+                                }
+                            }
+                        } else {
+                            baseJson.put(key, raw)
                         }
                     }
                     // Convert merged JSON back to object
