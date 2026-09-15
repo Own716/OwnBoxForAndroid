@@ -111,7 +111,10 @@ func (s *LoadBalance) pickByDestination(dest M.Socksaddr) adapter.Outbound {
 	if n == 0 {
 		return nil
 	}
-	if s.strategy == "consistent_hash" || s.strategy == "leastLoad" || s.strategy == "sticky" {
+	// Enforce destination stickiness: any connection with a valid host or IP is consistently
+	// hashed to the same outbound node. This prevents IP hopping during chunked / multipart file uploads,
+	// WebSockets, and TLS session resumption.
+	if dest.Fqdn != "" || dest.IsIP() {
 		idx := int(hashDestination(dest) % uint32(n))
 		return s.outbounds[idx]
 	}
@@ -128,7 +131,7 @@ func (s *LoadBalance) DialContext(ctx context.Context, network string, destinati
 		return nil, E.New("no outbounds available")
 	}
 	var startIdx int
-	if s.strategy == "consistent_hash" || s.strategy == "leastLoad" || s.strategy == "sticky" {
+	if destination.Fqdn != "" || destination.IsIP() {
 		startIdx = int(hashDestination(destination) % uint32(n))
 	} else if s.strategy == "random" {
 		startIdx = rand.Intn(n)
@@ -153,7 +156,7 @@ func (s *LoadBalance) ListenPacket(ctx context.Context, destination M.Socksaddr)
 		return nil, E.New("no outbounds available")
 	}
 	var startIdx int
-	if s.strategy == "consistent_hash" || s.strategy == "leastLoad" || s.strategy == "sticky" {
+	if destination.Fqdn != "" || destination.IsIP() {
 		startIdx = int(hashDestination(destination) % uint32(n))
 	} else if s.strategy == "random" {
 		startIdx = rand.Intn(n)

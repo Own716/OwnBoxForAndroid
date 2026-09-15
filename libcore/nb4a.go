@@ -52,10 +52,10 @@ func InitCore(process, cachePath, internalAssets, externalAssets string,
 	isBgProcess = strings.HasSuffix(process, ":bg")
 
 	// Tune Go runtime memory footprint for mobile environments:
-	// - Set GC percentage to 50 (default 100) to collect garbage earlier and prevent heap explosion.
-	// - Set soft memory limit to 128 MiB so the allocator proactively returns unused spans to OS.
-	debug.SetGCPercent(50)
-	debug.SetMemoryLimit(128 * 1024 * 1024)
+	// - Set GC percentage to 80 (default 100) to balance collection efficiency and prevent throughput choking.
+	// - Set soft memory limit to 512 MiB to avoid GC thrashing under multi-node load balancing & high-speed uploads.
+	debug.SetGCPercent(80)
+	debug.SetMemoryLimit(512 * 1024 * 1024)
 
 	intfNB4A = if1
 	intfBox = if2
