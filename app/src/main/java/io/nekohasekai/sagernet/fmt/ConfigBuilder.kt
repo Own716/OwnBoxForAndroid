@@ -730,6 +730,7 @@ fun buildConfig(
                 stack = when (DataStore.tunImplementation) {
                     TunImplementation.GVISOR -> "gvisor"
                     TunImplementation.SYSTEM -> "system"
+                    TunImplementation.SING_TUN -> "go"
                     else -> "mixed"
                 }
                 mtu = DataStore.mtu

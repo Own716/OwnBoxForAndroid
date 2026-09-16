@@ -28,4 +28,15 @@ class ConfigBuilderLoadBalanceTest {
         assertEquals("loadbalance", lbLeastLoad.type)
         assertEquals("leastLoad", lbLeastLoad.strategy)
     }
+
+    @Test
+    fun verifyTunImplementationSingTunMapping() {
+        val stack = when (io.nekohasekai.sagernet.TunImplementation.SING_TUN) {
+            io.nekohasekai.sagernet.TunImplementation.GVISOR -> "gvisor"
+            io.nekohasekai.sagernet.TunImplementation.SYSTEM -> "system"
+            io.nekohasekai.sagernet.TunImplementation.SING_TUN -> "go"
+            else -> "mixed"
+        }
+        assertEquals("go", stack)
+    }
 }

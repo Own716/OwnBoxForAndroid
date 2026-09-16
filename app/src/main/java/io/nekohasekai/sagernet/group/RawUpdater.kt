@@ -67,9 +67,10 @@ object RawUpdater : GroupUpdater() {
             val preferredUa = subscription.customUserAgent?.takeIf { it.isNotBlank() }
                 ?: DataStore.defaultSubscriptionUserAgent
 
-            // Fallback UA candidates in order: user preferred UA -> Singbox/1.14 -> clash-meta -> v2rayN/7.8.2 -> Throne/1.0.0 -> sing-box/1.14.0
+            // Fallback UA candidates in order: user preferred UA -> sing-box/1.15.0 -> Singbox/1.14 -> clash-meta -> v2rayN/7.8.2 -> Throne/1.0.0 -> sing-box/1.14.0
             val candidateUas = linkedSetOf(
                 preferredUa,
+                "sing-box/1.15.0",
                 "Singbox/1.14",
                 "clash-meta",
                 "v2rayN/7.8.2",

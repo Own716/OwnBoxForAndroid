@@ -215,6 +215,7 @@ object TunImplementation {
     const val GVISOR = 0
     const val SYSTEM = 1
     const val MIXED = 2
+    const val SING_TUN = 3
 }
 
 object IPv6Mode {

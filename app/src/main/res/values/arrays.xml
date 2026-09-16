@@ -578,6 +578,7 @@
         <item>gVisor</item>
         <item>System</item>
         <item>Mixed</item>
+        <item>Sing-Tun</item>
     </string-array>
 
     <string-array name="hysteria_protocol">
