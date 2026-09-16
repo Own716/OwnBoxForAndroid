@@ -256,7 +256,7 @@ func (w *boxPlatformInterfaceWrapper) FindConnectionOwner(request *adapter.FindC
 	if packageName != "" {
 		packageNames = []string{packageName}
 	}
-	return &adapter.ConnectionOwner{UserId: uid, AndroidPackageNames: packageNames}, nil
+	return &adapter.ConnectionOwner{UserId: uid, PackageNames: packageNames}, nil
 }
 
 func (w *boxPlatformInterfaceWrapper) UsePlatformWIFIMonitor() bool {
@@ -324,6 +324,14 @@ func (w *boxPlatformInterfaceWrapper) UsePlatformBridge() bool {
 }
 
 func (w *boxPlatformInterfaceWrapper) CreateBridge(options adapter.BridgeOptions) (adapter.BridgeSession, error) {
+	return nil, os.ErrInvalid
+}
+
+func (w *boxPlatformInterfaceWrapper) UsePlatformAutoRedirect() bool {
+	return false
+}
+
+func (w *boxPlatformInterfaceWrapper) CreateAutoRedirect(options adapter.AutoRedirectOptions) (adapter.AutoRedirectSession, error) {
 	return nil, os.ErrInvalid
 }
 
