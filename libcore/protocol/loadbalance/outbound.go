@@ -4,7 +4,9 @@ import (
 	"context"
 	"math/rand"
 	"net"
+	"slices"
 	"sync/atomic"
+	"time"
 
 	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/adapter/outbound"
@@ -33,6 +35,7 @@ var (
 	_ adapter.Outbound                = (*LoadBalance)(nil)
 	_ adapter.ConnectionHandler       = (*LoadBalance)(nil)
 	_ adapter.PacketConnectionHandler = (*LoadBalance)(nil)
+	_ adapter.Referrer                = (*LoadBalance)(nil)
 )
 
 type LoadBalance struct {
@@ -45,6 +48,7 @@ type LoadBalance struct {
 	strategy       string
 	outbounds      []adapter.Outbound
 	counter        uint64
+	activeConns    []*atomic.Int64
 	interruptGroup *interrupt.Group
 }
 
@@ -65,14 +69,20 @@ func NewLoadBalance(ctx context.Context, router adapter.Router, logger log.Conte
 	return lb, nil
 }
 
+func (s *LoadBalance) References() []string {
+	return s.tags
+}
+
 func (s *LoadBalance) Start() error {
 	s.outbounds = make([]adapter.Outbound, 0, len(s.tags))
+	s.activeConns = make([]*atomic.Int64, len(s.tags))
 	for i, tag := range s.tags {
 		detour, loaded := s.outbound.Outbound(tag)
 		if !loaded {
 			return E.New("outbound ", i, " not found: ", tag)
 		}
 		s.outbounds = append(s.outbounds, detour)
+		s.activeConns[i] = new(atomic.Int64)
 	}
 	return nil
 }
@@ -94,55 +104,101 @@ func hashDestination(dest M.Socksaddr) uint32 {
 	return h
 }
 
-func (s *LoadBalance) pick() adapter.Outbound {
+func (s *LoadBalance) candidateIndices(dest M.Socksaddr) []int {
 	n := len(s.outbounds)
 	if n == 0 {
 		return nil
 	}
-	if s.strategy == "random" {
-		return s.outbounds[rand.Intn(n)]
+	indices := make([]int, n)
+	for i := 0; i < n; i++ {
+		indices[i] = i
 	}
-	idx := atomic.AddUint64(&s.counter, 1) % uint64(n)
-	return s.outbounds[idx]
+	switch s.strategy {
+	case "leastLoad":
+		// Sort outbounds by active connections ascending
+		slices.SortStableFunc(indices, func(a, b int) int {
+			ca := s.activeConns[a].Load()
+			cb := s.activeConns[b].Load()
+			if ca < cb {
+				return -1
+			} else if ca > cb {
+				return 1
+			}
+			return 0
+		})
+	case "consistent_hash":
+		if dest.Fqdn != "" || dest.IsIP() {
+			start := int(hashDestination(dest) % uint32(n))
+			for i := 0; i < n; i++ {
+				indices[i] = (start + i) % n
+			}
+		} else {
+			start := int(atomic.AddUint64(&s.counter, 1) % uint64(n))
+			for i := 0; i < n; i++ {
+				indices[i] = (start + i) % n
+			}
+		}
+	case "random":
+		start := rand.Intn(n)
+		for i := 0; i < n; i++ {
+			indices[i] = (start + i) % n
+		}
+	case "round_robin", "roundRobin":
+		fallthrough
+	default:
+		start := int(atomic.AddUint64(&s.counter, 1) % uint64(n))
+		for i := 0; i < n; i++ {
+			indices[i] = (start + i) % n
+		}
+	}
+	return indices
 }
 
-func (s *LoadBalance) pickByDestination(dest M.Socksaddr) adapter.Outbound {
-	n := len(s.outbounds)
-	if n == 0 {
-		return nil
+type trackedConn struct {
+	net.Conn
+	onClose func()
+	closed  atomic.Bool
+}
+
+func (c *trackedConn) Close() error {
+	if c.closed.CompareAndSwap(false, true) {
+		if c.onClose != nil {
+			c.onClose()
+		}
 	}
-	// Enforce destination stickiness: any connection with a valid host or IP is consistently
-	// hashed to the same outbound node. This prevents IP hopping during chunked / multipart file uploads,
-	// WebSockets, and TLS session resumption.
-	if dest.Fqdn != "" || dest.IsIP() {
-		idx := int(hashDestination(dest) % uint32(n))
-		return s.outbounds[idx]
-	}
-	if s.strategy == "random" {
-		return s.outbounds[rand.Intn(n)]
-	}
-	idx := atomic.AddUint64(&s.counter, 1) % uint64(n)
-	return s.outbounds[idx]
+	return c.Conn.Close()
 }
 
 func (s *LoadBalance) DialContext(ctx context.Context, network string, destination M.Socksaddr) (net.Conn, error) {
-	n := len(s.outbounds)
+	indices := s.candidateIndices(destination)
+	n := len(indices)
 	if n == 0 {
 		return nil, E.New("no outbounds available")
 	}
-	var startIdx int
-	if destination.Fqdn != "" || destination.IsIP() {
-		startIdx = int(hashDestination(destination) % uint32(n))
-	} else if s.strategy == "random" {
-		startIdx = rand.Intn(n)
-	} else {
-		startIdx = int(atomic.AddUint64(&s.counter, 1) % uint64(n))
-	}
 	var lastErr error
-	for i := 0; i < n; i++ {
-		candidate := s.outbounds[(startIdx+i)%n]
-		conn, err := candidate.DialContext(ctx, network, destination)
+	for i, idx := range indices {
+		candidate := s.outbounds[idx]
+		var (
+			conn net.Conn
+			err  error
+		)
+		if i < n-1 {
+			candidateCtx, cancel := context.WithTimeout(ctx, 3500*time.Millisecond)
+			conn, err = candidate.DialContext(candidateCtx, network, destination)
+			cancel()
+		} else {
+			conn, err = candidate.DialContext(ctx, network, destination)
+		}
 		if err == nil {
+			if s.strategy == "leastLoad" {
+				s.activeConns[idx].Add(1)
+				conn = &trackedConn{
+					Conn: conn,
+					onClose: func() {
+						s.activeConns[idx].Add(-1)
+					},
+				}
+			}
 			return s.interruptGroup.NewConn(conn, interrupt.IsExternalConnectionFromContext(ctx)), nil
 		}
 		lastErr = err
@@ -150,24 +206,51 @@ func (s *LoadBalance) DialContext(ctx context.Context, network string, destinati
 	return nil, lastErr
 }
 
+type trackedPacketConn struct {
+	net.PacketConn
+	onClose func()
+	closed  atomic.Bool
+}
+
+func (c *trackedPacketConn) Close() error {
+	if c.closed.CompareAndSwap(false, true) {
+		if c.onClose != nil {
+			c.onClose()
+		}
+	}
+	return c.PacketConn.Close()
+}
+
 func (s *LoadBalance) ListenPacket(ctx context.Context, destination M.Socksaddr) (net.PacketConn, error) {
-	n := len(s.outbounds)
+	indices := s.candidateIndices(destination)
+	n := len(indices)
 	if n == 0 {
 		return nil, E.New("no outbounds available")
 	}
-	var startIdx int
-	if destination.Fqdn != "" || destination.IsIP() {
-		startIdx = int(hashDestination(destination) % uint32(n))
-	} else if s.strategy == "random" {
-		startIdx = rand.Intn(n)
-	} else {
-		startIdx = int(atomic.AddUint64(&s.counter, 1) % uint64(n))
-	}
 	var lastErr error
-	for i := 0; i < n; i++ {
-		candidate := s.outbounds[(startIdx+i)%n]
-		conn, err := candidate.ListenPacket(ctx, destination)
+	for i, idx := range indices {
+		candidate := s.outbounds[idx]
+		var (
+			conn net.PacketConn
+			err  error
+		)
+		if i < n-1 {
+			candidateCtx, cancel := context.WithTimeout(ctx, 3500*time.Millisecond)
+			conn, err = candidate.ListenPacket(candidateCtx, destination)
+			cancel()
+		} else {
+			conn, err = candidate.ListenPacket(ctx, destination)
+		}
 		if err == nil {
+			if s.strategy == "leastLoad" {
+				s.activeConns[idx].Add(1)
+				conn = &trackedPacketConn{
+					PacketConn: conn,
+					onClose: func() {
+						s.activeConns[idx].Add(-1)
+					},
+				}
+			}
 			return s.interruptGroup.NewPacketConn(conn, interrupt.IsExternalConnectionFromContext(ctx)), nil
 		}
 		lastErr = err
@@ -177,30 +260,12 @@ func (s *LoadBalance) ListenPacket(ctx context.Context, destination M.Socksaddr)
 
 func (s *LoadBalance) NewConnection(ctx context.Context, conn net.Conn, metadata adapter.InboundContext, onClose N.CloseHandlerFunc) {
 	ctx = interrupt.ContextWithIsExternalConnection(ctx)
-	selected := s.pickByDestination(metadata.Destination)
-	if selected == nil {
-		conn.Close()
-		return
-	}
-	if outboundHandler, isHandler := selected.(adapter.ConnectionHandler); isHandler {
-		outboundHandler.NewConnection(ctx, conn, metadata, onClose)
-	} else {
-		s.connection.NewConnection(ctx, selected, conn, metadata, onClose)
-	}
+	s.connection.NewConnection(ctx, s, conn, metadata, onClose)
 }
 
 func (s *LoadBalance) NewPacketConnection(ctx context.Context, conn N.PacketConn, metadata adapter.InboundContext, onClose N.CloseHandlerFunc) {
 	ctx = interrupt.ContextWithIsExternalConnection(ctx)
-	selected := s.pickByDestination(metadata.Destination)
-	if selected == nil {
-		conn.Close()
-		return
-	}
-	if outboundHandler, isHandler := selected.(adapter.PacketConnectionHandler); isHandler {
-		outboundHandler.NewPacketConnection(ctx, conn, metadata, onClose)
-	} else {
-		s.connection.NewPacketConnection(ctx, selected, conn, metadata, onClose)
-	}
+	s.connection.NewPacketConnection(ctx, s, conn, metadata, onClose)
 }
 
 func (s *LoadBalance) Close() error {

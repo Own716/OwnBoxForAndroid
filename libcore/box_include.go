@@ -44,6 +44,7 @@ import (
 	h2http "libcore/protocol/http"
 	"libcore/protocol/juicity"
 	"libcore/protocol/loadbalance"
+	customUrltest "libcore/protocol/urltest"
 	customVless "libcore/protocol/vless"
 
 	_ "github.com/sagernet/sing-box/experimental/clashapi"
@@ -77,6 +78,9 @@ func nekoboxAndroidOutboundRegistry() *outbound.Registry {
 
 	group.RegisterSelector(registry)
 	group.RegisterURLTest(registry)
+	// 覆盖 sing-box 的 urltest outbound：防止单次连接失败误删优质节点测速记录，
+	// 支持容差 tolerance >= 0，限制 InterfaceUpdated 强刷频率，不断开已建立的长连接
+	customUrltest.RegisterURLTest(registry)
 	loadbalance.RegisterLoadBalance(registry)
 
 	socks.RegisterOutbound(registry)

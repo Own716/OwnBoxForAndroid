@@ -934,9 +934,6 @@ fun buildSingBoxOutboundStandardV2RayBean(bean: StandardV2RayBean): Outbound {
                 if (bean.encryption.isNotBlank() && bean.encryption != "auto") {
                     flow = bean.encryption
                 }
-                if (bean.vlessEncryption.isNotBlank() && bean.vlessEncryption != "none") {
-                    encryption = bean.vlessEncryption
-                }
                 when (bean.packetEncoding) {
                     0 -> packet_encoding = ""
                     1 -> packet_encoding = "packetaddr"

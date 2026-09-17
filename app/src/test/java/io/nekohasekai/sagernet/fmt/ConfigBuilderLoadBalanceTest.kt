@@ -30,6 +30,20 @@ class ConfigBuilderLoadBalanceTest {
     }
 
     @Test
+    fun buildUrlTestOutboundAllowsZeroTolerance() {
+        val members = listOf("node1", "node2")
+        val testUrl = "http://cp.cloudflare.com/generate_204"
+        val ut = buildUrlTestOutbound(members, testUrl = testUrl, toleranceMs = 0)
+        assertEquals(0, ut.tolerance)
+
+        val ut30 = buildUrlTestOutbound(members, testUrl = testUrl, toleranceMs = 30)
+        assertEquals(30, ut30.tolerance)
+
+        val utNull = buildUrlTestOutbound(members, testUrl = testUrl, toleranceMs = null)
+        assertEquals(50, utNull.tolerance)
+    }
+
+    @Test
     fun verifyTunImplementationSingTunMapping() {
         val stack = when (io.nekohasekai.sagernet.TunImplementation.SING_TUN) {
             io.nekohasekai.sagernet.TunImplementation.GVISOR -> "gvisor"

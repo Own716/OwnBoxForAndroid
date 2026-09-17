@@ -232,35 +232,41 @@ class BaseService {
         fun reload() {
             if (DataStore.selectedProxy == 0L) {
                 stopRunner(false, (this as Context).getString(R.string.profile_empty))
+                return
             }
             if (canReloadSelector()) {
-                val ent = SagerDatabase.proxyDao.getById(DataStore.selectedProxy)
-                val tag = data.proxy!!.config.profileTagMap[ent?.id] ?: ""
-                if (tag.isNotBlank() && ent != null) {
-                    // select from GUI
-                    data.proxy!!.box.selectOutbound(tag)
-                    // or select from webui
-                    // => selector_OnProxySelected
+                val proxy = data.proxy
+                val box = runCatching { proxy?.box }.getOrNull()
+                val tag = proxy?.config?.profileTagMap?.get(DataStore.selectedProxy) ?: ""
+                if (box != null && tag.isNotBlank()) {
+                    try {
+                        box.selectOutbound(tag)
+                        return
+                    } catch (e: Exception) {
+                        Logs.w("Failed to selectOutbound($tag): ${e.message}, restarting service")
+                    }
                 }
-                return
             }
             val s = data.state
             when {
                 s == State.Stopped -> startRunner()
                 s.canStop -> stopRunner(true)
-                else -> Logs.w("Illegal state $s when invoking use")
+                else -> {
+                    Logs.w("State $s encountered during reload, restarting runner")
+                    stopRunner(true)
+                }
             }
         }
 
         fun canReloadSelector(): Boolean {
-            if ((data.proxy?.config?.selectorGroupId ?: -1L) < 0) return false
-            val ent = SagerDatabase.proxyDao.getById(DataStore.selectedProxy) ?: return false
-            val tmpBox = ProxyInstance(ent)
-            tmpBox.buildConfigTmp()
-            if (tmpBox.lastSelectorGroupId == data.proxy?.lastSelectorGroupId) {
-                return true
-            }
-            return false
+            val proxy = data.proxy ?: return false
+            runCatching { proxy.box }.getOrNull() ?: return false
+            if (data.state != State.Connected) return false
+            if (proxy.config.selectorGroupId < 0L) return false
+            val profileId = DataStore.selectedProxy
+            if (profileId <= 0L) return false
+            val tag = proxy.config.profileTagMap[profileId]
+            return !tag.isNullOrBlank()
         }
 
         suspend fun startProcesses() {

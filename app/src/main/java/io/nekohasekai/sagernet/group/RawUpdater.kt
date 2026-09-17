@@ -197,14 +197,19 @@ object RawUpdater : GroupUpdater() {
 
         val filterMode = subscription.filterMode ?: SubscriptionFilterMode.DISABLED
         val filterRegex = subscription.filterRegex ?: ""
-        if (filterMode != SubscriptionFilterMode.DISABLED && filterRegex.isNotBlank()) {
-            val regex = filterRegex.toRegex()
-            proxies = when (filterMode) {
-                SubscriptionFilterMode.INCLUDE -> proxies.filter { regex.containsMatchIn(it.displayName()) }
-                SubscriptionFilterMode.EXCLUDE -> proxies.filterNot { regex.containsMatchIn(it.displayName()) }
-                else -> proxies
+        val isFilterActive = filterMode != SubscriptionFilterMode.DISABLED && filterRegex.isNotBlank()
+        if (isFilterActive) {
+            try {
+                val regex = filterRegex.trim().toRegex(RegexOption.IGNORE_CASE)
+                proxies = when (filterMode) {
+                    SubscriptionFilterMode.INCLUDE -> proxies.filter { regex.containsMatchIn(it.displayName()) }
+                    SubscriptionFilterMode.EXCLUDE -> proxies.filterNot { regex.containsMatchIn(it.displayName()) }
+                    else -> proxies
+                }
+                Logs.d("After filter (mode=$filterMode, regex=$filterRegex): ${proxies.size}")
+            } catch (e: Exception) {
+                Logs.w("Invalid subscription filter regex '$filterRegex': ${e.message}")
             }
-            Logs.d("After filter (mode=$filterMode): ${proxies.size}")
         }
 
         val exists = SagerDatabase.proxyDao.getByGroup(proxyGroup.id)
@@ -289,7 +294,7 @@ object RawUpdater : GroupUpdater() {
         }
 
         val toDelete = remainingExists
-        val isShrunkTooMuch = exists.size >= 10 && proxies.size < exists.size * 0.70
+        val isShrunkTooMuch = !isFilterActive && exists.size >= 10 && proxies.size < exists.size * 0.70
         if (isShrunkTooMuch) {
             Logs.w("RawUpdater circuit breaker triggered: exists=${exists.size}, fetched=${proxies.size}, skipping deletion")
         } else if (toDelete.isNotEmpty()) {

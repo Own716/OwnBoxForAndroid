@@ -2992,7 +2992,7 @@ class ConfigurationFragment @JvmOverloads constructor(
 
                     if (update) {
                         ProfileManager.postUpdate(lastSelected, noTraffic = true)
-                        if (DataStore.serviceState.canStop && reloadAccess.tryLock()) {
+                        if (DataStore.serviceState != BaseService.State.Stopped && reloadAccess.tryLock()) {
                             SagerNet.reloadService()
                             reloadAccess.unlock()
                         }

@@ -4384,8 +4384,6 @@ public class SingBoxOptions {
 
         public String flow;
 
-        public String encryption;
-
         public String network;
 
         public OutboundTLSOptions tls;

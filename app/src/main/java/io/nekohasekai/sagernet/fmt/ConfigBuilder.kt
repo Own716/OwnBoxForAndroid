@@ -160,7 +160,7 @@ internal fun buildUrlTestOutbound(
         interval = "${iv}s"
         // 50ms tolerance: prevents micro-jitter (< 50ms delta) from triggering node switch.
         // This is independent of the memory profile toggle — always active for leastPing stability.
-        tolerance = toleranceMs?.takeIf { it > 0 } ?: 50
+        tolerance = toleranceMs?.takeIf { it >= 0 } ?: 50
         // Enforce minimum 10-minute idle_timeout regardless of memory mode.
         // This guarantees Telegram file uploads (which can take many minutes) are never
         // interrupted by the kernel reclaiming an "idle" leastPing connection pool.
@@ -822,7 +822,8 @@ fun buildConfig(
                     )
                 } else {
                     val strat = when (balancerBean.strategy) {
-                        "consistent_hash", "leastLoad" -> "consistent_hash"
+                        "consistent_hash" -> "consistent_hash"
+                        "leastLoad" -> "leastLoad"
                         "round_robin", "roundRobin" -> "round_robin"
                         "random" -> "random"
                         else -> balancerBean.strategy
