@@ -11,7 +11,7 @@
         android:paddingBottom="80dp">
 
         <com.google.android.material.card.MaterialCardView
-            android:id="@+id/traffic_chart_card"
+            android:id="@+id/lan_sharing_card"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_margin="8dp"
@@ -32,14 +32,14 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/traffic_chart_title"
+                        android:text="@string/lan_sharing"
                         android:textAppearance="?attr/textAppearanceHeadline6" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="16dp"
-                        android:text="@string/traffic_chart_summary"
+                        android:text="@string/lan_sharing_tools_summary"
                         android:textAppearance="?attr/textAppearanceBody2"
                         android:textColor="?android:attr/textColorSecondary" />
 
@@ -53,7 +53,7 @@
                     android:orientation="horizontal">
 
                     <Button
-                        android:id="@+id/trafficChartBtn"
+                        android:id="@+id/lanSharingBtn"
                         style="@style/Widget.AppCompat.Button.Borderless"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"

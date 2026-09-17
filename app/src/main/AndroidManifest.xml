@@ -627,6 +627,11 @@
             android:configChanges="uiMode"
             android:label="@string/tool_connectivity_test" />
 
+        <activity
+            android:name="io.nekohasekai.sagernet.ui.LanSharingActivity"
+            android:configChanges="uiMode"
+            android:label="@string/lan_sharing" />
+
     </application>
 
 </manifest>
