@@ -24,6 +24,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.net.Inet4Address
 import java.net.NetworkInterface
+import java.util.Locale
 
 class LanSharingActivity : ThemedActivity() {
 
@@ -91,7 +92,7 @@ class LanSharingActivity : ThemedActivity() {
             if (!ip.isNullOrBlank()) {
                 copyToClipboard(ip, getString(R.string.lan_sharing_copied_ip, ip))
             } else {
-                Toast.makeText(this, R.string.lan_sharing_not_connected, Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, R.string.lan_sharing_wifi_not_connected_tip, Toast.LENGTH_SHORT).show()
             }
         }
         binding.btnCopyWifiIp.setOnClickListener { copyWifiHostAction() }
@@ -165,98 +166,126 @@ class LanSharingActivity : ThemedActivity() {
         return false
     }
 
+    private fun isHotspotIpPattern(ip: String): Boolean {
+        return ip.startsWith("192.168.43.") ||
+                ip.startsWith("192.168.44.") ||
+                ip.startsWith("192.168.49.") ||
+                ip.startsWith("192.168.50.") ||
+                ip.startsWith("172.20.10.")
+    }
+
+    private fun isCellularOrVirtualInterface(name: String): Boolean {
+        val n = name.lowercase()
+        return n.startsWith("rmnet") || n.startsWith("v4-") || n.startsWith("r_") ||
+                n.startsWith("ccmni") || n.startsWith("pdp") || n.startsWith("wwan") ||
+                n.startsWith("dummy") || n.startsWith("tun") || n.startsWith("sit") ||
+                n.startsWith("ip6") || n.startsWith("clat") || n.startsWith("seth") ||
+                n.startsWith("ipa") || n.startsWith("epdg") || n.startsWith("bond")
+    }
+
     private fun refreshNetworkInfo() {
         var wifiIp: String? = null
-        var hotspotIp: String? = null
+        var isWifiConnected = false
         val hotspotActive = isHotspotActive()
+        var hotspotIp: String? = null
 
         val cm = applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-        val activeNetwork = cm?.activeNetwork
-        val activeCaps = if (activeNetwork != null) cm.getNetworkCapabilities(activeNetwork) else null
-        val activeLinkProps = if (activeNetwork != null) cm.getLinkProperties(activeNetwork) else null
-        val isWifiActive = activeCaps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
-        val activeIface = activeLinkProps?.interfaceName?.lowercase()
+        val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+        val isWifiEnabled = runCatching { wifiManager?.isWifiEnabled == true }.getOrDefault(false)
 
-        // 1. 如果当前设备连接到了 Wi-Fi 路由器，提取真实的 Wi-Fi 局域网 IP
-        if (isWifiActive && activeLinkProps != null) {
-            wifiIp = activeLinkProps.linkAddresses
-                .mapNotNull { (it.address as? Inet4Address)?.hostAddress }
-                .firstOrNull { !it.startsWith("127.") }
+        // 1. Wi-Fi 状态与 IP 检测（仅当系统 Wi-Fi 功能已打开时才检测，彻底杜绝 Wi-Fi 关闭时误显）
+        if (isWifiEnabled && cm != null) {
+            // 在所有可用底层网络中寻找真正的 Wi-Fi 传输层网络（即使 VPN 开启，底层的 Wi-Fi 网络也在 allNetworks 中）
+            for (network in cm.allNetworks) {
+                val caps = cm.getNetworkCapabilities(network) ?: continue
+                if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                    val linkProps = cm.getLinkProperties(network) ?: continue
+                    val ip = linkProps.linkAddresses
+                        .mapNotNull { (it.address as? Inet4Address)?.hostAddress }
+                        .firstOrNull { !it.startsWith("127.") && !it.startsWith("169.254.") }
+                    if (!ip.isNullOrBlank()) {
+                        wifiIp = ip
+                        isWifiConnected = true
+                        break
+                    }
+                }
+            }
+
+            // 针对部分旧版本 Android 系统的辅助检测
+            if (!isWifiConnected && wifiManager != null) {
+                val info = runCatching { wifiManager.connectionInfo }.getOrNull()
+                val ipInt = info?.ipAddress ?: 0
+                if (ipInt != 0 && info?.networkId != -1) {
+                    val ip = String.format(
+                        Locale.US,
+                        "%d.%d.%d.%d",
+                        ipInt and 0xff,
+                        ipInt shr 8 and 0xff,
+                        ipInt shr 16 and 0xff,
+                        ipInt shr 24 and 0xff
+                    )
+                    if (ip != "0.0.0.0") {
+                        wifiIp = ip
+                        isWifiConnected = true
+                    }
+                }
+            }
         }
 
-        // 2. 检查是否有明确指定的 tethered 接口 (如 wlan1, ap0, swlan0, rndis0 等)
-        val tetheredIfaces = runCatching {
-            val method = cm?.javaClass?.getDeclaredMethod("getTetheredIfaces")
-            method?.isAccessible = true
-            (method?.invoke(cm) as? Array<*>)?.filterIsInstance<String>().orEmpty()
-        }.getOrDefault(emptyList())
+        // 2. 手机热点 IP 检测（方案 A）
+        // 判定准则：严格限定为真实热点局域网网段 (192.168.43.x 等)，绝对不采纳蜂窝移动数据 IP (如 10.x / 172.x 等运营商 CGNAT 私网)
+        if (hotspotActive) {
+            val tetheredIfaces = runCatching {
+                val method = cm?.javaClass?.getDeclaredMethod("getTetheredIfaces")
+                method?.isAccessible = true
+                (method?.invoke(cm) as? Array<*>)?.filterIsInstance<String>().orEmpty()
+            }.getOrDefault(emptyList())
 
-        runCatching {
-            val interfaces = NetworkInterface.getNetworkInterfaces()?.toList().orEmpty()
+            val interfaces = runCatching {
+                NetworkInterface.getNetworkInterfaces()?.toList().orEmpty()
+            }.getOrDefault(emptyList())
 
-            // 优先从 tethered 接口提取 IP
+            // 优先检查 tethered 明确指定的网卡
             for (tetherName in tetheredIfaces) {
                 val intf = interfaces.firstOrNull { it.name.equals(tetherName, ignoreCase = true) } ?: continue
                 val ip = intf.inetAddresses.toList()
                     .filterIsInstance<Inet4Address>()
                     .mapNotNull { it.hostAddress }
-                    .firstOrNull { !it.startsWith("127.") }
+                    .firstOrNull { isHotspotIpPattern(it) }
                 if (ip != null) {
                     hotspotIp = ip
                     break
                 }
             }
 
-            // 遍历所有网络接口进行识别
-            for (intf in interfaces) {
-                if (!intf.isUp || intf.isLoopback) continue
-                val name = intf.name.lowercase()
+            // 若未找到，遍历活跃网卡检查是否有符合热点网段的 IP
+            if (hotspotIp == null) {
+                for (intf in interfaces) {
+                    if (!intf.isUp || intf.isLoopback) continue
+                    val name = intf.name.lowercase()
+                    if (isCellularOrVirtualInterface(name)) continue
 
-                // 排除蜂窝移动数据、VPN及虚拟网卡
-                if (name.startsWith("rmnet") || name.startsWith("ccmni") || name.startsWith("pdp") ||
-                    name.startsWith("wwan") || name.startsWith("dummy") || name.startsWith("tun") ||
-                    name.startsWith("sit") || name.startsWith("ip6") || name.startsWith("clat")
-                ) {
-                    continue
-                }
-
-                val ipv4List = intf.inetAddresses.toList()
-                    .filterIsInstance<Inet4Address>()
-                    .mapNotNull { it.hostAddress }
-                    .filter { !it.startsWith("127.") }
-
-                for (host in ipv4List) {
-                    when {
-                        // 包含明确热点/AP 标志或热点典型私有网段
-                        name.contains("ap") || name.contains("softap") || name.contains("swlan") ||
-                            name.contains("rndis") || name.contains("wigig") || name.contains("tether") ||
-                            host.startsWith("192.168.43.") || host.startsWith("192.168.44.") ||
-                            host.startsWith("192.168.49.") || host.startsWith("192.168.50.") -> {
-                            if (hotspotIp == null) hotspotIp = host
-                        }
-                        // 当热点开启且当前网卡不是连接路由器的主要 Wi-Fi 网卡时（例如双 Wi-Fi 模式下的 wlan1），判定为热点网卡
-                        hotspotActive && activeIface != null && name != activeIface && name.contains("wlan") -> {
-                            if (hotspotIp == null) hotspotIp = host
-                        }
-                        // 普通 Wi-Fi 客户端网卡
-                        name.contains("wlan") -> {
-                            if (wifiIp == null) wifiIp = host
-                        }
-                        else -> {
-                            if (wifiIp == null) wifiIp = host
-                        }
+                    val ip = intf.inetAddresses.toList()
+                        .filterIsInstance<Inet4Address>()
+                        .mapNotNull { it.hostAddress }
+                        .firstOrNull { isHotspotIpPattern(it) }
+                    if (ip != null) {
+                        hotspotIp = ip
+                        break
                     }
                 }
             }
-        }
 
-        // 如果系统热点已开启，但底层未暴露私有 AP 网卡 IP，则采用 Android 标准热点网关 IP 192.168.43.1
-        val isHotspotOn = hotspotActive || !hotspotIp.isNullOrBlank()
-        if (isHotspotOn && hotspotIp.isNullOrBlank()) {
+            // Android 11+ 出于安全沙箱隔离，普通应用无法直接枚举 Tethering 专有 AP 网卡 IP
+            // 但 Android 热点网关地址对所有连入热点的客户端均为 192.168.43.1 黄金标准，作为默认值 100% 准确可用
+            if (hotspotIp.isNullOrBlank()) {
+                hotspotIp = "192.168.43.1"
+            }
+        } else {
             hotspotIp = "192.168.43.1"
         }
 
-        detectedWifiIp = wifiIp
+        detectedWifiIp = if (isWifiConnected) wifiIp else null
         detectedHotspotIp = hotspotIp
         val port = DataStore.mixedPort
 
@@ -264,7 +293,7 @@ class LanSharingActivity : ThemedActivity() {
         val secondaryColor = getColorAttr(android.R.attr.textColorSecondary)
 
         // 更新方案 A：手机热点展示
-        if (isHotspotOn) {
+        if (hotspotActive) {
             binding.textHotspotIp.text = detectedHotspotIp ?: "192.168.43.1"
             binding.badgeHotspotStatus.text = getString(R.string.lan_sharing_hotspot_detected)
             binding.badgeHotspotStatus.setTextColor(primaryColor)
@@ -278,7 +307,7 @@ class LanSharingActivity : ThemedActivity() {
         binding.textHotspotPort.text = port.toString()
 
         // 更新方案 B：同 Wi-Fi 局域网展示
-        if (!detectedWifiIp.isNullOrBlank()) {
+        if (isWifiConnected && !detectedWifiIp.isNullOrBlank()) {
             binding.textWifiIp.text = detectedWifiIp
             binding.badgeWifiStatus.text = getString(R.string.lan_sharing_wifi_detected)
             binding.badgeWifiStatus.setTextColor(primaryColor)

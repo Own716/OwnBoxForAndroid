@@ -92,12 +92,13 @@
     <string name="lan_sharing_hotspot_hint_off">Hotspot not active · Default IP is usually 192.168.43.1</string>
     <string name="lan_sharing_hotspot_detected">Hotspot Active</string>
     <string name="lan_sharing_hotspot_not_active">Hotspot Off</string>
-    <string name="lan_sharing_wifi_ip">Method B: Same Wi-Fi Network</string>
+    <string name="lan_sharing_wifi_ip">Method B: Same Wi-Fi</string>
     <string name="lan_sharing_wifi_desc">Use when both devices connect to the same Wi-Fi router</string>
     <string name="lan_sharing_wifi_hint_off">Not connected to Wi-Fi. Please connect to same Wi-Fi router</string>
     <string name="lan_sharing_wifi_detected">Wi-Fi Connected</string>
     <string name="lan_sharing_wifi_not_connected">Wi-Fi Disconnected</string>
     <string name="lan_sharing_not_connected">Not connected</string>
+    <string name="lan_sharing_wifi_not_connected_tip">Not connected to Wi-Fi. Please use Method A (Phone Hotspot)</string>
     <string name="lan_sharing_port_label">Proxy Port</string>
     <string name="lan_sharing_auth_title">Authentication</string>
     <string name="lan_sharing_auth_none">No username / password</string>

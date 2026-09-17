@@ -70,12 +70,13 @@
     <string name="lan_sharing_hotspot_hint_off">未检测到热点开启 · 开启热点后建议使用默认 IP: 192.168.43.1</string>
     <string name="lan_sharing_hotspot_detected">热点已开启</string>
     <string name="lan_sharing_hotspot_not_active">热点未开启</string>
-    <string name="lan_sharing_wifi_ip">方案 B：同 Wi-Fi 局域网共享</string>
+    <string name="lan_sharing_wifi_ip">方案 B：同 Wi-Fi 共享</string>
     <string name="lan_sharing_wifi_desc">两台设备连接同一个家庭/公司 Wi-Fi 路由器时使用</string>
     <string name="lan_sharing_wifi_hint_off">当前设备未连接 Wi-Fi，请先连接同一 Wi-Fi 路由器</string>
     <string name="lan_sharing_wifi_detected">Wi-Fi 已连接</string>
     <string name="lan_sharing_wifi_not_connected">Wi-Fi 未连接</string>
     <string name="lan_sharing_not_connected">未连接</string>
+    <string name="lan_sharing_wifi_not_connected_tip">当前未连接 Wi-Fi，若需共享请使用上方方案 A 手机热点</string>
     <string name="lan_sharing_port_label">代理端口</string>
     <string name="lan_sharing_auth_title">访问认证</string>
     <string name="lan_sharing_auth_none">无账号与密码</string>
