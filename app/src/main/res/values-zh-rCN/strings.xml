@@ -84,6 +84,15 @@
     <string name="lan_sharing_not_detected">未检测到</string>
     <string name="lan_sharing_devices_category">正在使用代理</string>
     <string name="lan_sharing_no_devices">暂无设备正在使用代理</string>
+    <string name="lan_sharing_devices_count">%1$d 台设备正在使用</string>
+    <string name="lan_sharing_no_devices_hint">请在连接热点的其他设备上设置代理主机与端口，发起网络请求后将在此实时显示</string>
+    <string name="lan_sharing_device_hotspot">热点客户端</string>
+    <string name="lan_sharing_device_wifi">局域网客户端</string>
+    <string name="lan_sharing_device_active">%1$d 个活跃连接</string>
+    <string name="lan_sharing_device_idle">空闲 (最近活跃)</string>
+    <string name="lan_sharing_device_recent">最近访问：%1$s</string>
+    <string name="lan_sharing_service_restarting">正在应用设置并重启核心…</string>
+    <string name="lan_sharing_service_not_connected">VPN 核心未连接，连接节点后即可共享</string>
     <string name="lan_sharing_menu_tutorial">使用教程与说明</string>
     <string name="lan_sharing_menu_port">端口设置</string>
     <string name="lan_sharing_copied_ip">已复制主机名: %1$s (请勿附带冒号和端口)</string>

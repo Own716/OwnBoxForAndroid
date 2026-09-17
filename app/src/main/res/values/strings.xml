@@ -106,6 +106,15 @@
     <string name="lan_sharing_not_detected">Not detected</string>
     <string name="lan_sharing_devices_category">Active Clients</string>
     <string name="lan_sharing_no_devices">No devices are currently using proxy</string>
+    <string name="lan_sharing_devices_count">%1$d device(s) active</string>
+    <string name="lan_sharing_no_devices_hint">Configure proxy host and port on the client device. Active connections will appear here in real-time.</string>
+    <string name="lan_sharing_device_hotspot">Hotspot Client</string>
+    <string name="lan_sharing_device_wifi">LAN Client</string>
+    <string name="lan_sharing_device_active">%1$d active connection(s)</string>
+    <string name="lan_sharing_device_idle">Idle (recently active)</string>
+    <string name="lan_sharing_device_recent">Recent: %1$s</string>
+    <string name="lan_sharing_service_restarting">Applying settings and restarting core...</string>
+    <string name="lan_sharing_service_not_connected">VPN core not connected. Connect a node to share.</string>
     <string name="lan_sharing_menu_tutorial">Tutorial &amp; Guide</string>
     <string name="lan_sharing_menu_port">Port Settings</string>
     <string name="lan_sharing_copied_ip">Copied Hostname IP: %1$s (Do not append port!)</string>

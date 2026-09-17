@@ -675,7 +675,7 @@ fun buildConfig(
                     // }
                 }
 
-                if (DataStore.enableClashAPI) {
+                if (DataStore.enableClashAPI || DataStore.allowAccess) {
                     clash_api = ClashAPIOptions().apply {
                         external_controller = "127.0.0.1:9090"
                         external_ui = "../files/yacd"
