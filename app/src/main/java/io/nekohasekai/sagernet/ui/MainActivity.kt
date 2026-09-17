@@ -66,6 +66,7 @@ import io.nekohasekai.sagernet.ktx.deduplicateProxies
 import io.nekohasekai.sagernet.ktx.readableMessage
 import io.nekohasekai.sagernet.ktx.deduplicateProxies
 import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
+import io.nekohasekai.sagernet.ktx.runOnMainDispatcher
 import io.nekohasekai.sagernet.ui.MessageStore
 import io.nekohasekai.sagernet.ktx.deduplicateProxies
 import io.nekohasekai.sagernet.ktx.Logs
@@ -684,31 +685,34 @@ class MainActivity : ThemedActivity(),
     }
 
     override fun onPreferenceDataStoreChanged(store: PreferenceDataStore, key: String) {
-        when (key) {
-            Key.SERVICE_MODE -> onBinderDied()
-            Key.PROFILE_ID -> {
-                LandingIpManager.clearCache()
-                if (DataStore.serviceState.connected && DataStore.showLandingIp) {
-                    binding.stats.refreshLandingIp(forceRefresh = true)
+        runOnMainDispatcher {
+            if (isDestroyed || isFinishing) return@runOnMainDispatcher
+            when (key) {
+                Key.SERVICE_MODE -> onBinderDied()
+                Key.PROFILE_ID -> {
+                    LandingIpManager.clearCache()
+                    if (DataStore.serviceState.connected && DataStore.showLandingIp) {
+                        binding.stats.refreshLandingIp(forceRefresh = true)
+                    }
                 }
-            }
-            Key.SHOW_BOTTOM_BAR -> {
-                syncMainControls(
-                    showWhenConnected = DataStore.showBottomBar,
-                    animate = true,
-                )
-                when (val fragment = currentMainFragment
-                    ?: supportFragmentManager.findFragmentById(R.id.fragment_holder)
-                ) {
-                    is GroupFragment -> fragment.updateBottomPadding()
-                    is RouteFragment -> fragment.updateBottomPadding()
+                Key.SHOW_BOTTOM_BAR -> {
+                    syncMainControls(
+                        showWhenConnected = DataStore.showBottomBar,
+                        animate = true,
+                    )
+                    when (val fragment = currentMainFragment
+                        ?: supportFragmentManager.findFragmentById(R.id.fragment_holder)
+                    ) {
+                        is GroupFragment -> fragment.updateBottomPadding()
+                        is RouteFragment -> fragment.updateBottomPadding()
+                    }
                 }
-            }
-            Key.PROXY_APPS, Key.BYPASS_MODE, Key.INDIVIDUAL -> {
-                if (DataStore.serviceState.canStop) {
-                    snackbar(getString(R.string.need_reload)).setAction(R.string.apply) {
-                        SagerNet.reloadService()
-                    }.show()
+                Key.PROXY_APPS, Key.BYPASS_MODE, Key.INDIVIDUAL -> {
+                    if (DataStore.serviceState.canStop) {
+                        snackbar(getString(R.string.need_reload)).setAction(R.string.apply) {
+                            SagerNet.reloadService()
+                        }.show()
+                    }
                 }
             }
         }

@@ -4,6 +4,8 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.os.Handler
+import android.os.Looper
 import android.text.format.Formatter
 import android.util.AttributeSet
 import android.view.View
@@ -39,6 +41,16 @@ class StatsBar @JvmOverloads constructor(
     companion object {
         private const val INITIAL_HIDE_DELAY_MS = 100L
         private const val SCROLL_TOGGLE_THRESHOLD_DP = 8f
+    }
+
+    private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
+
+    private fun runOnUi(block: () -> Unit) {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            block()
+        } else {
+            mainHandler.post(block)
+        }
     }
 
     private enum class Transition {
@@ -274,19 +286,21 @@ class StatsBar @JvmOverloads constructor(
         showWhenConnected: Boolean,
         animate: Boolean,
     ) {
-        currentState = state
-        allowShow = showControls
-        when {
-            !showControls || state != BaseService.State.Connected -> {
-                applyTransition(
-                    if (animate && showControls) Transition.HideAfterStart else Transition.HideImmediate
-                )
-            }
+        runOnUi {
+            currentState = state
+            allowShow = showControls
+            when {
+                !showControls || state != BaseService.State.Connected -> {
+                    applyTransition(
+                        if (animate && showControls) Transition.HideAfterStart else Transition.HideImmediate
+                    )
+                }
 
-            showWhenConnected -> applyTransition(
-                if (animate) Transition.ShowAnimated else Transition.ShowImmediate
-            )
-            alpha == 0f && isLaidOut -> alpha = 1f
+                showWhenConnected -> applyTransition(
+                    if (animate) Transition.ShowAnimated else Transition.ShowImmediate
+                )
+                alpha == 0f && isLaidOut -> alpha = 1f
+            }
         }
     }
 
@@ -392,195 +406,207 @@ class StatsBar @JvmOverloads constructor(
     }
 
     private fun updateStatusViews(latency: Int = lastMeasuredLatency, customStatus: CharSequence? = null) {
-        initViews()
-        if (currentState == BaseService.State.Connected) {
-            val cached = LandingIpManager.getCachedInfo()
-            if (DataStore.showLandingIp && cached != null && cached.ip.isNotBlank()) {
-                statusIpText.text = "${cached.countryFlag} ${cached.countryCode} ${cached.ip}"
-                statusIpText.visibility = View.VISIBLE
-            } else {
-                statusIpText.visibility = View.GONE
-            }
-
-            if (customStatus != null) {
-                statusTitleText.visibility = View.GONE
-                statusText.text = customStatus
-            } else {
-                val isHttps = DataStore.connectionTestURL.startsWith("https://", ignoreCase = true)
-                val handshakeType = if (isHttps) "HTTPS" else "HTTP"
-                if (latency > 0) {
-                    statusTitleText.text = "$handshakeType 握手延迟"
-                    statusTitleText.visibility = View.VISIBLE
-                    statusText.text = "${latency}ms"
+        runOnUi {
+            initViews()
+            if (currentState == BaseService.State.Connected) {
+                val cached = LandingIpManager.getCachedInfo()
+                if (DataStore.showLandingIp && cached != null && cached.ip.isNotBlank()) {
+                    statusIpText.text = "${cached.countryFlag} ${cached.countryCode} ${cached.ip}"
+                    statusIpText.visibility = View.VISIBLE
                 } else {
+                    statusIpText.visibility = View.GONE
+                }
+
+                if (customStatus != null) {
                     statusTitleText.visibility = View.GONE
-                    if (cached == null && DataStore.showLandingIp) {
-                        statusText.text = context.getString(R.string.landing_ip_querying)
+                    statusText.text = customStatus
+                } else {
+                    val isHttps = DataStore.connectionTestURL.startsWith("https://", ignoreCase = true)
+                    val handshakeType = if (isHttps) "HTTPS" else "HTTP"
+                    if (latency > 0) {
+                        statusTitleText.text = "$handshakeType 握手延迟"
+                        statusTitleText.visibility = View.VISIBLE
+                        statusText.text = "${latency}ms"
                     } else {
-                        statusText.text = app.getString(R.string.vpn_connected)
+                        statusTitleText.visibility = View.GONE
+                        if (cached == null && DataStore.showLandingIp) {
+                            statusText.text = context.getString(R.string.landing_ip_querying)
+                        } else {
+                            statusText.text = app.getString(R.string.vpn_connected)
+                        }
                     }
                 }
+            } else {
+                statusTitleText.visibility = View.GONE
+                statusIpText.visibility = View.GONE
+                statusText.text = customStatus ?: context.getText(
+                    when (currentState) {
+                        BaseService.State.Connecting -> R.string.connecting
+                        BaseService.State.Stopping -> R.string.stopping
+                        else -> R.string.not_connected
+                    }
+                )
             }
-        } else {
-            statusTitleText.visibility = View.GONE
-            statusIpText.visibility = View.GONE
-            statusText.text = customStatus ?: context.getText(
-                when (currentState) {
-                    BaseService.State.Connecting -> R.string.connecting
-                    BaseService.State.Stopping -> R.string.stopping
-                    else -> R.string.not_connected
-                }
-            )
+            TooltipCompat.setTooltipText(this, statusText.text)
         }
-        TooltipCompat.setTooltipText(this, statusText.text)
     }
 
     fun refreshDisplay() {
-        updateThemeColors()
-        if (currentState == BaseService.State.Connected) {
-            btnIpDetail?.visibility = if (DataStore.showLandingIp) View.VISIBLE else View.GONE
-            updateStatusViews()
-            if (DataStore.showLandingIp && LandingIpManager.getCachedInfo() == null) {
-                refreshLandingIp(forceRefresh = false)
+        runOnUi {
+            updateThemeColors()
+            if (currentState == BaseService.State.Connected) {
+                btnIpDetail?.visibility = if (DataStore.showLandingIp) View.VISIBLE else View.GONE
+                updateStatusViews()
+                if (DataStore.showLandingIp && LandingIpManager.getCachedInfo() == null) {
+                    refreshLandingIp(forceRefresh = false)
+                }
             }
         }
     }
 
     fun changeState(state: BaseService.State) {
-        currentState = state
-        updateHideOnScroll()
-        if (state == BaseService.State.Connected) {
-            btnIpDetail?.visibility = if (DataStore.showLandingIp) View.VISIBLE else View.GONE
-            updateStatusViews()
-            if (DataStore.showLandingIp) {
-                refreshLandingIp(forceRefresh = false)
+        runOnUi {
+            currentState = state
+            updateHideOnScroll()
+            if (state == BaseService.State.Connected) {
+                btnIpDetail?.visibility = if (DataStore.showLandingIp) View.VISIBLE else View.GONE
+                updateStatusViews()
+                if (DataStore.showLandingIp) {
+                    refreshLandingIp(forceRefresh = false)
+                }
+                testConnection(silent = true)
+            } else {
+                btnIpDetail?.visibility = View.GONE
+                resetLatencyState()
+                LandingIpManager.clearCache()
+                updateSpeed(0, 0)
+                updateStatusViews()
             }
-            testConnection(silent = true)
-        } else {
-            btnIpDetail?.visibility = View.GONE
-            resetLatencyState()
-            LandingIpManager.clearCache()
-            updateSpeed(0, 0)
-            updateStatusViews()
         }
     }
 
     fun refreshLandingIp(forceRefresh: Boolean = false) {
-        if (currentState != BaseService.State.Connected) return
-        if (!DataStore.showLandingIp) {
-            btnIpDetail?.visibility = View.GONE
-            updateStatusViews()
-            return
-        }
-        val currentProfile = DataStore.selectedProxy
-        val cached = LandingIpManager.getCachedInfo()
-        if (!forceRefresh && cached != null) {
-            btnIpDetail?.visibility = View.VISIBLE
-            updateStatusViews()
-            return
-        }
-
-        btnIpDetail?.visibility = View.VISIBLE
-        if (cached == null && lastMeasuredLatency <= 0) {
-            updateStatusViews(customStatus = context.getString(R.string.landing_ip_querying))
-        }
-
-        val activity = context as? MainActivity
-        val scope = activity?.lifecycleScope ?: CoroutineScope(Dispatchers.Main)
-        scope.launch {
-            val result = LandingIpManager.queryLandingIp(currentProfile, forceRefresh = forceRefresh)
-            if (currentState != BaseService.State.Connected) return@launch
+        runOnUi {
+            if (currentState != BaseService.State.Connected) return@runOnUi
             if (!DataStore.showLandingIp) {
                 btnIpDetail?.visibility = View.GONE
                 updateStatusViews()
-                return@launch
+                return@runOnUi
+            }
+            val currentProfile = DataStore.selectedProxy
+            val cached = LandingIpManager.getCachedInfo()
+            if (!forceRefresh && cached != null) {
+                btnIpDetail?.visibility = View.VISIBLE
+                updateStatusViews()
+                return@runOnUi
             }
 
-            result.onSuccess { info ->
-                btnIpDetail?.visibility = View.VISIBLE
-                updateStatusViews()
-                if (lastMeasuredLatency <= 0) {
-                    testConnection(silent = true)
+            btnIpDetail?.visibility = View.VISIBLE
+            if (cached == null && lastMeasuredLatency <= 0) {
+                updateStatusViews(customStatus = context.getString(R.string.landing_ip_querying))
+            }
+
+            val activity = context as? MainActivity
+            val scope = activity?.lifecycleScope ?: CoroutineScope(Dispatchers.Main)
+            scope.launch {
+                val result = LandingIpManager.queryLandingIp(currentProfile, forceRefresh = forceRefresh)
+                if (currentState != BaseService.State.Connected) return@launch
+                if (!DataStore.showLandingIp) {
+                    btnIpDetail?.visibility = View.GONE
+                    updateStatusViews()
+                    return@launch
                 }
-            }.onFailure { err ->
-                Logs.w(err)
-                btnIpDetail?.visibility = View.VISIBLE
-                updateStatusViews()
+
+                result.onSuccess { info ->
+                    btnIpDetail?.visibility = View.VISIBLE
+                    updateStatusViews()
+                    if (lastMeasuredLatency <= 0) {
+                        testConnection(silent = true)
+                    }
+                }.onFailure { err ->
+                    Logs.w(err)
+                    btnIpDetail?.visibility = View.VISIBLE
+                    updateStatusViews()
+                }
             }
         }
     }
 
     @SuppressLint("SetTextI18n")
     fun updateSpeed(txRate: Long, rxRate: Long) {
-        txText.text = "▲ ${
-            context.getString(
-                R.string.speed, Formatter.formatFileSize(context, txRate)
-            )
-        }"
-        rxText.text = "▼ ${
-            context.getString(
-                R.string.speed, Formatter.formatFileSize(context, rxRate)
-            )
-        }"
+        runOnUi {
+            txText.text = "▲ ${
+                context.getString(
+                    R.string.speed, Formatter.formatFileSize(context, txRate)
+                )
+            }"
+            rxText.text = "▼ ${
+                context.getString(
+                    R.string.speed, Formatter.formatFileSize(context, rxRate)
+                )
+            }"
+        }
     }
 
     fun testConnection(silent: Boolean = false) {
-        val activity = context as? MainActivity ?: return
-        if (currentState != BaseService.State.Connected) return
+        runOnUi {
+            val activity = context as? MainActivity ?: return@runOnUi
+            if (currentState != BaseService.State.Connected) return@runOnUi
 
-        val now = android.os.SystemClock.elapsedRealtime()
+            val now = android.os.SystemClock.elapsedRealtime()
 
-        // 1. 毫秒级极速响应：若已有真实基准延迟，0ms 瞬间反馈并刷新界面
-        if (lastMeasuredLatency > 0) {
-            val jitter = if (now - lastMeasureTime < 5000L) {
-                kotlin.random.Random.nextInt(-2, 3)
-            } else {
-                0
-            }
-            val displayLatency = (lastMeasuredLatency + jitter).coerceAtLeast(1)
-            updateStatusViews(displayLatency)
-        } else if (!silent) {
-            updateStatusViews(customStatus = app.getText(R.string.connection_test_testing))
-        }
-
-        // 2. 避免同时在后台并发堆积过量物理网络请求
-        if (isTestingRealLatency) {
-            return
-        }
-        // 400ms 内已有有效测速结果时，不重复发起物理网络请求，直接依赖毫秒级即时反馈
-        if (now - lastMeasureTime < 400L && lastMeasuredLatency > 0) {
-            return
-        }
-
-        isTestingRealLatency = true
-        val scope = activity.lifecycleScope
-        activeLatencyJob = scope.launch(Dispatchers.IO) {
-            try {
-                val elapsed = activity.urlTest()
-                withContext(Dispatchers.Main) {
-                    isTestingRealLatency = false
-                    if (currentState != BaseService.State.Connected) return@withContext
-                    if (elapsed > 0) {
-                        lastMeasuredLatency = elapsed
-                        lastMeasureTime = android.os.SystemClock.elapsedRealtime()
-                        updateStatusViews(elapsed)
-                    } else if (lastMeasuredLatency <= 0) {
-                        updateStatusViews(customStatus = app.getText(R.string.connection_test_fail))
-                    }
+            // 1. 毫秒级极速响应：若已有真实基准延迟，0ms 瞬间反馈并刷新界面
+            if (lastMeasuredLatency > 0) {
+                val jitter = if (now - lastMeasureTime < 5000L) {
+                    kotlin.random.Random.nextInt(-2, 3)
+                } else {
+                    0
                 }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    isTestingRealLatency = false
-                    if (currentState != BaseService.State.Connected) return@withContext
-                    Logs.w("testConnection error: $e")
-                    if (lastMeasuredLatency <= 0) {
-                        updateStatusViews(customStatus = app.getText(R.string.connection_test_fail))
-                        if (!silent) {
-                            activity.snackbar(
-                                app.getString(
-                                    R.string.connection_test_error, e.readableMessage
-                                )
-                            ).show()
+                val displayLatency = (lastMeasuredLatency + jitter).coerceAtLeast(1)
+                updateStatusViews(displayLatency)
+            } else if (!silent) {
+                updateStatusViews(customStatus = app.getText(R.string.connection_test_testing))
+            }
+
+            // 2. 避免同时在后台并发堆积过量物理网络请求
+            if (isTestingRealLatency) {
+                return@runOnUi
+            }
+            // 400ms 内已有有效测速结果时，不重复发起物理网络请求，直接依赖毫秒级即时反馈
+            if (now - lastMeasureTime < 400L && lastMeasuredLatency > 0) {
+                return@runOnUi
+            }
+
+            isTestingRealLatency = true
+            val scope = activity.lifecycleScope
+            activeLatencyJob = scope.launch(Dispatchers.IO) {
+                try {
+                    val elapsed = activity.urlTest()
+                    withContext(Dispatchers.Main) {
+                        isTestingRealLatency = false
+                        if (currentState != BaseService.State.Connected) return@withContext
+                        if (elapsed > 0) {
+                            lastMeasuredLatency = elapsed
+                            lastMeasureTime = android.os.SystemClock.elapsedRealtime()
+                            updateStatusViews(elapsed)
+                        } else if (lastMeasuredLatency <= 0) {
+                            updateStatusViews(customStatus = app.getText(R.string.connection_test_fail))
+                        }
+                    }
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        isTestingRealLatency = false
+                        if (currentState != BaseService.State.Connected) return@withContext
+                        Logs.w("testConnection error: $e")
+                        if (lastMeasuredLatency <= 0) {
+                            updateStatusViews(customStatus = app.getText(R.string.connection_test_fail))
+                            if (!silent) {
+                                activity.snackbar(
+                                    app.getString(
+                                        R.string.connection_test_error, e.readableMessage
+                                    )
+                                ).show()
+                            }
                         }
                     }
                 }
