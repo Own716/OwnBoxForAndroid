@@ -43,6 +43,7 @@ import io.nekohasekai.sagernet.database.SubscriptionBean
 import io.nekohasekai.sagernet.database.preference.OnPreferenceDataStoreChangeListener
 import io.nekohasekai.sagernet.databinding.LayoutMainBinding
 import io.nekohasekai.sagernet.utils.Theme
+import io.nekohasekai.sagernet.utils.LandingIpManager
 import io.nekohasekai.sagernet.fmt.AbstractBean
 import io.nekohasekai.sagernet.fmt.KryoConverters
 import io.nekohasekai.sagernet.fmt.PluginEntry
@@ -685,6 +686,12 @@ class MainActivity : ThemedActivity(),
     override fun onPreferenceDataStoreChanged(store: PreferenceDataStore, key: String) {
         when (key) {
             Key.SERVICE_MODE -> onBinderDied()
+            Key.PROFILE_ID -> {
+                LandingIpManager.clearCache()
+                if (DataStore.serviceState.connected && DataStore.showLandingIp) {
+                    binding.stats.refreshLandingIp(forceRefresh = true)
+                }
+            }
             Key.SHOW_BOTTOM_BAR -> {
                 syncMainControls(
                     showWhenConnected = DataStore.showBottomBar,
