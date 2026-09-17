@@ -5,6 +5,7 @@
     <PreferenceCategory app:title="@string/balancer_settings">
 
         <EditTextPreference
+            app:icon="@drawable/ic_social_emoji_symbols"
             app:key="profileName"
             app:title="@string/profile_name"
             app:useSimpleSummaryProvider="true" />
@@ -13,55 +14,65 @@
             app:defaultValue="0"
             app:entries="@array/balancer_type_entries"
             app:entryValues="@array/balancer_type_values"
+            app:icon="@drawable/ic_device_developer_mode"
             app:key="balancerType"
             app:title="@string/balancer_type"
             app:useSimpleSummaryProvider="true" />
-
-        <Preference
-            app:key="balancerTargetGroup"
-            app:title="@string/balancer_select_group" />
 
         <moe.matsuri.nb4a.ui.SimpleMenuPreference
             app:defaultValue="random"
             app:entries="@array/balancer_strategy_entries"
             app:entryValues="@array/balancer_strategy_values"
+            app:icon="@drawable/ic_baseline_compare_arrows_24"
             app:key="balancerStrategy"
             app:title="@string/balancer_strategy"
             app:useSimpleSummaryProvider="true" />
 
+        <Preference
+            app:icon="@drawable/ic_baseline_view_list_24"
+            app:key="balancerTargetGroup"
+            app:title="@string/balancer_select_group" />
+
         <SwitchPreference
             app:defaultValue="false"
+            app:icon="@drawable/ic_hardware_router"
             app:key="balancerUseFrontProxy"
             app:title="@string/balancer_use_front_proxy" />
 
         <SwitchPreference
             app:defaultValue="false"
+            app:icon="@drawable/baseline_public_24"
             app:key="balancerUseLandingProxy"
             app:title="@string/balancer_use_landing_proxy" />
 
         <EditTextPreference
+            app:icon="@drawable/ic_baseline_delete_24"
             app:key="balancerNameExclude"
             app:title="@string/balancer_name_exclude"
             app:useSimpleSummaryProvider="false" />
 
         <EditTextPreference
+            app:icon="@drawable/ic_baseline_manage_search_24"
             app:key="balancerNameInclude"
             app:title="@string/balancer_name_include"
             app:useSimpleSummaryProvider="false" />
 
         <EditTextPreference
+            app:icon="@drawable/ic_baseline_cast_connected_24"
             app:key="balancerTestUrl"
             app:title="@string/balancer_custom_url"
             app:useSimpleSummaryProvider="false" />
 
         <EditTextPreference
             app:defaultValue="300"
+            app:icon="@drawable/ic_baseline_local_bar_24"
             app:key="balancerInterval"
             app:title="@string/balancer_interval"
             app:useSimpleSummaryProvider="false" />
 
         <EditTextPreference
             app:defaultValue="300"
+            app:icon="@drawable/ic_baseline_speed_24"
             app:key="balancerTolerance"
             app:title="@string/balancer_tolerance"
             app:useSimpleSummaryProvider="false" />
@@ -70,10 +81,12 @@
             app:defaultValue="ms"
             app:entries="@array/tolerance_unit_entries"
             app:entryValues="@array/tolerance_unit_values"
+            app:icon="@drawable/ic_baseline_shutter_speed_24"
             app:key="balancerToleranceUnit"
             app:title="@string/balancer_tolerance_unit"
             app:useSimpleSummaryProvider="true" />
 
     </PreferenceCategory>
 
-</PreferenceScreen>
+</PreferenceScreen>
+
