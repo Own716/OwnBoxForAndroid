@@ -212,26 +212,35 @@
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_marginStart="16dp"
+                                android:layout_marginEnd="8dp"
                                 android:layout_weight="1"
+                                android:singleLine="true"
+                                android:ellipsize="end"
                                 android:text="@string/lan_sharing_hotspot_ip"
                                 android:textAppearance="?attr/textAppearanceSubtitle1"
                                 android:textStyle="bold" />
 
                             <TextView
-                                android:id="@+id/text_hotspot_status_desc"
+                                android:id="@+id/badge_hotspot_status"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
+                                android:background="@drawable/bg_doc_badge"
+                                android:paddingHorizontal="8dp"
+                                android:paddingVertical="3dp"
                                 android:text="@string/lan_sharing_hotspot_detected"
                                 android:textAppearance="?attr/textAppearanceCaption"
-                                android:textColor="?android:attr/textColorSecondary" />
+                                android:textColor="?attr/colorPrimary"
+                                android:textStyle="bold" />
 
                         </LinearLayout>
 
                         <TextView
-                            android:layout_width="wrap_content"
+                            android:id="@+id/text_hotspot_desc"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="40dp"
-                            android:layout_marginTop="2dp"
+                            android:layout_marginTop="4dp"
+                            android:layout_marginEnd="8dp"
                             android:text="@string/lan_sharing_hotspot_desc"
                             android:textAppearance="?attr/textAppearanceCaption"
                             android:textColor="?android:attr/textColorSecondary" />
@@ -370,26 +379,35 @@
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_marginStart="16dp"
+                                android:layout_marginEnd="8dp"
                                 android:layout_weight="1"
+                                android:singleLine="true"
+                                android:ellipsize="end"
                                 android:text="@string/lan_sharing_wifi_ip"
                                 android:textAppearance="?attr/textAppearanceSubtitle1"
                                 android:textStyle="bold" />
 
                             <TextView
-                                android:id="@+id/text_wifi_status_desc"
+                                android:id="@+id/badge_wifi_status"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
+                                android:background="@drawable/bg_doc_badge"
+                                android:paddingHorizontal="8dp"
+                                android:paddingVertical="3dp"
                                 android:text="@string/lan_sharing_wifi_detected"
                                 android:textAppearance="?attr/textAppearanceCaption"
-                                android:textColor="?android:attr/textColorSecondary" />
+                                android:textColor="?attr/colorPrimary"
+                                android:textStyle="bold" />
 
                         </LinearLayout>
 
                         <TextView
-                            android:layout_width="wrap_content"
+                            android:id="@+id/text_wifi_desc"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="40dp"
-                            android:layout_marginTop="2dp"
+                            android:layout_marginTop="4dp"
+                            android:layout_marginEnd="8dp"
                             android:text="@string/lan_sharing_wifi_desc"
                             android:textAppearance="?attr/textAppearanceCaption"
                             android:textColor="?android:attr/textColorSecondary" />
@@ -632,7 +650,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
                         android:lineSpacingExtra="3dp"
-                        android:text="1. 本机开启【局域网共享】并开启【个人热点】，VPN 连接节点。\n2. 目标手机连接该热点，在 Wi-Fi 详情中找到【代理】，从“无”改为【手动】。\n3. 【主机名】填 192.168.43.1（点击上方复制），【端口】填 2080。\n4. ⚠️ 严禁修改【IP 设置】（必须保持默认的 DHCP，不要改成静态）！\n点击此处卡片可查看完整手把手设置教程 →"
+                        android:text="1. 本机开启【局域网共享】，开启【个人热点】，VPN 连接好节点。\n2. 目标手机连接该热点，在 Wi-Fi 详情中找到【代理】，从“无”改为【手动】。\n3. ⚠️【避坑核心】：保持【IP 设置】为默认的【DHCP】，千万不要改成静态 IP，也不要填路由器 IP！\n4. ✅【主机名】填 192.168.43.1（点击上方复制），【端口】填 2080。\n点击此处卡片可查看完整手把手设置教程 →"
                         android:textAppearance="?attr/textAppearanceCaption"
                         android:textColor="?android:attr/textColorSecondary" />
 
