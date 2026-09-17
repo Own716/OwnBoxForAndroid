@@ -163,6 +163,11 @@ class ConfigurationFragment @JvmOverloads constructor(
         fun returnProfile(profileId: Long)
     }
 
+    companion object {
+        /** Synthetic ProxyGroup ID used for the "All Groups" tab. Must be negative to avoid DB collision. */
+        const val ALL_GROUPS_SENTINEL_ID = -1L
+    }
+
     lateinit var adapter: GroupPagerAdapter
     lateinit var tabLayout: TabLayout
     lateinit var groupPager: ViewPager2
@@ -315,10 +320,12 @@ class ConfigurationFragment @JvmOverloads constructor(
 
         override fun onPageSelected(position: Int) {
             if (adapter.groupList.size > position) {
-                val newGroupId = adapter.groupList[position].id
+                val group = adapter.groupList[position]
                 adapter.selectedGroupIndex = position
-                if (DataStore.selectedGroup != newGroupId) {
-                    DataStore.selectedGroup = newGroupId
+                // Skip updating DataStore.selectedGroup for the synthetic "All" tab
+                if (group.id == ALL_GROUPS_SENTINEL_ID) return
+                if (DataStore.selectedGroup != group.id) {
+                    DataStore.selectedGroup = group.id
                 }
             }
         }
@@ -512,8 +519,11 @@ class ConfigurationFragment @JvmOverloads constructor(
                             val pos = tab.position
                             if (pos in 0 until adapter.groupList.size) {
                                 val group = adapter.groupList[pos]
-                                if (!group.ungrouped) {
-                                    v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                                // Skip "All" sentinel tab and ungrouped tabs
+                                if (!group.ungrouped && group.id != ALL_GROUPS_SENTINEL_ID) {
+                                    if (DataStore.hapticFeedback) {
+                                        v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                                    }
                                     showGroupSettingsConfirmDialog(group)
                                 }
                             }
@@ -1760,6 +1770,19 @@ class ConfigurationFragment @JvmOverloads constructor(
                     newSelectedGroupIndex = 0
                 }
 
+                // Inject "All" tab sentinel at position 0 when the setting is enabled
+                if (DataStore.showAllGroupsTab && newGroupList.isNotEmpty()) {
+                    val sentinelGroup = ProxyGroup().apply {
+                        id = ALL_GROUPS_SENTINEL_ID
+                        name = app.getString(R.string.group_tab_all)
+                    }
+                    newGroupList.add(0, sentinelGroup)
+                    // Shift the real-group index by 1 to account for sentinel at 0
+                    if (newSelectedGroupIndex != null && newSelectedGroupIndex!! >= 0) {
+                        newSelectedGroupIndex = newSelectedGroupIndex!! + 1
+                    }
+                }
+
                 val runFunc = if (now) activity?.let { it::runOnUiThread } else groupPager::post
                 if (runFunc != null) {
                     val reloadAdapter = this@GroupPagerAdapter
@@ -1783,7 +1806,9 @@ class ConfigurationFragment @JvmOverloads constructor(
                                 if (!isUserInteractingWithPager && newSelectedGroupIndex != null && groupPager.currentItem != selectedGroupIndex) {
                                     groupPager.setCurrentItem(selectedGroupIndex, false)
                                 }
-                                val hideTab = groupList.size < 2
+                                // Show tab if there are ≥2 real groups (or ≥3 items including sentinel)
+                                val realGroupCount = groupList.count { it.id != ALL_GROUPS_SENTINEL_ID }
+                                val hideTab = realGroupCount < 2
                                 tabLayout.isGone = hideTab
                                 toolbar.elevation = if (hideTab) 0F else dp2px(4).toFloat()
                                 if (!select) {
@@ -1807,6 +1832,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         override fun createFragment(position: Int): Fragment {
             return GroupFragment().apply {
                 proxyGroup = groupList[position]
+                isAllGroupsTab = (proxyGroup.id == ALL_GROUPS_SENTINEL_ID)
                 groupFragments[proxyGroup.id] = this
                 if (position == selectedGroupIndex) {
                     selected = true
@@ -1888,6 +1914,8 @@ class ConfigurationFragment @JvmOverloads constructor(
 
         lateinit var proxyGroup: ProxyGroup
         var selected = false
+        /** True when this fragment represents the synthetic "All Groups" tab. */
+        var isAllGroupsTab = false
 
         override fun onCreateView(
             inflater: LayoutInflater,
@@ -2826,16 +2854,23 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
 
             fun reloadProfiles() {
-                var newProfiles = SagerDatabase.proxyDao.getByGroup(proxyGroup.id)
-                when (proxyGroup.order) {
-                    GroupOrder.BY_NAME -> {
-                        newProfiles = newProfiles.sortedBy { it.displayName() }
+                var newProfiles = if (isAllGroupsTab) {
+                    // All-groups tab: fetch every profile from every group
+                    SagerDatabase.proxyDao.getAll().sortedBy { it.displayName() }
+                } else {
+                    SagerDatabase.proxyDao.getByGroup(proxyGroup.id)
+                }
+                if (!isAllGroupsTab) {
+                    when (proxyGroup.order) {
+                        GroupOrder.BY_NAME -> {
+                            newProfiles = newProfiles.sortedBy { it.displayName() }
 
-                    }
+                        }
 
-                    GroupOrder.BY_DELAY -> {
-                        newProfiles =
-                            newProfiles.sortedBy { if (it.status == 1) it.ping else 114514 }
+                        GroupOrder.BY_DELAY -> {
+                            newProfiles =
+                                newProfiles.sortedBy { if (it.status == 1) it.ping else 114514 }
+                        }
                     }
                 }
 
@@ -2941,6 +2976,7 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             init {
                 view.setOnClickListener {
+                    if (DataStore.hapticFeedback) it.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                     val proxyEntity = entity
                     if (select) {
                         (requireActivity() as SelectCallback).returnProfile(proxyEntity.id)
@@ -2951,20 +2987,24 @@ class ConfigurationFragment @JvmOverloads constructor(
                 profileStatus.setOnClickListener {
                     val proxyEntity = entity
                     if (proxyEntity.status == 3) {
-                        alert(proxyEntity.error ?: "<?>").tryToShow()
+                        alert(proxyEntity.error ?: "<?>" ).tryToShow()
                     }
                 }
                 profileStatus.isFocusable = false
                 editButton.setOnClickListener {
+                    if (DataStore.hapticFeedback) it.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                     showNodeCascadingMenu(it, entity)
                 }
                 removeButton.setOnClickListener {
+                    if (DataStore.hapticFeedback) it.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                     removeProfile(entity)
                 }
                 doubleColumnMenuButton.setOnClickListener {
+                    if (DataStore.hapticFeedback) it.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                     showNodeCascadingMenu(it, entity)
                 }
                 shareLayout.setOnClickListener {
+                    if (DataStore.hapticFeedback) it.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                     val proxyEntity = entity
                     if (!select && proxyEntity.type != ProxyEntity.TYPE_CHAIN && proxyEntity.type != ProxyEntity.TYPE_BALANCER) {
                         showNodeCascadingMenu(it, proxyEntity)

@@ -99,9 +99,11 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var profileCardStyle by configurationStore.stringToInt(Key.PROFILE_CARD_STYLE) { 0 }
     var showSubscriptionInfoCard by configurationStore.boolean(Key.SHOW_SUBSCRIPTION_INFO_CARD) { true }
     var customThemeColor by configurationStore.int("custom_theme_color") { 0x00E676 }
+    var hapticFeedback by configurationStore.boolean(Key.HAPTIC_FEEDBACK) { true }
+    var showAllGroupsTab by configurationStore.boolean(Key.SHOW_ALL_GROUPS_TAB) { false }
 
     var allowInsecureOnRequest by configurationStore.boolean(Key.ALLOW_INSECURE_ON_REQUEST)
-    var networkChangeResetConnections by configurationStore.boolean(Key.NETWORK_CHANGE_RESET_CONNECTIONS) { true }
+    var networkChangeResetConnections by configurationStore.boolean(Key.NETWORK_CHANGE_RESET_CONNECTIONS) { false }
     var wakeResetConnections by configurationStore.boolean(Key.WAKE_RESET_CONNECTIONS)
 
     //

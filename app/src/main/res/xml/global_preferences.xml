@@ -108,6 +108,18 @@
             app:key="showBottomBar"
             app:title="@string/show_bottom_bar" />
 
+        <SwitchPreference
+            app:defaultValue="true"
+            app:key="hapticFeedback"
+            app:title="@string/haptic_feedback"
+            app:summary="@string/haptic_feedback_summary" />
+
+        <SwitchPreference
+            app:defaultValue="false"
+            app:key="showAllGroupsTab"
+            app:title="@string/show_all_groups_tab"
+            app:summary="@string/show_all_groups_tab_summary" />
+
     </moe.matsuri.nb4a.ui.ExpandablePreferenceCategory>
 
     <!-- 2. VPN 设置 -->
@@ -436,7 +448,7 @@
             app:title="@string/enable_clash_api" />
 
         <SwitchPreference
-            app:defaultValue="true"
+            app:defaultValue="false"
             app:icon="@drawable/ic_baseline_flip_camera_android_24"
             app:key="networkChangeResetConnections"
             app:title="@string/network_change_reset_connections"

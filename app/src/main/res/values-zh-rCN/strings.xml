@@ -967,4 +967,14 @@
     <string name="qrcode_standard_hint">标准协议链接格式（兼容各类通用客户端）</string>
     <string name="qrcode_sn_hint">Sing-box &amp; Neko 专用序列化链接（sn://）</string>
     <string name="copy_current_link">复制链接</string>
+
+    <!-- Haptic Feedback -->
+    <string name="haptic_feedback">触感反馈</string>
+    <string name="haptic_feedback_summary">点击按钮时产生微微震动反馈</string>
+
+    <!-- Show All Groups Tab -->
+    <string name="show_all_groups_tab">显示全部组标签页</string>
+    <string name="show_all_groups_tab_summary">在订阅组标签页最左侧添加"全部"Tab，汇总所有组的节点</string>
+    <string name="group_tab_all">全部</string>
+
 </resources>

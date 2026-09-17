@@ -1053,4 +1053,14 @@
     <string name="dashboard_log_resume">Resume Logs</string>
     <string name="dashboard_log_clear">Clear Logs</string>
     <string name="dashboard_search_rules_hint">Search rule payload or outbound</string>
+
+    <!-- Haptic Feedback -->
+    <string name="haptic_feedback">Haptic Feedback</string>
+    <string name="haptic_feedback_summary">Vibrate slightly when tapping buttons</string>
+
+    <!-- Show All Groups Tab -->
+    <string name="show_all_groups_tab">Show All Groups Tab</string>
+    <string name="show_all_groups_tab_summary">Add an "All" tab at the leftmost to show nodes from all subscription groups</string>
+    <string name="group_tab_all">All</string>
+
 </resources>

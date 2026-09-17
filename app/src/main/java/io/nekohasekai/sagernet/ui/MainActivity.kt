@@ -138,12 +138,17 @@ class MainActivity : ThemedActivity(),
         }
 
         binding.fab.setOnClickListener {
+            if (DataStore.hapticFeedback) it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
             if (DataStore.serviceState.canStop) SagerNet.stopService() else connect.launch(
                 null
             )
         }
-        binding.stats.setOnClickListener { if (DataStore.serviceState.connected) binding.stats.testConnection() }
+        binding.stats.setOnClickListener {
+            if (DataStore.hapticFeedback) it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+            if (DataStore.serviceState.connected) binding.stats.testConnection()
+        }
         binding.stats.setOnLongClickListener {
+            if (DataStore.hapticFeedback) it.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
             startActivity(Intent(this, TrafficChartActivity::class.java))
             true
         }
