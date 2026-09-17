@@ -44,7 +44,7 @@ class ServiceNotification(
     companion object {
         const val notificationId = 1
         val flags =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+            (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0) or PendingIntent.FLAG_UPDATE_CURRENT
 
         fun genTitle(ent: ProxyEntity): String {
             val gn = if (DataStore.showGroupInNotification)
@@ -162,7 +162,7 @@ class ServiceNotification(
 
             val switchAction = NotificationCompat.Action.Builder(
                 0, service.getString(R.string.action_switch), PendingIntent.getActivity(
-                    service, 0, Intent(service, SwitchActivity::class.java), flags
+                    service, 1, Intent(service, SwitchActivity::class.java), flags
                 )
             ).setShowsUserInterface(false).build()
             it.addAction(switchAction)
@@ -170,7 +170,7 @@ class ServiceNotification(
             val resetUpstreamAction = NotificationCompat.Action.Builder(
                 0, service.getString(R.string.reset_connections),
                 PendingIntent.getBroadcast(
-                    service, 0, Intent(Action.RESET_UPSTREAM_CONNECTIONS), flags
+                    service, 2, Intent(Action.RESET_UPSTREAM_CONNECTIONS).setPackage(service.packageName), flags
                 )
             ).setShowsUserInterface(false).build()
             it.addAction(resetUpstreamAction)

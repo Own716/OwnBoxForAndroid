@@ -19,6 +19,7 @@ import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.plugin.PluginManager
 import io.nekohasekai.sagernet.utils.DefaultNetworkListener
+import io.nekohasekai.sagernet.utils.LandingIpManager
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -73,10 +74,14 @@ class BaseService {
 
                 Action.RESET_UPSTREAM_CONNECTIONS -> runOnDefaultDispatcher {
                     Libcore.resetAllConnections(true)
+                    LandingIpManager.clearCache()
                     runOnMainDispatcher {
                         Util.collapseStatusBar(ctx)
-                        Toast.makeText(ctx, "Reset upstream connections done", Toast.LENGTH_SHORT)
-                            .show()
+                        Toast.makeText(
+                            ctx,
+                            ctx.getString(R.string.reset_connections_done),
+                            Toast.LENGTH_SHORT
+                        ).show()
                     }
                 }
 

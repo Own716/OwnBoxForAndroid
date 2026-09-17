@@ -513,6 +513,7 @@
     <string name="share_subscription">分享订阅</string>
     <string name="show_group_in_notification">在通知中显示组名</string>
     <string name="reset_connections">重置连接</string>
+    <string name="reset_connections_done">已重置出站连接</string>
     <string name="remove_duplicate">删除重复的服务器</string>
     <string name="no_duplicate_profiles">未发现重复的服务器</string>
     <string name="duplicate_profiles_removed">已清理 %1$d 个重复的服务器</string>
