@@ -114,7 +114,7 @@
                 android:layout_height="wrap_content"
                 app:cardCornerRadius="16dp"
                 app:cardElevation="0dp"
-                app:strokeColor="?attr/colorOutline"
+                app:strokeColor="@color/card_stroke"
                 app:strokeWidth="1dp">
 
                 <LinearLayout
@@ -174,7 +174,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
                         android:layout_marginStart="56dp"
-                        android:background="?attr/colorOutline" />
+                        android:background="@color/card_stroke" />
 
                     <!-- 行 2：Wi-Fi IPv4 地址 -->
                     <LinearLayout
@@ -233,7 +233,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
                         android:layout_marginStart="56dp"
-                        android:background="?attr/colorOutline" />
+                        android:background="@color/card_stroke" />
 
                     <!-- 行 3：热点路由器 IPv4 地址 -->
                     <LinearLayout
@@ -292,7 +292,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
                         android:layout_marginStart="56dp"
-                        android:background="?attr/colorOutline" />
+                        android:background="@color/card_stroke" />
 
                     <!-- 行 4：访问认证 -->
                     <LinearLayout
@@ -366,7 +366,7 @@
                 android:layout_height="wrap_content"
                 app:cardCornerRadius="16dp"
                 app:cardElevation="0dp"
-                app:strokeColor="?attr/colorOutline"
+                app:strokeColor="@color/card_stroke"
                 app:strokeWidth="1dp">
 
                 <LinearLayout
@@ -404,7 +404,7 @@
                 android:focusable="true"
                 app:cardCornerRadius="16dp"
                 app:cardElevation="0dp"
-                app:strokeColor="?attr/colorOutline"
+                app:strokeColor="@color/card_stroke"
                 app:strokeWidth="1dp">
 
                 <LinearLayout

@@ -384,7 +384,6 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat(), OnPreferenceDataS
 
         // 局域网共享
         val lanSharingPref = findPreference<Preference>("lanSharing")
-        val allowAccessPref = findPreference<SwitchPreference>(Key.ALLOW_ACCESS)
 
         fun getLocalIps(): String {
             val ips = runCatching {
@@ -414,32 +413,8 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat(), OnPreferenceDataS
         }
         updateLanSharingSummary()
 
-        allowAccessPref?.setOnPreferenceChangeListener { _, newValue ->
-            val enabled = newValue as Boolean
-            DataStore.allowAccess = enabled
-            updateLanSharingSummary()
-            needReload()
-            true
-        }
-
         lanSharingPref?.setOnPreferenceClickListener {
-            val enabled = DataStore.allowAccess
-            val localIp = getLocalIps()
-            val port = DataStore.mixedPort
-            val msgRes = if (enabled) R.string.lan_sharing_dialog_on else R.string.lan_sharing_dialog_off
-            val msg = getString(msgRes, localIp, port)
-            MaterialAlertDialogBuilder(requireContext())
-                .setTitle(R.string.lan_sharing)
-                .setMessage(msg)
-                .setPositiveButton(if (enabled) R.string.lan_sharing_turn_off else R.string.lan_sharing_turn_on) { _, _ ->
-                    val newState = !enabled
-                    DataStore.allowAccess = newState
-                    allowAccessPref?.isChecked = newState
-                    updateLanSharingSummary()
-                    needReload()
-                }
-                .setNegativeButton(android.R.string.cancel, null)
-                .show()
+            startActivity(Intent(requireContext(), LanSharingActivity::class.java))
             true
         }
     }
