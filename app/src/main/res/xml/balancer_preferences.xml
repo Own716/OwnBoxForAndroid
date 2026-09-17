@@ -29,6 +29,26 @@
             app:title="@string/balancer_strategy"
             app:useSimpleSummaryProvider="true" />
 
+        <SwitchPreference
+            app:defaultValue="false"
+            app:key="balancerUseFrontProxy"
+            app:title="@string/balancer_use_front_proxy" />
+
+        <SwitchPreference
+            app:defaultValue="false"
+            app:key="balancerUseLandingProxy"
+            app:title="@string/balancer_use_landing_proxy" />
+
+        <EditTextPreference
+            app:key="balancerNameExclude"
+            app:title="@string/balancer_name_exclude"
+            app:useSimpleSummaryProvider="false" />
+
+        <EditTextPreference
+            app:key="balancerNameInclude"
+            app:title="@string/balancer_name_include"
+            app:useSimpleSummaryProvider="false" />
+
         <EditTextPreference
             app:key="balancerTestUrl"
             app:title="@string/balancer_custom_url"
@@ -56,4 +76,4 @@
 
     </PreferenceCategory>
 
-</PreferenceScreen>
+</PreferenceScreen>

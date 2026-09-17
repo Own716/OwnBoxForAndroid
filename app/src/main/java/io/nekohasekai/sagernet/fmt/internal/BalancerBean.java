@@ -32,6 +32,11 @@ public class BalancerBean extends InternalBean {
     public int interval = 300;
     public int tolerance = 300;
     public String toleranceUnit = "ms";
+    // v4 fields
+    public boolean useFrontProxy = false;
+    public boolean useLandingProxy = false;
+    public String nameExclude = "";
+    public String nameInclude = "";
 
     public long calculateToleranceMs() {
         long value = tolerance;
@@ -76,11 +81,13 @@ public class BalancerBean extends InternalBean {
         if (interval <= 0) interval = 300;
         if (tolerance < 0) tolerance = 300;
         if (toleranceUnit == null || toleranceUnit.isEmpty()) toleranceUnit = "ms";
+        if (nameExclude == null) nameExclude = "";
+        if (nameInclude == null) nameInclude = "";
     }
 
     @Override
     public void serialize(ByteBufferOutput output) {
-        output.writeInt(3); // version
+        output.writeInt(4); // version
         output.writeInt(balancerType);
         output.writeLong(targetGroupId);
         output.writeString(strategy);
@@ -101,6 +108,11 @@ public class BalancerBean extends InternalBean {
         }
         output.writeInt(tolerance);
         output.writeString(toleranceUnit != null ? toleranceUnit : "ms");
+        // v4 fields
+        output.writeBoolean(useFrontProxy);
+        output.writeBoolean(useLandingProxy);
+        output.writeString(nameExclude != null ? nameExclude : "");
+        output.writeString(nameInclude != null ? nameInclude : "");
     }
 
     @Override
@@ -135,6 +147,18 @@ public class BalancerBean extends InternalBean {
             } else {
                 tolerance = 300;
                 toleranceUnit = "ms";
+            }
+
+            if (version >= 4) {
+                useFrontProxy = input.readBoolean();
+                useLandingProxy = input.readBoolean();
+                nameExclude = input.readString();
+                nameInclude = input.readString();
+            } else {
+                useFrontProxy = false;
+                useLandingProxy = false;
+                nameExclude = "";
+                nameInclude = "";
             }
         }
     }

@@ -55,6 +55,10 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         DataStore.balancerInterval = interval
         DataStore.balancerTolerance = tolerance
         DataStore.balancerToleranceUnit = if (toleranceUnit.isNullOrBlank()) "ms" else toleranceUnit
+        DataStore.balancerUseFrontProxy = useFrontProxy
+        DataStore.balancerUseLandingProxy = useLandingProxy
+        DataStore.balancerNameExclude = nameExclude ?: ""
+        DataStore.balancerNameInclude = nameInclude ?: ""
         DataStore.serverProtocol = proxies.joinToString(",")
     }
 
@@ -71,6 +75,10 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         interval = DataStore.balancerInterval
         tolerance = DataStore.balancerTolerance
         toleranceUnit = DataStore.balancerToleranceUnit
+        useFrontProxy = DataStore.balancerUseFrontProxy
+        useLandingProxy = DataStore.balancerUseLandingProxy
+        nameExclude = DataStore.balancerNameExclude
+        nameInclude = DataStore.balancerNameInclude
         proxies = proxyList.map { it.id }
         initializeDefaultValues()
     }
@@ -128,9 +136,18 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
             true
         }
 
+        val useFrontProxyPref = findPreference<Preference>("balancerUseFrontProxy")
+        val useLandingProxyPref = findPreference<Preference>("balancerUseLandingProxy")
+        val nameExcludePref = findPreference<EditTextPreference>("balancerNameExclude")
+        val nameIncludePref = findPreference<EditTextPreference>("balancerNameInclude")
+
         fun updateTypeVisibility(type: Int) {
             val isGroup = type == BalancerBean.TYPE_GROUP
             groupPref?.isVisible = isGroup
+            useFrontProxyPref?.isVisible = isGroup
+            useLandingProxyPref?.isVisible = isGroup
+            nameExcludePref?.isVisible = isGroup
+            nameIncludePref?.isVisible = isGroup
             configurationList.isVisible = !isGroup
             listCell.isVisible = !isGroup
         }
@@ -146,7 +163,7 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         val urlPref = findPreference<EditTextPreference>("balancerTestUrl")
         urlPref?.summaryProvider = Preference.SummaryProvider<EditTextPreference> { pref ->
             if (pref.text.isNullOrBlank()) {
-                getString(R.string.balancer_custom_url_sum)
+                getString(androidx.preference.R.string.not_set)
             } else {
                 pref.text
             }
@@ -157,14 +174,21 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
             val text = pref.text?.trim()
             val value = text?.toIntOrNull()
             if (value != null && value > 0) {
-                "${value}s"
+                value.toString()
             } else {
-                "300s"
+                "300"
             }
         }
 
         val tolerancePref = findPreference<EditTextPreference>("balancerTolerance")
         val toleranceUnitPref = findPreference<SimpleMenuPreference>("balancerToleranceUnit")
+
+        // Strategy-based visibility: hide tolerance prefs when strategy is leastLoad
+        fun updateStrategyVisibility(strategy: String) {
+            val showTolerance = strategy != BalancerBean.STRATEGY_LEAST_LOAD
+            tolerancePref?.isVisible = showTolerance
+            toleranceUnitPref?.isVisible = showTolerance
+        }
 
         fun updateToleranceSummary() {
             val text = tolerancePref?.text?.trim()
@@ -177,6 +201,15 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
             }
         }
         updateToleranceSummary()
+        updateStrategyVisibility(DataStore.balancerStrategy)
+
+        val strategyPref = findPreference<SimpleMenuPreference>("balancerStrategy")
+        strategyPref?.setOnPreferenceChangeListener { _, newValue ->
+            val strategy = (newValue as? String) ?: BalancerBean.STRATEGY_RANDOM
+            DataStore.balancerStrategy = strategy
+            updateStrategyVisibility(strategy)
+            true
+        }
 
         tolerancePref?.setOnPreferenceChangeListener { _, newValue ->
             val str = (newValue as? String)?.trim().orEmpty()
@@ -195,6 +228,15 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
             updateToleranceSummary()
             true
         }
+
+        // Name filter summary providers
+        nameExcludePref?.summaryProvider = Preference.SummaryProvider<EditTextPreference> { pref ->
+            if (pref.text.isNullOrBlank()) getString(androidx.preference.R.string.not_set) else pref.text
+        }
+        nameIncludePref?.summaryProvider = Preference.SummaryProvider<EditTextPreference> { pref ->
+            if (pref.text.isNullOrBlank()) getString(androidx.preference.R.string.not_set) else pref.text
+        }
+
 
         updateTypeVisibility(DataStore.balancerType)
     }

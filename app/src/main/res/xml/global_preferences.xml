@@ -215,6 +215,11 @@
             app:title="@string/http_proxy_bypass"
             app:useSimpleSummaryProvider="true" />
 
+        <Preference
+            app:icon="@drawable/ic_social_share"
+            app:key="lanSharing"
+            app:title="@string/lan_sharing" />
+
     </moe.matsuri.nb4a.ui.ExpandablePreferenceCategory>
 
     <!-- 4. 核心设置 -->

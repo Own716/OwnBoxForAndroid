@@ -381,6 +381,67 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat(), OnPreferenceDataS
             }.show()
             true
         }
+
+        // 局域网共享
+        val lanSharingPref = findPreference<Preference>("lanSharing")
+        val allowAccessPref = findPreference<SwitchPreference>(Key.ALLOW_ACCESS)
+
+        fun getLocalIps(): String {
+            val ips = runCatching {
+                java.net.NetworkInterface.getNetworkInterfaces()?.toList()
+                    ?.filter { !it.isLoopback && it.isUp }
+                    ?.flatMap { it.inetAddresses.toList() }
+                    ?.filter { !it.isLoopbackAddress && it is java.net.Inet4Address }
+                    ?.mapNotNull { it.hostAddress }
+                    ?.distinct()
+            }.getOrNull() ?: emptyList()
+            return when {
+                ips.isEmpty() -> "192.168.43.1"
+                ips.any { it.startsWith("192.168.43.") } -> ips.first { it.startsWith("192.168.43.") }
+                else -> ips.joinToString(" / ")
+            }
+        }
+
+        fun updateLanSharingSummary() {
+            val enabled = DataStore.allowAccess
+            if (enabled) {
+                val localIp = getLocalIps()
+                val port = DataStore.mixedPort
+                lanSharingPref?.summary = getString(R.string.lan_sharing_enabled_sum, localIp, port)
+            } else {
+                lanSharingPref?.summary = getString(R.string.lan_sharing_disabled_sum)
+            }
+        }
+        updateLanSharingSummary()
+
+        allowAccessPref?.setOnPreferenceChangeListener { _, newValue ->
+            val enabled = newValue as Boolean
+            DataStore.allowAccess = enabled
+            updateLanSharingSummary()
+            needReload()
+            true
+        }
+
+        lanSharingPref?.setOnPreferenceClickListener {
+            val enabled = DataStore.allowAccess
+            val localIp = getLocalIps()
+            val port = DataStore.mixedPort
+            val msgRes = if (enabled) R.string.lan_sharing_dialog_on else R.string.lan_sharing_dialog_off
+            val msg = getString(msgRes, localIp, port)
+            MaterialAlertDialogBuilder(requireContext())
+                .setTitle(R.string.lan_sharing)
+                .setMessage(msg)
+                .setPositiveButton(if (enabled) R.string.lan_sharing_turn_off else R.string.lan_sharing_turn_on) { _, _ ->
+                    val newState = !enabled
+                    DataStore.allowAccess = newState
+                    allowAccessPref?.isChecked = newState
+                    updateLanSharingSummary()
+                    needReload()
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+            true
+        }
     }
 
     override fun onResume() {
@@ -391,6 +452,28 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat(), OnPreferenceDataS
         }
         if (::globalCustomConfig.isInitialized) {
             globalCustomConfig.notifyChanged()
+        }
+        val lanSharingPref = findPreference<Preference>("lanSharing")
+        if (lanSharingPref != null) {
+            val enabled = DataStore.allowAccess
+            if (enabled) {
+                val ips = runCatching {
+                    java.net.NetworkInterface.getNetworkInterfaces()?.toList()
+                        ?.filter { !it.isLoopback && it.isUp }
+                        ?.flatMap { it.inetAddresses.toList() }
+                        ?.filter { !it.isLoopbackAddress && it is java.net.Inet4Address }
+                        ?.mapNotNull { it.hostAddress }
+                        ?.distinct()
+                }.getOrNull() ?: emptyList()
+                val localIp = when {
+                    ips.isEmpty() -> "192.168.43.1"
+                    ips.any { it.startsWith("192.168.43.") } -> ips.first { it.startsWith("192.168.43.") }
+                    else -> ips.joinToString(" / ")
+                }
+                lanSharingPref.summary = getString(R.string.lan_sharing_enabled_sum, localIp, DataStore.mixedPort)
+            } else {
+                lanSharingPref.summary = getString(R.string.lan_sharing_disabled_sum)
+            }
         }
     }
 

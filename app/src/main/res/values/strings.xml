@@ -71,6 +71,14 @@
     <string name="cag_route">Route Settings</string>
     <string name="allow_access">Allow Connections from the LAN</string>
     <string name="allow_access_sum">Bind inbound servers to 0.0.0.0</string>
+    <string name="lan_sharing">LAN Sharing</string>
+    <string name="lan_sharing_disabled_sum">Tap to enable hotspot proxy sharing</string>
+    <string name="lan_sharing_enabled_sum">Sharing enabled: set proxy %1$s:%2$d in Wi-Fi settings</string>
+    <string name="lan_sharing_dialog_off">LAN Sharing is currently disabled.\n\n1. Tap \"Turn On\" to enable.\n2. Enable the phone hotspot.\n3. Connect your device to OwnBox VPN.\n4. On the other device, connect to this hotspot, then set Manual Proxy in Wi-Fi settings:\n   IP: %1$s\n   Port: %2$d\n\nNo root required.</string>
+    <string name="lan_sharing_dialog_on">LAN Sharing is currently ON.\n\nOther devices on the hotspot can use:\n   IP: %1$s\n   Port: %2$d\n\nSet Manual Proxy in Wi-Fi settings on the other device.\n\nTap \"Turn Off\" to disable sharing.</string>
+    <string name="lan_sharing_turn_on">Turn On</string>
+    <string name="lan_sharing_turn_off">Turn Off</string>
+
     <string name="inbound_settings">Inbound Settings</string>
     <string name="general_settings">App Settings</string>
     <string name="require_http">Enable HTTP inbound</string>
@@ -929,6 +937,11 @@
     <string name="unit_ms">Milliseconds (ms)</string>
     <string name="unit_s">Seconds (s)</string>
     <string name="balancer_select_group">Select Group</string>
+    <string name="balancer_use_front_proxy">Use Group Front Proxy</string>
+    <string name="balancer_use_landing_proxy">Use Group Landing Proxy</string>
+    <string name="balancer_name_exclude">Name Exclusion (Regex)</string>
+    <string name="balancer_name_include">Name Inclusion (Regex)</string>
+
     <string name="show_subscription_info_card">Subscription Asset Info Card</string>
     <string name="show_subscription_info_card_summary">Display subscription traffic and expiry card at top of subscription groups</string>
     <string name="subscription_info">Subscription Info</string>

@@ -359,10 +359,10 @@ fun buildConfig(
         return name
     }
 
-    fun ProxyEntity.resolveChain(): MutableList<ProxyEntity> {
+    fun ProxyEntity.resolveChain(useGroupFront: Boolean = true, useGroupLanding: Boolean = true): MutableList<ProxyEntity> {
         val thisGroup = SagerDatabase.groupDao.getById(groupId)
-        val frontProxy = thisGroup?.frontProxy?.let { SagerDatabase.proxyDao.getById(it) }
-        val landingProxy = thisGroup?.landingProxy?.let { SagerDatabase.proxyDao.getById(it) }
+        val frontProxy = if (useGroupFront) thisGroup?.frontProxy?.let { SagerDatabase.proxyDao.getById(it) } else null
+        val landingProxy = if (useGroupLanding) thisGroup?.landingProxy?.let { SagerDatabase.proxyDao.getById(it) } else null
         val list = resolveChainInternal()
         if (frontProxy != null) {
             list.add(frontProxy)
@@ -784,7 +784,10 @@ fun buildConfig(
         // returns outbound tag
         @Suppress("UNCHECKED_CAST")
         fun buildChain(
-            chainId: Long, entity: ProxyEntity
+            chainId: Long,
+            entity: ProxyEntity,
+            useGroupFront: Boolean = true,
+            useGroupLanding: Boolean = true
         ): String {
             if (entity.type == ProxyEntity.TYPE_BALANCER) {
                 val balancerBean = entity.balancerBean ?: (entity.requireBean() as? BalancerBean) ?: BalancerBean()
@@ -794,16 +797,43 @@ fun buildConfig(
                         balancerBean.targetGroupId > 0L -> listOf(balancerBean.targetGroupId)
                         else -> emptyList()
                     }
-                    targetGids.flatMap { gid ->
+                    var list = targetGids.flatMap { gid ->
                         SagerDatabase.proxyDao.getByGroup(gid)
                     }.distinctBy { it.id }
+
+                    if (!balancerBean.nameInclude.isNullOrBlank()) {
+                        val regex = runCatching { Regex(balancerBean.nameInclude) }.getOrNull()
+                        if (regex != null) {
+                            list = list.filter { regex.containsMatchIn(it.displayName()) }
+                        }
+                    }
+                    if (!balancerBean.nameExclude.isNullOrBlank()) {
+                        val regex = runCatching { Regex(balancerBean.nameExclude) }.getOrNull()
+                        if (regex != null) {
+                            list = list.filterNot { regex.containsMatchIn(it.displayName()) }
+                        }
+                    }
+                    list
                 } else {
                     val rawEntities = SagerDatabase.proxyDao.getEntities(balancerBean.proxies).associateBy { it.id }
                     balancerBean.proxies.mapNotNull { rawEntities[it] }
                 }).filter { it.id != entity.id && it.type != ProxyEntity.TYPE_BALANCER && !DataStore.isGroupDisabled(it.groupId) }
 
+                val useFront = if (balancerBean.balancerType == BalancerBean.TYPE_GROUP) balancerBean.useFrontProxy else true
+                val useLanding = if (balancerBean.balancerType == BalancerBean.TYPE_GROUP) balancerBean.useLandingProxy else true
+
                 val memberTags = memberEntities.mapNotNull { member ->
-                    tagMap[member.id] ?: buildChain(member.id, member).also { tagMap[member.id] = it }
+                    val customKey = if (balancerBean.balancerType == BalancerBean.TYPE_GROUP && (!useFront || !useLanding)) {
+                        -member.id
+                    } else {
+                        member.id
+                    }
+                    tagMap[customKey] ?: buildChain(
+                        member.id,
+                        member,
+                        useGroupFront = useFront,
+                        useGroupLanding = useLanding
+                    ).also { tagMap[customKey] = it }
                 }.ifEmpty { listOf(TAG_DIRECT) }
 
                 val balancerTag = readableTag(entity.displayName())
@@ -839,7 +869,7 @@ fun buildConfig(
                 return balancerTag
             }
 
-            val profileList = entity.resolveChain()
+            val profileList = entity.resolveChain(useGroupFront, useGroupLanding)
             // profileList 的顺序即应用流量经过各 outbound 的顺序：前一跳通过
             // detour 交给后一跳拨号，最后一项直接连接物理网络。
             Logs.d(

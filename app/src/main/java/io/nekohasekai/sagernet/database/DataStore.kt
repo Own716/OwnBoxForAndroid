@@ -368,6 +368,10 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var balancerInterval by profileCacheStore.stringToInt("balancerInterval") { 300 }
     var balancerTolerance by profileCacheStore.stringToInt("balancerTolerance") { 300 }
     var balancerToleranceUnit by profileCacheStore.string("balancerToleranceUnit") { "ms" }
+    var balancerUseFrontProxy by profileCacheStore.boolean("balancerUseFrontProxy")
+    var balancerUseLandingProxy by profileCacheStore.boolean("balancerUseLandingProxy")
+    var balancerNameExclude by profileCacheStore.string("balancerNameExclude") { "" }
+    var balancerNameInclude by profileCacheStore.string("balancerNameInclude") { "" }
 
     var groupName by profileCacheStore.string(Key.GROUP_NAME)
     var groupType by profileCacheStore.stringToInt(Key.GROUP_TYPE)

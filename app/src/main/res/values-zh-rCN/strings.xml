@@ -49,6 +49,14 @@
     <string name="port_local_dns">本地 DNS 端口</string>
     <string name="allow_access">允许来自局域网的连接</string>
     <string name="allow_access_sum">将入站绑定至 0.0.0.0</string>
+    <string name="lan_sharing">局域网共享</string>
+    <string name="lan_sharing_disabled_sum">点击开启热点代理共享</string>
+    <string name="lan_sharing_enabled_sum">共享已开启：在 Wi-Fi 设置中将代理设为 %1$s:%2$d</string>
+    <string name="lan_sharing_dialog_off">局域网共享当前未开启。\n\n使用步骤：\n1. 点击「开启」启用共享。\n2. 打开手机热点。\n3. 本机连接 OwnBox VPN。\n4. 其他设备连接该热点后，在 Wi-Fi 设置中手动设置代理：\n   IP：%1$s\n   端口：%2$d\n\n无需 Root。</string>
+    <string name="lan_sharing_dialog_on">局域网共享当前已开启。\n\n热点内其他设备可使用：\n   IP：%1$s\n   端口：%2$d\n\n在其他设备的 Wi-Fi 设置中手动设置上述代理。\n\n点击「关闭」可停止共享。</string>
+    <string name="lan_sharing_turn_on">开启</string>
+    <string name="lan_sharing_turn_off">关闭</string>
+
     <string name="cag_dns">DNS 设置</string>
     <string name="cag_route">路由设置</string>
     <string name="inbound_settings">入站设置</string>
@@ -824,7 +832,7 @@
     <string name="balancer_strategy_consistent_hash">一致性哈希/会话保持 (consistent_hash)</string>
     <string name="balancer_custom_url">自定义测试 URL</string>
     <string name="balancer_custom_url_sum">针对此负载均衡节点的独立探测地址（留空使用全局默认）</string>
-    <string name="balancer_interval">观测间隔 (s)</string>
+    <string name="balancer_interval">负载均衡观测间隔（秒）</string>
     <string name="balancer_interval_sum">负载均衡后台定期健康检查与测速的观测间隔 (秒)，默认 300 秒</string>
     <string name="balancer_tolerance">切换容差 (Tolerance)</string>
     <string name="balancer_tolerance_sum">触发切换物理节点的延迟波动容差阈值，建议默认 300ms</string>
@@ -832,6 +840,11 @@
     <string name="unit_ms">毫秒 (ms)</string>
     <string name="unit_s">秒 (s)</string>
     <string name="balancer_select_group">选择分组</string>
+    <string name="balancer_use_front_proxy">使用分组前置代理</string>
+    <string name="balancer_use_landing_proxy">使用分组落地代理</string>
+    <string name="balancer_name_exclude">名称排除（正则表达式）</string>
+    <string name="balancer_name_include">名称包含（正则表达式）</string>
+
     <string name="show_subscription_info_card">置顶显示机场资产信息卡片</string>
     <string name="show_subscription_info_card_summary">在订阅分组顶部展示流量配额、剩余与到期时间等资产卡片</string>
     <string name="subscription_info">订阅资产信息</string>
