@@ -1,36 +1,45 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fitsSystemWindows="true">
+    android:orientation="vertical">
 
+    <!-- 顶部导航栏 (移除 fitsSystemWindows，由 ThemedActivity.applyAppBarInsets 统一适配状态栏高度，避免双重 Inset 导致空白过大) -->
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/appbar"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        android:background="?attr/colorSurface"
+        app:elevation="0dp"
+        app:liftOnScroll="true">
 
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
+            android:background="@android:color/transparent"
+            android:theme="?actionBarTheme"
             app:navigationIcon="@drawable/baseline_arrow_back_24"
-            app:title="@string/lan_sharing" />
+            app:navigationIconTint="?android:attr/textColorPrimary"
+            app:title="@string/lan_sharing"
+            app:titleTextColor="?android:attr/textColorPrimary" />
 
     </com.google.android.material.appbar.AppBarLayout>
 
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:paddingHorizontal="16dp"
-            android:paddingTop="16dp"
+            android:paddingTop="8dp"
             android:paddingBottom="60dp">
 
             <!-- 1. Hero 状态展示区 (圆标 + 共享状态) -->
@@ -39,18 +48,18 @@
                 android:layout_height="wrap_content"
                 android:gravity="center"
                 android:orientation="vertical"
-                android:paddingVertical="20dp">
+                android:paddingVertical="16dp">
 
                 <FrameLayout
                     android:id="@+id/icon_circle_container"
-                    android:layout_width="72dp"
-                    android:layout_height="72dp"
+                    android:layout_width="68dp"
+                    android:layout_height="68dp"
                     android:background="@drawable/bg_widget_capsule_liquid">
 
                     <ImageView
                         android:id="@+id/img_hero_status"
-                        android:layout_width="36dp"
-                        android:layout_height="36dp"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
                         android:layout_gravity="center"
                         android:src="@drawable/ic_social_share"
                         app:tint="?attr/colorPrimary" />
@@ -61,7 +70,7 @@
                     android:id="@+id/text_hero_title"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
+                    android:layout_marginTop="10dp"
                     android:text="@string/lan_sharing_active"
                     android:textAppearance="?attr/textAppearanceHeadline6"
                     android:textStyle="bold" />
@@ -81,7 +90,7 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="4dp"
                 android:layout_marginBottom="8dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
@@ -122,7 +131,7 @@
                     android:layout_height="wrap_content"
                     android:orientation="vertical">
 
-                    <!-- 行 1：局域网共享开关 -->
+                    <!-- 行 1：局域网共享主开关 -->
                     <LinearLayout
                         android:id="@+id/row_switch_lan_sharing"
                         android:layout_width="match_parent"
@@ -176,56 +185,155 @@
                         android:layout_marginStart="56dp"
                         android:background="@color/card_stroke" />
 
-                    <!-- 行 2：Wi-Fi IPv4 地址 -->
+                    <!-- 行 2：方式一：手机热点共享（主流推荐） -->
                     <LinearLayout
-                        android:id="@+id/row_wifi_ip"
+                        android:id="@+id/row_hotspot_ip"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:background="?attr/selectableItemBackground"
                         android:clickable="true"
                         android:focusable="true"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
+                        android:orientation="vertical"
                         android:padding="16dp">
 
-                        <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:src="@drawable/ic_clover_connected"
-                            app:tint="?android:attr/textColorSecondary" />
-
                         <LinearLayout
-                            android:layout_width="0dp"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="16dp"
-                            android:layout_weight="1"
-                            android:orientation="vertical">
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <ImageView
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:src="@drawable/ic_hardware_router"
+                                app:tint="?android:attr/textColorSecondary" />
 
                             <TextView
-                                android:layout_width="wrap_content"
+                                android:layout_width="0dp"
                                 android:layout_height="wrap_content"
-                                android:text="@string/lan_sharing_wifi_ip"
-                                android:textAppearance="?attr/textAppearanceSubtitle1" />
+                                android:layout_marginStart="16dp"
+                                android:layout_weight="1"
+                                android:text="@string/lan_sharing_hotspot_ip"
+                                android:textAppearance="?attr/textAppearanceSubtitle1"
+                                android:textStyle="bold" />
 
                             <TextView
-                                android:id="@+id/text_wifi_ip"
+                                android:id="@+id/text_hotspot_status_desc"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="2dp"
-                                android:text="@string/lan_sharing_not_detected"
-                                android:textAppearance="?attr/textAppearanceBody2"
+                                android:text="@string/lan_sharing_hotspot_detected"
+                                android:textAppearance="?attr/textAppearanceCaption"
                                 android:textColor="?android:attr/textColorSecondary" />
 
                         </LinearLayout>
 
-                        <ImageView
-                            android:id="@+id/btn_copy_wifi_ip"
-                            android:layout_width="36dp"
-                            android:layout_height="36dp"
-                            android:background="?attr/selectableItemBackgroundBorderless"
-                            android:padding="6dp"
-                            android:src="@drawable/ic_content_copy"
-                            app:tint="?android:attr/textColorSecondary" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="40dp"
+                            android:layout_marginTop="2dp"
+                            android:text="@string/lan_sharing_hotspot_desc"
+                            android:textAppearance="?attr/textAppearanceCaption"
+                            android:textColor="?android:attr/textColorSecondary" />
+
+                        <!-- 主机名与端口 分开展示与复制 -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="40dp"
+                            android:layout_marginTop="8dp"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="代理主机名 (Host)"
+                                    android:textAppearance="?attr/textAppearanceCaption"
+                                    android:textColor="?android:attr/textColorSecondary" />
+
+                                <TextView
+                                    android:id="@+id/text_hotspot_ip"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:text="192.168.43.1"
+                                    android:textAppearance="?attr/textAppearanceBody1"
+                                    android:textStyle="bold" />
+
+                            </LinearLayout>
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btn_copy_hotspot_ip"
+                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                android:layout_width="wrap_content"
+                                android:layout_height="36dp"
+                                android:insetTop="0dp"
+                                android:insetBottom="0dp"
+                                android:paddingHorizontal="12dp"
+                                android:text="复制主机名"
+                                android:textSize="12sp"
+                                app:cornerRadius="8dp"
+                                app:icon="@drawable/ic_content_copy"
+                                app:iconSize="14dp"
+                                app:strokeColor="@color/card_stroke" />
+
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="40dp"
+                            android:layout_marginTop="6dp"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="代理端口 (Port)"
+                                    android:textAppearance="?attr/textAppearanceCaption"
+                                    android:textColor="?android:attr/textColorSecondary" />
+
+                                <TextView
+                                    android:id="@+id/text_hotspot_port"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:text="2080"
+                                    android:textAppearance="?attr/textAppearanceBody1"
+                                    android:textStyle="bold" />
+
+                            </LinearLayout>
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btn_copy_hotspot_port"
+                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                android:layout_width="wrap_content"
+                                android:layout_height="36dp"
+                                android:insetTop="0dp"
+                                android:insetBottom="0dp"
+                                android:paddingHorizontal="12dp"
+                                android:text="复制端口"
+                                android:textSize="12sp"
+                                app:cornerRadius="8dp"
+                                app:icon="@drawable/ic_content_copy"
+                                app:iconSize="14dp"
+                                app:strokeColor="@color/card_stroke" />
+
+                        </LinearLayout>
 
                     </LinearLayout>
 
@@ -235,56 +343,155 @@
                         android:layout_marginStart="56dp"
                         android:background="@color/card_stroke" />
 
-                    <!-- 行 3：热点路由器 IPv4 地址 -->
+                    <!-- 行 3：方式二：同 Wi-Fi 局域网共享 -->
                     <LinearLayout
-                        android:id="@+id/row_hotspot_ip"
+                        android:id="@+id/row_wifi_ip"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:background="?attr/selectableItemBackground"
                         android:clickable="true"
                         android:focusable="true"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
+                        android:orientation="vertical"
                         android:padding="16dp">
 
-                        <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:src="@drawable/ic_hardware_router"
-                            app:tint="?android:attr/textColorSecondary" />
-
                         <LinearLayout
-                            android:layout_width="0dp"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="16dp"
-                            android:layout_weight="1"
-                            android:orientation="vertical">
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <ImageView
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:src="@drawable/ic_clover_connected"
+                                app:tint="?android:attr/textColorSecondary" />
 
                             <TextView
-                                android:layout_width="wrap_content"
+                                android:layout_width="0dp"
                                 android:layout_height="wrap_content"
-                                android:text="@string/lan_sharing_hotspot_ip"
-                                android:textAppearance="?attr/textAppearanceSubtitle1" />
+                                android:layout_marginStart="16dp"
+                                android:layout_weight="1"
+                                android:text="@string/lan_sharing_wifi_ip"
+                                android:textAppearance="?attr/textAppearanceSubtitle1"
+                                android:textStyle="bold" />
 
                             <TextView
-                                android:id="@+id/text_hotspot_ip"
+                                android:id="@+id/text_wifi_status_desc"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="2dp"
-                                android:text="@string/lan_sharing_not_detected"
-                                android:textAppearance="?attr/textAppearanceBody2"
+                                android:text="@string/lan_sharing_wifi_detected"
+                                android:textAppearance="?attr/textAppearanceCaption"
                                 android:textColor="?android:attr/textColorSecondary" />
 
                         </LinearLayout>
 
-                        <ImageView
-                            android:id="@+id/btn_copy_hotspot_ip"
-                            android:layout_width="36dp"
-                            android:layout_height="36dp"
-                            android:background="?attr/selectableItemBackgroundBorderless"
-                            android:padding="6dp"
-                            android:src="@drawable/ic_content_copy"
-                            app:tint="?android:attr/textColorSecondary" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="40dp"
+                            android:layout_marginTop="2dp"
+                            android:text="@string/lan_sharing_wifi_desc"
+                            android:textAppearance="?attr/textAppearanceCaption"
+                            android:textColor="?android:attr/textColorSecondary" />
+
+                        <!-- 主机名与端口 分开展示与复制 -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="40dp"
+                            android:layout_marginTop="8dp"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="代理主机名 (Host)"
+                                    android:textAppearance="?attr/textAppearanceCaption"
+                                    android:textColor="?android:attr/textColorSecondary" />
+
+                                <TextView
+                                    android:id="@+id/text_wifi_ip"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:text="@string/lan_sharing_not_detected"
+                                    android:textAppearance="?attr/textAppearanceBody1"
+                                    android:textStyle="bold" />
+
+                            </LinearLayout>
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btn_copy_wifi_ip"
+                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                android:layout_width="wrap_content"
+                                android:layout_height="36dp"
+                                android:insetTop="0dp"
+                                android:insetBottom="0dp"
+                                android:paddingHorizontal="12dp"
+                                android:text="复制主机名"
+                                android:textSize="12sp"
+                                app:cornerRadius="8dp"
+                                app:icon="@drawable/ic_content_copy"
+                                app:iconSize="14dp"
+                                app:strokeColor="@color/card_stroke" />
+
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="40dp"
+                            android:layout_marginTop="6dp"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="代理端口 (Port)"
+                                    android:textAppearance="?attr/textAppearanceCaption"
+                                    android:textColor="?android:attr/textColorSecondary" />
+
+                                <TextView
+                                    android:id="@+id/text_wifi_port"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:text="2080"
+                                    android:textAppearance="?attr/textAppearanceBody1"
+                                    android:textStyle="bold" />
+
+                            </LinearLayout>
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btn_copy_wifi_port"
+                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                android:layout_width="wrap_content"
+                                android:layout_height="36dp"
+                                android:insetTop="0dp"
+                                android:insetBottom="0dp"
+                                android:paddingHorizontal="12dp"
+                                android:text="复制端口"
+                                android:textSize="12sp"
+                                app:cornerRadius="8dp"
+                                app:icon="@drawable/ic_content_copy"
+                                app:iconSize="14dp"
+                                app:strokeColor="@color/card_stroke" />
+
+                        </LinearLayout>
 
                     </LinearLayout>
 
@@ -354,7 +561,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
+                android:layout_marginTop="20dp"
                 android:layout_marginBottom="8dp"
                 android:text="@string/lan_sharing_devices_category"
                 android:textAppearance="?attr/textAppearanceSubtitle1"
@@ -374,18 +581,18 @@
                     android:layout_height="wrap_content"
                     android:gravity="center"
                     android:orientation="vertical"
-                    android:padding="24dp">
+                    android:padding="20dp">
 
                     <ImageView
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
                         android:src="@drawable/ic_baseline_multiple_stop_24"
                         app:tint="?android:attr/textColorSecondary" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
+                        android:layout_marginTop="8dp"
                         android:text="@string/lan_sharing_no_devices"
                         android:textAppearance="?attr/textAppearanceBody2"
                         android:textColor="?android:attr/textColorSecondary" />
@@ -394,7 +601,7 @@
 
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- 4. 底部快捷提示卡片 (解决小米/安卓用户疑惑) -->
+            <!-- 4. 底部快捷提示卡片 (手把手防坑指南) -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/card_tutorial_shortcut"
                 android:layout_width="match_parent"
@@ -413,27 +620,19 @@
                     android:orientation="vertical"
                     android:padding="16dp">
 
-                    <LinearLayout
-                        android:layout_width="match_parent"
+                    <TextView
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="💡 小米 / 安卓设置核心指南"
-                            android:textAppearance="?attr/textAppearanceSubtitle1"
-                            android:textStyle="bold" />
-
-                    </LinearLayout>
+                        android:text="💡 小米 / 安卓设备设置与避坑核心指南"
+                        android:textAppearance="?attr/textAppearanceSubtitle1"
+                        android:textStyle="bold" />
 
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
                         android:lineSpacingExtra="3dp"
-                        android:text="1. 连接热点后打开 Wi-Fi 高级选项，将【代理】从“无”改为【手动】。\n2. 在【主机名】中填入上方热点 IP（如 192.168.43.1），在【端口】填 2080。\n3. ⚠️ 切勿修改【IP 设置】（必须保持默认的 DHCP，不要改成静态）！\n点击此处查看完整图文设置教程与说明 →"
+                        android:text="1. 本机开启【局域网共享】并开启【个人热点】，VPN 连接节点。\n2. 目标手机连接该热点，在 Wi-Fi 详情中找到【代理】，从“无”改为【手动】。\n3. 【主机名】填 192.168.43.1（点击上方复制），【端口】填 2080。\n4. ⚠️ 严禁修改【IP 设置】（必须保持默认的 DHCP，不要改成静态）！\n点击此处卡片可查看完整手把手设置教程 →"
                         android:textAppearance="?attr/textAppearanceCaption"
                         android:textColor="?android:attr/textColorSecondary" />
 
@@ -445,4 +644,4 @@
 
     </androidx.core.widget.NestedScrollView>
 
-</androidx.coordinatorlayout.widget.CoordinatorLayout>
+</LinearLayout>

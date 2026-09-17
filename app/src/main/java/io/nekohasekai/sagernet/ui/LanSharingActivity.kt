@@ -10,13 +10,15 @@ import android.view.MenuItem
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.Toast
-import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.databinding.ActivityLanSharingBinding
 import io.nekohasekai.sagernet.ktx.getColorAttr
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.net.Inet4Address
 import java.net.NetworkInterface
 
@@ -56,12 +58,9 @@ class LanSharingActivity : ThemedActivity() {
             if (DataStore.allowAccess != isChecked) {
                 DataStore.allowAccess = isChecked
                 updateUIState()
-                SagerNet.reloadService()
-                Toast.makeText(
-                    this,
-                    if (isChecked) R.string.lan_sharing_turn_on else R.string.lan_sharing_turn_off,
-                    Toast.LENGTH_SHORT
-                ).show()
+                restartServiceIfNeeded(
+                    if (isChecked) R.string.lan_sharing_turn_on else R.string.lan_sharing_turn_off
+                )
             }
         }
 
@@ -69,8 +68,22 @@ class LanSharingActivity : ThemedActivity() {
             binding.switchLanSharing.toggle()
         }
 
-        // 复制 Wi-Fi IP (提供纯 IP 复制，方便在目标设备上直接填入“主机名”，不用删端口)
-        val copyWifiAction = {
+        // 热点主机名 (IP) 复制
+        val copyHotspotHostAction = {
+            val ip = detectedHotspotIp ?: "192.168.43.1"
+            copyToClipboard(ip, getString(R.string.lan_sharing_copied_ip, ip))
+        }
+        binding.btnCopyHotspotIp.setOnClickListener { copyHotspotHostAction() }
+
+        // 热点端口复制
+        val copyHotspotPortAction = {
+            val port = DataStore.mixedPort
+            copyToClipboard(port.toString(), getString(R.string.lan_sharing_copied_port, port))
+        }
+        binding.btnCopyHotspotPort.setOnClickListener { copyHotspotPortAction() }
+
+        // 同 Wi-Fi 主机名 (IP) 复制
+        val copyWifiHostAction = {
             val ip = detectedWifiIp
             if (!ip.isNullOrBlank()) {
                 copyToClipboard(ip, getString(R.string.lan_sharing_copied_ip, ip))
@@ -78,16 +91,14 @@ class LanSharingActivity : ThemedActivity() {
                 Toast.makeText(this, R.string.lan_sharing_not_detected, Toast.LENGTH_SHORT).show()
             }
         }
-        binding.btnCopyWifiIp.setOnClickListener { copyWifiAction() }
-        binding.rowWifiIp.setOnClickListener { copyWifiAction() }
+        binding.btnCopyWifiIp.setOnClickListener { copyWifiHostAction() }
 
-        // 复制热点 IP
-        val copyHotspotAction = {
-            val ip = detectedHotspotIp ?: "192.168.43.1"
-            copyToClipboard(ip, getString(R.string.lan_sharing_copied_ip, ip))
+        // 同 Wi-Fi 端口复制
+        val copyWifiPortAction = {
+            val port = DataStore.mixedPort
+            copyToClipboard(port.toString(), getString(R.string.lan_sharing_copied_port, port))
         }
-        binding.btnCopyHotspotIp.setOnClickListener { copyHotspotAction() }
-        binding.rowHotspotIp.setOnClickListener { copyHotspotAction() }
+        binding.btnCopyWifiPort.setOnClickListener { copyWifiPortAction() }
 
         // 访问认证配置
         val authAction = {
@@ -102,6 +113,21 @@ class LanSharingActivity : ThemedActivity() {
         }
     }
 
+    private fun restartServiceIfNeeded(fallbackToastRes: Int? = null) {
+        if (DataStore.serviceState.canStop) {
+            Toast.makeText(this, R.string.lan_sharing_restarting_service, Toast.LENGTH_SHORT).show()
+            lifecycleScope.launch {
+                SagerNet.stopService()
+                delay(600)
+                SagerNet.startService()
+            }
+        } else {
+            fallbackToastRes?.let {
+                Toast.makeText(this, it, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     private fun refreshNetworkInfo() {
         var wifiIp: String? = null
         var hotspotIp: String? = null
@@ -111,22 +137,34 @@ class LanSharingActivity : ThemedActivity() {
             for (intf in interfaces) {
                 if (!intf.isUp || intf.isLoopback) continue
                 val name = intf.name.lowercase()
+
+                // 彻底排除蜂窝移动数据（rmnet/ccmni/pdp/wwan等）与虚拟网卡，杜绝运营商内网 IP 混淆
+                if (name.startsWith("rmnet") || name.startsWith("ccmni") || name.startsWith("pdp") ||
+                    name.startsWith("wwan") || name.startsWith("dummy") || name.startsWith("tun") ||
+                    name.startsWith("sit") || name.startsWith("ip6") || name.startsWith("clat")
+                ) {
+                    continue
+                }
+
                 val addrs = intf.inetAddresses.toList().filter { !it.isLoopbackAddress && it is Inet4Address }
                 for (addr in addrs) {
                     val host = addr.hostAddress ?: continue
                     when {
-                        // 热点或虚拟 AP 常见网卡名字与 IP 前缀
-                        name.contains("ap") || name.contains("swlan") || name.contains("rndis") ||
-                                host.startsWith("192.168.43.") || host.startsWith("192.168.44.") ||
-                                host.startsWith("192.168.49.") || host.startsWith("10.101.") -> {
+                        // 热点或虚拟 AP 专用网卡及热点常用私有网段 (192.168.43.x / 44.x / 49.x / 50.x)
+                        name.contains("ap") || name.contains("softap") || name.contains("swlan") ||
+                            name.contains("rndis") || name.contains("wigig") || name.contains("tether") ||
+                            host.startsWith("192.168.43.") || host.startsWith("192.168.44.") ||
+                            host.startsWith("192.168.49.") || host.startsWith("192.168.50.") -> {
                             if (hotspotIp == null) hotspotIp = host
                         }
-                        // 常见 Wi-Fi 网卡
+                        // 正常 Wi-Fi 无线网卡 (连接家庭/公司路由器的网卡)
                         name.contains("wlan") -> {
                             if (wifiIp == null) wifiIp = host
                         }
                         else -> {
-                            if (wifiIp == null) wifiIp = host
+                            if (wifiIp == null && !host.startsWith("127.")) {
+                                wifiIp = host
+                            }
                         }
                     }
                 }
@@ -135,21 +173,28 @@ class LanSharingActivity : ThemedActivity() {
 
         detectedWifiIp = wifiIp
         detectedHotspotIp = hotspotIp
-
         val port = DataStore.mixedPort
+
+        // 更新热点 IP 展示 (若未开启热点，显示标准建议 IP 192.168.43.1 并注明状态)
+        if (!detectedHotspotIp.isNullOrBlank()) {
+            binding.textHotspotIp.text = detectedHotspotIp
+            binding.textHotspotPort.text = port.toString()
+            binding.textHotspotStatusDesc.text = getString(R.string.lan_sharing_hotspot_detected)
+        } else {
+            binding.textHotspotIp.text = "192.168.43.1"
+            binding.textHotspotPort.text = port.toString()
+            binding.textHotspotStatusDesc.text = getString(R.string.lan_sharing_hotspot_not_active)
+        }
 
         // 更新 Wi-Fi IP 展示
         if (!detectedWifiIp.isNullOrBlank()) {
-            binding.textWifiIp.text = "${detectedWifiIp}:$port"
+            binding.textWifiIp.text = detectedWifiIp
+            binding.textWifiPort.text = port.toString()
+            binding.textWifiStatusDesc.text = getString(R.string.lan_sharing_wifi_detected)
         } else {
             binding.textWifiIp.text = getString(R.string.lan_sharing_not_detected)
-        }
-
-        // 更新热点 IP 展示 (若未开启热点，提示默认建议 IP)
-        if (!detectedHotspotIp.isNullOrBlank()) {
-            binding.textHotspotIp.text = "${detectedHotspotIp}:$port"
-        } else {
-            binding.textHotspotIp.text = "192.168.43.1:$port (${getString(R.string.lan_sharing_not_detected)})"
+            binding.textWifiPort.text = port.toString()
+            binding.textWifiStatusDesc.text = getString(R.string.lan_sharing_wifi_not_connected)
         }
 
         updateUIState()
@@ -227,15 +272,13 @@ class LanSharingActivity : ThemedActivity() {
                 DataStore.mixedUsername = user
                 DataStore.mixedPassword = pass
                 updateUIState()
-                SagerNet.reloadService()
-                Toast.makeText(this, R.string.saved, Toast.LENGTH_SHORT).show()
+                restartServiceIfNeeded(R.string.saved)
             }
             .setNeutralButton(R.string.clear) { _, _ ->
                 DataStore.mixedUsername = ""
                 DataStore.mixedPassword = ""
                 updateUIState()
-                SagerNet.reloadService()
-                Toast.makeText(this, R.string.saved, Toast.LENGTH_SHORT).show()
+                restartServiceIfNeeded(R.string.saved)
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
@@ -261,8 +304,7 @@ class LanSharingActivity : ThemedActivity() {
                 if (port != null && port in 1024..65535) {
                     DataStore.mixedPort = port
                     refreshNetworkInfo()
-                    SagerNet.reloadService()
-                    Toast.makeText(this, R.string.saved, Toast.LENGTH_SHORT).show()
+                    restartServiceIfNeeded(R.string.saved)
                 } else {
                     Toast.makeText(this, R.string.lan_sharing_invalid_port, Toast.LENGTH_SHORT).show()
                 }
