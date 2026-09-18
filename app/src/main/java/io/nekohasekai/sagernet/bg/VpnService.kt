@@ -147,7 +147,7 @@ class VpnService : BaseVpnService(),
         // address & route & MTU ...... use NB4A GUI config
         val builder = Builder().setConfigureIntent(SagerNet.configureIntent(this))
             .setSession(getString(R.string.app_name))
-            .setMtu(DataStore.mtu)
+            .setMtu(if (DataStore.mtu == 1500) 1400 else DataStore.mtu)
         val ipv6Mode = DataStore.ipv6Mode
 
         // address: 始终添加 IPv6 虚拟地址与路由，确保 Android 系统完整接管 IPv6，彻底杜绝从物理网卡泄露

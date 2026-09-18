@@ -730,10 +730,10 @@ fun buildConfig(
                 stack = when (DataStore.tunImplementation) {
                     TunImplementation.GVISOR -> "gvisor"
                     TunImplementation.SYSTEM -> "system"
-                    TunImplementation.SING_TUN -> "go"
+                    TunImplementation.SING_TUN -> "mixed"
                     else -> "mixed"
                 }
-                mtu = DataStore.mtu
+                mtu = if (DataStore.mtu == 1500) 1400 else DataStore.mtu
                 auto_route = true
                 strict_route = DataStore.strictRoute
                 // sing-box 1.13 移除了入站 sniff/domain_strategy 字段，

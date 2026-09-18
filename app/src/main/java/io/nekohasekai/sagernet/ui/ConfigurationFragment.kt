@@ -288,7 +288,11 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     fun getCurrentGroupFragment(): GroupFragment? {
         return try {
-            childFragmentManager.findFragmentByTag("f" + DataStore.selectedGroup) as GroupFragment?
+            if (!::adapter.isInitialized) return null
+            val pos = if (::groupPager.isInitialized) groupPager.currentItem else adapter.selectedGroupIndex
+            val group = adapter.groupList.getOrNull(pos) ?: return null
+            adapter.groupFragments[group.id]
+                ?: (childFragmentManager.findFragmentByTag("f" + group.id) as? GroupFragment)
         } catch (e: Exception) {
             Logs.e(e)
             null
@@ -322,6 +326,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             if (adapter.groupList.size > position) {
                 val group = adapter.groupList[position]
                 adapter.selectedGroupIndex = position
+                activity?.invalidateOptionsMenu()
                 // Skip updating DataStore.selectedGroup for the synthetic "All" tab
                 if (group.id == ALL_GROUPS_SENTINEL_ID) return
                 if (DataStore.selectedGroup != group.id) {
@@ -584,6 +589,26 @@ class ConfigurationFragment @JvmOverloads constructor(
     override fun onPrepareOptionsMenu(menu: Menu) {
         menu.findItem(R.id.action_global_mode)?.isChecked = DataStore.globalMode
         menu.findItem(R.id.action_hide_unavailable)?.isChecked = DataStore.hideUnavailableProfiles
+        val isAll = isCurrentAllGroups()
+        if (isAll) {
+            menu.findItem(R.id.action_update_subscription)?.setTitle("更新全部订阅")
+            menu.findItem(R.id.action_connection_url_test)?.setTitle("URL 测试（全部）")
+            menu.findItem(R.id.action_connection_tcp_ping)?.setTitle("TCP Ping 测试（全部）")
+            menu.findItem(R.id.action_speed_test_group)?.setTitle("速度测试（全部）")
+            menu.findItem(R.id.action_clear_traffic_statistics)?.setTitle("清空全部流量统计数据")
+            menu.findItem(R.id.action_remove_duplicate)?.setTitle("删除全部重复的服务器")
+            menu.findItem(R.id.action_connection_test_clear_results)?.setTitle("清理全部测试结果")
+            menu.findItem(R.id.action_connection_test_delete_unavailable)?.setTitle("清理全部不可用配置")
+        } else {
+            menu.findItem(R.id.action_update_subscription)?.setTitle(R.string.update_current_subscription)
+            menu.findItem(R.id.action_connection_url_test)?.setTitle(R.string.connection_test_url_test)
+            menu.findItem(R.id.action_connection_tcp_ping)?.setTitle(R.string.connection_test_tcp_ping)
+            menu.findItem(R.id.action_speed_test_group)?.setTitle(R.string.speed_test_group)
+            menu.findItem(R.id.action_clear_traffic_statistics)?.setTitle(R.string.clear_traffic_statistics)
+            menu.findItem(R.id.action_remove_duplicate)?.setTitle(R.string.remove_duplicate)
+            menu.findItem(R.id.action_connection_test_clear_results)?.setTitle(R.string.connection_test_clear_results)
+            menu.findItem(R.id.action_connection_test_delete_unavailable)?.setTitle(R.string.connection_test_delete_unavailable)
+        }
         super.onPrepareOptionsMenu(menu)
     }
 
@@ -716,7 +741,12 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     }
 
-    fun isCurrentAllGroups(): Boolean = getCurrentGroupFragment()?.isAllGroupsTab == true
+    fun isCurrentAllGroups(): Boolean {
+        if (!::adapter.isInitialized) return false
+        val pos = if (::groupPager.isInitialized) groupPager.currentItem else adapter.selectedGroupIndex
+        val group = adapter.groupList.getOrNull(pos) ?: return false
+        return group.id == ALL_GROUPS_SENTINEL_ID
+    }
 
     override fun onMenuItemClick(item: MenuItem): Boolean {
         when (item.itemId) {
@@ -883,13 +913,26 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
 
             R.id.action_update_subscription -> {
-                val group = DataStore.currentGroup()
-                if (group.type != GroupType.SUBSCRIPTION) {
-                    snackbar(R.string.group_not_subscription).show()
-                    Logs.e("onMenuItemClick: Group(${group.displayName()}) is not subscription")
-                } else {
+                val isAll = isCurrentAllGroups()
+                if (isAll) {
                     runOnLifecycleDispatcher {
-                        GroupUpdater.startUpdate(group, true)
+                        val subGroups = SagerDatabase.groupDao.allGroups().filter { it.type == GroupType.SUBSCRIPTION }
+                        if (subGroups.isEmpty()) {
+                            safeSnackbar("没有可更新的订阅分组")
+                        } else {
+                            subGroups.forEach { GroupUpdater.startUpdate(it, true) }
+                            safeSnackbar("正在更新全部 ${subGroups.size} 个订阅组...")
+                        }
+                    }
+                } else {
+                    val group = DataStore.currentGroup()
+                    if (group.type != GroupType.SUBSCRIPTION) {
+                        snackbar(R.string.group_not_subscription).show()
+                        Logs.e("onMenuItemClick: Group(${group.displayName()}) is not subscription")
+                    } else {
+                        runOnLifecycleDispatcher {
+                            GroupUpdater.startUpdate(group, true)
+                        }
                     }
                 }
             }
