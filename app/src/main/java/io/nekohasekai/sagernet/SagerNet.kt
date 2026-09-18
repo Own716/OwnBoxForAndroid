@@ -252,12 +252,29 @@ class SagerNet : Application(),
         fun stopService() =
             application.sendBroadcast(Intent(Action.CLOSE).setPackage(application.packageName))
 
+        fun updatePerformancePriorityMode(enabled: Boolean) {
+            DataStore.performancePriorityMode = enabled
+            runCatching {
+                val file = File(application.noBackupFilesDir, "perf_mode")
+                if (enabled) file.writeText("1") else file.delete()
+            }
+            if (!enabled) {
+                Libcore.forceGc()
+                System.gc()
+            }
+            application.sendBroadcast(
+                Intent(Action.SWITCH_PERFORMANCE_MODE).setPackage(application.packageName)
+            )
+        }
+
         var underlyingNetwork: Network? = null
 
         var appVersionNameForDisplay = {
             var n = BuildConfig.VERSION_NAME
             if (isPreview) {
-                n += " " + BuildConfig.PRE_VERSION_NAME
+                if (BuildConfig.PRE_VERSION_NAME.isNotBlank() && BuildConfig.PRE_VERSION_NAME != BuildConfig.VERSION_NAME) {
+                    n += " " + BuildConfig.PRE_VERSION_NAME
+                }
             } else if (!isOss) {
                 n += " ${BuildConfig.FLAVOR}"
             }

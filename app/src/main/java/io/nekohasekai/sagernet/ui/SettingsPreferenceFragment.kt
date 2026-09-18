@@ -347,15 +347,7 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat(), OnPreferenceDataS
         val performancePriorityMode = findPreference<SwitchPreference>(Key.PERFORMANCE_PRIORITY_MODE)
         performancePriorityMode?.setOnPreferenceChangeListener { _, newValue ->
             val enabled = newValue as Boolean
-            DataStore.performancePriorityMode = enabled
-            runCatching {
-                val file = File(SagerNet.application.noBackupFilesDir, "perf_mode")
-                if (enabled) file.writeText("1") else file.delete()
-            }
-            if (!enabled) {
-                Libcore.forceGc()
-                System.gc()
-            }
+            SagerNet.updatePerformancePriorityMode(enabled)
             true
         }
         hideFromRecentApps.setOnPreferenceChangeListener { _, newValue ->

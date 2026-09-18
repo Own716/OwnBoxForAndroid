@@ -185,6 +185,7 @@ class TrafficLooper
         // for display
         val itemBypass = TrafficUpdater.TrafficLooperData(tag = TAG_BYPASS)
         var idleSeconds = 0
+        var lastDelayMs = 3000L
 
         while (currentCoroutineContext().isActive) {
             val isForegroundUI = data.binder.callbackIdMap.containsValue(
@@ -340,23 +341,31 @@ class TrafficLooper
                 }
             }
 
-            // Periodic idle memory reclaim: when idle in background, return memory to OS
-            if (!isForegroundUI && snapshot.speed.txRateProxy == 0L && snapshot.speed.rxRateProxy == 0L) {
-                idleSeconds += 5
-                if (idleSeconds >= 60) {
+            // Memory profile & background power optimization
+            if (!DataStore.performancePriorityMode) {
+                // In low-power / standard mode: aggressively reclaim memory when idle in background
+                if (!isForegroundUI && snapshot.speed.txRateProxy == 0L && snapshot.speed.rxRateProxy == 0L) {
+                    idleSeconds += (lastDelayMs / 1000).toInt().coerceAtLeast(1)
+                    if (idleSeconds >= 30) {
+                        idleSeconds = 0
+                        Libcore.forceGc()
+                        System.gc()
+                    }
+                } else {
                     idleSeconds = 0
-                    Libcore.forceGc()
                 }
             } else {
+                // In performance priority mode: keep memory buffers hot, do not force GC
                 idleSeconds = 0
             }
 
             val nextDelay = when {
                 isForegroundUI -> baseDelayMs
-                !isInteractive -> 10000L
-                data.notification?.listenPostSpeed == true -> 3000L
-                else -> 5000L
+                !isInteractive -> if (DataStore.performancePriorityMode) 10000L else 30000L
+                data.notification?.listenPostSpeed == true -> if (DataStore.performancePriorityMode) 3000L else 6000L
+                else -> if (DataStore.performancePriorityMode) 5000L else 15000L
             }
+            lastDelayMs = nextDelay
             delay(nextDelay)
         }
     }

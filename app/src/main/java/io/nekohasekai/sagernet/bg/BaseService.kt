@@ -89,9 +89,21 @@ class BaseService {
                     }
                 }
 
+                Action.SWITCH_PERFORMANCE_MODE -> {
+                    val enabled = DataStore.performancePriorityMode
+                    Logs.i("BaseService: SWITCH_PERFORMANCE_MODE received, enabled=$enabled")
+                    if (!enabled) {
+                        Libcore.forceGc()
+                        System.gc()
+                    }
+                }
+
                 Intent.ACTION_SCREEN_OFF -> {
-                    // Screen turned off: reclaim OS memory to keep background RSS minimal
-                    Libcore.forceGc()
+                    // Screen turned off: in low power / standard mode, reclaim OS memory to keep background RSS minimal
+                    if (!DataStore.performancePriorityMode) {
+                        Libcore.forceGc()
+                        System.gc()
+                    }
                 }
 
                 Intent.ACTION_SCREEN_ON,
@@ -566,6 +578,7 @@ class BaseService {
                         addAction(PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED)
                     }
                     addAction(Action.RESET_UPSTREAM_CONNECTIONS)
+                    addAction(Action.SWITCH_PERFORMANCE_MODE)
                     addAction(Intent.ACTION_SCREEN_ON)
                     addAction(Intent.ACTION_SCREEN_OFF)
                     addAction(Intent.ACTION_USER_PRESENT)

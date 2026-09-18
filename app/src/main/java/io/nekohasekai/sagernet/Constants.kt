@@ -253,4 +253,5 @@ object Action {
 
     // const val SWITCH_WAKE_LOCK = "io.nekohasekai.sagernet.SWITCH_WAKELOCK"
     const val RESET_UPSTREAM_CONNECTIONS = "com.ownbox.app.RESET_UPSTREAM_CONNECTIONS"
+    const val SWITCH_PERFORMANCE_MODE = "com.ownbox.app.SWITCH_PERFORMANCE_MODE"
 }

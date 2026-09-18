@@ -188,7 +188,8 @@ class MainActivity : ThemedActivity(),
             }
         }
 
-        if (isPreview && DataStore.previewHintDismissedVersion != BuildConfig.PRE_VERSION_NAME) {
+        val isPreRelease = isPreview && (BuildConfig.PRE_VERSION_NAME.contains("preview", true) || BuildConfig.PRE_VERSION_NAME.contains("beta", true) || BuildConfig.PRE_VERSION_NAME.contains("alpha", true))
+        if (isPreRelease && DataStore.previewHintDismissedVersion != BuildConfig.PRE_VERSION_NAME) {
             MaterialAlertDialogBuilder(this)
                 .setTitle(BuildConfig.PRE_VERSION_NAME)
                 .setMessage(R.string.preview_version_hint)
