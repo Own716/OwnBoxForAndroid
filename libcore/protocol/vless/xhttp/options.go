@@ -1,8 +1,13 @@
 package xhttp
 
 import (
+	"bytes"
+	"encoding/base64"
+	"fmt"
+	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/sagernet/sing-box/option"
@@ -11,6 +16,12 @@ import (
 )
 
 const V2RayTransportTypeXHTTP = "xhttp"
+
+const (
+	UplinkDataPlacementBody   = "body"
+	UplinkDataPlacementHeader = PlacementHeader
+	UplinkDataPlacementCookie = PlacementCookie
+)
 
 func NormalizeXHTTPMode(mode string) (string, error) {
 	mode = strings.TrimSpace(mode)
@@ -26,24 +37,37 @@ func NormalizeXHTTPMode(mode string) (string, error) {
 }
 
 type V2RayXHTTPBaseOptions struct {
-	Mode                 string                 `json:"mode"`
+	Mode                 string                 `json:"mode,omitempty"`
 	Host                 string                 `json:"host,omitempty"`
 	Path                 string                 `json:"path,omitempty"`
 	Headers              map[string]string      `json:"headers,omitempty"`
 	DomainStrategy       option.DomainStrategy  `json:"domain_strategy,omitempty"`
 	XPaddingBytes        Xbadoption.Range       `json:"x_padding_bytes"`
+	XPaddingObfsMode     bool                   `json:"x_padding_obfs_mode,omitempty"`
+	XPaddingKey          string                 `json:"x_padding_key,omitempty"`
+	XPaddingHeader       string                 `json:"x_padding_header,omitempty"`
+	XPaddingPlacement    string                 `json:"x_padding_placement,omitempty"`
+	XPaddingMethod       string                 `json:"x_padding_method,omitempty"`
+	UplinkHttpMethod     string                 `json:"uplink_http_method,omitempty"`
+	SessionPlacement     string                 `json:"session_placement,omitempty"`
+	SessionKey           string                 `json:"session_key,omitempty"`
+	SeqPlacement         string                 `json:"seq_placement,omitempty"`
+	SeqKey               string                 `json:"seq_key,omitempty"`
+	UplinkDataPlacement  string                 `json:"uplink_data_placement,omitempty"`
+	UplinkDataKey        string                 `json:"uplink_data_key,omitempty"`
+	UplinkChunkSize      Xbadoption.Range       `json:"uplink_chunk_size"`
 	NoGRPCHeader         bool                   `json:"no_grpc_header,omitempty"`
 	NoSSEHeader          bool                   `json:"no_sse_header,omitempty"`
 	ScMaxEachPostBytes   Xbadoption.Range       `json:"sc_max_each_post_bytes"`
 	ScMinPostsIntervalMs Xbadoption.Range       `json:"sc_min_posts_interval_ms"`
 	ScMaxBufferedPosts   int64                  `json:"sc_max_buffered_posts,omitempty"`
 	ScStreamUpServerSecs Xbadoption.Range       `json:"sc_stream_up_server_secs"`
-	Xmux                 *V2RayXHTTPXmuxOptions `json:"xmux"`
+	Xmux                 *V2RayXHTTPXmuxOptions `json:"xmux,omitempty"`
 }
 
 type V2RayXHTTPOptions struct {
 	V2RayXHTTPBaseOptions
-	Download *V2RayXHTTPDownloadOptions `json:"download"`
+	Download *V2RayXHTTPDownloadOptions `json:"download,omitempty"`
 }
 
 type V2RayXHTTPDownloadOptions struct {
@@ -53,14 +77,100 @@ type V2RayXHTTPDownloadOptions struct {
 	Detour string `json:"detour,omitempty"`
 }
 
+func (c *V2RayXHTTPBaseOptions) GetNormalizedSessionPlacement() string {
+	p := strings.ToLower(strings.TrimSpace(c.SessionPlacement))
+	if p == "" {
+		return PlacementPath
+	}
+	return p
+}
+
+func (c *V2RayXHTTPBaseOptions) GetNormalizedSessionKey() string {
+	k := strings.TrimSpace(c.SessionKey)
+	if k != "" {
+		return k
+	}
+	if c.GetNormalizedSessionPlacement() == PlacementHeader {
+		return "X-Session-ID"
+	}
+	return "session"
+}
+
+func (c *V2RayXHTTPBaseOptions) GetNormalizedSeqPlacement() string {
+	p := strings.ToLower(strings.TrimSpace(c.SeqPlacement))
+	if p == "" {
+		if c.GetNormalizedSessionPlacement() == PlacementPath {
+			return PlacementPath
+		}
+		return PlacementQuery
+	}
+	return p
+}
+
+func (c *V2RayXHTTPBaseOptions) GetNormalizedSeqKey() string {
+	k := strings.TrimSpace(c.SeqKey)
+	if k != "" {
+		return k
+	}
+	if c.GetNormalizedSeqPlacement() == PlacementHeader {
+		return "X-Seq"
+	}
+	return "seq"
+}
+
+func (c *V2RayXHTTPBaseOptions) GetNormalizedUplinkHTTPMethod() string {
+	m := strings.ToUpper(strings.TrimSpace(c.UplinkHttpMethod))
+	if m == "" {
+		return "POST"
+	}
+	return m
+}
+
+func (c *V2RayXHTTPBaseOptions) GetNormalizedUplinkDataPlacement() string {
+	p := strings.ToLower(strings.TrimSpace(c.UplinkDataPlacement))
+	if p == "" {
+		return "body"
+	}
+	return p
+}
+
+func (c *V2RayXHTTPBaseOptions) GetNormalizedUplinkDataKey() string {
+	k := strings.TrimSpace(c.UplinkDataKey)
+	if k != "" {
+		return k
+	}
+	switch c.GetNormalizedUplinkDataPlacement() {
+	case PlacementHeader:
+		return "x-data"
+	case PlacementCookie:
+		return "data"
+	default:
+		return "data"
+	}
+}
+
+func (c *V2RayXHTTPBaseOptions) GetNormalizedUplinkChunkSize() Xbadoption.Range {
+	if c.UplinkChunkSize.To == 0 {
+		switch c.GetNormalizedUplinkDataPlacement() {
+		case PlacementCookie:
+			return Xbadoption.Range{From: 3072, To: 3072}
+		default:
+			return Xbadoption.Range{From: 4096, To: 4096}
+		}
+	}
+	return c.UplinkChunkSize
+}
+
 func (c *V2RayXHTTPBaseOptions) GetNormalizedPath() string {
 	pathAndQuery := strings.SplitN(c.Path, "?", 2)
 	path := pathAndQuery[0]
 	if path == "" || path[0] != '/' {
 		path = "/" + path
 	}
-	if path[len(path)-1] != '/' {
-		path = path + "/"
+	if c.GetNormalizedSessionPlacement() == PlacementPath || c.GetNormalizedSeqPlacement() == PlacementPath {
+		if path[len(path)-1] != '/' {
+			path = path + "/"
+		}
 	}
 	return path
 }
@@ -91,6 +201,12 @@ func (c *V2RayXHTTPBaseOptions) GetRequestHeader(rawURL string) http.Header {
 	for k, v := range c.Headers {
 		header.Add(k, v)
 	}
+	req, err := http.NewRequest("GET", rawURL, nil)
+	if err == nil {
+		req.Header = header
+		c.ApplyPadding(req)
+		return req.Header
+	}
 	paddingLen := int(c.GetNormalizedXPaddingBytes().Rand())
 	if paddingLen > 0 {
 		paddingStr := strings.Repeat("X", paddingLen)
@@ -105,6 +221,99 @@ func (c *V2RayXHTTPBaseOptions) GetRequestHeader(rawURL string) http.Header {
 		header.Set("X-Padding", paddingStr)
 	}
 	return header
+}
+
+func (c *V2RayXHTTPBaseOptions) ApplySessionAndSeq(req *http.Request, sessionId string, seq int64) {
+	if sessionId != "" {
+		switch c.GetNormalizedSessionPlacement() {
+		case PlacementPath:
+			if !strings.HasSuffix(req.URL.Path, "/") {
+				req.URL.Path += "/"
+			}
+			req.URL.Path += sessionId
+		case PlacementQuery:
+			q := req.URL.Query()
+			q.Set(c.GetNormalizedSessionKey(), sessionId)
+			req.URL.RawQuery = q.Encode()
+		case PlacementHeader:
+			req.Header.Set(c.GetNormalizedSessionKey(), sessionId)
+		case PlacementCookie:
+			req.AddCookie(&http.Cookie{
+				Name:  c.GetNormalizedSessionKey(),
+				Value: sessionId,
+			})
+		}
+	}
+
+	if seq >= 0 {
+		seqStr := strconv.FormatInt(seq, 10)
+		switch c.GetNormalizedSeqPlacement() {
+		case PlacementPath:
+			if !strings.HasSuffix(req.URL.Path, "/") {
+				req.URL.Path += "/"
+			}
+			req.URL.Path += seqStr
+		case PlacementQuery:
+			q := req.URL.Query()
+			q.Set(c.GetNormalizedSeqKey(), seqStr)
+			req.URL.RawQuery = q.Encode()
+		case PlacementHeader:
+			req.Header.Set(c.GetNormalizedSeqKey(), seqStr)
+		case PlacementCookie:
+			req.AddCookie(&http.Cookie{
+				Name:  c.GetNormalizedSeqKey(),
+				Value: seqStr,
+			})
+		}
+	}
+}
+
+// ApplyUplinkPayload applies payload into headers or cookies when uplink_data_placement is not "body".
+// Returns true if payload should be sent in HTTP request body, or false if already embedded into headers/cookies.
+func (c *V2RayXHTTPBaseOptions) ApplyUplinkPayload(req *http.Request, payload []byte) (inBody bool) {
+	placement := c.GetNormalizedUplinkDataPlacement()
+	if placement == "body" || len(payload) == 0 {
+		if req.Body == nil && len(payload) > 0 {
+			req.Body = io.NopCloser(bytes.NewReader(payload))
+			req.ContentLength = int64(len(payload))
+		}
+		return true
+	}
+
+	encodedData := base64.RawURLEncoding.EncodeToString(payload)
+	key := c.GetNormalizedUplinkDataKey()
+	chunkSizeRange := c.GetNormalizedUplinkChunkSize()
+
+	switch placement {
+	case PlacementHeader:
+		for i := 0; len(encodedData) > 0; i++ {
+			chunkSize := min(int(chunkSizeRange.Rand()), len(encodedData))
+			if chunkSize <= 0 {
+				chunkSize = len(encodedData)
+			}
+			chunk := encodedData[:chunkSize]
+			encodedData = encodedData[chunkSize:]
+			headerKey := fmt.Sprintf("%s-%d", key, i)
+			req.Header.Set(headerKey, chunk)
+		}
+		return false
+
+	case PlacementCookie:
+		for i := 0; len(encodedData) > 0; i++ {
+			chunkSize := min(int(chunkSizeRange.Rand()), len(encodedData))
+			if chunkSize <= 0 {
+				chunkSize = len(encodedData)
+			}
+			chunk := encodedData[:chunkSize]
+			encodedData = encodedData[chunkSize:]
+			cookieName := fmt.Sprintf("%s_%d", key, i)
+			req.AddCookie(&http.Cookie{Name: cookieName, Value: chunk})
+		}
+		return false
+
+	default:
+		return true
+	}
 }
 
 func (c *V2RayXHTTPBaseOptions) GetNormalizedXPaddingBytes() Xbadoption.Range {
