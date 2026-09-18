@@ -1,8 +1,11 @@
 package io.nekohasekai.sagernet.ui
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
@@ -421,17 +424,30 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
     }
 
+    private fun showSoftKeyboard(view: View?) {
+        if (view == null) return
+        view.requestFocus()
+        val imm = view.context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        imm?.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT)
+    }
+
     private fun updateSearchMaxWidth(searchView: SearchView) {
         if (!isToolbarInitialized) return
         val tbWidth = toolbar.width
         if (tbWidth > 0) {
-            searchView.maxWidth = (tbWidth - dp2px(112)).coerceAtLeast(dp2px(160))
+            val maxW = (tbWidth - dp2px(112)).coerceAtLeast(dp2px(160))
+            if (searchView.maxWidth != maxW) {
+                searchView.maxWidth = maxW
+            }
         } else {
             toolbar.post {
                 if (isAdded && !isDetached && isToolbarInitialized) {
                     val postW = toolbar.width
                     if (postW > 0) {
-                        searchView.maxWidth = (postW - dp2px(112)).coerceAtLeast(dp2px(160))
+                        val maxW = (postW - dp2px(112)).coerceAtLeast(dp2px(160))
+                        if (searchView.maxWidth != maxW) {
+                            searchView.maxWidth = maxW
+                        }
                     }
                 }
             }
@@ -460,9 +476,21 @@ class ConfigurationFragment @JvmOverloads constructor(
                 hintColor = ctx.getColorAttr(android.R.attr.textColorSecondary)
             }
         }
-        val editText = searchView.findViewById<TextView>(androidx.appcompat.R.id.search_src_text)
+        val editText = searchView.findViewById<SearchView.SearchAutoComplete>(androidx.appcompat.R.id.search_src_text)
         editText?.setTextColor(textColor)
         editText?.setHintTextColor(hintColor)
+        editText?.imeOptions = EditorInfo.IME_ACTION_SEARCH or EditorInfo.IME_FLAG_NO_FULLSCREEN
+
+        editText?.setOnClickListener {
+            showSoftKeyboard(editText)
+        }
+        searchView.setOnClickListener {
+            if (searchView.isIconified) {
+                searchView.isIconified = false
+            }
+            showSoftKeyboard(editText)
+        }
+
         val closeBtn = searchView.findViewById<ImageView>(androidx.appcompat.R.id.search_close_btn)
         closeBtn?.setColorFilter(textColor)
         val searchBtn = searchView.findViewById<ImageView>(androidx.appcompat.R.id.search_button)
@@ -601,6 +629,8 @@ class ConfigurationFragment @JvmOverloads constructor(
                 toolbar.title = ""
                 updateSearchMaxWidth(searchView)
                 updateToolbarMenuTitles()
+                val editText = searchView.findViewById<SearchView.SearchAutoComplete>(androidx.appcompat.R.id.search_src_text)
+                showSoftKeyboard(editText)
             }
 
             searchView.setOnCloseListener {
@@ -609,11 +639,18 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
         }
 
-        toolbar.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
-            val sItem = toolbar.menu.findItem(R.id.action_search)
-            val sv = (sItem?.actionView as? SearchView) ?: toolbar.findViewById<SearchView>(R.id.action_search)
-            if (sv != null && toolbar.width > 0) {
-                sv.maxWidth = (toolbar.width - dp2px(112)).coerceAtLeast(dp2px(160))
+        toolbar.addOnLayoutChangeListener { _, left, _, right, _, oldLeft, _, oldRight, _ ->
+            val newWidth = right - left
+            val oldWidth = oldRight - oldLeft
+            if (newWidth != oldWidth && newWidth > 0) {
+                val sItem = toolbar.menu.findItem(R.id.action_search)
+                val sv = (sItem?.actionView as? SearchView) ?: toolbar.findViewById<SearchView>(R.id.action_search)
+                if (sv != null) {
+                    val targetW = (newWidth - dp2px(112)).coerceAtLeast(dp2px(160))
+                    if (sv.maxWidth != targetW) {
+                        sv.maxWidth = targetW
+                    }
+                }
             }
         }
 
@@ -778,9 +815,16 @@ class ConfigurationFragment @JvmOverloads constructor(
     }
 
     override fun onKeyDown(ketCode: Int, event: KeyEvent): Boolean {
-        val fragment = getCurrentGroupFragment()
-        fragment?.configurationListView?.apply {
-            if (!hasFocus()) requestFocus()
+        val searchItem = if (isToolbarInitialized) toolbar.menu.findItem(R.id.action_search) else null
+        val searchView = (searchItem?.actionView as? SearchView) ?: (if (isToolbarInitialized) toolbar.findViewById<SearchView>(R.id.action_search) else null)
+        if (searchView != null && (!searchView.isIconified || searchView.hasFocus())) {
+            return false
+        }
+        if (ketCode == KeyEvent.KEYCODE_DPAD_UP || ketCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+            val fragment = getCurrentGroupFragment()
+            fragment?.configurationListView?.apply {
+                if (!hasFocus()) requestFocus()
+            }
         }
         return super.onKeyDown(ketCode, event)
     }
@@ -2379,7 +2423,10 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
             checkOrderMenu()
             updateSubscriptionInfoCard()
-            configurationListView.requestFocus()
+            val pf = parentFragment as? ConfigurationFragment
+            if (pf == null || pf.currentSearchQuery.isBlank()) {
+                configurationListView.requestFocus()
+            }
         }
 
         fun checkOrderMenu() {
@@ -2751,6 +2798,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
 
             var configurationIdList: MutableList<Long> = mutableListOf()
+            val allConfigurationIdList: MutableList<Long> = mutableListOf()
             val configurationList = HashMap<Long, ProxyEntity>()
             private val pendingTrafficUpdates = HashSet<Long>()
             private val profileStatePayload = Any()
@@ -2940,17 +2988,22 @@ class ConfigurationFragment @JvmOverloads constructor(
             private val updated = HashSet<ProxyEntity>()
 
             fun filter(name: String) {
-                if (name.isEmpty()) {
-                    reloadProfiles()
+                val query = name.trim()
+                if (query.isEmpty()) {
+                    configurationIdList.clear()
+                    configurationIdList.addAll(allConfigurationIdList)
+                    notifyDataSetChanged()
                     return
                 }
                 configurationIdList.clear()
-                val lower = name.lowercase()
-                configurationIdList.addAll(configurationList.filter {
-                    it.value.displayName().lowercase().contains(lower) ||
-                            it.value.displayType().lowercase().contains(lower) ||
-                            it.value.displayAddress().lowercase().contains(lower)
-                }.keys)
+                val lower = query.lowercase()
+                val matched = allConfigurationIdList.filter { id ->
+                    val entity = configurationList[id] ?: return@filter false
+                    (entity.displayName()?.lowercase()?.contains(lower) == true) ||
+                            (entity.displayType()?.lowercase()?.contains(lower) == true) ||
+                            (entity.displayAddress()?.lowercase()?.contains(lower) == true)
+                }
+                configurationIdList.addAll(matched)
                 notifyDataSetChanged()
             }
 
@@ -3241,6 +3294,8 @@ class ConfigurationFragment @JvmOverloads constructor(
                 configurationListView.post {
                     configurationList.clear()
                     configurationList.putAll(newProfileMap)
+                    allConfigurationIdList.clear()
+                    allConfigurationIdList.addAll(newProfileIds)
                     configurationIdList.clear()
                     configurationIdList.addAll(newProfileIds)
                     notifyDataSetChanged()
