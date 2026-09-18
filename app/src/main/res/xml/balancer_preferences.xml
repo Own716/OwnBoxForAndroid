@@ -33,6 +33,18 @@
             app:key="balancerTargetGroup"
             app:title="@string/balancer_select_group" />
 
+        <io.nekohasekai.sagernet.widget.OutboundPreference
+            app:icon="@drawable/ic_hardware_router"
+            app:key="balancerFrontProxy"
+            app:title="@string/front_proxy"
+            app:useSimpleSummaryProvider="true" />
+
+        <io.nekohasekai.sagernet.widget.OutboundPreference
+            app:icon="@drawable/baseline_public_24"
+            app:key="balancerLandingProxy"
+            app:title="@string/landing_proxy"
+            app:useSimpleSummaryProvider="true" />
+
         <SwitchPreference
             app:defaultValue="false"
             app:icon="@drawable/ic_hardware_router"

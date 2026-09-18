@@ -716,6 +716,8 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     }
 
+    fun isCurrentAllGroups(): Boolean = getCurrentGroupFragment()?.isAllGroupsTab == true
+
     override fun onMenuItemClick(item: MenuItem): Boolean {
         when (item.itemId) {
             R.id.action_scan_qr_code -> {
@@ -894,8 +896,13 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             R.id.action_clear_traffic_statistics -> {
                 val trafficService = (activity as? MainActivity)?.connection?.service
+                val isAll = isCurrentAllGroups()
                 runOnDefaultDispatcher {
-                    val profiles = SagerDatabase.proxyDao.getByGroup(DataStore.currentGroupId())
+                    val profiles = if (isAll) {
+                        SagerDatabase.proxyDao.getAll()
+                    } else {
+                        SagerDatabase.proxyDao.getByGroup(DataStore.currentGroupId())
+                    }
                     val toClear = mutableListOf<ProxyEntity>()
                     if (profiles.isNotEmpty()) for (profile in profiles) {
                         if (profile.tx != 0L || profile.rx != 0L) {
@@ -913,23 +920,33 @@ class ConfigurationFragment @JvmOverloads constructor(
                         Logs.w(e)
                     }
                     onMainDispatcher {
-                        getCurrentGroupFragment()?.adapter?.clearTrafficStatistics()
+                        adapter.groupFragments.values.forEach { it.adapter?.clearTrafficStatistics() }
                     }
                 }
             }
 
             R.id.action_connection_test_clear_results -> {
+                val isAll = isCurrentAllGroups()
                 runOnDefaultDispatcher {
-                    SagerDatabase.proxyDao.clearTestResults(DataStore.currentGroupId())
+                    if (isAll) {
+                        SagerDatabase.proxyDao.clearAllTestResults()
+                    } else {
+                        SagerDatabase.proxyDao.clearTestResults(DataStore.currentGroupId())
+                    }
                     onMainDispatcher {
-                        getCurrentGroupFragment()?.adapter?.clearTestResults()
+                        adapter.groupFragments.values.forEach { it.adapter?.clearTestResults() }
                     }
                 }
             }
 
             R.id.action_connection_test_delete_unavailable -> {
+                val isAll = isCurrentAllGroups()
                 runOnDefaultDispatcher {
-                    val profiles = SagerDatabase.proxyDao.getByGroup(DataStore.currentGroupId())
+                    val profiles = if (isAll) {
+                        SagerDatabase.proxyDao.getAll()
+                    } else {
+                        SagerDatabase.proxyDao.getByGroup(DataStore.currentGroupId())
+                    }
                     val toClear = mutableListOf<ProxyEntity>()
                     if (profiles.isNotEmpty()) for (profile in profiles) {
                         if (profile.status != 0 && profile.status != 1) {
@@ -942,12 +959,14 @@ class ConfigurationFragment @JvmOverloads constructor(
                                 .setMessage(R.string.delete_confirm_prompt)
                                 .setPositiveButton(R.string.yes) { _, _ ->
                                     for (profile in toClear) {
-                                        adapter.groupFragments[DataStore.selectedGroup]?.adapter?.apply {
-                                            val index = configurationIdList.indexOf(profile.id)
-                                            if (index >= 0) {
-                                                configurationIdList.removeAt(index)
-                                                configurationList.remove(profile.id)
-                                                notifyItemRemoved(index)
+                                        adapter.groupFragments.values.forEach { groupFragment ->
+                                            groupFragment.adapter?.apply {
+                                                val index = configurationIdList.indexOf(profile.id)
+                                                if (index >= 0) {
+                                                    configurationIdList.removeAt(index)
+                                                    configurationList.remove(profile.id)
+                                                    notifyItemRemoved(index)
+                                                }
                                             }
                                         }
                                     }
@@ -967,9 +986,14 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
 
             R.id.action_remove_duplicate -> {
+                val isAll = isCurrentAllGroups()
                 runOnDefaultDispatcher {
-                    val targetGroupId = DataStore.selectedGroup.takeIf { it > 0 } ?: DataStore.currentGroupId()
-                    val profiles = SagerDatabase.proxyDao.getByGroup(targetGroupId)
+                    val targetGroupId = if (isAll) ALL_GROUPS_SENTINEL_ID else (DataStore.selectedGroup.takeIf { it > 0 } ?: DataStore.currentGroupId())
+                    val profiles = if (isAll) {
+                        SagerDatabase.proxyDao.getAll()
+                    } else {
+                        SagerDatabase.proxyDao.getByGroup(targetGroupId)
+                    }
                     val grouped = profiles.groupBy { pf ->
                         runCatching {
                             Protocols.Deduplication(pf.requireBean(), pf.displayType()).hash()
@@ -1021,11 +1045,19 @@ class ConfigurationFragment @JvmOverloads constructor(
                                             }
 
                                             SagerDatabase.proxyDao.deleteProxy(toClear)
-                                            GroupManager.rearrange(targetGroupId)
-                                            GroupManager.postReload(targetGroupId)
+                                            val affectedGroupIds = toClear.map { it.groupId }.distinct().filter { it > 0L }
+                                            if (isAll) {
+                                                affectedGroupIds.forEach { gid ->
+                                                    GroupManager.rearrange(gid)
+                                                    GroupManager.postReload(gid)
+                                                }
+                                            } else {
+                                                GroupManager.rearrange(targetGroupId)
+                                                GroupManager.postReload(targetGroupId)
+                                            }
 
                                             onMainDispatcher {
-                                                adapter.groupFragments[targetGroupId]?.adapter?.reloadProfiles()
+                                                adapter.groupFragments.values.forEach { it.adapter?.reloadProfiles() }
                                                 val res = (context ?: SagerNet.application).resources
                                                 safeSnackbar(res.getString(R.string.duplicate_profiles_removed, count))
                                             }
@@ -1107,7 +1139,9 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     private fun speedTest() {
         if (DataStore.runningTest) return else DataStore.runningTest = true
+        val isAll = isCurrentAllGroups()
         val group = DataStore.currentGroup()
+        val displayName = if (isAll) getString(R.string.group_tab_all) else group.displayName()
         val binding = LayoutProgressListBinding.inflate(layoutInflater)
         binding.progressCircular.isGone = true
         binding.progressLinear.isVisible = true
@@ -1146,7 +1180,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             speedTestHidden = true
             speedTestNotification = ConnectionTestNotification(
                 dialog.context,
-                "[${group.displayName()}] ${getString(R.string.speed_test_group)}",
+                "[$displayName] ${getString(R.string.speed_test_group)}",
             )
             dialog.hide()
         }
@@ -1157,7 +1191,11 @@ class ConfigurationFragment @JvmOverloads constructor(
 
         speedTestJob = runOnDefaultDispatcher {
             try {
-                val profiles = SagerDatabase.proxyDao.getByGroup(group.id)
+                val profiles = if (isAll) {
+                    SagerDatabase.proxyDao.getAll()
+                } else {
+                    SagerDatabase.proxyDao.getByGroup(group.id)
+                }
                 if (profiles.isEmpty()) {
                     onMainDispatcher {
                         dialog.dismiss()
@@ -1564,17 +1602,23 @@ class ConfigurationFragment @JvmOverloads constructor(
         val test = TestDialog()
         val dialog = test.builder.show()
         val testJobs = mutableListOf<Job>()
+        val isAll = isCurrentAllGroups()
         val group = DataStore.currentGroup()
-        val targetUrl = DataStore.groupUrlTestUrl(group.id)
+        val displayName = if (isAll) getString(R.string.group_tab_all) else group.displayName()
+        val targetUrl = if (isAll) DataStore.connectionTestURL else DataStore.groupUrlTestUrl(group.id)
         Logs.d(
-            "URLTestTrace batch=start groupId=${group.id} group=${group.name} " +
+            "URLTestTrace batch=start isAll=$isAll groupId=${group.id} group=${group.name} " +
                     "concurrent=${DataStore.connectionTestConcurrent} timeout=${DataStore.connectionTestTimeout}ms " +
                     "link=$targetUrl serviceState=${DataStore.serviceState} " +
                     "currentProfile=${DataStore.currentProfile} network=${SagerNet.underlyingNetwork}"
         )
 
         val mainJob = runOnDefaultDispatcher {
-            val profilesList = SagerDatabase.proxyDao.getByGroup(group.id)
+            val profilesList = if (isAll) {
+                SagerDatabase.proxyDao.getAll()
+            } else {
+                SagerDatabase.proxyDao.getByGroup(group.id)
+            }
             test.proxyN = profilesList.size
             val profiles = ConcurrentLinkedQueue(profilesList)
             Logs.d("URLTestTrace batch=loaded profiles=${profilesList.size}")
@@ -1633,7 +1677,13 @@ class ConfigurationFragment @JvmOverloads constructor(
                         Logs.w(e)
                     }
                 }
-                GroupManager.postReload(DataStore.currentGroupId())
+                if (isAll) {
+                    onMainDispatcher {
+                        adapter.groupFragments.values.forEach { it.adapter?.reloadProfiles() }
+                    }
+                } else {
+                    GroupManager.postReload(DataStore.currentGroupId())
+                }
                 DataStore.runningTest = false
             }
         }
@@ -1641,7 +1691,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             test.dialogStatus.set(1)
             test.notification = ConnectionTestNotification(
                 dialog.context,
-                "[${group.displayName()}] ${getString(R.string.connection_test)}"
+                "[$displayName] ${getString(R.string.connection_test)}"
             )
             dialog.hide()
         }
@@ -1653,11 +1703,17 @@ class ConfigurationFragment @JvmOverloads constructor(
         val test = TestDialog()
         val dialog = test.builder.show()
         val testJobs = mutableListOf<Job>()
+        val isAll = isCurrentAllGroups()
         val group = DataStore.currentGroup()
-        Logs.d("TcpPingTrace batch=start groupId=${group.id} group=${group.name}")
+        val displayName = if (isAll) getString(R.string.group_tab_all) else group.displayName()
+        Logs.d("TcpPingTrace batch=start isAll=$isAll groupId=${group.id} group=${group.name}")
 
         val mainJob = runOnDefaultDispatcher {
-            val profilesList = SagerDatabase.proxyDao.getByGroup(group.id)
+            val profilesList = if (isAll) {
+                SagerDatabase.proxyDao.getAll()
+            } else {
+                SagerDatabase.proxyDao.getByGroup(group.id)
+            }
             test.proxyN = profilesList.size
             val profiles = ConcurrentLinkedQueue(profilesList)
             val tcpPing = io.nekohasekai.sagernet.bg.proto.TcpPing()
@@ -1705,7 +1761,13 @@ class ConfigurationFragment @JvmOverloads constructor(
                         Logs.w(e)
                     }
                 }
-                GroupManager.postReload(DataStore.currentGroupId())
+                if (isAll) {
+                    onMainDispatcher {
+                        adapter.groupFragments.values.forEach { it.adapter?.reloadProfiles() }
+                    }
+                } else {
+                    GroupManager.postReload(DataStore.currentGroupId())
+                }
                 DataStore.runningTest = false
             }
         }
@@ -1713,7 +1775,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             test.dialogStatus.set(1)
             test.notification = ConnectionTestNotification(
                 dialog.context,
-                "[${group.displayName()}] TCP Ping"
+                "[$displayName] TCP Ping"
             )
             dialog.hide()
         }

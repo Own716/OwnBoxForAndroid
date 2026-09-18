@@ -116,7 +116,21 @@ object DefaultNetworkListener {
     // 派发到专用 worker 线程（曾用 mainHandler 派发到进程主线程，
     // 测速多监听器 + onCapabilitiesChanged 风暴时主线程被秒级阻塞 → 界面卡死）
     private object Callback : ConnectivityManager.NetworkCallback() {
+        private var pendingUpdateRunnable: Runnable? = null
+        private var lastUpdateNetwork: Network? = null
+        private var lastUpdateTime = 0L
+
+        private fun cancelPendingUpdate() {
+            pendingUpdateRunnable?.let {
+                callbackHandler.removeCallbacks(it)
+                pendingUpdateRunnable = null
+            }
+        }
+
         override fun onAvailable(network: Network) {
+            cancelPendingUpdate()
+            lastUpdateNetwork = network
+            lastUpdateTime = SystemClock.elapsedRealtime()
             Logs.d("DefaultNetworkListener onAvailable enter network=$network thread=${Thread.currentThread().name}")
             runBlocking { networkActor.send(NetworkMessage.Put(network)) }
         }
@@ -124,12 +138,30 @@ object DefaultNetworkListener {
         override fun onCapabilitiesChanged(
             network: Network, networkCapabilities: NetworkCapabilities
         ) { // it's a good idea to refresh capabilities
-            // 风暴源：逐条 debug（Info 会刷屏）
+            val now = SystemClock.elapsedRealtime()
+            // 500ms 防抖：若短时间内针对同一网络连续触发网络属性变化（如信号抖动、速率协商），进行合并防抖
+            if (lastUpdateNetwork == network && now - lastUpdateTime < 500L) {
+                cancelPendingUpdate()
+                val runnable = Runnable {
+                    lastUpdateTime = SystemClock.elapsedRealtime()
+                    runBlocking { networkActor.send(NetworkMessage.Update(network)) }
+                }
+                pendingUpdateRunnable = runnable
+                callbackHandler.postDelayed(runnable, 500L - (now - lastUpdateTime))
+                return
+            }
+
+            cancelPendingUpdate()
+            lastUpdateNetwork = network
+            lastUpdateTime = now
             Logs.d("DefaultNetworkListener onCapabilitiesChanged enter network=$network thread=${Thread.currentThread().name}")
             runBlocking { networkActor.send(NetworkMessage.Update(network)) }
         }
 
         override fun onLost(network: Network) {
+            cancelPendingUpdate()
+            lastUpdateNetwork = null
+            lastUpdateTime = 0L
             Logs.d("DefaultNetworkListener onLost enter network=$network thread=${Thread.currentThread().name}")
             runBlocking { networkActor.send(NetworkMessage.Lost(network)) }
         }

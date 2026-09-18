@@ -372,6 +372,10 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var balancerToleranceUnit by profileCacheStore.string("balancerToleranceUnit") { "ms" }
     var balancerUseFrontProxy by profileCacheStore.boolean("balancerUseFrontProxy")
     var balancerUseLandingProxy by profileCacheStore.boolean("balancerUseLandingProxy")
+    var balancerFrontProxy by profileCacheStore.long("balancerFrontProxyLong")
+    var balancerLandingProxy by profileCacheStore.long("balancerLandingProxyLong")
+    var balancerFrontProxyTmp by profileCacheStore.stringToInt("balancerFrontProxy")
+    var balancerLandingProxyTmp by profileCacheStore.stringToInt("balancerLandingProxy")
     var balancerNameExclude by profileCacheStore.string("balancerNameExclude") { "" }
     var balancerNameInclude by profileCacheStore.string("balancerNameInclude") { "" }
 

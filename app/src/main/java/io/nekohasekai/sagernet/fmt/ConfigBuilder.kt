@@ -787,10 +787,22 @@ fun buildConfig(
             chainId: Long,
             entity: ProxyEntity,
             useGroupFront: Boolean = true,
-            useGroupLanding: Boolean = true
+            useGroupLanding: Boolean = true,
+            externalDetour: String? = null
         ): String {
             if (entity.type == ProxyEntity.TYPE_BALANCER) {
                 val balancerBean = entity.balancerBean ?: (entity.requireBean() as? BalancerBean) ?: BalancerBean()
+                val balancerFrontEntity = if (balancerBean.frontProxy > 0L && balancerBean.frontProxy != entity.id) {
+                    SagerDatabase.proxyDao.getById(balancerBean.frontProxy)
+                } else null
+                val balancerLandingEntity = if (balancerBean.landingProxy > 0L && balancerBean.landingProxy != entity.id) {
+                    SagerDatabase.proxyDao.getById(balancerBean.landingProxy)
+                } else null
+
+                val balancerFrontTag = balancerFrontEntity?.let { front ->
+                    tagMap[front.id] ?: buildChain(front.id, front).also { tagMap[front.id] = it }
+                }
+
                 val memberEntities = (if (balancerBean.balancerType == BalancerBean.TYPE_GROUP) {
                     val targetGids = when {
                         balancerBean.targetGroupIds.isNotEmpty() -> balancerBean.targetGroupIds
@@ -817,13 +829,23 @@ fun buildConfig(
                 } else {
                     val rawEntities = SagerDatabase.proxyDao.getEntities(balancerBean.proxies).associateBy { it.id }
                     balancerBean.proxies.mapNotNull { rawEntities[it] }
-                }).filter { it.id != entity.id && it.type != ProxyEntity.TYPE_BALANCER && !DataStore.isGroupDisabled(it.groupId) }
+                }).filter {
+                    it.id != entity.id &&
+                    it.id != (balancerFrontEntity?.id ?: 0L) &&
+                    it.id != (balancerLandingEntity?.id ?: 0L) &&
+                    it.type != ProxyEntity.TYPE_BALANCER &&
+                    !DataStore.isGroupDisabled(it.groupId)
+                }
 
                 val useFront = if (balancerBean.balancerType == BalancerBean.TYPE_GROUP) balancerBean.useFrontProxy else true
                 val useLanding = if (balancerBean.balancerType == BalancerBean.TYPE_GROUP) balancerBean.useLandingProxy else true
 
+                val memberEffectiveDetour = balancerFrontTag ?: externalDetour
+
                 val memberTags = memberEntities.mapNotNull { member ->
-                    val customKey = if (balancerBean.balancerType == BalancerBean.TYPE_GROUP && (!useFront || !useLanding)) {
+                    val customKey = if (memberEffectiveDetour != null) {
+                        -member.id
+                    } else if (balancerBean.balancerType == BalancerBean.TYPE_GROUP && (!useFront || !useLanding)) {
                         -member.id
                     } else {
                         member.id
@@ -831,8 +853,9 @@ fun buildConfig(
                     tagMap[customKey] ?: buildChain(
                         member.id,
                         member,
-                        useGroupFront = useFront,
-                        useGroupLanding = useLanding
+                        useGroupFront = if (memberEffectiveDetour != null) false else useFront,
+                        useGroupLanding = useLanding,
+                        externalDetour = memberEffectiveDetour
                     ).also { tagMap[customKey] = it }
                 }.ifEmpty { listOf(TAG_DIRECT) }
 
@@ -866,7 +889,21 @@ fun buildConfig(
                 outbounds.add(balancerOutbound)
                 trafficMap[balancerTag] = listOf(entity)
                 balancerMemberMap[entity.id] = memberEntities.map { it.id }
-                return balancerTag
+
+                val finalBalancerTag = if (balancerLandingEntity != null) {
+                    val landingTag = buildChain(
+                        chainId = -balancerLandingEntity.id,
+                        entity = balancerLandingEntity,
+                        useGroupFront = false,
+                        useGroupLanding = false,
+                        externalDetour = balancerTag
+                    )
+                    landingTag
+                } else {
+                    balancerTag
+                }
+
+                return finalBalancerTag
             }
 
             val profileList = entity.resolveChain(useGroupFront, useGroupLanding)
@@ -897,7 +934,7 @@ fun buildConfig(
 
             // chainTagOut: v2ray outbound tag for this chain
             var chainTagOut = ""
-            val chainTag = "c-$chainId"
+            val chainTag = if (chainId < 0) "c-m${-chainId}" else "c-$chainId"
             var muxApplied = false
 
             val defaultServerDomainStrategy = if (ipv6Mode == IPv6Mode.DISABLE) "ipv4_only" else if (ipv6Mode == IPv6Mode.ONLY) "ipv6_only" else SingBoxOptionsUtil.domainStrategy("server")
@@ -1162,6 +1199,10 @@ fun buildConfig(
                 pastEntity = proxyEntity
             }
 
+            if (!externalDetour.isNullOrBlank() && chainOutbounds.isNotEmpty()) {
+                chainOutbounds.last().detourTo(externalDetour)
+            }
+
             trafficMap[chainTagOut] = chainTrafficSet.toList()
             return chainTagOut
         }
@@ -1215,28 +1256,37 @@ fun buildConfig(
 
         val mainProxyTag = (if (buildSelector || useAutoSelect || useLoadBalance) TAG_PROXY else tagMap[proxy.id]) ?: TAG_PROXY
 
-        // 在应用用户规则之前检查全局模式
-        if (!forTest && DataStore.globalMode) {
-            // 全局模式下的规则处理
-            
-            // 绕过内部网络（如果启用）
+        if (!forTest) {
+            // 关键安全隔离：本地回环、多播与链路本地地址强制直连，
+            // 彻底防止 TUN 内部回环（TX/RX 对称空耗 50kB/s、CPU 狂飙 340% 的根本原因）
+            route.rules.add(Rule_DefaultOptions().apply {
+                ip_cidr = listOf(
+                    "127.0.0.0/8",
+                    "::1/128",
+                    "224.0.0.0/4",
+                    "169.254.0.0/16",
+                    "fe80::/10"
+                )
+                outbound = TAG_DIRECT
+            })
+
+            // 绕过内部网络（无论全局还是规则模式，只要开启绕过局域网均生效）
             if (DataStore.bypassLan) {
                 route.rules.add(Rule_DefaultOptions().apply {
                     ip_cidr = listOf(
-                        "224.0.0.0/3",
-                        "172.16.0.0/12",
-                        "127.0.0.0/8",
                         "10.0.0.0/8",
+                        "172.16.0.0/12",
                         "192.168.0.0/16",
-                        "169.254.0.0/16",
-                        "::1/128",
-                        "fc00::/7",
-                        "fe80::/10"
+                        "fc00::/7"
                     )
                     outbound = TAG_DIRECT
                 })
             }
+        }
 
+        // 在应用用户规则之前检查全局模式
+        if (!forTest && DataStore.globalMode) {
+            // 全局模式下的规则处理
             route.rules.add(Rule_DefaultOptions().apply {
                 inbound = listOf("tun-in")
                 outbound = mainProxyTag

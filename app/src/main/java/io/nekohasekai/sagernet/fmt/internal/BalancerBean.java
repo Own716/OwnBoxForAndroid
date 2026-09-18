@@ -37,6 +37,9 @@ public class BalancerBean extends InternalBean {
     public boolean useLandingProxy = false;
     public String nameExclude = "";
     public String nameInclude = "";
+    // v5 fields
+    public long frontProxy = -1L;
+    public long landingProxy = -1L;
 
     public long calculateToleranceMs() {
         long value = tolerance;
@@ -83,11 +86,13 @@ public class BalancerBean extends InternalBean {
         if (toleranceUnit == null || toleranceUnit.isEmpty()) toleranceUnit = "ms";
         if (nameExclude == null) nameExclude = "";
         if (nameInclude == null) nameInclude = "";
+        if (frontProxy == 0L) frontProxy = -1L;
+        if (landingProxy == 0L) landingProxy = -1L;
     }
 
     @Override
     public void serialize(ByteBufferOutput output) {
-        output.writeInt(4); // version
+        output.writeInt(5); // version
         output.writeInt(balancerType);
         output.writeLong(targetGroupId);
         output.writeString(strategy);
@@ -113,6 +118,9 @@ public class BalancerBean extends InternalBean {
         output.writeBoolean(useLandingProxy);
         output.writeString(nameExclude != null ? nameExclude : "");
         output.writeString(nameInclude != null ? nameInclude : "");
+        // v5 fields
+        output.writeLong(frontProxy);
+        output.writeLong(landingProxy);
     }
 
     @Override
@@ -159,6 +167,14 @@ public class BalancerBean extends InternalBean {
                 useLandingProxy = false;
                 nameExclude = "";
                 nameInclude = "";
+            }
+
+            if (version >= 5) {
+                frontProxy = input.readLong();
+                landingProxy = input.readLong();
+            } else {
+                frontProxy = -1L;
+                landingProxy = -1L;
             }
         }
     }

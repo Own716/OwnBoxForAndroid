@@ -679,6 +679,17 @@ data class ProxyEntity(
         )
         fun clearTestResults(groupId: Long): Int
 
+        @Query(
+            """UPDATE proxy_entities SET
+                status = 0,
+                ping = 0,
+                error = NULL,
+                speedTestMode = '',
+                speedTestDownloadBitsPerSecond = 0,
+                speedTestUploadBitsPerSecond = 0"""
+        )
+        fun clearAllTestResults(): Int
+
         @Insert
         fun addProxy(proxy: ProxyEntity): Long
 

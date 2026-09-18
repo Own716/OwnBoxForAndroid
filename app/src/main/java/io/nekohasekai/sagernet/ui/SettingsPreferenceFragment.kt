@@ -27,6 +27,7 @@ import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
 import java.io.File
+import libcore.Libcore
 
 class SettingsPreferenceFragment : PreferenceFragmentCompat(), OnPreferenceDataStoreChangeListener {
 
@@ -343,6 +344,20 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat(), OnPreferenceDataS
         resolveDestination.onPreferenceChangeListener = reloadListener
         tunImplementation.onPreferenceChangeListener = reloadListener
         acquireWakeLock.onPreferenceChangeListener = reloadListener
+        val performancePriorityMode = findPreference<SwitchPreference>(Key.PERFORMANCE_PRIORITY_MODE)
+        performancePriorityMode?.setOnPreferenceChangeListener { _, newValue ->
+            val enabled = newValue as Boolean
+            DataStore.performancePriorityMode = enabled
+            runCatching {
+                val file = File(SagerNet.application.noBackupFilesDir, "perf_mode")
+                if (enabled) file.writeText("1") else file.delete()
+            }
+            if (!enabled) {
+                Libcore.forceGc()
+                System.gc()
+            }
+            true
+        }
         hideFromRecentApps.setOnPreferenceChangeListener { _, newValue ->
             (activity as? MainActivity)?.applyHideFromRecentApps(newValue as Boolean)
             // needReload()

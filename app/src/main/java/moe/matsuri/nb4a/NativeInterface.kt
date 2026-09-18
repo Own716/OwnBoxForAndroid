@@ -124,6 +124,7 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
         var index: Int = Int.MIN_VALUE
         var network: Network? = null
         var suppressed: Int = 0
+        var lastCheckTime: Long = 0L
     }
 
     private val ifaceReportStates = Collections.synchronizedMap(
@@ -149,9 +150,17 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
             state.index = Int.MIN_VALUE
             state.network = null
             state.suppressed = 0
+            state.lastCheckTime = 0L
+            cachedInterfaces = null
             listener.updateDefaultInterface("", -1)
             return
         }
+        val now = SystemClock.elapsedRealtime()
+        if (state.network == network && state.name != null && now - state.lastCheckTime < 500L) {
+            state.suppressed++
+            return
+        }
+        state.lastCheckTime = now
         // LinkProperties / NetworkInterface 可能短暂未就绪，参考 husi/SFA 重试
         repeat(10) { attempt ->
             val linkProperties = SagerNet.connectivity.getLinkProperties(network)
@@ -198,7 +207,15 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
     // 平台网络接口枚举（sing-box 官方内核拨号路径强制要求，否则报 no available network interface）。
     // 参考 husi AndroidPlatformInterface.getInterfaces。
 
+    private var cachedInterfaces: List<LibcoreNetworkInterface>? = null
+    private var lastInterfaceFetchTime = 0L
+
     override fun getInterfaces(): NetworkInterfaceIterator {
+        val now = SystemClock.elapsedRealtime()
+        val cached = cachedInterfaces
+        if (cached != null && now - lastInterfaceFetchTime < 1000L) {
+            return InterfaceArray(cached.iterator(), cached.size)
+        }
         @Suppress("DEPRECATION") val networks = SagerNet.connectivity.allNetworks
         val networkInterfaces = NetworkInterface.getNetworkInterfaces().toList()
         val interfaces = mutableListOf<LibcoreNetworkInterface>()
@@ -233,6 +250,8 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
                 !networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
             interfaces.add(boxInterface)
         }
+        cachedInterfaces = interfaces
+        lastInterfaceFetchTime = now
         return InterfaceArray(interfaces.iterator(), interfaces.size)
     }
 

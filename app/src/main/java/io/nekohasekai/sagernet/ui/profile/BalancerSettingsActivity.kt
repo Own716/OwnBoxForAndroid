@@ -26,10 +26,42 @@ import io.nekohasekai.sagernet.databinding.LayoutProfileBinding
 import io.nekohasekai.sagernet.fmt.internal.BalancerBean
 import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.ui.ProfileSelectActivity
+import io.nekohasekai.sagernet.widget.OutboundPreference
 import moe.matsuri.nb4a.Protocols.getProtocolColor
 import moe.matsuri.nb4a.ui.SimpleMenuPreference
 
 class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.layout_balancer_settings) {
+
+    private lateinit var frontProxyPreference: OutboundPreference
+    private lateinit var landingProxyPreference: OutboundPreference
+
+    val selectProfileForAddFront = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        if (it.resultCode == Activity.RESULT_OK) runOnDefaultDispatcher {
+            val profile = ProfileManager.getProfile(
+                it.data!!.getLongExtra(ProfileSelectActivity.EXTRA_PROFILE_ID, 0)
+            ) ?: return@runOnDefaultDispatcher
+            DataStore.balancerFrontProxy = profile.id
+            onMainDispatcher {
+                frontProxyPreference.value = OutboundPreference.VALUE_SELECT_PROFILE
+            }
+        }
+    }
+
+    val selectProfileForAddLanding = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        if (it.resultCode == Activity.RESULT_OK) runOnDefaultDispatcher {
+            val profile = ProfileManager.getProfile(
+                it.data!!.getLongExtra(ProfileSelectActivity.EXTRA_PROFILE_ID, 0)
+            ) ?: return@runOnDefaultDispatcher
+            DataStore.balancerLandingProxy = profile.id
+            onMainDispatcher {
+                landingProxyPreference.value = OutboundPreference.VALUE_SELECT_PROFILE
+            }
+        }
+    }
 
     override fun createEntity(): BalancerBean {
         val count = runCatching { SagerDatabase.proxyDao.getByType(ProxyEntity.TYPE_BALANCER).size }.getOrDefault(0) + 1
@@ -57,6 +89,10 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         DataStore.balancerToleranceUnit = if (toleranceUnit.isNullOrBlank()) "ms" else toleranceUnit
         DataStore.balancerUseFrontProxy = useFrontProxy
         DataStore.balancerUseLandingProxy = useLandingProxy
+        DataStore.balancerFrontProxy = frontProxy
+        DataStore.balancerFrontProxyTmp = if (frontProxy > 0L) OutboundPreference.VALUE_SELECT_PROFILE.toInt() else 0
+        DataStore.balancerLandingProxy = landingProxy
+        DataStore.balancerLandingProxyTmp = if (landingProxy > 0L) OutboundPreference.VALUE_SELECT_PROFILE.toInt() else 0
         DataStore.balancerNameExclude = nameExclude ?: ""
         DataStore.balancerNameInclude = nameInclude ?: ""
         DataStore.serverProtocol = proxies.joinToString(",")
@@ -77,6 +113,16 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         toleranceUnit = DataStore.balancerToleranceUnit
         useFrontProxy = DataStore.balancerUseFrontProxy
         useLandingProxy = DataStore.balancerUseLandingProxy
+        frontProxy = if (DataStore.balancerFrontProxyTmp == OutboundPreference.VALUE_SELECT_PROFILE.toInt()) {
+            DataStore.balancerFrontProxy
+        } else {
+            -1L
+        }
+        landingProxy = if (DataStore.balancerLandingProxyTmp == OutboundPreference.VALUE_SELECT_PROFILE.toInt()) {
+            DataStore.balancerLandingProxy
+        } else {
+            -1L
+        }
         nameExclude = DataStore.balancerNameExclude
         nameInclude = DataStore.balancerNameInclude
         proxies = proxyList.map { it.id }
@@ -88,6 +134,52 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         rootKey: String?,
     ) {
         addPreferencesFromResource(R.xml.balancer_preferences)
+
+        frontProxyPreference = findPreference("balancerFrontProxy")!!
+        frontProxyPreference.apply {
+            setEntries(R.array.front_proxy_entry)
+            setEntryValues(R.array.front_proxy_value)
+            value = DataStore.balancerFrontProxyTmp.toString()
+            setOnPreferenceChangeListener { _, newValue ->
+                if (newValue.toString() == OutboundPreference.VALUE_SELECT_PROFILE) {
+                    selectProfileForAddFront.launch(
+                        Intent(
+                            this@BalancerSettingsActivity, ProfileSelectActivity::class.java
+                        ).apply {
+                            ProfileManager.getProfile(DataStore.balancerFrontProxy)?.let {
+                                putExtra(ProfileSelectActivity.EXTRA_SELECTED, it)
+                            }
+                        }
+                    )
+                    false
+                } else {
+                    true
+                }
+            }
+        }
+
+        landingProxyPreference = findPreference("balancerLandingProxy")!!
+        landingProxyPreference.apply {
+            setEntries(R.array.front_proxy_entry)
+            setEntryValues(R.array.front_proxy_value)
+            value = DataStore.balancerLandingProxyTmp.toString()
+            setOnPreferenceChangeListener { _, newValue ->
+                if (newValue.toString() == OutboundPreference.VALUE_SELECT_PROFILE) {
+                    selectProfileForAddLanding.launch(
+                        Intent(
+                            this@BalancerSettingsActivity, ProfileSelectActivity::class.java
+                        ).apply {
+                            ProfileManager.getProfile(DataStore.balancerLandingProxy)?.let {
+                                putExtra(ProfileSelectActivity.EXTRA_SELECTED, it)
+                            }
+                        }
+                    )
+                    false
+                } else {
+                    true
+                }
+            }
+        }
 
         val groupPref = findPreference<Preference>("balancerTargetGroup")
         val allGroups = runCatching { SagerDatabase.groupDao.allGroups() }.getOrDefault(emptyList())
@@ -372,9 +464,11 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
 
     fun testProfileAllowed(profile: ProxyEntity): Boolean {
         if (profile.id == DataStore.editingId) return false
+        if (profile.id == DataStore.balancerFrontProxy || profile.id == DataStore.balancerLandingProxy) return false
         if (profile.type == ProxyEntity.TYPE_BALANCER) {
             val bean = profile.balancerBean ?: return true
             if (bean.proxies.contains(DataStore.editingId)) return false
+            if (bean.frontProxy == DataStore.editingId || bean.landingProxy == DataStore.editingId) return false
         }
         return true
     }
