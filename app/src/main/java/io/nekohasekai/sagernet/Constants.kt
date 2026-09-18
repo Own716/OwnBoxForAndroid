@@ -90,6 +90,7 @@ object Key {
     const val SHOW_SUBSCRIPTION_INFO_CARD = "show_subscription_info_card"
     const val HAPTIC_FEEDBACK = "hapticFeedback"
     const val SHOW_ALL_GROUPS_TAB = "showAllGroupsTab"
+    const val ALL_GROUPS_ORDER = "allGroupsOrder"
 
     const val ALLOW_INSECURE_ON_REQUEST = "allowInsecureOnRequest"
 

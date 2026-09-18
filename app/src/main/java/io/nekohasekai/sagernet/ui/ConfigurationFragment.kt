@@ -1682,6 +1682,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                             } ?: throw java.util.concurrent.TimeoutException("URL test timeout")
                             profile.status = 1
                             profile.ping = result
+                            profile.error = null
                             Logs.d("URLTest ${profile.displayName()}: done, ping=${result}ms")
                         } catch (e: PluginManager.PluginNotFoundException) {
                             profile.status = 2
@@ -1693,6 +1694,13 @@ class ConfigurationFragment @JvmOverloads constructor(
                                 "URLTestTrace batch=result worker=$workerId profileId=${profile.id} " +
                                         "profile=${profile.displayName()} failed error=${e.readableMessage}"
                             )
+                        }
+
+                        try {
+                            SagerDatabase.proxyDao.updatePingResult(profile.id, profile.status, profile.ping, profile.error)
+                            ProfileManager.postUpdate(profile, false)
+                        } catch (e: Exception) {
+                            Logs.w(e)
                         }
 
                         test.update(profile)
@@ -1713,13 +1721,6 @@ class ConfigurationFragment @JvmOverloads constructor(
             runOnDefaultDispatcher {
                 mainJob.cancel()
                 testJobs.forEach { it.cancel() }
-                test.results.forEach {
-                    try {
-                        ProfileManager.updateProfile(it)
-                    } catch (e: Exception) {
-                        Logs.w(e)
-                    }
-                }
                 if (isAll) {
                     onMainDispatcher {
                         adapter.groupFragments.values.forEach { it.adapter?.reloadProfiles() }
@@ -1779,6 +1780,13 @@ class ConfigurationFragment @JvmOverloads constructor(
                             Logs.w("TcpPing ${profile.displayName()} failed error=${e.readableMessage}")
                         }
 
+                        try {
+                            SagerDatabase.proxyDao.updatePingResult(profile.id, profile.status, profile.ping, profile.error)
+                            ProfileManager.postUpdate(profile, false)
+                        } catch (e: Exception) {
+                            Logs.w(e)
+                        }
+
                         test.update(profile)
                     }
                 })
@@ -1797,13 +1805,6 @@ class ConfigurationFragment @JvmOverloads constructor(
             runOnDefaultDispatcher {
                 mainJob.cancel()
                 testJobs.forEach { it.cancel() }
-                test.results.forEach {
-                    try {
-                        ProfileManager.updateProfile(it)
-                    } catch (e: Exception) {
-                        Logs.w(e)
-                    }
-                }
                 if (isAll) {
                     onMainDispatcher {
                         adapter.groupFragments.values.forEach { it.adapter?.reloadProfiles() }
@@ -2046,6 +2047,7 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             savedInstanceState?.getParcelable<ProxyGroup>("proxyGroup")?.also {
                 proxyGroup = it
+                isAllGroupsTab = (it.id == ALL_GROUPS_SENTINEL_ID)
                 onViewCreated(requireView(), null)
             }
         }
@@ -2173,7 +2175,8 @@ class ConfigurationFragment @JvmOverloads constructor(
             val origin = menu.findItem(R.id.action_order_origin)
             val byName = menu.findItem(R.id.action_order_by_name)
             val byDelay = menu.findItem(R.id.action_order_by_delay)
-            when (proxyGroup.order) {
+            val currentOrder = if (isAllGroupsTab) DataStore.allGroupsOrder else proxyGroup.order
+            when (currentOrder) {
                 GroupOrder.ORIGIN -> {
                     origin.isChecked = true
                 }
@@ -2188,14 +2191,23 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
 
             fun updateTo(order: Int) {
-                val needUpdateDb = proxyGroup.order != order
-                proxyGroup.order = order
-                runOnDefaultDispatcher {
-                    if (needUpdateDb) {
-                        GroupManager.updateGroup(proxyGroup)
+                if (isAllGroupsTab) {
+                    DataStore.allGroupsOrder = order
+                    runOnDefaultDispatcher {
+                        onMainDispatcher {
+                            adapter?.reloadProfiles()
+                        }
                     }
-                    onMainDispatcher {
-                        adapter?.reloadProfiles()
+                } else {
+                    val needUpdateDb = proxyGroup.order != order
+                    proxyGroup.order = order
+                    runOnDefaultDispatcher {
+                        if (needUpdateDb) {
+                            GroupManager.updateGroup(proxyGroup)
+                        }
+                        onMainDispatcher {
+                            adapter?.reloadProfiles()
+                        }
                     }
                 }
             }
@@ -2931,7 +2943,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
 
             override suspend fun onRemoved(groupId: Long, profileId: Long) {
-                if (groupId != proxyGroup.id) return
+                if (groupId != proxyGroup.id && !isAllGroupsTab) return
                 val index = configurationIdList.indexOf(profileId)
                 if (index < 0) return
 
@@ -2961,21 +2973,32 @@ class ConfigurationFragment @JvmOverloads constructor(
             fun reloadProfiles() {
                 var newProfiles = if (isAllGroupsTab) {
                     // All-groups tab: fetch every profile from every group
-                    SagerDatabase.proxyDao.getAll().sortedBy { it.displayName() }
+                    SagerDatabase.proxyDao.getAll()
                 } else {
                     SagerDatabase.proxyDao.getByGroup(proxyGroup.id)
                 }
-                if (!isAllGroupsTab) {
-                    when (proxyGroup.order) {
-                        GroupOrder.BY_NAME -> {
-                            newProfiles = newProfiles.sortedBy { it.displayName() }
-
+                val currentOrder = if (isAllGroupsTab) DataStore.allGroupsOrder else proxyGroup.order
+                when (currentOrder) {
+                    GroupOrder.ORIGIN -> {
+                        if (isAllGroupsTab) {
+                            newProfiles = newProfiles.sortedBy { it.id }
+                        } else {
+                            newProfiles = newProfiles.sortedBy { it.userOrder }
                         }
+                    }
 
-                        GroupOrder.BY_DELAY -> {
-                            newProfiles =
-                                newProfiles.sortedBy { if (it.status == 1) it.ping else 114514 }
-                        }
+                    GroupOrder.BY_NAME -> {
+                        newProfiles = newProfiles.sortedBy { it.displayName() }
+                    }
+
+                    GroupOrder.BY_DELAY -> {
+                        newProfiles = newProfiles.sortedWith(
+                            compareBy(
+                                { if (it.status == 1 && it.ping > 0) 0 else 1 },
+                                { if (it.status == 1 && it.ping > 0) it.ping else Int.MAX_VALUE },
+                                { it.displayName() }
+                            )
+                        )
                     }
                 }
 

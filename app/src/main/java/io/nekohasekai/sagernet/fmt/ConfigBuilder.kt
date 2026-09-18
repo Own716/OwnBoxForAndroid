@@ -168,16 +168,16 @@ internal fun buildUrlTestOutbound(
         val rawIdleTimeout = idleTimeoutStr?.takeIf { it.isNotBlank() }
         if (rawIdleTimeout != null) {
             val parsed = if (rawIdleTimeout.all { c -> c.isDigit() }) "${rawIdleTimeout}s" else rawIdleTimeout
-            // Parse minutes from string like "3m", "5m", "10m"; enforce minimum 10m
-            val minSecs = 10 * 60
+            // Parse minutes from string like "3m", "5m", "10m", "30m"; enforce minimum 30m
+            val minSecs = 30 * 60
             val parsedSecs = when {
                 parsed.endsWith("m") -> (parsed.dropLast(1).toLongOrNull() ?: 0L) * 60
                 parsed.endsWith("s") -> parsed.dropLast(1).toLongOrNull() ?: 0L
                 else -> 0L
             }
-            idle_timeout = if (parsedSecs < minSecs) "10m" else parsed
+            idle_timeout = if (parsedSecs < minSecs) "30m" else parsed
         } else {
-            idle_timeout = "10m"
+            idle_timeout = "30m"
         }
         // CRITICAL: Never interrupt active connections on node switch.
         // interrupt_exist_connections=true would instantly kill Telegram upload streams on any
@@ -730,8 +730,9 @@ fun buildConfig(
                 stack = when (DataStore.tunImplementation) {
                     TunImplementation.GVISOR -> "gvisor"
                     TunImplementation.SYSTEM -> "system"
-                    TunImplementation.SING_TUN -> "mixed"
-                    else -> "mixed"
+                    TunImplementation.MIXED -> "mixed"
+                    TunImplementation.SING_TUN -> null
+                    else -> null
                 }
                 mtu = if (DataStore.mtu == 1500) 1400 else DataStore.mtu
                 auto_route = true
