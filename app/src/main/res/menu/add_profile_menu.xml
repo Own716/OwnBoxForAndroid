@@ -108,6 +108,18 @@
                 <item
                     android:id="@+id/action_remove_duplicate"
                     android:title="@string/remove_duplicate" />
+                <item
+                    android:id="@+id/action_export"
+                    android:title="@string/action_export">
+                    <menu>
+                        <item
+                            android:id="@+id/action_export_clipboard"
+                            android:title="@string/action_export_clipboard" />
+                        <item
+                            android:id="@+id/action_export_file"
+                            android:title="@string/action_export_file" />
+                    </menu>
+                </item>
             </group>
             <group android:id="@+id/group_actions_test">
                 <item

@@ -116,7 +116,11 @@ class ColorPickerPreference @JvmOverloads constructor(
             addView(rootLayout)
         }
 
-        val currentThemeId = if (DataStore.appTheme == Theme.CUSTOM) Theme.GREEN else DataStore.appTheme
+        val currentThemeId = if (DataStore.appTheme !in setOf(Theme.BLACK, Theme.WHITE, Theme.LIGHT_GRAY)) {
+            Theme.LIGHT_GRAY
+        } else {
+            DataStore.appTheme
+        }
 
         fun applyTheme(themeId: Int) {
             persistInt(themeId)
@@ -204,93 +208,6 @@ class ColorPickerPreference @JvmOverloads constructor(
             }
             rootLayout.addView(card)
         }
-
-        // 2. Divider
-        val divider = View(context).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp2px(1)
-            ).apply {
-                setMargins(0, dp2px(12), 0, dp2px(12))
-            }
-            setBackgroundColor(Color.parseColor("#22888888"))
-        }
-        rootLayout.addView(divider)
-
-        // 3. Vetted Color Themes Section
-        val colorTitle = TextView(context).apply {
-            text = "精选经典色彩预设"
-            textSize = 13f
-            setTextColor(context.getColorAttr(R.attr.primaryOrTextSecondary))
-            setTypeface(null, Typeface.BOLD)
-            setPadding(dp2px(4), dp2px(4), 0, dp2px(8))
-        }
-        rootLayout.addView(colorTitle)
-
-        val presetColors = listOf(
-            PresetTheme(Theme.BLUE, "经典蓝", Color.parseColor("#2196F3")),
-            PresetTheme(Theme.VERDANT_MINT, "薄荷绿", Color.parseColor("#00E676")),
-            PresetTheme(Theme.CYAN, "青色", Color.parseColor("#00BCD4")),
-            PresetTheme(Theme.PINK_SSR, "樱花粉", Color.parseColor("#FF4081")),
-            PresetTheme(Theme.ORANGE, "活力橙", Color.parseColor("#FF9800")),
-            PresetTheme(Theme.AMBER, "琥珀金", Color.parseColor("#FFC107")),
-            PresetTheme(Theme.DEEP_PURPLE, "深紫", Color.parseColor("#673AB7")),
-            PresetTheme(Theme.LIGHT_BLUE, "晴空蓝", Color.parseColor("#03A9F4")),
-            PresetTheme(Theme.GREEN, "自然绿", Color.parseColor("#4CAF50")),
-            PresetTheme(Theme.RED, "热情红", Color.parseColor("#F44336")),
-            PresetTheme(Theme.BLUE_GREY, "蓝灰", Color.parseColor("#607D8B")),
-            PresetTheme(Theme.TEAL, "鸭翅绿", Color.parseColor("#009688"))
-        )
-
-        val grid = GridLayout(context).apply {
-            columnCount = 4
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-
-            for (preset in presetColors) {
-                val isSelected = currentThemeId == preset.id
-                val itemLayout = LinearLayout(context).apply {
-                    orientation = LinearLayout.VERTICAL
-                    gravity = Gravity.CENTER_HORIZONTAL
-                    setPadding(dp2px(4), dp2px(8), dp2px(4), dp2px(8))
-                    isClickable = true
-                    isFocusable = true
-                    setBackgroundResource(android.R.drawable.list_selector_background)
-                    setOnClickListener {
-                        applyTheme(preset.id)
-                    }
-
-                    val badge = ImageView(context).apply {
-                        val sz = dp2px(44)
-                        layoutParams = LinearLayout.LayoutParams(sz, sz)
-                        setImageDrawable(getColorBadgeDrawable(context.resources, preset.color, isSelected))
-                    }
-                    addView(badge)
-
-                    val label = TextView(context).apply {
-                        text = preset.name
-                        textSize = 11.5f
-                        gravity = Gravity.CENTER
-                        setTextColor(
-                            if (isSelected) context.getColorAttr(R.attr.colorPrimary)
-                            else context.getColorAttr(android.R.attr.textColorPrimary)
-                        )
-                        setTypeface(null, if (isSelected) Typeface.BOLD else Typeface.NORMAL)
-                        setPadding(0, dp2px(5), 0, 0)
-                    }
-                    addView(label)
-                }
-
-                val gridParams = GridLayout.LayoutParams().apply {
-                    width = 0
-                    columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
-                }
-                addView(itemLayout, gridParams)
-            }
-        }
-        rootLayout.addView(grid)
 
         dialog = MaterialAlertDialogBuilder(context)
             .setTitle(title)

@@ -177,6 +177,8 @@ class ConfigurationFragment @JvmOverloads constructor(
     @Volatile
     private var selectedProxySnapshot = selectedItem?.id ?: 0L
 
+    var currentSearchQuery: String = ""
+
     @Volatile
     private var currentProfileSnapshot = 0L
 
@@ -327,6 +329,9 @@ class ConfigurationFragment @JvmOverloads constructor(
                 val group = adapter.groupList[position]
                 adapter.selectedGroupIndex = position
                 activity?.invalidateOptionsMenu()
+                if (currentSearchQuery.isNotEmpty()) {
+                    getCurrentGroupFragment()?.adapter?.filter(currentSearchQuery)
+                }
                 // Skip updating DataStore.selectedGroup for the synthetic "All" tab
                 if (group.id == ALL_GROUPS_SENTINEL_ID) return
                 if (DataStore.selectedGroup != group.id) {
@@ -337,7 +342,9 @@ class ConfigurationFragment @JvmOverloads constructor(
     }
 
     override fun onQueryTextChange(query: String): Boolean {
+        currentSearchQuery = query
         getCurrentGroupFragment()?.adapter?.filter(query)
+        activity?.invalidateOptionsMenu()
         return false
     }
 
@@ -493,9 +500,13 @@ class ConfigurationFragment @JvmOverloads constructor(
             searchView.maxWidth = Int.MAX_VALUE
 
             searchView.setOnQueryTextFocusChangeListener { _, hasFocus ->
-                if (!hasFocus) {
+                if (!hasFocus && searchView.query.isNullOrEmpty()) {
                     cancelSearch(searchView)
                 }
+            }
+            searchView.setOnCloseListener {
+                cancelSearch(searchView)
+                false
             }
         }
 
@@ -590,6 +601,15 @@ class ConfigurationFragment @JvmOverloads constructor(
         menu.findItem(R.id.action_global_mode)?.isChecked = DataStore.globalMode
         menu.findItem(R.id.action_hide_unavailable)?.isChecked = DataStore.hideUnavailableProfiles
         val isAll = isCurrentAllGroups()
+        val isSearching = currentSearchQuery.isNotBlank()
+        val exportItem = menu.findItem(R.id.action_export)
+        if (isSearching) {
+            exportItem?.title = "导出搜索结果"
+        } else if (isAll) {
+            exportItem?.title = "导出配置（全部）"
+        } else {
+            exportItem?.title = "导出配置（本组）"
+        }
         if (isAll) {
             menu.findItem(R.id.action_update_subscription)?.setTitle("更新全部订阅")
             menu.findItem(R.id.action_connection_url_test)?.setTitle("URL 测试（全部）")
@@ -666,6 +686,15 @@ class ConfigurationFragment @JvmOverloads constructor(
             speedTestNotification = null
             speedTestDialog?.show()
         }
+    }
+
+    override fun onBackPressed(): Boolean {
+        val searchView = toolbar.findViewById<SearchView>(R.id.action_search)
+        if (searchView != null && !searchView.isIconified) {
+            cancelSearch(searchView)
+            return true
+        }
+        return super.onBackPressed()
     }
 
     override fun onKeyDown(ketCode: Int, event: KeyEvent): Boolean {
@@ -1110,6 +1139,74 @@ class ConfigurationFragment @JvmOverloads constructor(
                                     .show()
                             }
                         }
+                    }
+                }
+                return true
+            }
+
+            R.id.action_export_clipboard -> {
+                val isSearching = currentSearchQuery.isNotBlank()
+                val isAll = isCurrentAllGroups()
+                runOnDefaultDispatcher {
+                    val (profiles, _) = getProfilesForExport()
+                    if (profiles.isEmpty()) {
+                        onMainDispatcher {
+                            if (isSearching) safeSnackbar("未找到匹配的搜索结果") else safeSnackbar(R.string.no_proxies_found_in_subscription)
+                        }
+                        return@runOnDefaultDispatcher
+                    }
+                    val links = profiles.mapNotNull { p ->
+                        runCatching { p.toStdLink(compact = true) }.getOrNull()?.takeIf { it.isNotBlank() }
+                    }.joinToString("\n")
+
+                    if (links.isBlank()) {
+                        onMainDispatcher {
+                            safeSnackbar("当前没有支持标准链接导出的节点")
+                        }
+                        return@runOnDefaultDispatcher
+                    }
+
+                    onMainDispatcher {
+                        SagerNet.trySetPrimaryClip(links)
+                        val count = profiles.size
+                        val msg = if (isSearching) {
+                            "已将 $count 个搜索结果导出到剪贴板"
+                        } else if (isAll) {
+                            "已将全部 $count 个配置导出到剪贴板"
+                        } else {
+                            "已将本组 $count 个配置导出到剪贴板"
+                        }
+                        safeSnackbar(msg)
+                    }
+                }
+                return true
+            }
+
+            R.id.action_export_file -> {
+                val isSearching = currentSearchQuery.isNotBlank()
+                val isAll = isCurrentAllGroups()
+                runOnDefaultDispatcher {
+                    val (profiles, name) = getProfilesForExport()
+                    if (profiles.isEmpty()) {
+                        onMainDispatcher {
+                            if (isSearching) safeSnackbar("未找到匹配的搜索结果") else safeSnackbar(R.string.no_proxies_found_in_subscription)
+                        }
+                        return@runOnDefaultDispatcher
+                    }
+                    val links = profiles.mapNotNull { p ->
+                        runCatching { p.toStdLink(compact = true) }.getOrNull()?.takeIf { it.isNotBlank() }
+                    }.joinToString("\n")
+
+                    if (links.isBlank()) {
+                        onMainDispatcher {
+                            safeSnackbar("当前没有支持标准链接导出的节点")
+                        }
+                        return@runOnDefaultDispatcher
+                    }
+
+                    pendingExportProfilesText = links
+                    onMainDispatcher {
+                        startFilesForResult(exportProfilesToFile, "profiles_${name}.txt")
                     }
                 }
                 return true
@@ -3533,9 +3630,62 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
         }
 
+    private var pendingExportProfilesText: String? = null
+
+    private val exportProfilesToFile =
+        registerForActivityResult(ActivityResultContracts.CreateDocument()) { uri ->
+            val text = pendingExportProfilesText
+            pendingExportProfilesText = null
+            if (uri != null && !text.isNullOrEmpty()) {
+                runOnDefaultDispatcher {
+                    try {
+                        val resolver = (context ?: MessageStore.getCurrentActivity() ?: SagerNet.application).contentResolver
+                        resolver.openOutputStream(uri)!!.bufferedWriter().use {
+                            it.write(text)
+                        }
+                        onMainDispatcher {
+                            safeSnackbar(R.string.action_export_msg)
+                        }
+                    } catch (e: Exception) {
+                        Logs.w(e)
+                        onMainDispatcher {
+                            safeSnackbar(e.readableMessage)
+                        }
+                    }
+                }
+            }
+        }
+
+    private fun getProfilesForExport(): Pair<List<ProxyEntity>, String> {
+        val isAll = isCurrentAllGroups()
+        val isSearching = currentSearchQuery.isNotBlank()
+        val currentFragment = getCurrentGroupFragment()
+
+        if (isSearching && currentFragment?.adapter != null) {
+            val ad = currentFragment.adapter!!
+            val list = ad.configurationIdList.mapNotNull { id ->
+                ad.configurationList[id] ?: ProfileManager.getProfile(id)
+            }
+            return Pair(list, "search_${currentSearchQuery.trim()}")
+        }
+
+        if (isAll) {
+            val list = SagerDatabase.proxyDao.getAll()
+            return Pair(list, "all")
+        }
+
+        val groupId = DataStore.selectedGroup.takeIf { it > 0 } ?: DataStore.currentGroupId()
+        val group = SagerDatabase.groupDao.getById(groupId)
+        val list = SagerDatabase.proxyDao.getByGroup(groupId)
+        return Pair(list, group?.displayName() ?: "group_$groupId")
+    }
+
     private fun cancelSearch(searchView: SearchView) {
+        currentSearchQuery = ""
+        getCurrentGroupFragment()?.adapter?.filter("")
         searchView.onActionViewCollapsed()
         searchView.clearFocus()
+        activity?.invalidateOptionsMenu()
     }
 
 }

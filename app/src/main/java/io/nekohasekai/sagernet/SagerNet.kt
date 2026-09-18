@@ -111,6 +111,9 @@ class SagerNet : Application(),
         }
 
         if (isMainProcess) {
+            if (DataStore.appTheme !in setOf(Theme.BLACK, Theme.WHITE, Theme.LIGHT_GRAY)) {
+                DataStore.appTheme = Theme.LIGHT_GRAY
+            }
             Theme.apply(this)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && DataStore.useSystemTheme) {
                 com.google.android.material.color.DynamicColors.applyToActivitiesIfAvailable(this)

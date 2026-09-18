@@ -41,51 +41,19 @@ object Theme {
     const val LIGHT_GRAY = 24
     const val CUSTOM = 99
 
-    private fun defaultTheme() = GREEN
+    private fun defaultTheme() = LIGHT_GRAY
 
     fun getClosestThemeForColor(color: Int): Int {
         val hsv = FloatArray(3)
         Color.colorToHSV(color, hsv)
-        val hue = hsv[0]
         val sat = hsv[1]
         val value = hsv[2]
 
-        if (sat < 0.18f) {
-            return when {
-                value >= 0.88f -> WHITE
-                value >= 0.70f -> LIGHT_GRAY
-                value <= 0.25f -> BLACK
-                else -> GREY
-            }
+        return when {
+            sat < 0.18f && value >= 0.88f -> WHITE
+            sat < 0.18f && value <= 0.25f -> BLACK
+            else -> LIGHT_GRAY
         }
-
-        val colors = app.resources.getIntArray(R.array.material_colors)
-        var minDistance = Double.MAX_VALUE
-        var closestTheme = GREEN
-        val targetHsv = FloatArray(3)
-
-        for (i in colors.indices) {
-            val c = colors[i]
-            Color.colorToHSV(c, targetHsv)
-            val tHue = targetHsv[0]
-            val tSat = targetHsv[1]
-            val tVal = targetHsv[2]
-
-            if (tSat < 0.18f) continue
-
-            val hueDiff = kotlin.math.abs(hue - tHue)
-            val circularHueDiff = kotlin.math.min(hueDiff, 360f - hueDiff)
-
-            val dist = circularHueDiff * circularHueDiff * 3.0 +
-                    (sat - tSat) * (sat - tSat) * 10000.0 +
-                    (value - tVal) * (value - tVal) * 5000.0
-
-            if (dist < minDistance) {
-                minDistance = dist
-                closestTheme = i + 1
-            }
-        }
-        return closestTheme
     }
 
     fun getSystemWallpaperColor(context: Context): Int? {
@@ -151,71 +119,29 @@ object Theme {
 
     fun getTheme(theme: Int): Int {
         return when (theme) {
-            MONET -> R.style.Theme_SagerNet_Monet
-            RED -> R.style.Theme_SagerNet_Red
-            PINK -> R.style.Theme_SagerNet
-            PINK_SSR -> R.style.Theme_SagerNet_Pink_SSR
-            PURPLE -> R.style.Theme_SagerNet_Purple
-            DEEP_PURPLE -> R.style.Theme_SagerNet_DeepPurple
-            INDIGO -> R.style.Theme_SagerNet_Indigo
-            BLUE -> R.style.Theme_SagerNet_Blue
-            LIGHT_BLUE -> R.style.Theme_SagerNet_LightBlue
-            CYAN -> R.style.Theme_SagerNet_Cyan
-            TEAL -> R.style.Theme_SagerNet_Teal
-            GREEN -> R.style.Theme_SagerNet_Green
-            LIGHT_GREEN -> R.style.Theme_SagerNet_LightGreen
-            LIME -> R.style.Theme_SagerNet_Lime
-            YELLOW -> R.style.Theme_SagerNet_Yellow
-            AMBER -> R.style.Theme_SagerNet_Amber
-            ORANGE -> R.style.Theme_SagerNet_Orange
-            DEEP_ORANGE -> R.style.Theme_SagerNet_DeepOrange
-            BROWN -> R.style.Theme_SagerNet_Brown
-            GREY -> R.style.Theme_SagerNet_Grey
-            BLUE_GREY -> R.style.Theme_SagerNet_BlueGrey
             BLACK -> R.style.Theme_SagerNet_Black
-            VERDANT_MINT -> R.style.Theme_SagerNet_VerdantMint
             WHITE -> R.style.Theme_SagerNet_White
             LIGHT_GRAY -> R.style.Theme_SagerNet_LightGray
-            CUSTOM -> {
-                DataStore.appTheme = defaultTheme()
-                getTheme(defaultTheme())
+            else -> {
+                if (DataStore.appTheme !in setOf(BLACK, WHITE, LIGHT_GRAY)) {
+                    DataStore.appTheme = LIGHT_GRAY
+                }
+                R.style.Theme_SagerNet_LightGray
             }
-            else -> getTheme(defaultTheme())
         }
     }
 
     fun getDialogTheme(theme: Int): Int {
         return when (theme) {
-            MONET -> R.style.Theme_SagerNet_Dialog_Monet
-            RED -> R.style.Theme_SagerNet_Dialog_Red
-            PINK -> R.style.Theme_SagerNet_Dialog
-            PINK_SSR -> R.style.Theme_SagerNet_Dialog_Pink_SSR
-            PURPLE -> R.style.Theme_SagerNet_Dialog_Purple
-            DEEP_PURPLE -> R.style.Theme_SagerNet_Dialog_DeepPurple
-            INDIGO -> R.style.Theme_SagerNet_Dialog_Indigo
-            BLUE -> R.style.Theme_SagerNet_Dialog_Blue
-            LIGHT_BLUE -> R.style.Theme_SagerNet_Dialog_LightBlue
-            CYAN -> R.style.Theme_SagerNet_Dialog_Cyan
-            TEAL -> R.style.Theme_SagerNet_Dialog_Teal
-            GREEN -> R.style.Theme_SagerNet_Dialog_Green
-            LIGHT_GREEN -> R.style.Theme_SagerNet_Dialog_LightGreen
-            LIME -> R.style.Theme_SagerNet_Dialog_Lime
-            YELLOW -> R.style.Theme_SagerNet_Dialog_Yellow
-            AMBER -> R.style.Theme_SagerNet_Dialog_Amber
-            ORANGE -> R.style.Theme_SagerNet_Dialog_Orange
-            DEEP_ORANGE -> R.style.Theme_SagerNet_Dialog_DeepOrange
-            BROWN -> R.style.Theme_SagerNet_Dialog_Brown
-            GREY -> R.style.Theme_SagerNet_Dialog_Grey
-            BLUE_GREY -> R.style.Theme_SagerNet_Dialog_BlueGrey
             BLACK -> R.style.Theme_SagerNet_Dialog_Black
-            VERDANT_MINT -> R.style.Theme_SagerNet_Dialog_VerdantMint
             WHITE -> R.style.Theme_SagerNet_Dialog_White
             LIGHT_GRAY -> R.style.Theme_SagerNet_Dialog_LightGray
-            CUSTOM -> {
-                DataStore.appTheme = defaultTheme()
-                getDialogTheme(defaultTheme())
+            else -> {
+                if (DataStore.appTheme !in setOf(BLACK, WHITE, LIGHT_GRAY)) {
+                    DataStore.appTheme = LIGHT_GRAY
+                }
+                R.style.Theme_SagerNet_Dialog_LightGray
             }
-            else -> getDialogTheme(defaultTheme())
         }
     }
 
