@@ -16,19 +16,11 @@ class MarqueeTextView @JvmOverloads constructor(
         isSingleLine = true
         ellipsize = TextUtils.TruncateAt.MARQUEE
         marqueeRepeatLimit = -1
-        isFocusable = true
-        isFocusableInTouchMode = true
+        isFocusable = false
+        isFocusableInTouchMode = false
         setHorizontallyScrolling(true)
         isSelected = true
     }
 
     override fun isFocused(): Boolean = true
-
-    override fun onFocusChanged(focused: Boolean, direction: Int, previouslyFocusedRect: Rect?) {
-        super.onFocusChanged(true, direction, previouslyFocusedRect)
-    }
-
-    override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
-        super.onWindowFocusChanged(true)
-    }
 }

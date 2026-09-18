@@ -18,7 +18,7 @@
             android:id="@+id/content_lin"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:focusable="true"
+            android:focusable="false"
             android:orientation="vertical">
 
             <LinearLayout
@@ -136,8 +136,8 @@
                     android:singleLine="true"
                     android:ellipsize="marquee"
                     android:marqueeRepeatLimit="marquee_forever"
-                    android:focusable="true"
-                    android:focusableInTouchMode="true"
+                    android:focusable="false"
+                    android:focusableInTouchMode="false"
                     android:scrollHorizontally="true"
                     tools:text="@string/server_address"
                     android:textAppearance="?android:attr/textAppearanceSmall"

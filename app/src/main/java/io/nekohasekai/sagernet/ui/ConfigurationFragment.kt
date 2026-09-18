@@ -32,6 +32,8 @@ import androidx.appcompat.widget.Toolbar
 import androidx.core.graphics.ColorUtils
 import androidx.core.graphics.drawable.DrawableCompat
 import androidx.core.net.toUri
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
 import androidx.core.view.size
@@ -344,13 +346,20 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
     }
 
+    val isSearchActive: Boolean
+        get() {
+            val searchItem = if (isToolbarInitialized) toolbar.menu.findItem(R.id.action_search) else null
+            val searchView = (searchItem?.actionView as? SearchView) ?: (if (isToolbarInitialized) toolbar.findViewById<SearchView>(R.id.action_search) else null)
+            return searchView != null && !searchView.isIconified
+        }
+
     private var searchJob: Job? = null
 
     override fun onQueryTextChange(query: String): Boolean {
         currentSearchQuery = query
         searchJob?.cancel()
         searchJob = lifecycleScope.launch {
-            delay(80)
+            delay(150)
             getCurrentGroupFragment()?.adapter?.filter(query)
             updateToolbarMenuTitles()
         }
@@ -426,9 +435,14 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     private fun showSoftKeyboard(view: View?) {
         if (view == null) return
-        view.requestFocus()
-        val imm = view.context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
-        imm?.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT)
+        view.post {
+            view.requestFocus()
+            val imm = view.context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+            imm?.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT)
+            activity?.window?.let { win ->
+                WindowCompat.getInsetsController(win, view).show(WindowInsetsCompat.Type.ime())
+            }
+        }
     }
 
     private fun updateSearchMaxWidth(searchView: SearchView) {
@@ -481,6 +495,11 @@ class ConfigurationFragment @JvmOverloads constructor(
         editText?.setHintTextColor(hintColor)
         editText?.imeOptions = EditorInfo.IME_ACTION_SEARCH or EditorInfo.IME_FLAG_NO_FULLSCREEN
 
+        editText?.setOnFocusChangeListener { v, hasFocus ->
+            if (hasFocus) {
+                showSoftKeyboard(v)
+            }
+        }
         editText?.setOnClickListener {
             showSoftKeyboard(editText)
         }
@@ -635,7 +654,7 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             searchView.setOnCloseListener {
                 cancelSearch(searchView)
-                false
+                true
             }
         }
 
@@ -2424,7 +2443,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             checkOrderMenu()
             updateSubscriptionInfoCard()
             val pf = parentFragment as? ConfigurationFragment
-            if (pf == null || pf.currentSearchQuery.isBlank()) {
+            if (pf == null || (!pf.isSearchActive && pf.currentSearchQuery.isBlank())) {
                 configurationListView.requestFocus()
             }
         }
@@ -2559,6 +2578,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             if (!::proxyGroup.isInitialized) return
 
             configurationListView = view.findViewById(R.id.configuration_list)
+            configurationListView.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
             setupLayoutManager()
             configurationListView.layoutManager = layoutManager
             adapter = ConfigurationAdapter()
@@ -3854,16 +3874,26 @@ class ConfigurationFragment @JvmOverloads constructor(
         return Pair(list, group?.displayName() ?: "group_$groupId")
     }
 
+    private var isCancelingSearch = false
+
     private fun cancelSearch(searchView: SearchView) {
-        currentSearchQuery = ""
-        searchJob?.cancel()
-        getCurrentGroupFragment()?.adapter?.filter("")
-        toolbar.menu.findItem(R.id.action_add)?.isVisible = true
-        toolbar.title = getString(R.string.app_name)
-        searchView.setQuery("", false)
-        searchView.isIconified = true
-        searchView.clearFocus()
-        updateToolbarMenuTitles()
+        if (isCancelingSearch) return
+        isCancelingSearch = true
+        try {
+            currentSearchQuery = ""
+            searchJob?.cancel()
+            getCurrentGroupFragment()?.adapter?.filter("")
+            toolbar.menu.findItem(R.id.action_add)?.isVisible = true
+            toolbar.title = getString(R.string.app_name)
+            searchView.setQuery("", false)
+            if (!searchView.isIconified) {
+                searchView.isIconified = true
+            }
+            searchView.clearFocus()
+            updateToolbarMenuTitles()
+        } finally {
+            isCancelingSearch = false
+        }
     }
 
 }
