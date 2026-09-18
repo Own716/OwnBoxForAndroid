@@ -22,6 +22,7 @@ open class ToolbarFragment : Fragment {
     constructor(contentLayoutId: Int) : super(contentLayoutId)
 
     lateinit var toolbar: Toolbar
+    val isToolbarInitialized: Boolean get() = ::toolbar.isInitialized
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)

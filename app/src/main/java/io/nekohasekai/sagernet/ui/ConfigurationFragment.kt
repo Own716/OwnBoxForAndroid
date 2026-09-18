@@ -328,7 +328,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             if (adapter.groupList.size > position) {
                 val group = adapter.groupList[position]
                 adapter.selectedGroupIndex = position
-                activity?.invalidateOptionsMenu()
+                updateToolbarMenuTitles()
                 if (currentSearchQuery.isNotEmpty()) {
                     getCurrentGroupFragment()?.adapter?.filter(currentSearchQuery)
                 }
@@ -341,14 +341,26 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
     }
 
+    private var searchJob: Job? = null
+
     override fun onQueryTextChange(query: String): Boolean {
         currentSearchQuery = query
-        getCurrentGroupFragment()?.adapter?.filter(query)
-        activity?.invalidateOptionsMenu()
-        return false
+        searchJob?.cancel()
+        searchJob = lifecycleScope.launch {
+            delay(80)
+            getCurrentGroupFragment()?.adapter?.filter(query)
+            updateToolbarMenuTitles()
+        }
+        return true
     }
 
-    override fun onQueryTextSubmit(query: String): Boolean = false
+    override fun onQueryTextSubmit(query: String): Boolean {
+        currentSearchQuery = query
+        searchJob?.cancel()
+        getCurrentGroupFragment()?.adapter?.filter(query)
+        updateToolbarMenuTitles()
+        return true
+    }
 
     private fun showGroupSettingsConfirmDialog(group: ProxyGroup) {
         if (!isAdded || isDetached) return
@@ -374,6 +386,89 @@ class ConfigurationFragment @JvmOverloads constructor(
                 item.icon = tinted
             }
         }
+    }
+
+    private fun updateToolbarMenuTitles() {
+        if (!isToolbarInitialized) return
+        val isAll = isCurrentAllGroups()
+        val isSearching = currentSearchQuery.isNotBlank()
+        val exportItem = toolbar.menu.findItem(R.id.action_export)
+        if (isSearching) {
+            exportItem?.title = "导出搜索结果"
+        } else if (isAll) {
+            exportItem?.title = "导出配置（全部）"
+        } else {
+            exportItem?.title = "导出配置（本组）"
+        }
+        if (isAll) {
+            toolbar.menu.findItem(R.id.action_update_subscription)?.setTitle("更新全部订阅")
+            toolbar.menu.findItem(R.id.action_connection_url_test)?.setTitle("URL 测试（全部）")
+            toolbar.menu.findItem(R.id.action_connection_tcp_ping)?.setTitle("TCP Ping 测试（全部）")
+            toolbar.menu.findItem(R.id.action_speed_test_group)?.setTitle("速度测试（全部）")
+            toolbar.menu.findItem(R.id.action_clear_traffic_statistics)?.setTitle("清空全部流量统计数据")
+            toolbar.menu.findItem(R.id.action_remove_duplicate)?.setTitle("删除全部重复的服务器")
+            toolbar.menu.findItem(R.id.action_connection_test_clear_results)?.setTitle("清理全部测试结果")
+            toolbar.menu.findItem(R.id.action_connection_test_delete_unavailable)?.setTitle("清理全部不可用配置")
+        } else {
+            toolbar.menu.findItem(R.id.action_update_subscription)?.setTitle(R.string.update_current_subscription)
+            toolbar.menu.findItem(R.id.action_connection_url_test)?.setTitle(R.string.connection_test_url_test)
+            toolbar.menu.findItem(R.id.action_connection_tcp_ping)?.setTitle(R.string.connection_test_tcp_ping)
+            toolbar.menu.findItem(R.id.action_speed_test_group)?.setTitle(R.string.speed_test_group)
+            toolbar.menu.findItem(R.id.action_clear_traffic_statistics)?.setTitle(R.string.clear_traffic_statistics)
+            toolbar.menu.findItem(R.id.action_remove_duplicate)?.setTitle(R.string.remove_duplicate)
+            toolbar.menu.findItem(R.id.action_connection_test_clear_results)?.setTitle(R.string.connection_test_clear_results)
+            toolbar.menu.findItem(R.id.action_connection_test_delete_unavailable)?.setTitle(R.string.connection_test_delete_unavailable)
+        }
+    }
+
+    private fun updateSearchMaxWidth(searchView: SearchView) {
+        if (!isToolbarInitialized) return
+        val tbWidth = toolbar.width
+        if (tbWidth > 0) {
+            searchView.maxWidth = (tbWidth - dp2px(112)).coerceAtLeast(dp2px(160))
+        } else {
+            toolbar.post {
+                if (isAdded && !isDetached && isToolbarInitialized) {
+                    val postW = toolbar.width
+                    if (postW > 0) {
+                        searchView.maxWidth = (postW - dp2px(112)).coerceAtLeast(dp2px(160))
+                    }
+                }
+            }
+        }
+    }
+
+    private fun styleSearchView(searchView: SearchView) {
+        val ctx = context ?: return
+        val textColor: Int
+        val hintColor: Int
+        when {
+            Theme.isWhiteTheme() -> {
+                textColor = Color.parseColor("#212121")
+                hintColor = Color.parseColor("#8A000000")
+            }
+            Theme.isLightGrayTheme() -> {
+                textColor = Color.parseColor("#1F2937")
+                hintColor = Color.parseColor("#6B7280")
+            }
+            Theme.isBlackTheme() -> {
+                textColor = Color.WHITE
+                hintColor = Color.parseColor("#CAC4D0")
+            }
+            else -> {
+                textColor = ctx.getColorAttr(android.R.attr.textColorPrimary)
+                hintColor = ctx.getColorAttr(android.R.attr.textColorSecondary)
+            }
+        }
+        val editText = searchView.findViewById<TextView>(androidx.appcompat.R.id.search_src_text)
+        editText?.setTextColor(textColor)
+        editText?.setHintTextColor(hintColor)
+        val closeBtn = searchView.findViewById<ImageView>(androidx.appcompat.R.id.search_close_btn)
+        closeBtn?.setColorFilter(textColor)
+        val searchBtn = searchView.findViewById<ImageView>(androidx.appcompat.R.id.search_button)
+        searchBtn?.setColorFilter(textColor)
+        val magBtn = searchView.findViewById<ImageView>(androidx.appcompat.R.id.search_mag_icon)
+        magBtn?.setColorFilter(textColor)
     }
 
     @SuppressLint("DetachAndAttachSameFragment")
@@ -494,19 +589,31 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
         }
 
-        val searchView = toolbar.findViewById<SearchView>(R.id.action_search)
+        val searchItem = toolbar.menu.findItem(R.id.action_search)
+        val searchView = (searchItem?.actionView as? SearchView) ?: toolbar.findViewById<SearchView>(R.id.action_search)
         if (searchView != null) {
+            styleSearchView(searchView)
+            updateSearchMaxWidth(searchView)
             searchView.setOnQueryTextListener(this)
-            searchView.maxWidth = Int.MAX_VALUE
 
-            searchView.setOnQueryTextFocusChangeListener { _, hasFocus ->
-                if (!hasFocus && searchView.query.isNullOrEmpty()) {
-                    cancelSearch(searchView)
-                }
+            searchView.setOnSearchClickListener {
+                toolbar.menu.findItem(R.id.action_add)?.isVisible = false
+                toolbar.title = ""
+                updateSearchMaxWidth(searchView)
+                updateToolbarMenuTitles()
             }
+
             searchView.setOnCloseListener {
                 cancelSearch(searchView)
                 false
+            }
+        }
+
+        toolbar.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            val sItem = toolbar.menu.findItem(R.id.action_search)
+            val sv = (sItem?.actionView as? SearchView) ?: toolbar.findViewById<SearchView>(R.id.action_search)
+            if (sv != null && toolbar.width > 0) {
+                sv.maxWidth = (toolbar.width - dp2px(112)).coerceAtLeast(dp2px(160))
             }
         }
 
@@ -600,35 +707,7 @@ class ConfigurationFragment @JvmOverloads constructor(
     override fun onPrepareOptionsMenu(menu: Menu) {
         menu.findItem(R.id.action_global_mode)?.isChecked = DataStore.globalMode
         menu.findItem(R.id.action_hide_unavailable)?.isChecked = DataStore.hideUnavailableProfiles
-        val isAll = isCurrentAllGroups()
-        val isSearching = currentSearchQuery.isNotBlank()
-        val exportItem = menu.findItem(R.id.action_export)
-        if (isSearching) {
-            exportItem?.title = "导出搜索结果"
-        } else if (isAll) {
-            exportItem?.title = "导出配置（全部）"
-        } else {
-            exportItem?.title = "导出配置（本组）"
-        }
-        if (isAll) {
-            menu.findItem(R.id.action_update_subscription)?.setTitle("更新全部订阅")
-            menu.findItem(R.id.action_connection_url_test)?.setTitle("URL 测试（全部）")
-            menu.findItem(R.id.action_connection_tcp_ping)?.setTitle("TCP Ping 测试（全部）")
-            menu.findItem(R.id.action_speed_test_group)?.setTitle("速度测试（全部）")
-            menu.findItem(R.id.action_clear_traffic_statistics)?.setTitle("清空全部流量统计数据")
-            menu.findItem(R.id.action_remove_duplicate)?.setTitle("删除全部重复的服务器")
-            menu.findItem(R.id.action_connection_test_clear_results)?.setTitle("清理全部测试结果")
-            menu.findItem(R.id.action_connection_test_delete_unavailable)?.setTitle("清理全部不可用配置")
-        } else {
-            menu.findItem(R.id.action_update_subscription)?.setTitle(R.string.update_current_subscription)
-            menu.findItem(R.id.action_connection_url_test)?.setTitle(R.string.connection_test_url_test)
-            menu.findItem(R.id.action_connection_tcp_ping)?.setTitle(R.string.connection_test_tcp_ping)
-            menu.findItem(R.id.action_speed_test_group)?.setTitle(R.string.speed_test_group)
-            menu.findItem(R.id.action_clear_traffic_statistics)?.setTitle(R.string.clear_traffic_statistics)
-            menu.findItem(R.id.action_remove_duplicate)?.setTitle(R.string.remove_duplicate)
-            menu.findItem(R.id.action_connection_test_clear_results)?.setTitle(R.string.connection_test_clear_results)
-            menu.findItem(R.id.action_connection_test_delete_unavailable)?.setTitle(R.string.connection_test_delete_unavailable)
-        }
+        updateToolbarMenuTitles()
         super.onPrepareOptionsMenu(menu)
     }
 
@@ -689,7 +768,8 @@ class ConfigurationFragment @JvmOverloads constructor(
     }
 
     override fun onBackPressed(): Boolean {
-        val searchView = toolbar.findViewById<SearchView>(R.id.action_search)
+        val searchItem = toolbar.menu.findItem(R.id.action_search)
+        val searchView = (searchItem?.actionView as? SearchView) ?: toolbar.findViewById<SearchView>(R.id.action_search)
         if (searchView != null && !searchView.isIconified) {
             cancelSearch(searchView)
             return true
@@ -1207,6 +1287,45 @@ class ConfigurationFragment @JvmOverloads constructor(
                     pendingExportProfilesText = links
                     onMainDispatcher {
                         startFilesForResult(exportProfilesToFile, "profiles_${name}.txt")
+                    }
+                }
+                return true
+            }
+
+            R.id.action_export_qr -> {
+                val isSearching = currentSearchQuery.isNotBlank()
+                runOnDefaultDispatcher {
+                    val (profiles, _) = getProfilesForExport()
+                    if (profiles.isEmpty()) {
+                        onMainDispatcher {
+                            if (isSearching) safeSnackbar("未找到匹配的搜索结果") else safeSnackbar(R.string.no_proxies_found_in_subscription)
+                        }
+                        return@runOnDefaultDispatcher
+                    }
+                    val validProfiles = profiles.filter { it.haveStandardLink() || it.haveLink() }
+                    if (validProfiles.isEmpty()) {
+                        onMainDispatcher {
+                            safeSnackbar("当前没有支持二维码导出的节点")
+                        }
+                        return@runOnDefaultDispatcher
+                    }
+                    val first = validProfiles.first()
+                    val hasStd = first.haveStandardLink()
+                    val stdLink = if (hasStd) runCatching { first.toStdLink() }.getOrNull() else null
+                    val universalLink = if (first.haveLink()) runCatching { first.requireBean().toUniversalLink() }.getOrNull() else null
+                    val title = first.displayName() ?: ""
+                    onMainDispatcher {
+                        if (validProfiles.size > 1) {
+                            safeSnackbar("共找到 ${validProfiles.size} 个节点，已展示第 1 个节点的二维码")
+                        }
+                        QRCodeDialog(
+                            stdLink = stdLink,
+                            universalLink = universalLink,
+                            displayName = title,
+                            displayType = first.displayType(),
+                            typeInt = first.type,
+                            initialIsSn = false
+                        ).showAllowingStateLoss(parentFragmentManager)
                     }
                 }
                 return true
@@ -3682,10 +3801,14 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     private fun cancelSearch(searchView: SearchView) {
         currentSearchQuery = ""
+        searchJob?.cancel()
         getCurrentGroupFragment()?.adapter?.filter("")
-        searchView.onActionViewCollapsed()
+        toolbar.menu.findItem(R.id.action_add)?.isVisible = true
+        toolbar.title = getString(R.string.app_name)
+        searchView.setQuery("", false)
+        searchView.isIconified = true
         searchView.clearFocus()
-        activity?.invalidateOptionsMenu()
+        updateToolbarMenuTitles()
     }
 
 }
