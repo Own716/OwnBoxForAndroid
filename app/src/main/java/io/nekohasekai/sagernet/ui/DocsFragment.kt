@@ -221,12 +221,12 @@ class DocsFragment : ToolbarFragment(R.layout.layout_docs) {
         allItems.add(
             DocListItem.Item(
                 category = "用户界面设置",
-                title = "动态取色与纯色主题 (useSystemTheme / appTheme)",
+                title = "纯色主题与夜间模式 (appTheme / nightTheme)",
                 badge = "推荐: 按个人偏好",
-                desc = "支持 Android 12+ Monet 莫奈原生壁纸动态取色、自定义 HEX 主题色、纯白白底模式及深色模式适配。",
-                prosCons = "【利】个性化视觉体验，纯白清爽明亮，系统动态取色与桌面壁纸浑然一体；【弊】无负面影响。",
+                desc = "支持经典黑、纯白及浅灰纯色主题与深色模式适配。",
+                prosCons = "【利】纯净视觉体验，深色清爽护眼；【弊】无负面影响。",
                 recommendation = "【最稳推荐：自由选用】对网络核心与底层代理协议零影响，按视觉喜好设定即可。",
-                keywords = "主题 莫奈 动态取色 纯白 夜间 颜色",
+                keywords = "主题 纯白 浅灰 经典黑 夜间 颜色",
             )
         )
 

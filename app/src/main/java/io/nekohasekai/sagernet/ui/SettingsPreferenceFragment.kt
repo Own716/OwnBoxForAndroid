@@ -94,20 +94,7 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat(), OnPreferenceDataS
 
         val categoryUI = findPreference<ExpandablePreferenceCategory>("categoryUI")
         val appTheme = findPreference<ColorPickerPreference>(Key.APP_THEME)!!
-        val useSystemTheme = findPreference<SwitchPreference>(Key.USE_SYSTEM_THEME)!!
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-            categoryUI?.setChildVisibilityRule(Key.USE_SYSTEM_THEME) { false }
-            useSystemTheme.isVisible = false
-        } else {
-            useSystemTheme.setOnPreferenceChangeListener { _, newValue ->
-                val enabled = newValue as Boolean
-                DataStore.useSystemTheme = enabled
-                appTheme.isEnabled = !enabled
-                activity?.recreate()
-                true
-            }
-            appTheme.isEnabled = !DataStore.useSystemTheme
-        }
+        appTheme.isEnabled = true
 
         appTheme.setOnPreferenceChangeListener { _, newValue ->
             DataStore.appTheme = (newValue as Number).toInt()

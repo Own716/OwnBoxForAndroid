@@ -69,12 +69,6 @@
             app:summary="@string/show_subscription_info_card_summary"
             app:title="@string/show_subscription_info_card" />
 
-        <SwitchPreference
-            app:defaultValue="false"
-            app:icon="@drawable/ic_baseline_color_lens_24"
-            app:key="useSystemTheme"
-            app:summary="@string/use_system_theme_summary"
-            app:title="@string/use_system_theme" />
 
         <moe.matsuri.nb4a.ui.ColorPickerPreference
             android:title="@string/theme"
