@@ -491,6 +491,10 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     private fun updateSearchMaxWidth(searchView: SearchView) {
         if (!isToolbarInitialized) return
+        if (searchView.isIconified) {
+            searchView.maxWidth = dp2px(48)
+            return
+        }
         val tbWidth = toolbar.width
         if (tbWidth > 0) {
             val maxW = (tbWidth - dp2px(112)).coerceAtLeast(dp2px(160))
@@ -500,6 +504,10 @@ class ConfigurationFragment @JvmOverloads constructor(
         } else {
             toolbar.post {
                 if (isAdded && !isDetached && isToolbarInitialized) {
+                    if (searchView.isIconified) {
+                        searchView.maxWidth = dp2px(48)
+                        return@post
+                    }
                     val postW = toolbar.width
                     if (postW > 0) {
                         val maxW = (postW - dp2px(112)).coerceAtLeast(dp2px(160))
@@ -545,12 +553,6 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
         }
         editText?.setOnClickListener {
-            showSoftKeyboard(editText)
-        }
-        searchView.setOnClickListener {
-            if (searchView.isIconified) {
-                searchView.isIconified = false
-            }
             showSoftKeyboard(editText)
         }
 
@@ -759,9 +761,13 @@ class ConfigurationFragment @JvmOverloads constructor(
                 val sItem = toolbar.menu.findItem(R.id.action_search)
                 val sv = (sItem?.actionView as? SearchView) ?: toolbar.findViewById<SearchView>(R.id.action_search)
                 if (sv != null) {
-                    val targetW = (newWidth - dp2px(112)).coerceAtLeast(dp2px(160))
-                    if (sv.maxWidth != targetW) {
-                        sv.maxWidth = targetW
+                    if (!sv.isIconified) {
+                        val targetW = (newWidth - dp2px(112)).coerceAtLeast(dp2px(160))
+                        if (sv.maxWidth != targetW) {
+                            sv.maxWidth = targetW
+                        }
+                    } else {
+                        sv.maxWidth = dp2px(48)
                     }
                 }
             }
@@ -3983,17 +3989,26 @@ class ConfigurationFragment @JvmOverloads constructor(
             currentSearchQuery = ""
             searchJob?.cancel()
             getCurrentGroupFragment()?.adapter?.filter("")
+
+            searchView.setQuery("", false)
+            searchView.onActionViewCollapsed()
+            val searchItem = toolbar.menu.findItem(R.id.action_search)
+            searchItem?.collapseActionView()
+            searchView.clearFocus()
+            searchView.maxWidth = dp2px(48)
+
             toolbar.menu.findItem(R.id.action_add)?.isVisible = true
             toolbar.title = getString(R.string.app_name)
 
+            val primaryColor = when {
+                Theme.isWhiteTheme() -> Color.parseColor("#212121")
+                Theme.isLightGrayTheme() -> Color.parseColor("#1F2937")
+                Theme.isBlackTheme() -> Color.WHITE
+                else -> requireContext().getColorAttr(android.R.attr.textColorPrimary)
+            }
+
             if (!select) {
                 toolbar.setNavigationIcon(R.drawable.ic_navigation_menu)
-                val primaryColor = when {
-                    Theme.isWhiteTheme() -> Color.parseColor("#212121")
-                    Theme.isLightGrayTheme() -> Color.parseColor("#1F2937")
-                    Theme.isBlackTheme() -> Color.WHITE
-                    else -> requireContext().getColorAttr(android.R.attr.textColorPrimary)
-                }
                 toolbar.navigationIcon?.let {
                     val tinted = it.mutate()
                     DrawableCompat.setTint(tinted, primaryColor)
@@ -4004,14 +4019,14 @@ class ConfigurationFragment @JvmOverloads constructor(
                 }
             }
 
-            searchView.setQuery("", false)
-            if (!searchView.isIconified) {
-                searchView.isIconified = true
-            }
-            searchView.clearFocus()
+            tintMenuIcons(toolbar.menu, primaryColor)
+
             val imm = requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
             imm?.hideSoftInputFromWindow(searchView.windowToken, 0)
             updateToolbarMenuTitles()
+            toolbar.post {
+                toolbar.requestLayout()
+            }
         } finally {
             isCancelingSearch = false
         }
