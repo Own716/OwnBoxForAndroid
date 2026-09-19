@@ -37,6 +37,8 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
 import androidx.core.view.size
+import androidx.core.view.GravityCompat
+import androidx.core.widget.addTextChangedListener
 import io.nekohasekai.sagernet.utils.Theme
 import kotlinx.coroutines.delay
 import androidx.fragment.app.Fragment
@@ -359,8 +361,28 @@ class ConfigurationFragment @JvmOverloads constructor(
         currentSearchQuery = query
         searchJob?.cancel()
         searchJob = lifecycleScope.launch {
-            delay(150)
-            getCurrentGroupFragment()?.adapter?.filter(query)
+            if (query.isNotBlank()) {
+                delay(180)
+            }
+            val groupFragment = getCurrentGroupFragment() ?: return@launch
+            val adapter = groupFragment.adapter ?: return@launch
+            val trimmed = query.trim()
+            if (trimmed.isEmpty()) {
+                adapter.filter("")
+            } else {
+                val lower = trimmed.lowercase()
+                val matched = withContext(Dispatchers.Default) {
+                    val all = adapter.allConfigurationIdList
+                    val map = adapter.configurationList
+                    all.filter { id ->
+                        val entity = map[id] ?: return@filter false
+                        (entity.displayName()?.lowercase()?.contains(lower) == true) ||
+                                (entity.displayType()?.lowercase()?.contains(lower) == true) ||
+                                (entity.displayAddress()?.lowercase()?.contains(lower) == true)
+                    }
+                }
+                adapter.applyFilterResult(matched)
+            }
             updateToolbarMenuTitles()
         }
         return true
@@ -369,8 +391,30 @@ class ConfigurationFragment @JvmOverloads constructor(
     override fun onQueryTextSubmit(query: String): Boolean {
         currentSearchQuery = query
         searchJob?.cancel()
-        getCurrentGroupFragment()?.adapter?.filter(query)
-        updateToolbarMenuTitles()
+        val groupFragment = getCurrentGroupFragment()
+        val adapter = groupFragment?.adapter
+        if (adapter != null) {
+            val trimmed = query.trim()
+            if (trimmed.isEmpty()) {
+                adapter.filter("")
+            } else {
+                val lower = trimmed.lowercase()
+                lifecycleScope.launch {
+                    val matched = withContext(Dispatchers.Default) {
+                        val all = adapter.allConfigurationIdList
+                        val map = adapter.configurationList
+                        all.filter { id ->
+                            val entity = map[id] ?: return@filter false
+                            (entity.displayName()?.lowercase()?.contains(lower) == true) ||
+                                    (entity.displayType()?.lowercase()?.contains(lower) == true) ||
+                                    (entity.displayAddress()?.lowercase()?.contains(lower) == true)
+                        }
+                    }
+                    adapter.applyFilterResult(matched)
+                    updateToolbarMenuTitles()
+                }
+            }
+        }
         return true
     }
 
@@ -495,9 +539,9 @@ class ConfigurationFragment @JvmOverloads constructor(
         editText?.setHintTextColor(hintColor)
         editText?.imeOptions = EditorInfo.IME_ACTION_SEARCH or EditorInfo.IME_FLAG_NO_FULLSCREEN
 
-        editText?.setOnFocusChangeListener { v, hasFocus ->
+        searchView.setOnQueryTextFocusChangeListener { _, hasFocus ->
             if (hasFocus) {
-                showSoftKeyboard(v)
+                showSoftKeyboard(editText)
             }
         }
         editText?.setOnClickListener {
@@ -512,6 +556,32 @@ class ConfigurationFragment @JvmOverloads constructor(
 
         val closeBtn = searchView.findViewById<ImageView>(androidx.appcompat.R.id.search_close_btn)
         closeBtn?.setColorFilter(textColor)
+
+        // Ensure close button stays visible while search is active
+        editText?.addTextChangedListener {
+            if (!searchView.isIconified) {
+                closeBtn?.visibility = View.VISIBLE
+            }
+        }
+
+        closeBtn?.setOnClickListener {
+            val text = editText?.text?.toString().orEmpty()
+            if (text.isNotEmpty()) {
+                editText?.setText("")
+                currentSearchQuery = ""
+                searchJob?.cancel()
+                getCurrentGroupFragment()?.adapter?.filter("")
+                updateToolbarMenuTitles()
+                closeBtn.post {
+                    if (!searchView.isIconified) {
+                        closeBtn.visibility = View.VISIBLE
+                    }
+                }
+            } else {
+                cancelSearch(searchView)
+            }
+        }
+
         val searchBtn = searchView.findViewById<ImageView>(androidx.appcompat.R.id.search_button)
         searchBtn?.setColorFilter(textColor)
         val magBtn = searchView.findViewById<ImageView>(androidx.appcompat.R.id.search_mag_icon)
@@ -648,13 +718,37 @@ class ConfigurationFragment @JvmOverloads constructor(
                 toolbar.title = ""
                 updateSearchMaxWidth(searchView)
                 updateToolbarMenuTitles()
+
+                // Show back navigation arrow on the toolbar for clear exit path
+                if (!select) {
+                    toolbar.setNavigationIcon(R.drawable.baseline_arrow_back_24)
+                    val primaryColor = when {
+                        Theme.isWhiteTheme() -> Color.parseColor("#212121")
+                        Theme.isLightGrayTheme() -> Color.parseColor("#1F2937")
+                        Theme.isBlackTheme() -> Color.WHITE
+                        else -> requireContext().getColorAttr(android.R.attr.textColorPrimary)
+                    }
+                    toolbar.navigationIcon?.let {
+                        val tinted = it.mutate()
+                        DrawableCompat.setTint(tinted, primaryColor)
+                        toolbar.navigationIcon = tinted
+                    }
+                    toolbar.setNavigationOnClickListener {
+                        cancelSearch(searchView)
+                    }
+                }
+
                 val editText = searchView.findViewById<SearchView.SearchAutoComplete>(androidx.appcompat.R.id.search_src_text)
+                val closeBtn = searchView.findViewById<ImageView>(androidx.appcompat.R.id.search_close_btn)
+                closeBtn?.visibility = View.VISIBLE
                 showSoftKeyboard(editText)
             }
 
             searchView.setOnCloseListener {
-                cancelSearch(searchView)
-                true
+                if (!isCancelingSearch) {
+                    cancelSearch(searchView)
+                }
+                false
             }
         }
 
@@ -3007,6 +3101,12 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             private val updated = HashSet<ProxyEntity>()
 
+            fun applyFilterResult(matched: List<Long>) {
+                configurationIdList.clear()
+                configurationIdList.addAll(matched)
+                notifyDataSetChanged()
+            }
+
             fun filter(name: String) {
                 val query = name.trim()
                 if (query.isEmpty()) {
@@ -3885,11 +3985,32 @@ class ConfigurationFragment @JvmOverloads constructor(
             getCurrentGroupFragment()?.adapter?.filter("")
             toolbar.menu.findItem(R.id.action_add)?.isVisible = true
             toolbar.title = getString(R.string.app_name)
+
+            if (!select) {
+                toolbar.setNavigationIcon(R.drawable.ic_navigation_menu)
+                val primaryColor = when {
+                    Theme.isWhiteTheme() -> Color.parseColor("#212121")
+                    Theme.isLightGrayTheme() -> Color.parseColor("#1F2937")
+                    Theme.isBlackTheme() -> Color.WHITE
+                    else -> requireContext().getColorAttr(android.R.attr.textColorPrimary)
+                }
+                toolbar.navigationIcon?.let {
+                    val tinted = it.mutate()
+                    DrawableCompat.setTint(tinted, primaryColor)
+                    toolbar.navigationIcon = tinted
+                }
+                toolbar.setNavigationOnClickListener {
+                    (activity as? MainActivity)?.binding?.drawerLayout?.openDrawer(GravityCompat.START)
+                }
+            }
+
             searchView.setQuery("", false)
             if (!searchView.isIconified) {
                 searchView.isIconified = true
             }
             searchView.clearFocus()
+            val imm = requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+            imm?.hideSoftInputFromWindow(searchView.windowToken, 0)
             updateToolbarMenuTitles()
         } finally {
             isCancelingSearch = false
