@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"libcore/protocol/vless/internal/xray/signal/done"
@@ -17,9 +18,14 @@ type splitConn struct {
 	remoteAddr net.Addr
 	localAddr  net.Addr
 	onClose    func()
+	closeOnce  sync.Once
+	closed     atomic.Bool
 }
 
 func (c *splitConn) Write(b []byte) (int, error) {
+	if c.closed.Load() {
+		return 0, io.ErrClosedPipe
+	}
 	return c.writer.Write(b)
 }
 
@@ -28,25 +34,30 @@ func (c *splitConn) Read(b []byte) (int, error) {
 }
 
 func (c *splitConn) Close() error {
-	if c.onClose != nil {
-		c.onClose()
-	}
+	var err error
+	c.closeOnce.Do(func() {
+		c.closed.Store(true)
+		if c.onClose != nil {
+			c.onClose()
+		}
+		var err1, err2 error
+		if c.writer != nil {
+			err1 = c.writer.Close()
+		}
+		if c.reader != nil {
+			err2 = c.reader.Close()
+		}
+		if err1 != nil {
+			err = err1
+		} else {
+			err = err2
+		}
+	})
+	return err
+}
 
-	var err, err2 error
-	if c.writer != nil {
-		err = c.writer.Close()
-	}
-	if c.reader != nil {
-		err2 = c.reader.Close()
-	}
-	if err != nil {
-		return err
-	}
-	if err2 != nil {
-		return err2
-	}
-
-	return nil
+func (c *splitConn) IsClosed() bool {
+	return c.closed.Load()
 }
 
 func (c *splitConn) LocalAddr() net.Addr {
@@ -58,17 +69,14 @@ func (c *splitConn) RemoteAddr() net.Addr {
 }
 
 func (c *splitConn) SetDeadline(t time.Time) error {
-	// TODO cannot do anything useful
 	return nil
 }
 
 func (c *splitConn) SetReadDeadline(t time.Time) error {
-	// TODO cannot do anything useful
 	return nil
 }
 
 func (c *splitConn) SetWriteDeadline(t time.Time) error {
-	// TODO cannot do anything useful
 	return nil
 }
 
@@ -76,6 +84,7 @@ type H1Conn struct {
 	UnreadedResponsesCount int
 	RespBufReader          *bufio.Reader
 	net.Conn
+	closed atomic.Bool
 }
 
 func NewH1Conn(conn net.Conn) *H1Conn {
@@ -83,6 +92,17 @@ func NewH1Conn(conn net.Conn) *H1Conn {
 		RespBufReader: bufio.NewReader(conn),
 		Conn:          conn,
 	}
+}
+
+func (c *H1Conn) Close() error {
+	if c.closed.CompareAndSwap(false, true) {
+		return c.Conn.Close()
+	}
+	return nil
+}
+
+func (c *H1Conn) IsClosed() bool {
+	return c.closed.Load()
 }
 
 type httpServerConn struct {

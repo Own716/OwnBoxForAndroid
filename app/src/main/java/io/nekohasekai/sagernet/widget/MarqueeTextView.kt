@@ -22,5 +22,15 @@ class MarqueeTextView @JvmOverloads constructor(
         isSelected = true
     }
 
-    override fun isFocused(): Boolean = true
+    override fun onFocusChanged(focused: Boolean, direction: Int, previouslyFocusedRect: Rect?) {
+        if (focused) {
+            super.onFocusChanged(focused, direction, previouslyFocusedRect)
+        }
+    }
+
+    override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+        if (hasWindowFocus) {
+            super.onWindowFocusChanged(hasWindowFocus)
+        }
+    }
 }

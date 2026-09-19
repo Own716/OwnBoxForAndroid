@@ -12,6 +12,7 @@ import (
 
 type XmuxConn interface {
 	IsClosed() bool
+	Close() error
 }
 
 type XmuxClient struct {
@@ -29,6 +30,7 @@ type XmuxManager struct {
 	newConnFunc func() XmuxConn
 	xmuxClients []*XmuxClient
 	mtx         sync.Mutex
+	closed      bool
 }
 
 func NewXmuxManager(options V2RayXHTTPXmuxOptions, newConnFunc func() XmuxConn) *XmuxManager {
@@ -63,12 +65,16 @@ func (m *XmuxManager) newXmuxClient() *XmuxClient {
 func (m *XmuxManager) GetXmuxClient(ctx context.Context) *XmuxClient {
 	m.mtx.Lock()
 	defer m.mtx.Unlock()
+	if m.closed {
+		return m.newXmuxClient()
+	}
 	for i := 0; i < len(m.xmuxClients); {
 		xmuxClient := m.xmuxClients[i]
 		if xmuxClient.XmuxConn.IsClosed() ||
 			xmuxClient.leftUsage == 0 ||
 			xmuxClient.LeftRequests.Load() <= 0 ||
 			(xmuxClient.UnreusableAt != time.Time{} && time.Now().After(xmuxClient.UnreusableAt)) {
+			_ = xmuxClient.XmuxConn.Close()
 			m.xmuxClients = append(m.xmuxClients[:i], m.xmuxClients[i+1:]...)
 		} else {
 			i++
@@ -99,4 +105,17 @@ func (m *XmuxManager) GetXmuxClient(ctx context.Context) *XmuxClient {
 		xmuxClient.leftUsage -= 1
 	}
 	return xmuxClient
+}
+
+func (m *XmuxManager) Close() error {
+	m.mtx.Lock()
+	defer m.mtx.Unlock()
+	m.closed = true
+	for _, client := range m.xmuxClients {
+		if client != nil && client.XmuxConn != nil {
+			_ = client.XmuxConn.Close()
+		}
+	}
+	m.xmuxClients = nil
+	return nil
 }
