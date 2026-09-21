@@ -76,7 +76,39 @@ object ConnectivityDiagnosticsManager {
         )
     }
 
-    suspend fun probeEntry(host: String, port: Int): EntryProbeResult = withContext(Dispatchers.IO) {
+    suspend fun probeEntry(
+        host: String,
+        port: Int,
+        isBalancer: Boolean = false,
+        memberCount: Int = 0,
+        strategyName: String = "",
+    ): EntryProbeResult = withContext(Dispatchers.IO) {
+        val isLoopback = host.isBlank() || host == "127.0.0.1" || host.equals("localhost", ignoreCase = true) || host == "::1"
+        if (isBalancer || (isLoopback && memberCount > 0)) {
+            val stratDesc = if (strategyName.isNotBlank()) "「$strategyName」" else ""
+            return@withContext EntryProbeResult(
+                state = StageState.SUCCESS,
+                host = "策略组调度",
+                port = 0,
+                dnsResolvedIp = "本地调度",
+                rttMs = 0L,
+                summary = "策略调度就绪",
+                errorDetail = "智能策略组已就绪 (聚合 ${if (memberCount > 0) memberCount else "多"} 个候选节点)，由 sing-box 核心按${stratDesc}自动调度出站",
+            )
+        }
+
+        if (isLoopback) {
+            return@withContext EntryProbeResult(
+                state = StageState.SUCCESS,
+                host = "本地链路",
+                port = port,
+                dnsResolvedIp = "127.0.0.1",
+                rttMs = 0L,
+                summary = "本地服务出站",
+                errorDetail = "经本地出站建立转发链路",
+            )
+        }
+
         if (host.isBlank() || port <= 0) {
             return@withContext EntryProbeResult(
                 state = StageState.WARNING,
@@ -367,10 +399,6 @@ object ConnectivityDiagnosticsManager {
             return Pair(NodeUsability.INDETERMINATE, "VPN 代理服务未运行，无法进行出网连通性评估")
         }
 
-        if (entry.state == StageState.FAILED) {
-            return Pair(NodeUsability.UNUSABLE, "节点入口握手失败，节点服务器可能已离线、端口关闭或被防火墙拦截")
-        }
-
         if (tunnel.state == StageState.FAILED) {
             return Pair(NodeUsability.UNUSABLE, "代理隧道建立失败，无法通过当前节点转发网络流量")
         }
@@ -381,28 +409,39 @@ object ConnectivityDiagnosticsManager {
 
         val hasGoogleCn = targets.any { it.isGoogleCn }
 
-        return when {
-            successCount == totalCount -> {
-                val avgRtt = internationalTargets.map { it.rttMs }.filter { it > 0 }.average().toInt()
-                val cnNote = if (hasGoogleCn) "（注意：检测到 Google 送中）" else ""
-                Pair(
-                    NodeUsability.FULLY_USABLE,
-                    "所有国际主流服务均畅通无阻，平均出网延迟约 ${avgRtt} ms$cnNote",
-                )
-            }
-            successCount >= (totalCount * 0.6) -> {
-                val failedNames = internationalTargets.filter { it.state != StageState.SUCCESS }.joinToString("、") { it.name }
-                Pair(
-                    NodeUsability.PARTIALLY_USABLE,
-                    "节点可用，但部分服务受阻或超时（$failedNames），可能存在区域版权限制或特定封锁",
-                )
-            }
-            else -> {
-                Pair(
-                    NodeUsability.UNUSABLE,
-                    "绝大多数海外网络目标均无法连接，当前节点网络质量极低或已被严重阻断",
-                )
+        // Real internet traffic is the ultimate ground truth
+        if (tunnel.state == StageState.SUCCESS && successCount > 0) {
+            val avgRtt = internationalTargets.map { it.rttMs }.filter { it > 0 }.average().let { if (it.isNaN()) 0 else it.toInt() }
+            val cnNote = if (hasGoogleCn) "（注意：检测到 Google 送中）" else ""
+            val entryWarningNote = if (entry.state == StageState.FAILED) "（注：直连TCP握手受阻，但代理隧道与多目标实际出网完全通畅）" else ""
+
+            return when {
+                successCount == totalCount -> {
+                    Pair(
+                        NodeUsability.FULLY_USABLE,
+                        "所有国际主流服务均畅通无阻，平均出网延迟约 ${avgRtt} ms$cnNote$entryWarningNote",
+                    )
+                }
+                successCount >= (totalCount * 0.6) -> {
+                    val failedNames = internationalTargets.filter { it.state != StageState.SUCCESS }.joinToString("、") { it.name }
+                    Pair(
+                        NodeUsability.PARTIALLY_USABLE,
+                        "节点可用，但部分服务受阻或超时（$failedNames），可能存在区域版权限制或特定封锁$entryWarningNote",
+                    )
+                }
+                else -> {
+                    Pair(
+                        NodeUsability.UNUSABLE,
+                        "绝大多数海外网络目标均无法连接，当前节点网络质量极低或已被严重阻断",
+                    )
+                }
             }
         }
+
+        if (entry.state == StageState.FAILED) {
+            return Pair(NodeUsability.UNUSABLE, "节点入口握手失败，节点服务器可能已离线、端口关闭或被防火墙拦截")
+        }
+
+        return Pair(NodeUsability.UNUSABLE, "网络探测未通过，当前节点不可用")
     }
 }

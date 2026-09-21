@@ -95,7 +95,7 @@ class MediaUnlockActivity : ThemedActivity() {
         if (!DataStore.serviceState.connected) {
             Toast.makeText(this, getString(R.string.vpn_not_connected_warning), Toast.LENGTH_LONG).show()
             val initialList = MediaUnlockManager.createInitialItems(notConnected = true)
-            adapter.submitList(initialList)
+            adapter.setItems(initialList)
             binding.tvSummaryStats.text = "代理服务未连接"
             binding.tvSummaryRate.text = "未开始"
             binding.progressUnlockRatio.progress = 0
@@ -103,7 +103,7 @@ class MediaUnlockActivity : ThemedActivity() {
         }
 
         val items = MediaUnlockManager.createInitialItems(notConnected = false)
-        adapter.submitList(items.map { it.copy() })
+        adapter.setItems(items)
 
         val total = items.size
         binding.progressUnlockRatio.max = total
@@ -135,7 +135,7 @@ class MediaUnlockActivity : ThemedActivity() {
                         }
 
                         items[index] = tested
-                        adapter.notifyItemChanged(index)
+                        adapter.updateItem(index, tested)
 
                         completedCount++
                         if (tested.status == UnlockStatus.UNLOCKED || tested.status == UnlockStatus.PARTIAL) {
@@ -151,12 +151,24 @@ class MediaUnlockActivity : ThemedActivity() {
         }
     }
 
-    class MediaUnlockAdapter : ListAdapter<MediaUnlockItem, MediaUnlockAdapter.VH>(DiffCallback) {
+    class MediaUnlockAdapter : RecyclerView.Adapter<MediaUnlockAdapter.VH>() {
 
-        object DiffCallback : DiffUtil.ItemCallback<MediaUnlockItem>() {
-            override fun areItemsTheSame(oldItem: MediaUnlockItem, newItem: MediaUnlockItem) = oldItem.id == newItem.id
-            override fun areContentsTheSame(oldItem: MediaUnlockItem, newItem: MediaUnlockItem) = oldItem == newItem
+        private val items = ArrayList<MediaUnlockItem>()
+
+        fun setItems(newItems: List<MediaUnlockItem>) {
+            items.clear()
+            items.addAll(newItems)
+            notifyDataSetChanged()
         }
+
+        fun updateItem(index: Int, item: MediaUnlockItem) {
+            if (index in items.indices) {
+                items[index] = item
+                notifyItemChanged(index)
+            }
+        }
+
+        override fun getItemCount(): Int = items.size
 
         class VH(view: View) : RecyclerView.ViewHolder(view) {
             val icon: ImageView = view.findViewById(R.id.iv_platform_icon)
@@ -175,7 +187,7 @@ class MediaUnlockActivity : ThemedActivity() {
 
         @SuppressLint("SetTextI18n")
         override fun onBindViewHolder(holder: VH, position: Int) {
-            val item = getItem(position)
+            val item = items[position]
             holder.icon.setImageResource(item.iconRes)
             holder.name.text = item.name
             holder.category.text = item.category

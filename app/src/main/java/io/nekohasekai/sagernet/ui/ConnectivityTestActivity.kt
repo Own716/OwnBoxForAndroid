@@ -27,6 +27,7 @@ import io.nekohasekai.sagernet.database.ProfileManager
 import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.databinding.ActivityConnectivityTestBinding
+import io.nekohasekai.sagernet.fmt.internal.BalancerBean
 import io.nekohasekai.sagernet.tools.connectivity.ConnectivityDiagnosticsManager
 import io.nekohasekai.sagernet.tools.connectivity.EntryProbeResult
 import io.nekohasekai.sagernet.tools.connectivity.NodeUsability
@@ -113,15 +114,61 @@ class ConnectivityTestActivity : ThemedActivity(), SagerConnection.Callback {
         val proxy = getCurrentTargetProxy()
         val nodeName = proxy?.displayName() ?: getString(R.string.unknown)
         val bean = runCatching { proxy?.requireBean() }.getOrNull()
-        val host = bean?.serverAddress.orEmpty()
-        val port = bean?.serverPort ?: 0
+        val isBalancer = proxy?.type == ProxyEntity.TYPE_BALANCER || bean is BalancerBean
+        val balancerBean = if (isBalancer) (proxy?.balancerBean ?: bean as? BalancerBean) else null
+
+        var host = bean?.serverAddress.orEmpty()
+        var port = bean?.serverPort ?: 0
+        var memberCount = 0
+        var strategyDesc = ""
+
+        if (isBalancer && balancerBean != null) {
+            val members = runCatching {
+                if (balancerBean.balancerType == BalancerBean.TYPE_GROUP) {
+                    val targetGids = when {
+                        balancerBean.targetGroupIds.isNotEmpty() -> balancerBean.targetGroupIds
+                        balancerBean.targetGroupId > 0L -> listOf(balancerBean.targetGroupId)
+                        else -> emptyList()
+                    }
+                    targetGids.flatMap { SagerDatabase.proxyDao.getByGroup(it) }
+                } else {
+                    val raw = SagerDatabase.proxyDao.getEntities(balancerBean.proxies).associateBy { it.id }
+                    balancerBean.proxies.mapNotNull { raw[it] }
+                }.filter { it.type != ProxyEntity.TYPE_BALANCER && !DataStore.isGroupDisabled(it.groupId) }
+            }.getOrDefault(emptyList())
+
+            memberCount = members.size
+            strategyDesc = when (balancerBean.strategy) {
+                BalancerBean.STRATEGY_LEAST_PING -> "最低延迟"
+                BalancerBean.STRATEGY_LEAST_LOAD -> "最低负载"
+                BalancerBean.STRATEGY_RANDOM -> "随机选择"
+                BalancerBean.STRATEGY_ROUND_ROBIN, BalancerBean.STRATEGY_ROUND_ROBIN_LEGACY -> "轮询"
+                BalancerBean.STRATEGY_FAILOVER -> "故障转移"
+                BalancerBean.STRATEGY_STABLE -> "最稳定"
+                BalancerBean.STRATEGY_CONSISTENT_HASH -> "一致性哈希"
+                else -> balancerBean.strategy.orEmpty().ifEmpty { "调度器" }
+            }
+
+            val firstMember = members.firstOrNull()
+            val firstBean = runCatching { firstMember?.requireBean() }.getOrNull()
+            if (firstBean != null && firstBean.serverAddress.isNotBlank() && firstBean.serverPort > 0 && firstBean.serverAddress != "127.0.0.1") {
+                host = firstBean.serverAddress
+                port = firstBean.serverPort
+                binding.tvCurrentTarget.text = "目标入口: 策略调度 · 候选 $host:$port"
+            } else {
+                host = ""
+                port = 0
+                binding.tvCurrentTarget.text = "目标入口: 策略调度 ($strategyDesc · 聚合 $memberCount 节点)"
+            }
+        } else {
+            binding.tvCurrentTarget.text = if (host.isNotBlank() && port > 0) {
+                "目标入口: $host:$port"
+            } else {
+                "目标入口: 未配置"
+            }
+        }
 
         binding.tvCurrentNode.text = nodeName
-        binding.tvCurrentTarget.text = if (host.isNotBlank() && port > 0) {
-            "目标入口: $host:$port"
-        } else {
-            "目标入口: 未配置"
-        }
 
         // Initialize Stage 1 UI
         binding.progressEntry.visibility = View.VISIBLE
@@ -145,7 +192,7 @@ class ConnectivityTestActivity : ThemedActivity(), SagerConnection.Callback {
 
         testJob = lifecycleScope.launch {
             // --- Stage 1: Inbound Entry Probe ---
-            val entryResult = ConnectivityDiagnosticsManager.probeEntry(host, port)
+            val entryResult = ConnectivityDiagnosticsManager.probeEntry(host, port, isBalancer, memberCount, strategyDesc)
             if (isNodeChanged()) return@launch
 
             withContext(Dispatchers.Main) {
@@ -205,7 +252,7 @@ class ConnectivityTestActivity : ThemedActivity(), SagerConnection.Callback {
         binding.tvEntryDetail.text = entry.errorDetail ?: "DNS 解析成功 (${entry.dnsResolvedIp ?: entry.host})，物理握手延迟 ${entry.rttMs} ms"
 
         if (entry.state == StageState.SUCCESS) {
-            binding.badgeEntry.text = "${entry.rttMs} ms"
+            binding.badgeEntry.text = if (entry.rttMs > 0) "${entry.rttMs} ms" else "就绪"
             binding.badgeEntry.setTextColor(Color.parseColor("#059669"))
         } else {
             binding.badgeEntry.text = "握手受阻"

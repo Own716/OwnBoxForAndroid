@@ -31,10 +31,21 @@ class ConnectivityVerdictTest {
     }
 
     @Test
-    fun failedEntryLeadsToUnusable() {
+    fun failedEntryWithSuccessfulTargetsStillUsable() {
         val entry = EntryProbeResult(state = StageState.FAILED, summary = "握手超时")
         val tunnel = TunnelProbeResult(state = StageState.SUCCESS)
         val targets = dummyTargets(setOf(0, 1, 2, 3, 4, 5))
+
+        val (verdict, explanation) = ConnectivityDiagnosticsManager.synthesizeUsability(entry, tunnel, targets, isConnected = true)
+        assertEquals(NodeUsability.FULLY_USABLE, verdict)
+        assertTrue(explanation.contains("直连TCP握手受阻"))
+    }
+
+    @Test
+    fun failedEntryAndFailedTunnelLeadsToUnusable() {
+        val entry = EntryProbeResult(state = StageState.FAILED, summary = "握手超时")
+        val tunnel = TunnelProbeResult(state = StageState.FAILED)
+        val targets = dummyTargets(emptySet())
 
         val (verdict, _) = ConnectivityDiagnosticsManager.synthesizeUsability(entry, tunnel, targets, isConnected = true)
         assertEquals(NodeUsability.UNUSABLE, verdict)

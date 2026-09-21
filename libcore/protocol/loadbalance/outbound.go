@@ -136,6 +136,15 @@ func hashDestination(dest M.Socksaddr) uint32 {
 	return h
 }
 
+func (s *LoadBalance) isNodeDegraded(idx int, now int64) bool {
+	if idx < 0 || idx >= len(s.stats) || s.stats[idx] == nil {
+		return false
+	}
+	fails := s.stats[idx].consecutiveFails.Load()
+	lastFail := s.stats[idx].lastFailTime.Load()
+	return fails >= 2 && now-lastFail < 30_000
+}
+
 func (s *LoadBalance) candidateIndices(dest M.Socksaddr) []int {
 	n := len(s.outbounds)
 	if n == 0 {
@@ -145,28 +154,25 @@ func (s *LoadBalance) candidateIndices(dest M.Socksaddr) []int {
 	for i := 0; i < n; i++ {
 		indices[i] = i
 	}
+	now := time.Now().UnixMilli()
+
 	switch s.strategy {
 	case "failover":
-		now := time.Now().UnixMilli()
 		healthy := make([]int, 0, n)
 		degraded := make([]int, 0, n)
 		for i := 0; i < n; i++ {
-			fails := s.stats[i].consecutiveFails.Load()
-			lastFail := s.stats[i].lastFailTime.Load()
-			// If >= 2 consecutive failures and within 30s cooldown, mark as degraded
-			if fails >= 2 && now-lastFail < 30_000 {
+			if s.isNodeDegraded(i, now) {
 				degraded = append(degraded, i)
 			} else {
 				healthy = append(healthy, i)
 			}
 		}
 		if len(healthy) == 0 {
-			// All degraded, try in original order
 			return indices
 		}
 		return append(healthy, degraded...)
+
 	case "stable":
-		now := time.Now().UnixMilli()
 		scores := make([]int64, n)
 		for i := 0; i < n; i++ {
 			total := s.stats[i].totalDials.Load()
@@ -197,9 +203,24 @@ func (s *LoadBalance) candidateIndices(dest M.Socksaddr) []int {
 			}
 			return 0
 		})
+		return indices
+
 	case "leastLoad":
-		// Sort outbounds by active connections ascending
-		slices.SortStableFunc(indices, func(a, b int) int {
+		healthy := make([]int, 0, n)
+		degraded := make([]int, 0, n)
+		for i := 0; i < n; i++ {
+			if s.isNodeDegraded(i, now) {
+				degraded = append(degraded, i)
+			} else {
+				healthy = append(healthy, i)
+			}
+		}
+		if len(healthy) == 0 {
+			healthy = indices
+			degraded = nil
+		}
+		// Sort healthy by active connections ascending
+		slices.SortStableFunc(healthy, func(a, b int) int {
 			ca := s.activeConns[a].Load()
 			cb := s.activeConns[b].Load()
 			if ca < cb {
@@ -209,32 +230,106 @@ func (s *LoadBalance) candidateIndices(dest M.Socksaddr) []int {
 			}
 			return 0
 		})
+		// If destination affinity is present and sticky node load is not excessive, promote it
+		if (dest.Fqdn != "" || dest.IsIP()) && len(healthy) > 1 {
+			hashIdx := int(hashDestination(dest) % uint32(len(healthy)))
+			bestIdx := healthy[0]
+			targetCandidate := healthy[hashIdx]
+			if s.activeConns[targetCandidate].Load() <= s.activeConns[bestIdx].Load()+3 {
+				for pos, cand := range healthy {
+					if cand == targetCandidate {
+						copy(healthy[1:pos+1], healthy[0:pos])
+						healthy[0] = targetCandidate
+						break
+					}
+				}
+			}
+		}
+		return append(healthy, degraded...)
+
 	case "consistent_hash":
+		healthy := make([]int, 0, n)
+		degraded := make([]int, 0, n)
+		for i := 0; i < n; i++ {
+			if s.isNodeDegraded(i, now) {
+				degraded = append(degraded, i)
+			} else {
+				healthy = append(healthy, i)
+			}
+		}
+		if len(healthy) == 0 {
+			healthy = indices
+			degraded = nil
+		}
+		hn := len(healthy)
+		rotated := make([]int, hn)
 		if dest.Fqdn != "" || dest.IsIP() {
-			start := int(hashDestination(dest) % uint32(n))
-			for i := 0; i < n; i++ {
-				indices[i] = (start + i) % n
+			start := int(hashDestination(dest) % uint32(hn))
+			for i := 0; i < hn; i++ {
+				rotated[i] = healthy[(start+i)%hn]
 			}
 		} else {
-			start := int(atomic.AddUint64(&s.counter, 1) % uint64(n))
-			for i := 0; i < n; i++ {
-				indices[i] = (start + i) % n
+			start := int(atomic.AddUint64(&s.counter, 1) % uint64(hn))
+			for i := 0; i < hn; i++ {
+				rotated[i] = healthy[(start+i)%hn]
 			}
 		}
+		return append(rotated, degraded...)
+
 	case "random":
-		start := rand.Intn(n)
+		healthy := make([]int, 0, n)
+		degraded := make([]int, 0, n)
 		for i := 0; i < n; i++ {
-			indices[i] = (start + i) % n
+			if s.isNodeDegraded(i, now) {
+				degraded = append(degraded, i)
+			} else {
+				healthy = append(healthy, i)
+			}
 		}
+		if len(healthy) == 0 {
+			healthy = indices
+			degraded = nil
+		}
+		hn := len(healthy)
+		start := rand.Intn(hn)
+		rotated := make([]int, hn)
+		for i := 0; i < hn; i++ {
+			rotated[i] = healthy[(start+i)%hn]
+		}
+		return append(rotated, degraded...)
+
 	case "round_robin", "roundRobin":
 		fallthrough
 	default:
-		start := int(atomic.AddUint64(&s.counter, 1) % uint64(n))
+		healthy := make([]int, 0, n)
+		degraded := make([]int, 0, n)
 		for i := 0; i < n; i++ {
-			indices[i] = (start + i) % n
+			if s.isNodeDegraded(i, now) {
+				degraded = append(degraded, i)
+			} else {
+				healthy = append(healthy, i)
+			}
 		}
+		if len(healthy) == 0 {
+			healthy = indices
+			degraded = nil
+		}
+		hn := len(healthy)
+		rotated := make([]int, hn)
+		// Maintain destination stickiness to avoid video buffering / session resets
+		if dest.Fqdn != "" || dest.IsIP() {
+			start := int(hashDestination(dest) % uint32(hn))
+			for i := 0; i < hn; i++ {
+				rotated[i] = healthy[(start+i)%hn]
+			}
+		} else {
+			start := int(atomic.AddUint64(&s.counter, 1) % uint64(hn))
+			for i := 0; i < hn; i++ {
+				rotated[i] = healthy[(start+i)%hn]
+			}
+		}
+		return append(rotated, degraded...)
 	}
-	return indices
 }
 
 type trackedConn struct {
@@ -267,7 +362,11 @@ func (s *LoadBalance) DialContext(ctx context.Context, network string, destinati
 		)
 		start := time.Now()
 		if i < n-1 {
-			candidateCtx, cancel := context.WithTimeout(ctx, 3500*time.Millisecond)
+			timeout := 2200 * time.Millisecond
+			if idx < len(s.stats) && s.stats[idx] != nil && s.stats[idx].consecutiveFails.Load() > 0 {
+				timeout = 1200 * time.Millisecond
+			}
+			candidateCtx, cancel := context.WithTimeout(ctx, timeout)
 			conn, err = candidate.DialContext(candidateCtx, network, destination)
 			cancel()
 		} else {
@@ -327,7 +426,11 @@ func (s *LoadBalance) ListenPacket(ctx context.Context, destination M.Socksaddr)
 		)
 		start := time.Now()
 		if i < n-1 {
-			candidateCtx, cancel := context.WithTimeout(ctx, 3500*time.Millisecond)
+			timeout := 2200 * time.Millisecond
+			if idx < len(s.stats) && s.stats[idx] != nil && s.stats[idx].consecutiveFails.Load() > 0 {
+				timeout = 1200 * time.Millisecond
+			}
+			candidateCtx, cancel := context.WithTimeout(ctx, timeout)
 			conn, err = candidate.ListenPacket(candidateCtx, destination)
 			cancel()
 		} else {
