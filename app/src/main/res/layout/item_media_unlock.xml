@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="10dp"
-    app:cardCornerRadius="@dimen/card_corner_radius"
+    app:cardCornerRadius="14dp"
     app:cardElevation="0dp"
     app:strokeColor="@color/card_stroke"
     app:strokeWidth="1dp">
@@ -24,14 +24,14 @@
 
             <ImageView
                 android:id="@+id/iv_platform_icon"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
                 tools:src="@drawable/ic_platform_netflix" />
 
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
+                android:layout_marginStart="14dp"
                 android:layout_weight="1"
                 android:orientation="vertical">
 
@@ -40,9 +40,9 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textColor="?android:attr/textColorPrimary"
-                    android:textSize="16sp"
+                    android:textSize="15sp"
                     android:textStyle="bold"
-                    tools:text="Netflix" />
+                    tools:text="Claude (Anthropic)" />
 
                 <TextView
                     android:id="@+id/tv_platform_category"
@@ -50,7 +50,7 @@
                     android:layout_height="wrap_content"
                     android:textColor="?android:attr/textColorSecondary"
                     android:textSize="11sp"
-                    tools:text="流媒体平台" />
+                    tools:text="AI 智能服务" />
 
             </LinearLayout>
 
@@ -62,16 +62,35 @@
                 app:indicatorSize="20dp"
                 app:trackThickness="2.5dp" />
 
-            <TextView
-                android:id="@+id/tv_status_badge"
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                android:visibility="gone"
-                tools:text="完整解锁 🇺🇸 US"
-                tools:textColor="#10B981"
-                tools:visibility="visible" />
+                android:gravity="end"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tv_status_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:visibility="gone"
+                    tools:text="原生全解锁 🇺🇸 US"
+                    tools:textColor="#059669"
+                    tools:visibility="visible" />
+
+                <TextView
+                    android:id="@+id/tv_latency"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textColor="?android:attr/textColorSecondary"
+                    android:textSize="11sp"
+                    android:visibility="gone"
+                    tools:text="156 ms"
+                    tools:visibility="visible" />
+
+            </LinearLayout>
 
         </LinearLayout>
 
@@ -81,8 +100,8 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:textColor="?android:attr/textColorSecondary"
-            android:textSize="13sp"
-            tools:text="完整支持全部非自制版权剧集与自制剧" />
+            android:textSize="12sp"
+            tools:text="完整支持播放全部非自制版权剧集与自制剧" />
 
     </LinearLayout>
 

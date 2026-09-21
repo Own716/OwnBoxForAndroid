@@ -29,19 +29,21 @@
         <androidx.core.widget.NestedScrollView
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:padding="16dp">
+            android:paddingHorizontal="16dp"
+            android:paddingTop="12dp"
+            android:paddingBottom="40dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
-                <!-- Primary Status Card -->
+                <!-- 1. Primary Score & Reputation Card -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/card_status"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    app:cardCornerRadius="@dimen/card_corner_radius"
+                    app:cardCornerRadius="18dp"
                     app:cardElevation="2dp"
                     app:strokeWidth="0dp">
 
@@ -50,49 +52,94 @@
                         android:layout_height="wrap_content"
                         android:gravity="center_horizontal"
                         android:orientation="vertical"
-                        android:padding="24dp">
+                        android:padding="22dp">
 
                         <ImageView
                             android:id="@+id/iv_status_icon"
-                            android:layout_width="56dp"
-                            android:layout_height="56dp"
+                            android:layout_width="44dp"
+                            android:layout_height="44dp"
                             android:src="@drawable/ic_tool_ip_purity"
                             app:tint="@color/white" />
+
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:gravity="bottom"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:id="@+id/tv_score_number"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:fontFamily="sans-serif-black"
+                                android:textColor="@color/white"
+                                android:textSize="48sp"
+                                android:textStyle="bold"
+                                tools:text="96" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="4dp"
+                                android:layout_marginBottom="8dp"
+                                android:textColor="#E2E8F0"
+                                android:textSize="18sp"
+                                android:text="/ 100" />
+
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tv_score_badge"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:background="@drawable/bg_label_radius_24"
+                            android:backgroundTint="#33FFFFFF"
+                            android:paddingHorizontal="14dp"
+                            android:paddingVertical="4dp"
+                            android:textColor="@color/white"
+                            android:textSize="14sp"
+                            android:textStyle="bold"
+                            tools:text="极高纯净度 (原生住宅宽带)" />
 
                         <TextView
                             android:id="@+id/tv_status_title"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="12dp"
+                            android:layout_marginTop="8dp"
                             android:textColor="@color/white"
-                            android:textSize="20sp"
+                            android:textSize="15sp"
                             android:textStyle="bold"
-                            tools:text="数据中心 IP" />
+                            tools:text="原生住宅宽带 IP" />
 
                         <TextView
                             android:id="@+id/tv_status_desc"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
+                            android:layout_marginTop="4dp"
                             android:gravity="center"
                             android:textColor="#E2E8F0"
                             android:textSize="13sp"
-                            tools:text="已被标记为托管机房、数据中心或公共代理出口" />
+                            tools:text="基于双权威情报库综合评估，该出口属于真实家庭宽带，风险评分极低" />
 
                     </LinearLayout>
 
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- Data Reference Note Banner -->
+                <!-- 2. Data Conflict Alert Banner (Visible only when sources disagree) -->
                 <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/card_conflict"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
-                    app:cardBackgroundColor="?android:attr/colorBackground"
-                    app:cardCornerRadius="@dimen/card_corner_radius"
+                    android:visibility="gone"
+                    app:cardBackgroundColor="#FEF3C7"
+                    app:cardCornerRadius="14dp"
                     app:cardElevation="0dp"
-                    app:strokeColor="@color/card_stroke"
-                    app:strokeWidth="1dp">
+                    app:strokeColor="#F59E0B"
+                    app:strokeWidth="1dp"
+                    tools:visibility="visible">
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -104,28 +151,29 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="🛡️"
+                            android:text="⚠️"
                             android:textSize="18sp" />
 
                         <TextView
+                            android:id="@+id/tv_conflict_text"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="10dp"
                             android:layout_weight="1"
-                            android:text="数据参考 Scamalytics / IPinfo / AbuseIPDB 等全球权威风控数据库。"
-                            android:textColor="?android:attr/textColorSecondary"
-                            android:textSize="12sp" />
+                            android:textColor="#92400E"
+                            android:textSize="12sp"
+                            tools:text="数据源存在分歧：ip-api.com 未标记机房，但 api.ipapi.is 识别到数据中心特征，已从严介入评估。" />
 
                     </LinearLayout>
 
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- Device & Outbound Comparison Card -->
+                <!-- 3. Human vs Machine Traffic Ratio Card -->
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    app:cardCornerRadius="@dimen/card_corner_radius"
+                    android:layout_marginTop="14dp"
+                    app:cardCornerRadius="16dp"
                     app:cardElevation="1dp"
                     app:strokeColor="@color/card_stroke"
                     app:strokeWidth="1dp">
@@ -139,7 +187,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="物理网络与代理出口对比"
+                            android:text="人机流量特征比例预估"
                             android:textColor="?android:attr/textColorPrimary"
                             android:textSize="15sp"
                             android:textStyle="bold" />
@@ -147,11 +195,641 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
-                            android:text="说明：检测结果衡量的是当前节点出口 IP 的网络属性，与手机当前物理接入方式无关。"
+                            android:layout_marginTop="2dp"
+                            android:text="家庭住宅网络以真实人流为主，机房服务器则承载大量自动化爬虫/机器人流量。"
                             android:textColor="?android:attr/textColorSecondary"
                             android:textSize="12sp" />
 
+                        <ProgressBar
+                            android:id="@+id/progress_human_ratio"
+                            style="@android:style/Widget.ProgressBar.Horizontal"
+                            android:layout_width="match_parent"
+                            android:layout_height="12dp"
+                            android:layout_marginTop="12dp"
+                            android:max="100"
+                            android:progress="85"
+                            android:progressTint="#10B981" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:id="@+id/tv_human_ratio"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:textColor="#059669"
+                                android:textSize="13sp"
+                                android:textStyle="bold"
+                                tools:text="真实人流: 85%" />
+
+                            <TextView
+                                android:id="@+id/tv_machine_ratio"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textColor="#E11D48"
+                                android:textSize="13sp"
+                                android:textStyle="bold"
+                                tools:text="机器/爬虫: 15%" />
+
+                        </LinearLayout>
+
+                    </LinearLayout>
+
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- 4. 6-Dimensional Evidence Breakdown Card -->
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    app:cardCornerRadius="16dp"
+                    app:cardElevation="1dp"
+                    app:strokeColor="@color/card_stroke"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="多维风控特征证据分析"
+                            android:textColor="?android:attr/textColorPrimary"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+
+                        <!-- Dimension 1: Residential -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:orientation="vertical">
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal">
+
+                                <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:text="原生住宅属性 (Residential)"
+                                    android:textColor="?android:attr/textColorPrimary"
+                                    android:textSize="13sp" />
+
+                                <TextView
+                                    android:id="@+id/tv_residential_val"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:textStyle="bold"
+                                    tools:text="96%" />
+
+                            </LinearLayout>
+
+                            <ProgressBar
+                                android:id="@+id/progress_residential"
+                                style="@android:style/Widget.ProgressBar.Horizontal"
+                                android:layout_width="match_parent"
+                                android:layout_height="6dp"
+                                android:layout_marginTop="4dp"
+                                android:max="100"
+                                android:progress="96"
+                                android:progressTint="#059669" />
+
+                        </LinearLayout>
+
+                        <!-- Dimension 2: Datacenter -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:orientation="vertical">
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal">
+
+                                <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:text="机房托管概率 (Datacenter)"
+                                    android:textColor="?android:attr/textColorPrimary"
+                                    android:textSize="13sp" />
+
+                                <TextView
+                                    android:id="@+id/tv_datacenter_val"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:textStyle="bold"
+                                    tools:text="4%" />
+
+                            </LinearLayout>
+
+                            <ProgressBar
+                                android:id="@+id/progress_datacenter"
+                                style="@android:style/Widget.ProgressBar.Horizontal"
+                                android:layout_width="match_parent"
+                                android:layout_height="6dp"
+                                android:layout_marginTop="4dp"
+                                android:max="100"
+                                android:progress="4"
+                                android:progressTint="#E11D48" />
+
+                        </LinearLayout>
+
+                        <!-- Dimension 3: Proxy / VPN -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:orientation="vertical">
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal">
+
+                                <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:text="代理 / VPN 出口倾向 (Proxy/VPN)"
+                                    android:textColor="?android:attr/textColorPrimary"
+                                    android:textSize="13sp" />
+
+                                <TextView
+                                    android:id="@+id/tv_proxy_val"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:textStyle="bold"
+                                    tools:text="10%" />
+
+                            </LinearLayout>
+
+                            <ProgressBar
+                                android:id="@+id/progress_proxy"
+                                style="@android:style/Widget.ProgressBar.Horizontal"
+                                android:layout_width="match_parent"
+                                android:layout_height="6dp"
+                                android:layout_marginTop="4dp"
+                                android:max="100"
+                                android:progress="10"
+                                android:progressTint="#F59E0B" />
+
+                        </LinearLayout>
+
+                        <!-- Dimension 4: Abuse Record -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:orientation="vertical">
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal">
+
+                                <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:text="滥用 / 恶意活动记录 (Abuse)"
+                                    android:textColor="?android:attr/textColorPrimary"
+                                    android:textSize="13sp" />
+
+                                <TextView
+                                    android:id="@+id/tv_abuse_val"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:textStyle="bold"
+                                    tools:text="0%" />
+
+                            </LinearLayout>
+
+                            <ProgressBar
+                                android:id="@+id/progress_abuse"
+                                style="@android:style/Widget.ProgressBar.Horizontal"
+                                android:layout_width="match_parent"
+                                android:layout_height="6dp"
+                                android:layout_marginTop="4dp"
+                                android:max="100"
+                                android:progress="0"
+                                android:progressTint="#EF4444" />
+
+                        </LinearLayout>
+
+                        <!-- Dimension 5: Automation Tendency -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:orientation="vertical">
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal">
+
+                                <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:text="自动化流量特征 (Automation/Bot)"
+                                    android:textColor="?android:attr/textColorPrimary"
+                                    android:textSize="13sp" />
+
+                                <TextView
+                                    android:id="@+id/tv_automation_val"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:textStyle="bold"
+                                    tools:text="8%" />
+
+                            </LinearLayout>
+
+                            <ProgressBar
+                                android:id="@+id/progress_automation"
+                                style="@android:style/Widget.ProgressBar.Horizontal"
+                                android:layout_width="match_parent"
+                                android:layout_height="6dp"
+                                android:layout_marginTop="4dp"
+                                android:max="100"
+                                android:progress="8"
+                                android:progressTint="#8B5CF6" />
+
+                        </LinearLayout>
+
+                        <!-- Dimension 6: Confidence -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:orientation="vertical">
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal">
+
+                                <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:text="综合评估置信度 (Confidence)"
+                                    android:textColor="?android:attr/textColorPrimary"
+                                    android:textSize="13sp" />
+
+                                <TextView
+                                    android:id="@+id/tv_confidence_val"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:textStyle="bold"
+                                    tools:text="96%" />
+
+                            </LinearLayout>
+
+                            <ProgressBar
+                                android:id="@+id/progress_confidence"
+                                style="@android:style/Widget.ProgressBar.Horizontal"
+                                android:layout_width="match_parent"
+                                android:layout_height="6dp"
+                                android:layout_marginTop="4dp"
+                                android:max="100"
+                                android:progress="96"
+                                android:progressTint="#3B82F6" />
+
+                        </LinearLayout>
+
+                    </LinearLayout>
+
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- 5. Scenario Suitability Card -->
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    app:cardCornerRadius="16dp"
+                    app:cardElevation="1dp"
+                    app:strokeColor="@color/card_stroke"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="多场景适用性评估"
+                            android:textColor="?android:attr/textColorPrimary"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+
+                        <!-- Scenario 1: Web Browsing -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="网页浏览与日常搜索"
+                                android:textColor="?android:attr/textColorPrimary"
+                                android:textSize="13sp" />
+
+                            <TextView
+                                android:id="@+id/tv_scenario_web_badge"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textStyle="bold"
+                                tools:text="极佳"
+                                tools:textColor="#059669" />
+
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tv_scenario_web_desc"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:textColor="?android:attr/textColorSecondary"
+                            android:textSize="12sp"
+                            tools:text="访问顺畅，极少触发人机验证" />
+
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="1dp"
+                            android:layout_marginVertical="8dp"
+                            android:background="@color/card_stroke" />
+
+                        <!-- Scenario 2: Streaming -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="流媒体影音播放"
+                                android:textColor="?android:attr/textColorPrimary"
+                                android:textSize="13sp" />
+
+                            <TextView
+                                android:id="@+id/tv_scenario_stream_badge"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textStyle="bold"
+                                tools:text="极佳"
+                                tools:textColor="#059669" />
+
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tv_scenario_stream_desc"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:textColor="?android:attr/textColorSecondary"
+                            android:textSize="12sp"
+                            tools:text="原生纯净出口，流媒体版权解锁率高" />
+
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="1dp"
+                            android:layout_marginVertical="8dp"
+                            android:background="@color/card_stroke" />
+
+                        <!-- Scenario 3: AI Chat -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="AI 对话与学术应用"
+                                android:textColor="?android:attr/textColorPrimary"
+                                android:textSize="13sp" />
+
+                            <TextView
+                                android:id="@+id/tv_scenario_ai_badge"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textStyle="bold"
+                                tools:text="极佳"
+                                tools:textColor="#059669" />
+
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tv_scenario_ai_desc"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:textColor="?android:attr/textColorSecondary"
+                            android:textSize="12sp"
+                            tools:text="住宅属性极佳，ChatGPT / Claude 风控通过率高" />
+
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="1dp"
+                            android:layout_marginVertical="8dp"
+                            android:background="@color/card_stroke" />
+
+                        <!-- Scenario 4: Finance & Registration -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="账号注册与金融支付"
+                                android:textColor="?android:attr/textColorPrimary"
+                                android:textSize="13sp" />
+
+                            <TextView
+                                android:id="@+id/tv_scenario_finance_badge"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textStyle="bold"
+                                tools:text="极佳"
+                                tools:textColor="#059669" />
+
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tv_scenario_finance_desc"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:textColor="?android:attr/textColorSecondary"
+                            android:textSize="12sp"
+                            tools:text="极低欺诈风险评级，适合敏感账号注册与支付" />
+
+                    </LinearLayout>
+
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- 6. Data Source Transparency Card -->
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    app:cardCornerRadius="16dp"
+                    app:cardElevation="1dp"
+                    app:strokeColor="@color/card_stroke"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="权威数据源响应透明化"
+                            android:textColor="?android:attr/textColorPrimary"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+
+                        <!-- Source 1: ip-api.com -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:id="@+id/tv_source1_name"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="1. ip-api.com"
+                                android:textColor="?android:attr/textColorPrimary"
+                                android:textSize="13sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/tv_source1_status"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textStyle="bold"
+                                tools:text="响应正常 · 128ms"
+                                tools:textColor="#059669" />
+
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tv_source1_summary"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:textColor="?android:attr/textColorSecondary"
+                            android:textSize="12sp"
+                            tools:text="托管(hosting)=否，代理(proxy)=否" />
+
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="1dp"
+                            android:layout_marginVertical="8dp"
+                            android:background="@color/card_stroke" />
+
+                        <!-- Source 2: api.ipapi.is -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:id="@+id/tv_source2_name"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="2. api.ipapi.is"
+                                android:textColor="?android:attr/textColorPrimary"
+                                android:textSize="13sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/tv_source2_status"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textStyle="bold"
+                                tools:text="响应正常 · 210ms"
+                                tools:textColor="#059669" />
+
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tv_source2_summary"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:textColor="?android:attr/textColorSecondary"
+                            android:textSize="12sp"
+                            tools:text="机房(datacenter)=否，VPN=否，滥用=否" />
+
+                    </LinearLayout>
+
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- 7. Detailed Network & Attribution Card -->
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    app:cardCornerRadius="16dp"
+                    app:cardElevation="1dp"
+                    app:strokeColor="@color/card_stroke"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="出口 IP 与网络归属详情"
+                            android:textColor="?android:attr/textColorPrimary"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+
+                        <!-- Device Network -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -173,43 +851,20 @@
                                 android:textColor="?android:attr/textColorPrimary"
                                 android:textSize="13sp"
                                 android:textStyle="bold"
-                                tools:text="蜂窝移动网络 (4G/5G)" />
+                                tools:text="Wi-Fi 无线网络 (物理接入)" />
 
                         </LinearLayout>
 
-                    </LinearLayout>
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="1dp"
+                            android:layout_marginVertical="8dp"
+                            android:background="@color/card_stroke" />
 
-                </com.google.android.material.card.MaterialCardView>
-
-                <!-- Detailed Attribution Card -->
-                <com.google.android.material.card.MaterialCardView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    app:cardCornerRadius="@dimen/card_corner_radius"
-                    app:cardElevation="1dp"
-                    app:strokeColor="@color/card_stroke"
-                    app:strokeWidth="1dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:padding="16dp">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="出口 IP 纯净度检测详情"
-                            android:textColor="?android:attr/textColorPrimary"
-                            android:textSize="15sp"
-                            android:textStyle="bold" />
-
-                        <!-- IP -->
+                        <!-- Outbound IP -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="14dp"
                             android:orientation="horizontal">
 
                             <TextView
@@ -227,14 +882,14 @@
                                 android:textColor="?android:attr/textColorPrimary"
                                 android:textSize="13sp"
                                 android:textStyle="bold"
-                                tools:text="104.21.56.78" />
+                                tools:text="104.28.192.10" />
+
                         </LinearLayout>
 
                         <View
                             android:layout_width="match_parent"
                             android:layout_height="1dp"
-                            android:layout_marginTop="8dp"
-                            android:layout_marginBottom="8dp"
+                            android:layout_marginVertical="8dp"
                             android:background="@color/card_stroke" />
 
                         <!-- Location -->
@@ -246,7 +901,7 @@
                             <TextView
                                 android:layout_width="120dp"
                                 android:layout_height="wrap_content"
-                                android:text="地理位置"
+                                android:text="出口地理位置"
                                 android:textColor="?android:attr/textColorSecondary"
                                 android:textSize="13sp" />
 
@@ -258,16 +913,16 @@
                                 android:textColor="?android:attr/textColorPrimary"
                                 android:textSize="13sp"
                                 tools:text="🇺🇸 美国 · 加利福尼亚 (US)" />
+
                         </LinearLayout>
 
                         <View
                             android:layout_width="match_parent"
                             android:layout_height="1dp"
-                            android:layout_marginTop="8dp"
-                            android:layout_marginBottom="8dp"
+                            android:layout_marginVertical="8dp"
                             android:background="@color/card_stroke" />
 
-                        <!-- Fraud Score -->
+                        <!-- Fraud Score Summary -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -285,20 +940,20 @@
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
-                                android:textColor="?android:attr/textColorPrimary"
                                 android:textSize="13sp"
                                 android:textStyle="bold"
-                                tools:text="极低风险 (Scamalytics 评估)" />
+                                tools:text="极低风险 (原生住宅)"
+                                tools:textColor="#059669" />
+
                         </LinearLayout>
 
                         <View
                             android:layout_width="match_parent"
                             android:layout_height="1dp"
-                            android:layout_marginTop="8dp"
-                            android:layout_marginBottom="8dp"
+                            android:layout_marginVertical="8dp"
                             android:background="@color/card_stroke" />
 
-                        <!-- Hosting / Datacenter -->
+                        <!-- Hosting -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -318,17 +973,17 @@
                                 android:layout_weight="1"
                                 android:textColor="?android:attr/textColorPrimary"
                                 android:textSize="13sp"
-                                tools:text="是 (Hosting / Datacenter)" />
+                                tools:text="否 (Residential / 原生家宽)" />
+
                         </LinearLayout>
 
                         <View
                             android:layout_width="match_parent"
                             android:layout_height="1dp"
-                            android:layout_marginTop="8dp"
-                            android:layout_marginBottom="8dp"
+                            android:layout_marginVertical="8dp"
                             android:background="@color/card_stroke" />
 
-                        <!-- Proxy Flag -->
+                        <!-- Proxy -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -348,17 +1003,17 @@
                                 android:layout_weight="1"
                                 android:textColor="?android:attr/textColorPrimary"
                                 android:textSize="13sp"
-                                tools:text="否 (未标记为公共 VPN 出口)" />
+                                tools:text="否 (未标记为公共 VPN)" />
+
                         </LinearLayout>
 
                         <View
                             android:layout_width="match_parent"
                             android:layout_height="1dp"
-                            android:layout_marginTop="8dp"
-                            android:layout_marginBottom="8dp"
+                            android:layout_marginVertical="8dp"
                             android:background="@color/card_stroke" />
 
-                        <!-- Cellular / Base Station -->
+                        <!-- Mobile Base Station -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -378,14 +1033,14 @@
                                 android:layout_weight="1"
                                 android:textColor="?android:attr/textColorPrimary"
                                 android:textSize="13sp"
-                                tools:text="否 (机房固网 / 常规家宽出口)" />
+                                tools:text="否 (固网家宽出口)" />
+
                         </LinearLayout>
 
                         <View
                             android:layout_width="match_parent"
                             android:layout_height="1dp"
-                            android:layout_marginTop="8dp"
-                            android:layout_marginBottom="8dp"
+                            android:layout_marginVertical="8dp"
                             android:background="@color/card_stroke" />
 
                         <!-- ISP -->
@@ -408,14 +1063,14 @@
                                 android:layout_weight="1"
                                 android:textColor="?android:attr/textColorPrimary"
                                 android:textSize="13sp"
-                                tools:text="Cloudflare, Inc." />
+                                tools:text="Verizon Fios" />
+
                         </LinearLayout>
 
                         <View
                             android:layout_width="match_parent"
                             android:layout_height="1dp"
-                            android:layout_marginTop="8dp"
-                            android:layout_marginBottom="8dp"
+                            android:layout_marginVertical="8dp"
                             android:background="@color/card_stroke" />
 
                         <!-- ASN -->
@@ -438,14 +1093,14 @@
                                 android:layout_weight="1"
                                 android:textColor="?android:attr/textColorPrimary"
                                 android:textSize="13sp"
-                                tools:text="AS13335 CLOUDFLARENET" />
+                                tools:text="AS701 MCI Communications" />
+
                         </LinearLayout>
 
                         <View
                             android:layout_width="match_parent"
                             android:layout_height="1dp"
-                            android:layout_marginTop="8dp"
-                            android:layout_marginBottom="8dp"
+                            android:layout_marginVertical="8dp"
                             android:background="@color/card_stroke" />
 
                         <!-- Reverse DNS -->
@@ -457,7 +1112,7 @@
                             <TextView
                                 android:layout_width="120dp"
                                 android:layout_height="wrap_content"
-                                android:text="反向域名 (PTR)"
+                                android:text="反向解析 (PTR)"
                                 android:textColor="?android:attr/textColorSecondary"
                                 android:textSize="13sp" />
 
@@ -468,20 +1123,21 @@
                                 android:layout_weight="1"
                                 android:textColor="?android:attr/textColorPrimary"
                                 android:textSize="13sp"
-                                tools:text="one.one.one.one" />
+                                tools:text="pool-104-28-192-10.verizon.net" />
+
                         </LinearLayout>
 
                     </LinearLayout>
 
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- Authoritative External Verification Links -->
+                <!-- 8. External Risk Reports Verification -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/card_external_links"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    app:cardCornerRadius="@dimen/card_corner_radius"
+                    android:layout_marginTop="14dp"
+                    app:cardCornerRadius="16dp"
                     app:cardElevation="1dp"
                     app:strokeColor="@color/card_stroke"
                     app:strokeWidth="1dp">
@@ -495,7 +1151,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="权威风控报告直达验证"
+                            android:text="外部风控数据库直达验证"
                             android:textColor="?android:attr/textColorPrimary"
                             android:textSize="15sp"
                             android:textStyle="bold" />
@@ -503,8 +1159,8 @@
                         <TextView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
-                            android:text="点击下方按钮可在浏览器中直达权威数据库查看该 IP 的实时完整风控与黑名单报告："
+                            android:layout_marginTop="2dp"
+                            android:text="在浏览器中直接打开权威第三方数据库验证该 IP 的实时信誉评分："
                             android:textColor="?android:attr/textColorSecondary"
                             android:textSize="12sp" />
 
@@ -532,7 +1188,7 @@
                                 android:layout_height="46dp"
                                 android:layout_marginTop="8dp"
                                 android:gravity="center_vertical|start"
-                                android:text="在 IPinfo.io 查看 ASN 与机房风控数据"
+                                android:text="在 IPinfo.io 查看 ASN 与机房归属"
                                 android:textSize="13sp"
                                 app:cornerRadius="12dp"
                                 app:icon="@drawable/baseline_public_24" />
@@ -544,7 +1200,7 @@
                                 android:layout_height="46dp"
                                 android:layout_marginTop="8dp"
                                 android:gravity="center_vertical|start"
-                                android:text="在 AbuseIPDB 查看黑名单与滥用举报记录"
+                                android:text="在 AbuseIPDB 查看滥用与黑名单记录"
                                 android:textSize="13sp"
                                 app:cornerRadius="12dp"
                                 app:icon="@drawable/baseline_public_24" />
@@ -560,10 +1216,9 @@
                     android:id="@+id/btn_retest"
                     android:layout_width="match_parent"
                     android:layout_height="52dp"
-                    android:layout_marginTop="20dp"
-                    android:layout_marginBottom="32dp"
+                    android:layout_marginTop="18dp"
                     android:text="@string/retest"
-                    app:cornerRadius="@dimen/button_corner_radius"
+                    app:cornerRadius="14dp"
                     app:icon="@drawable/ic_action_cached" />
 
             </LinearLayout>

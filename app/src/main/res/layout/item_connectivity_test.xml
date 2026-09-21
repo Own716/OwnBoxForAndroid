@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="10dp"
-    app:cardCornerRadius="@dimen/card_corner_radius"
+    app:cardCornerRadius="14dp"
     app:cardElevation="0dp"
     app:strokeColor="@color/card_stroke"
     app:strokeWidth="1dp">
@@ -32,7 +32,7 @@
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
+                android:layout_marginStart="14dp"
                 android:layout_weight="1"
                 android:orientation="vertical">
 
@@ -41,9 +41,9 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textColor="?android:attr/textColorPrimary"
-                    android:textSize="16sp"
+                    android:textSize="15sp"
                     android:textStyle="bold"
-                    tools:text="大陆直连 TCP 握手" />
+                    tools:text="Google 国际网络与送中检测" />
 
                 <TextView
                     android:id="@+id/tv_dimension_category"
@@ -51,7 +51,7 @@
                     android:layout_height="wrap_content"
                     android:textColor="?android:attr/textColorSecondary"
                     android:textSize="11sp"
-                    tools:text="入口可达性探测" />
+                    tools:text="https://www.google.com/generate_204" />
 
             </LinearLayout>
 
@@ -60,19 +60,43 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:indeterminate="true"
-                app:indicatorSize="20dp"
-                app:trackThickness="2.5dp" />
+                app:indicatorSize="18dp"
+                app:trackThickness="2dp" />
 
-            <TextView
-                android:id="@+id/tv_status_badge"
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                android:visibility="gone"
-                tools:text="28 ms"
-                tools:textColor="#10B981"
-                tools:visibility="visible" />
+                android:gravity="end"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tv_status_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:visibility="gone"
+                    tools:text="未送中 · 204"
+                    tools:textColor="#059669"
+                    tools:visibility="visible" />
+
+                <TextView
+                    android:id="@+id/tv_jitter_tag"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:background="@drawable/bg_label_radius_24"
+                    android:backgroundTint="#22F59E0B"
+                    android:paddingHorizontal="6dp"
+                    android:paddingVertical="1dp"
+                    android:textColor="#D97706"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:visibility="gone"
+                    tools:text="自动重试恢复"
+                    tools:visibility="visible" />
+
+            </LinearLayout>
 
         </LinearLayout>
 
@@ -82,8 +106,8 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:textColor="?android:attr/textColorSecondary"
-            android:textSize="13sp"
-            tools:text="直连握手成功，服务器入口节点网络通畅" />
+            android:textSize="12sp"
+            tools:text="国际出口正常，Google 未被重定向至中国大陆服务器，国际搜索畅通" />
 
     </LinearLayout>
 
