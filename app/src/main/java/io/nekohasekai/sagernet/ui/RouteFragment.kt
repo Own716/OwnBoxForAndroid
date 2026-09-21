@@ -12,16 +12,7 @@ import androidx.core.view.updatePadding
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import android.text.format.Formatter
-import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.*
-import moe.matsuri.nb4a.utils.ConnectionUidResolver
-import io.nekohasekai.sagernet.utils.PackageCache
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import org.json.JSONObject
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.TimeUnit
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProfileManager
@@ -149,228 +140,7 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
         ruleListView.updatePadding(bottom = dp2px(if (DataStore.showBottomBar) 80 else 4))
     }
 
-    data class RouteLiveStats(
-        val connCount: Int = 0,
-        val upRate: Long = 0L,
-        val downRate: Long = 0L,
-        val mainTarget: String = "",
-        val exitNode: String = "",
-        val matched: Boolean = false
-    )
-
-    private var liveMonitorJob: Job? = null
-    private val liveStatsMap = ConcurrentHashMap<Long, RouteLiveStats>()
-    private val lastTrafficMap = mutableMapOf<String, Pair<Long, Long>>() // connId -> Pair(up, down)
-    private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(2, TimeUnit.SECONDS)
-        .readTimeout(2, TimeUnit.SECONDS)
-        .build()
-
-    override fun onResume() {
-        super.onResume()
-        startLiveMonitor()
-    }
-
-    override fun onPause() {
-        super.onPause()
-        stopLiveMonitor()
-    }
-
-    private fun startLiveMonitor() {
-        liveMonitorJob?.cancel()
-        liveMonitorJob = viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
-            while (isActive) {
-                if (DataStore.serviceState.connected) {
-                    pollConnections()
-                } else {
-                    if (liveStatsMap.isNotEmpty()) {
-                        liveStatsMap.clear()
-                        withContext(Dispatchers.Main) {
-                            if (::ruleAdapter.isInitialized) {
-                                ruleAdapter.notifyDataSetChanged()
-                            }
-                        }
-                    }
-                }
-                delay(2000)
-            }
-        }
-    }
-
-    private fun stopLiveMonitor() {
-        liveMonitorJob?.cancel()
-        liveMonitorJob = null
-        liveStatsMap.clear()
-        lastTrafficMap.clear()
-    }
-
-    private suspend fun pollConnections() {
-        try {
-            val req = Request.Builder().url("http://127.0.0.1:9090/connections").build()
-            httpClient.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) return
-                val body = resp.body?.string() ?: return
-                val json = JSONObject(body)
-                val connectionsArr = json.optJSONArray("connections") ?: return
-
-                if (!::ruleAdapter.isInitialized) return
-                val currentRules = ruleAdapter.ruleList.toList()
-                val newStats = mutableMapOf<Long, RouteLiveStats>()
-
-                class Accumulator(
-                    var count: Int = 0,
-                    var upRate: Long = 0L,
-                    var downRate: Long = 0L,
-                    val exits: MutableList<String> = mutableListOf(),
-                    val targets: MutableList<String> = mutableListOf()
-                )
-                val accumulators = mutableMapOf<Long, Accumulator>()
-
-                val rulePackageUids: Map<Long, Set<Int>> = currentRules.associate { r ->
-                    r.id to r.packages.mapNotNull { pkg -> PackageCache[pkg] }.toSet()
-                }
-
-                val currentConnIds = mutableSetOf<String>()
-
-                for (i in 0 until connectionsArr.length()) {
-                    val conn = connectionsArr.optJSONObject(i) ?: continue
-                    val connId = conn.optString("id")
-                    currentConnIds.add(connId)
-                    val meta = conn.optJSONObject("metadata")
-                    val network = meta?.optString("network") ?: "TCP"
-                    val host = meta?.optString("destinationHost") ?: ""
-                    val destIP = meta?.optString("destinationIP") ?: ""
-                    val destPort = meta?.optString("destinationPort")?.toIntOrNull() ?: 0
-                    val sourceIP = meta?.optString("sourceIP") ?: ""
-                    val sourcePort = meta?.optString("sourcePort")?.toIntOrNull() ?: 0
-                    val upload = conn.optLong("upload", 0L)
-                    val download = conn.optLong("download", 0L)
-
-                    val last = lastTrafficMap[connId]
-                    val upRate = if (last != null) (upload - last.first).coerceAtLeast(0L) / 2 else 0L
-                    val downRate = if (last != null) (download - last.second).coerceAtLeast(0L) / 2 else 0L
-                    lastTrafficMap[connId] = Pair(upload, download)
-
-                    val chainsArr = conn.optJSONArray("chains")
-                    val chainsList = mutableListOf<String>()
-                    if (chainsArr != null) {
-                        for (j in 0 until chainsArr.length()) {
-                            chainsList.add(chainsArr.getString(j))
-                        }
-                    }
-
-                    val exit = when {
-                        chainsList.isEmpty() -> "直连"
-                        chainsList.size == 1 -> chainsList[0]
-                        else -> chainsList.joinToString(" → ")
-                    }
-
-                    val connUid = if (context != null) {
-                        ConnectionUidResolver.resolveUid(requireContext(), network, sourceIP, sourcePort, destIP, destPort)
-                    } else -1
-
-                    val appName = if (connUid > 0 && context != null) {
-                        try {
-                            val pm = requireContext().packageManager
-                            val pkgs = pm.getPackagesForUid(connUid)
-                            val p = pkgs?.firstOrNull()
-                            if (p != null) {
-                                pm.getApplicationLabel(pm.getApplicationInfo(p, 0)).toString()
-                            } else ""
-                        } catch (_: Throwable) { "" }
-                    } else ""
-
-                    val targetDisplay = when {
-                        appName.isNotBlank() && host.isNotBlank() -> "$appName ($host)"
-                        appName.isNotBlank() -> appName
-                        host.isNotBlank() -> if (destPort > 0) "$host:$destPort" else host
-                        destIP.isNotBlank() -> if (destPort > 0) "$destIP:$destPort" else destIP
-                        else -> "网络连接"
-                    }
-
-                    for (rule in currentRules) {
-                        if (!rule.enabled) continue
-                        var matched = false
-                        val uids = rulePackageUids[rule.id]
-                        if (connUid > 0 && uids != null && uids.contains(connUid)) {
-                            matched = true
-                        } else if (rule.protocol.contains("quic", ignoreCase = true) || rule.network.equals("udp", ignoreCase = true)) {
-                            if (network.equals("udp", ignoreCase = true) && (destPort == 443 || meta?.optString("protocol")?.contains("quic", true) == true)) {
-                                matched = true
-                            }
-                        } else if (host.isNotEmpty() && rule.domains.isNotBlank()) {
-                            val dl = rule.domains.split("\n", ",")
-                            if (dl.any { d ->
-                                val clean = d.trim().removePrefix("domain:").removePrefix("full:").removePrefix("geosite:")
-                                host.equals(clean, ignoreCase = true) || host.endsWith(".$clean", ignoreCase = true)
-                            }) {
-                                matched = true
-                            } else if (rule.domains.contains("geosite:cn", ignoreCase = true) &&
-                                (exit == "直连" || host.endsWith(".cn", ignoreCase = true) || host.contains("qq.com") || host.contains("weixin") || host.contains("wechat") || host.contains("baidu") || host.contains("bilibili") || host.contains("taobao") || host.contains("alipay"))
-                            ) {
-                                matched = true
-                            }
-                        } else if (rule.domains.contains("geosite:category-ads-all", ignoreCase = true) && (exit == "屏蔽" || rule.outbound == -2L)) {
-                            matched = true
-                        } else if (destIP.isNotEmpty() && rule.ip.isNotBlank()) {
-                            val il = rule.ip.split("\n", ",")
-                            if (il.any { ip -> destIP.startsWith(ip.trim().split("/")[0]) }) {
-                                matched = true
-                            } else if (rule.ip.contains("geoip:cn", ignoreCase = true) && exit == "直连") {
-                                matched = true
-                            }
-                        }
-
-                        if (matched) {
-                            val acc = accumulators.getOrPut(rule.id) { Accumulator() }
-                            acc.count++
-                            acc.upRate += upRate
-                            acc.downRate += downRate
-                            if (!acc.exits.contains(exit)) {
-                                acc.exits.add(exit)
-                            }
-                            if (!acc.targets.contains(targetDisplay)) {
-                                acc.targets.add(targetDisplay)
-                            }
-                            break
-                        }
-                    }
-                }
-
-                lastTrafficMap.keys.retainAll(currentConnIds)
-
-                for (rule in currentRules) {
-                    val acc = accumulators[rule.id]
-                    if (acc != null && acc.count > 0) {
-                        val mainTarget = acc.targets.firstOrNull() ?: ""
-                        newStats[rule.id] = RouteLiveStats(
-                            connCount = acc.count,
-                            upRate = acc.upRate,
-                            downRate = acc.downRate,
-                            mainTarget = mainTarget,
-                            exitNode = acc.exits.joinToString(", "),
-                            matched = true
-                        )
-                    } else {
-                        newStats[rule.id] = RouteLiveStats(
-                            connCount = 0,
-                            matched = false
-                        )
-                    }
-                }
-
-                withContext(Dispatchers.Main) {
-                    liveStatsMap.clear()
-                    liveStatsMap.putAll(newStats)
-                    ruleAdapter.notifyDataSetChanged()
-                }
-            }
-        } catch (_: Throwable) {
-        }
-    }
-
     override fun onDestroy() {
-        stopLiveMonitor()
         if (::ruleAdapter.isInitialized) {
             ProfileManager.removeListener(ruleAdapter)
         }
@@ -603,7 +373,6 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
             val editButton = binding.edit
             val shareLayout = binding.share
             val enableSwitch = binding.enable
-            val liveStatus = binding.routeLiveStatus
 
             fun bind(ruleEntity: RuleEntity) {
                 rule = ruleEntity
@@ -619,27 +388,6 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
                     else -> R.color.color_route_config // 配置：紫色
                 }
                 routeOutbound.setTextColor(ContextCompat.getColor(itemView.context, colorRes))
-
-                // 实际路由走向展示
-                if (!DataStore.serviceState.connected) {
-                    liveStatus.visibility = View.GONE
-                } else {
-                    val stats = liveStatsMap[rule.id]
-                    if (stats == null || stats.connCount == 0) {
-                        liveStatus.visibility = View.GONE
-                    } else {
-                        liveStatus.visibility = View.VISIBLE
-                        val upRateStr = Formatter.formatFileSize(itemView.context, stats.upRate) + "/s"
-                        val downRateStr = Formatter.formatFileSize(itemView.context, stats.downRate) + "/s"
-                        val rateText = if (stats.upRate > 0 || stats.downRate > 0) " | ↑ $upRateStr | ↓ $downRateStr" else ""
-                        val targetText = if (stats.mainTarget.isNotBlank()) "${stats.mainTarget} → " else ""
-                        liveStatus.text = "走向: $targetText${stats.exitNode} (${stats.connCount}条连接$rateText)"
-                        liveStatus.setTextColor(ContextCompat.getColor(itemView.context, R.color.color_route_direct))
-                    }
-                }
-                liveStatus.setOnClickListener(null)
-                liveStatus.isClickable = false
-                liveStatus.isFocusable = false
 
                 itemView.setOnClickListener(null)
                 itemView.isClickable = false
