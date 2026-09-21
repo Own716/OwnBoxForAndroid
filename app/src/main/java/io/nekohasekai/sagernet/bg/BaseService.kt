@@ -99,6 +99,7 @@ class BaseService {
                 }
 
                 Intent.ACTION_SCREEN_OFF -> {
+                    proxy?.box?.sleep()
                     // Screen turned off: in low power / standard mode, reclaim OS memory to keep background RSS minimal
                     if (!DataStore.performancePriorityMode) {
                         Libcore.forceGc()

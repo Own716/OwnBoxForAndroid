@@ -150,11 +150,16 @@ class VpnService : BaseVpnService(),
             .setMtu(if (DataStore.mtu == 1500) 1400 else DataStore.mtu)
         val ipv6Mode = DataStore.ipv6Mode
 
-        // address: 始终添加 IPv6 虚拟地址与路由，确保 Android 系统完整接管 IPv6，彻底杜绝从物理网卡泄露
+        // address: 当启用 IPv6 时才添加 IPv6 虚拟地址与路由；当禁用 IPv6 时绝不配置 IPv6 虚拟地址与路由，
+        // 避免 Android 系统向微信等双栈客户端通告虚假 IPv6 连通性导致 Mars 握手超时、发图片/文件卡死转圈
         builder.addAddress(PRIVATE_VLAN4_CLIENT, 30)
-        builder.addAddress(PRIVATE_VLAN6_CLIENT, 126)
+        if (ipv6Mode != io.nekohasekai.sagernet.IPv6Mode.DISABLE) {
+            builder.addAddress(PRIVATE_VLAN6_CLIENT, 126)
+        }
         builder.addDnsServer(PRIVATE_VLAN4_ROUTER)
-        builder.addDnsServer(PRIVATE_VLAN6_ROUTER)
+        if (ipv6Mode != io.nekohasekai.sagernet.IPv6Mode.DISABLE) {
+            builder.addDnsServer(PRIVATE_VLAN6_ROUTER)
+        }
 
         // route
         if (DataStore.bypassLan) {
@@ -165,11 +170,15 @@ class VpnService : BaseVpnService(),
             builder.addRoute(PRIVATE_VLAN4_ROUTER, 32)
             builder.addRoute(FAKEDNS_VLAN4_CLIENT, 15)
             // https://issuetracker.google.com/issues/149636790
-            builder.addRoute("2000::", 3)
-            builder.addRoute("fc00::", 7)
+            if (ipv6Mode != io.nekohasekai.sagernet.IPv6Mode.DISABLE) {
+                builder.addRoute("2000::", 3)
+                builder.addRoute("fc00::", 7)
+            }
         } else {
             builder.addRoute("0.0.0.0", 0)
-            builder.addRoute("::", 0)
+            if (ipv6Mode != io.nekohasekai.sagernet.IPv6Mode.DISABLE) {
+                builder.addRoute("::", 0)
+            }
         }
 
         updateUnderlyingNetwork(builder)

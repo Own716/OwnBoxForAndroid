@@ -46,15 +46,8 @@ class TrafficChartActivity : ThemedActivity() {
 
     private var trafficWebSocket: WebSocket? = null
     private var isForeground = false
-    private var pollingJob: Job? = null
     private var wsRetryCount = 0
     private var failedPollCount = 0
-
-    private lateinit var connectionAdapter: ConnectionAdapter
-
-    data class AppDisplayInfo(val name: String, val icon: Drawable?)
-    private val appInfoCache = LruCache<Int, AppDisplayInfo>(128)
-    private val portToUidCache = LruCache<Int, Int>(256)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,27 +55,6 @@ class TrafficChartActivity : ThemedActivity() {
         setContentView(binding.root)
 
         binding.toolbar.setNavigationOnClickListener { finish() }
-
-        connectionAdapter = ConnectionAdapter { connId ->
-            closeConnection(connId)
-        }
-        binding.connectionsRecycler.layoutManager = LinearLayoutManager(this)
-        binding.connectionsRecycler.adapter = connectionAdapter
-
-        binding.btnCloseAllConnections.setOnClickListener {
-            MaterialAlertDialogBuilder(this)
-                .setTitle(R.string.traffic_close_all)
-                .setMessage(R.string.traffic_close_all_confirm)
-                .setPositiveButton(android.R.string.ok) { _, _ ->
-                    closeAllConnections()
-                }
-                .setNegativeButton(android.R.string.cancel, null)
-                .show()
-        }
-
-        binding.btnRefreshConnections.setOnClickListener {
-            fetchConnectionsManual()
-        }
 
         binding.btnGoConnect.setOnClickListener {
             finish()
@@ -125,30 +97,13 @@ class TrafficChartActivity : ThemedActivity() {
         binding.tvMonitorStatus.setTextColor(Color.parseColor("#059669"))
         binding.chartStatusHint.visibility = View.GONE
 
-        // 1. Connect WebSocket to /traffic
+        // Connect WebSocket to /traffic
         connectTrafficWebSocket()
-
-        // 2. Poll /connections periodically
-        pollingJob?.cancel()
-        pollingJob = lifecycleScope.launch(Dispatchers.IO) {
-            while (isActive && isForeground) {
-                fetchConnections()
-                delay(1500)
-            }
-        }
-    }
-
-    private fun fetchConnectionsManual() {
-        lifecycleScope.launch(Dispatchers.IO) {
-            fetchConnections()
-        }
     }
 
     private fun stopMonitoring() {
         trafficWebSocket?.cancel()
         trafficWebSocket = null
-        pollingJob?.cancel()
-        pollingJob = null
     }
 
     private fun connectTrafficWebSocket() {
@@ -211,232 +166,5 @@ class TrafficChartActivity : ThemedActivity() {
                 trafficWebSocket = null
             }
         })
-    }
-
-    @SuppressLint("SetTextI18n")
-    private suspend fun fetchConnections() {
-        try {
-            val req = Request.Builder().url("http://127.0.0.1:9090/connections").build()
-            client.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) {
-                    handlePollFailure()
-                    return
-                }
-                failedPollCount = 0
-                val bodyStr = resp.body?.string() ?: return
-                val root = JSONObject(bodyStr)
-                val upTotal = root.optLong("uploadTotal", 0L)
-                val downTotal = root.optLong("downloadTotal", 0L)
-                val connArray = root.optJSONArray("connections")
-
-                val items = mutableListOf<ConnectionModel>()
-                if (connArray != null) {
-                    for (i in 0 until connArray.length()) {
-                        val c = connArray.getJSONObject(i)
-                        val id = c.optString("id")
-                        val meta = c.optJSONObject("metadata")
-                        val network = meta?.optString("network")?.uppercase() ?: "TCP"
-                        val host = meta?.optString("destinationHost")?.takeIf { it.isNotEmpty() }
-                            ?: meta?.optString("destinationIP") ?: "Unknown"
-                        val destPort = meta?.optString("destinationPort") ?: ""
-                        val fullDest = if (destPort.isNotEmpty()) "$host:$destPort" else host
-
-                        val sourceIP = meta?.optString("sourceIP") ?: ""
-                        val sourcePortStr = meta?.optString("sourcePort") ?: ""
-                        val sourcePort = sourcePortStr.toIntOrNull() ?: 0
-                        val destIP = meta?.optString("destinationIP") ?: ""
-                        val processPath = meta?.optString("processPath") ?: ""
-
-                        val upload = c.optLong("upload", 0L)
-                        val download = c.optLong("download", 0L)
-                        val rule = c.optString("rule", "MATCH")
-                        val chainsArr = c.optJSONArray("chains")
-                        val chainsList = mutableListOf<String>()
-                        if (chainsArr != null) {
-                            for (j in 0 until chainsArr.length()) {
-                                chainsList.add(chainsArr.getString(j))
-                            }
-                        }
-
-                        // Resolve App Identity & Icon
-                        val uid = resolveUid(network, sourceIP, sourcePort, destIP, destPort.toIntOrNull() ?: 0)
-                        val appDisplay = getAppDisplayInfo(uid, processPath, destPort)
-
-                        items.add(
-                            ConnectionModel(
-                                id = id,
-                                network = network,
-                                destination = fullDest,
-                                rule = "Rule: $rule",
-                                chains = if (chainsList.isNotEmpty()) "Chains: " + chainsList.joinToString(" » ") else "",
-                                upload = upload,
-                                download = download,
-                                appName = appDisplay.name,
-                                appIcon = appDisplay.icon
-                            )
-                        )
-                    }
-                }
-
-                withContext(Dispatchers.Main) {
-                    binding.cardConnectionError.visibility = View.GONE
-                    binding.connectionsCountTitle.text = "活跃网络连接 (${items.size})"
-                    binding.connectionsTotalStats.text = "总计上传: " + Formatter.formatFileSize(this@TrafficChartActivity, upTotal) +
-                            "  |  总计下载: " + Formatter.formatFileSize(this@TrafficChartActivity, downTotal)
-
-                    if (items.isEmpty()) {
-                        binding.connectionsEmptyHint.visibility = View.VISIBLE
-                        binding.connectionsRecycler.visibility = View.GONE
-                    } else {
-                        binding.connectionsEmptyHint.visibility = View.GONE
-                        binding.connectionsRecycler.visibility = View.VISIBLE
-                        connectionAdapter.submitList(items)
-                    }
-                }
-            }
-        } catch (_: Exception) {
-            handlePollFailure()
-        }
-    }
-
-    private suspend fun handlePollFailure() {
-        failedPollCount++
-        if (failedPollCount >= 4 && isForeground && DataStore.serviceState.connected) {
-            withContext(Dispatchers.Main) {
-                binding.cardConnectionError.visibility = View.VISIBLE
-            }
-        }
-    }
-
-    private fun resolveUid(network: String, sourceIP: String, sourcePort: Int, destIP: String, destPort: Int): Int {
-        return moe.matsuri.nb4a.utils.ConnectionUidResolver.resolveUid(this, network, sourceIP, sourcePort, destIP, destPort)
-    }
-
-    private fun getAppDisplayInfo(uid: Int, processPath: String, destPort: String): AppDisplayInfo {
-        if (uid > 0) {
-            appInfoCache.get(uid)?.let { return it }
-            try {
-                val packages = packageManager.getPackagesForUid(uid)
-                val pkg = packages?.firstOrNull()
-                if (pkg != null) {
-                    val appInfo = packageManager.getApplicationInfo(pkg, 0)
-                    val name = packageManager.getApplicationLabel(appInfo).toString()
-                    val icon = packageManager.getApplicationIcon(appInfo)
-                    val info = AppDisplayInfo(name, icon)
-                    appInfoCache.put(uid, info)
-                    return info
-                }
-            } catch (_: Throwable) {
-            }
-        }
-
-        if (processPath.isNotBlank()) {
-            val cleanPkg = processPath.substringAfterLast("/").substringBefore(" ")
-            try {
-                val appInfo = packageManager.getApplicationInfo(cleanPkg, 0)
-                val name = packageManager.getApplicationLabel(appInfo).toString()
-                val icon = packageManager.getApplicationIcon(appInfo)
-                val info = AppDisplayInfo(name, icon)
-                if (uid > 0) appInfoCache.put(uid, info)
-                return info
-            } catch (_: Throwable) {
-            }
-        }
-
-        val defaultIcon = AppCompatResources.getDrawable(this, R.drawable.ic_navigation_apps)
-        val defaultName = if (destPort == "53") "系统 DNS 解析" else if (uid == 0) "系统核心服务" else "网络服务进程"
-        return AppDisplayInfo(defaultName, defaultIcon)
-    }
-
-    private fun closeConnection(id: String) {
-        runOnDefaultDispatcher {
-            try {
-                val req = Request.Builder()
-                    .url("http://127.0.0.1:9090/connections/$id")
-                    .delete()
-                    .build()
-                client.newCall(req).execute().close()
-                delay(200)
-                fetchConnections()
-            } catch (_: Exception) {
-            }
-        }
-    }
-
-    private fun closeAllConnections() {
-        runOnDefaultDispatcher {
-            try {
-                val req = Request.Builder()
-                    .url("http://127.0.0.1:9090/connections")
-                    .delete()
-                    .build()
-                client.newCall(req).execute().close()
-                delay(200)
-                fetchConnections()
-            } catch (_: Exception) {
-            }
-        }
-    }
-
-    data class ConnectionModel(
-        val id: String,
-        val network: String,
-        val destination: String,
-        val rule: String,
-        val chains: String,
-        val upload: Long,
-        val download: Long,
-        val appName: String,
-        val appIcon: Drawable?
-    )
-
-    class ConnectionAdapter(
-        private val onClose: (String) -> Unit
-    ) : ListAdapter<ConnectionModel, ConnectionAdapter.VH>(DiffCallback) {
-
-        object DiffCallback : DiffUtil.ItemCallback<ConnectionModel>() {
-            override fun areItemsTheSame(oldItem: ConnectionModel, newItem: ConnectionModel) = oldItem.id == newItem.id
-            override fun areContentsTheSame(oldItem: ConnectionModel, newItem: ConnectionModel) = oldItem == newItem
-        }
-
-        class VH(view: View) : RecyclerView.ViewHolder(view) {
-            val appIcon: ImageView = view.findViewById(R.id.conn_app_icon)
-            val appName: TextView = view.findViewById(R.id.conn_app_name)
-            val network: TextView = view.findViewById(R.id.conn_network)
-            val host: TextView = view.findViewById(R.id.conn_host)
-            val rule: TextView = view.findViewById(R.id.conn_rule)
-            val chains: TextView = view.findViewById(R.id.conn_chains)
-            val traffic: TextView = view.findViewById(R.id.conn_traffic)
-            val closeBtn: ImageView = view.findViewById(R.id.conn_close_btn)
-        }
-
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-            val view = LayoutInflater.from(parent.context).inflate(R.layout.item_connection, parent, false)
-            return VH(view)
-        }
-
-        @SuppressLint("SetTextI18n")
-        override fun onBindViewHolder(holder: VH, position: Int) {
-            val item = getItem(position)
-            if (item.appIcon != null) {
-                holder.appIcon.setImageDrawable(item.appIcon)
-            } else {
-                holder.appIcon.setImageResource(R.drawable.ic_navigation_apps)
-            }
-            holder.appName.text = item.appName
-            holder.network.text = item.network
-            holder.host.text = item.destination
-            holder.rule.text = item.rule
-            holder.chains.text = item.chains
-            holder.chains.visibility = if (item.chains.isNotEmpty()) View.VISIBLE else View.GONE
-
-            val upStr = Formatter.formatFileSize(holder.itemView.context, item.upload)
-            val downStr = Formatter.formatFileSize(holder.itemView.context, item.download)
-            holder.traffic.text = "▲ $upStr  ▼ $downStr"
-
-            holder.closeBtn.setOnClickListener {
-                onClose(item.id)
-            }
-        }
     }
 }

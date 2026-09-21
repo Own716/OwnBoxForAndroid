@@ -909,8 +909,8 @@
         <string name="app_icon_text">Text</string>
         <string name="app_icon_selected">Selected</string>
     <string name="switch_node">Switch Node</string>
-    <string name="traffic_chart_title">Real-time Traffic &amp; Connections</string>
-    <string name="traffic_chart_summary">View real-time speed chart and manage active connections</string>
+    <string name="traffic_chart_title">Real-time Traffic Chart</string>
+    <string name="traffic_chart_summary">View real-time speed chart and traffic throughput statistics</string>
     <string name="traffic_current_up">Upload Speed</string>
     <string name="traffic_current_down">Download Speed</string>
     <string name="traffic_peak">Peak</string>

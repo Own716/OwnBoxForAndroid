@@ -148,6 +148,9 @@ class StatsBar @JvmOverloads constructor(
             statusTitleText.isSelected = true
             statusIpText = findViewById(R.id.status_ip)
             statusIpText.isSelected = true
+            statusIpText.setOnClickListener {
+                onIpDetailClicked()
+            }
             txText = findViewById(R.id.tx)
             rxText = findViewById(R.id.rx)
             btnIpDetail = findViewById(R.id.btn_ip_detail)
@@ -419,6 +422,9 @@ class StatsBar @JvmOverloads constructor(
                     statusIpText.visibility = View.VISIBLE
                 } else if (DataStore.showLandingIp && LandingIpManager.isCurrentlyQuerying()) {
                     statusIpText.text = context.getString(R.string.landing_ip_querying)
+                    statusIpText.visibility = View.VISIBLE
+                } else if (DataStore.showLandingIp) {
+                    statusIpText.text = LandingIpManager.getProfileFallbackDisplay(DataStore.selectedProxy)
                     statusIpText.visibility = View.VISIBLE
                 } else {
                     statusIpText.visibility = View.GONE

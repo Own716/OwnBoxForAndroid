@@ -812,8 +812,8 @@
         <string name="app_icon_text">文本</string>
         <string name="app_icon_selected">已选择</string>
     <string name="switch_node">切换节点</string>
-    <string name="traffic_chart_title">实时流量与活跃连接</string>
-    <string name="traffic_chart_summary">查看实时上下行速率图表与管理当前活跃网络连接</string>
+    <string name="traffic_chart_title">实时流量图表</string>
+    <string name="traffic_chart_summary">查看实时上下行速率动态图表与流量吞吐统计</string>
     <string name="traffic_current_up">实时上传</string>
     <string name="traffic_current_down">实时下载</string>
     <string name="traffic_peak">峰值</string>

@@ -87,13 +87,72 @@ object LandingIpManager {
         }.getOrNull() ?: fallbackName
     }
 
+    fun parseProfileRegion(name: String): Pair<String, String> {
+        if (name.isBlank()) return Pair("🌐", "节点出口")
+        // Check if name contains Regional Indicator Symbol flag emoji (e.g. 🇺🇸, 🇭🇰)
+        for (i in 0 until name.length - 1) {
+            val cp1 = name.codePointAt(i)
+            if (cp1 in 0x1F1E6..0x1F1FF) {
+                val charCount1 = Character.charCount(cp1)
+                if (i + charCount1 < name.length) {
+                    val cp2 = name.codePointAt(i + charCount1)
+                    if (cp2 in 0x1F1E6..0x1F1FF) {
+                        val flag = String(Character.toChars(cp1)) + String(Character.toChars(cp2))
+                        val c1 = (cp1 - 0x1F1E6 + 'A'.code).toChar()
+                        val c2 = (cp2 - 0x1F1E6 + 'A'.code).toChar()
+                        val code = "$c1$c2"
+                        return Pair(flag, code)
+                    }
+                }
+            }
+        }
+        val lower = name.lowercase()
+        return when {
+            lower.contains("香港") || lower.contains("hk") || lower.contains("hong kong") -> Pair("🇭🇰", "HK")
+            lower.contains("日本") || lower.contains("jp") || lower.contains("japan") || lower.contains("东京") || lower.contains("大阪") -> Pair("🇯🇵", "JP")
+            lower.contains("美国") || lower.contains("us") || lower.contains("united states") || lower.contains("洛杉矶") || lower.contains("硅谷") -> Pair("🇺🇸", "US")
+            lower.contains("台湾") || lower.contains("tw") || lower.contains("taiwan") || lower.contains("台北") -> Pair("🇹🇼", "TW")
+            lower.contains("新加坡") || lower.contains("sg") || lower.contains("singapore") || lower.contains("狮城") -> Pair("🇸🇬", "SG")
+            lower.contains("韩国") || lower.contains("kr") || lower.contains("korea") || lower.contains("首尔") -> Pair("🇰🇷", "KR")
+            lower.contains("英国") || lower.contains("uk") || lower.contains("gb") || lower.contains("united kingdom") || lower.contains("伦敦") -> Pair("🇬🇧", "GB")
+            lower.contains("德国") || lower.contains("de") || lower.contains("germany") || lower.contains("法兰克福") -> Pair("🇩🇪", "DE")
+            lower.contains("法国") || lower.contains("fr") || lower.contains("france") || lower.contains("巴黎") -> Pair("🇫🇷", "FR")
+            lower.contains("加拿大") || lower.contains("ca") || lower.contains("canada") -> Pair("🇨🇦", "CA")
+            lower.contains("澳大利亚") || lower.contains("au") || lower.contains("australia") || lower.contains("悉尼") -> Pair("🇦🇺", "AU")
+            lower.contains("俄罗斯") || lower.contains("ru") || lower.contains("russia") || lower.contains("莫斯科") -> Pair("🇷🇺", "RU")
+            lower.contains("土耳其") || lower.contains("tr") || lower.contains("turkey") -> Pair("🇹🇷", "TR")
+            lower.contains("阿根廷") || lower.contains("ar") || lower.contains("argentina") -> Pair("🇦🇷", "AR")
+            lower.contains("印度") || lower.contains("in") || lower.contains("india") -> Pair("🇮🇳", "IN")
+            lower.contains("中国") || lower.contains("cn") || lower.contains("china") -> Pair("🇨🇳", "CN")
+            else -> Pair("🌐", "节点出口")
+        }
+    }
+
+    fun getProfileFallbackDisplay(profileId: Long): String {
+        val profile = runCatching {
+            io.nekohasekai.sagernet.database.ProfileManager.getProfile(profileId)
+        }.getOrNull()
+        val name = profile?.displayName().orEmpty()
+        val (flag, region) = parseProfileRegion(name)
+        return "$flag $region (点击重试)"
+    }
+
+    private fun createHttpClient(): libcore.HTTPClient {
+        return Libcore.newHttpClient().apply {
+            modernTLS()
+            val mixedPort = DataStore.mixedPort
+            if (mixedPort > 0) {
+                trySocks5(mixedPort.toInt(), "", "")
+            } else {
+                tryProxyOutbound()
+            }
+        }
+    }
+
     private fun fetchIpWhoIs(ua: String, startTime: Long): LandingIpInfo? {
         var client: libcore.HTTPClient? = null
         try {
-            client = Libcore.newHttpClient().apply {
-                modernTLS()
-                tryProxyOutbound()
-            }
+            client = createHttpClient()
             val req = client.newRequest().apply {
                 setURL("https://ipwho.is/")
                 setUserAgent(ua)
@@ -141,10 +200,7 @@ object LandingIpManager {
     private fun fetchIpSb(ua: String, startTime: Long): LandingIpInfo? {
         var client: libcore.HTTPClient? = null
         try {
-            client = Libcore.newHttpClient().apply {
-                modernTLS()
-                tryProxyOutbound()
-            }
+            client = createHttpClient()
             val req = client.newRequest().apply {
                 setURL("https://api.ip.sb/geoip")
                 setUserAgent(ua)
@@ -189,10 +245,7 @@ object LandingIpManager {
     private fun fetchIpApi(ua: String, startTime: Long): LandingIpInfo? {
         var client: libcore.HTTPClient? = null
         try {
-            client = Libcore.newHttpClient().apply {
-                modernTLS()
-                tryProxyOutbound()
-            }
+            client = createHttpClient()
             val req = client.newRequest().apply {
                 setURL("http://ip-api.com/json/?fields=status,message,country,countryCode,regionName,city,isp,org,as,query")
                 setUserAgent(ua)
@@ -236,10 +289,7 @@ object LandingIpManager {
     private fun fetchCloudflare(ua: String, startTime: Long): LandingIpInfo? {
         var client: libcore.HTTPClient? = null
         try {
-            client = Libcore.newHttpClient().apply {
-                modernTLS()
-                tryProxyOutbound()
-            }
+            client = createHttpClient()
             val req = client.newRequest().apply {
                 setURL("https://cloudflare.com/cdn-cgi/trace")
                 setUserAgent(ua)
@@ -271,6 +321,40 @@ object LandingIpManager {
                     isp = "Cloudflare Edge",
                     org = "Cloudflare Anycast",
                     asn = if (cfColo.isNotBlank()) "Cloudflare $cfColo" else "Cloudflare",
+                    durationMs = cost,
+                )
+            }
+        } catch (_: Throwable) {
+        } finally {
+            runCatching { client?.close() }
+        }
+        return null
+    }
+
+    private fun fetchIpify(ua: String, startTime: Long): LandingIpInfo? {
+        var client: libcore.HTTPClient? = null
+        try {
+            client = createHttpClient()
+            val req = client.newRequest().apply {
+                setURL("https://api.ipify.org?format=json")
+                setUserAgent(ua)
+            }
+            val resp = req.execute()
+            val body = Util.getStringBox(resp.contentString)
+            val json = JSONObject(body)
+            val ip = json.optString("ip").trim()
+            if (ip.isNotBlank()) {
+                val cost = System.currentTimeMillis() - startTime
+                return LandingIpInfo(
+                    ip = ip,
+                    country = "",
+                    countryCode = "",
+                    countryFlag = "🌐",
+                    city = "",
+                    region = "",
+                    isp = "",
+                    org = "",
+                    asn = "",
                     durationMs = cost,
                 )
             }
@@ -314,29 +398,34 @@ object LandingIpManager {
             coroutineScope {
                 val resultChannel = Channel<LandingIpInfo>(Channel.UNLIMITED)
 
-                // 并发启动 4 大出网探测源，超时限制严格控制在 2.8s 以内，绝不堵塞主线程
+                // 并发启动 5 大出网探测源，超时限制严格控制在 2.5s 以内，绝不堵塞主线程
                 launch {
-                    val info = withTimeoutOrNull(2800L) { fetchIpWhoIs(ua, startTime) }
+                    val info = withTimeoutOrNull(1800L) { fetchCloudflare(ua, startTime) }
                     if (info != null) resultChannel.send(info)
                 }
 
                 launch {
-                    val info = withTimeoutOrNull(2800L) { fetchIpSb(ua, startTime) }
+                    val info = withTimeoutOrNull(2000L) { fetchIpify(ua, startTime) }
                     if (info != null) resultChannel.send(info)
                 }
 
                 launch {
-                    val info = withTimeoutOrNull(2800L) { fetchIpApi(ua, startTime) }
+                    val info = withTimeoutOrNull(2500L) { fetchIpWhoIs(ua, startTime) }
                     if (info != null) resultChannel.send(info)
                 }
 
                 launch {
-                    val info = withTimeoutOrNull(2000L) { fetchCloudflare(ua, startTime) }
+                    val info = withTimeoutOrNull(2500L) { fetchIpSb(ua, startTime) }
+                    if (info != null) resultChannel.send(info)
+                }
+
+                launch {
+                    val info = withTimeoutOrNull(2500L) { fetchIpApi(ua, startTime) }
                     if (info != null) resultChannel.send(info)
                 }
 
                 var winningInfo: LandingIpInfo? = null
-                val deadline = System.currentTimeMillis() + 3500L
+                val deadline = System.currentTimeMillis() + 2800L
                 while (System.currentTimeMillis() < deadline) {
                     val remaining = (deadline - System.currentTimeMillis()).coerceAtLeast(1L)
                     val received = withTimeoutOrNull(remaining) { resultChannel.receiveCatching().getOrNull() }
@@ -344,6 +433,9 @@ object LandingIpManager {
                         val isDetailed = received.isp.isNotBlank() && received.isp != "Cloudflare Edge"
                         if (isDetailed) {
                             winningInfo = received
+                            currentCache = received
+                            cachedProfileId = profileId
+                            onUpdate?.invoke(received)
                             break
                         } else {
                             if (winningInfo == null) {
@@ -357,6 +449,9 @@ object LandingIpManager {
                             val second = withTimeoutOrNull(detailedRemaining) { resultChannel.receiveCatching().getOrNull() }
                             if (second != null && second.isp.isNotBlank() && second.isp != "Cloudflare Edge") {
                                 winningInfo = second
+                                currentCache = second
+                                cachedProfileId = profileId
+                                onUpdate?.invoke(second)
                             }
                             break
                         }

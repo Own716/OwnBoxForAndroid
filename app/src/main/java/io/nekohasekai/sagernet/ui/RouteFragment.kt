@@ -153,6 +153,7 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
         val connCount: Int = 0,
         val upRate: Long = 0L,
         val downRate: Long = 0L,
+        val mainTarget: String = "",
         val exitNode: String = "",
         val matched: Boolean = false
     )
@@ -220,7 +221,8 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
                     var count: Int = 0,
                     var upRate: Long = 0L,
                     var downRate: Long = 0L,
-                    val exits: MutableList<String> = mutableListOf()
+                    val exits: MutableList<String> = mutableListOf(),
+                    val targets: MutableList<String> = mutableListOf()
                 )
                 val accumulators = mutableMapOf<Long, Accumulator>()
 
@@ -267,20 +269,54 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
                         ConnectionUidResolver.resolveUid(requireContext(), network, sourceIP, sourcePort, destIP, destPort)
                     } else -1
 
+                    val appName = if (connUid > 0 && context != null) {
+                        try {
+                            val pm = requireContext().packageManager
+                            val pkgs = pm.getPackagesForUid(connUid)
+                            val p = pkgs?.firstOrNull()
+                            if (p != null) {
+                                pm.getApplicationLabel(pm.getApplicationInfo(p, 0)).toString()
+                            } else ""
+                        } catch (_: Throwable) { "" }
+                    } else ""
+
+                    val targetDisplay = when {
+                        appName.isNotBlank() && host.isNotBlank() -> "$appName ($host)"
+                        appName.isNotBlank() -> appName
+                        host.isNotBlank() -> if (destPort > 0) "$host:$destPort" else host
+                        destIP.isNotBlank() -> if (destPort > 0) "$destIP:$destPort" else destIP
+                        else -> "网络连接"
+                    }
+
                     for (rule in currentRules) {
                         if (!rule.enabled) continue
                         var matched = false
                         val uids = rulePackageUids[rule.id]
                         if (connUid > 0 && uids != null && uids.contains(connUid)) {
                             matched = true
-                        } else if (host.isNotEmpty() && rule.domains.isNotBlank()) {
-                            val dl = rule.domains.split("\n", ",")
-                            if (dl.any { d -> host.equals(d.trim(), ignoreCase = true) || host.endsWith("." + d.trim().removePrefix("domain:").removePrefix("full:"), ignoreCase = true) }) {
+                        } else if (rule.protocol.contains("quic", ignoreCase = true) || rule.network.equals("udp", ignoreCase = true)) {
+                            if (network.equals("udp", ignoreCase = true) && (destPort == 443 || meta?.optString("protocol")?.contains("quic", true) == true)) {
                                 matched = true
                             }
+                        } else if (host.isNotEmpty() && rule.domains.isNotBlank()) {
+                            val dl = rule.domains.split("\n", ",")
+                            if (dl.any { d ->
+                                val clean = d.trim().removePrefix("domain:").removePrefix("full:").removePrefix("geosite:")
+                                host.equals(clean, ignoreCase = true) || host.endsWith(".$clean", ignoreCase = true)
+                            }) {
+                                matched = true
+                            } else if (rule.domains.contains("geosite:cn", ignoreCase = true) &&
+                                (exit == "直连" || host.endsWith(".cn", ignoreCase = true) || host.contains("qq.com") || host.contains("weixin") || host.contains("wechat") || host.contains("baidu") || host.contains("bilibili") || host.contains("taobao") || host.contains("alipay"))
+                            ) {
+                                matched = true
+                            }
+                        } else if (rule.domains.contains("geosite:category-ads-all", ignoreCase = true) && (exit == "屏蔽" || rule.outbound == -2L)) {
+                            matched = true
                         } else if (destIP.isNotEmpty() && rule.ip.isNotBlank()) {
                             val il = rule.ip.split("\n", ",")
                             if (il.any { ip -> destIP.startsWith(ip.trim().split("/")[0]) }) {
+                                matched = true
+                            } else if (rule.ip.contains("geoip:cn", ignoreCase = true) && exit == "直连") {
                                 matched = true
                             }
                         }
@@ -293,6 +329,9 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
                             if (!acc.exits.contains(exit)) {
                                 acc.exits.add(exit)
                             }
+                            if (!acc.targets.contains(targetDisplay)) {
+                                acc.targets.add(targetDisplay)
+                            }
                             break
                         }
                     }
@@ -303,10 +342,12 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
                 for (rule in currentRules) {
                     val acc = accumulators[rule.id]
                     if (acc != null && acc.count > 0) {
+                        val mainTarget = acc.targets.firstOrNull() ?: ""
                         newStats[rule.id] = RouteLiveStats(
                             connCount = acc.count,
                             upRate = acc.upRate,
                             downRate = acc.downRate,
+                            mainTarget = mainTarget,
                             exitNode = acc.exits.joinToString(", "),
                             matched = true
                         )
@@ -579,26 +620,26 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
                 }
                 routeOutbound.setTextColor(ContextCompat.getColor(itemView.context, colorRes))
 
-                // 实际路由出口状态展示
+                // 实际路由走向展示
                 if (!DataStore.serviceState.connected) {
                     liveStatus.visibility = View.GONE
                 } else {
                     val stats = liveStatsMap[rule.id]
-                    liveStatus.visibility = View.VISIBLE
                     if (stats == null || stats.connCount == 0) {
-                        liveStatus.text = "暂无活动连接"
-                        liveStatus.setTextColor(ContextCompat.getColor(itemView.context, R.color.material_grey_500))
+                        liveStatus.visibility = View.GONE
                     } else {
+                        liveStatus.visibility = View.VISIBLE
                         val upRateStr = Formatter.formatFileSize(itemView.context, stats.upRate) + "/s"
                         val downRateStr = Formatter.formatFileSize(itemView.context, stats.downRate) + "/s"
                         val rateText = if (stats.upRate > 0 || stats.downRate > 0) " | ↑ $upRateStr | ↓ $downRateStr" else ""
-                        liveStatus.text = "实际出口: ${stats.exitNode} (${stats.connCount}条连接$rateText)"
+                        val targetText = if (stats.mainTarget.isNotBlank()) "${stats.mainTarget} → " else ""
+                        liveStatus.text = "走向: $targetText${stats.exitNode} (${stats.connCount}条连接$rateText)"
                         liveStatus.setTextColor(ContextCompat.getColor(itemView.context, R.color.color_route_direct))
                     }
                 }
-                liveStatus.setOnClickListener {
-                    startActivity(Intent(it.context, TrafficChartActivity::class.java))
-                }
+                liveStatus.setOnClickListener(null)
+                liveStatus.isClickable = false
+                liveStatus.isFocusable = false
 
                 itemView.setOnClickListener(null)
                 itemView.isClickable = false
