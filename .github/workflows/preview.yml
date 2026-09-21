@@ -6,6 +6,10 @@ on:
       - main
   workflow_dispatch:
     inputs:
+
+permissions:
+  contents: write
+
 jobs:
   libcore:
     name: Native Build (LibCore)
@@ -91,3 +95,46 @@ jobs:
         with:
           name: APKs
           path: ${{ env.APK }}
+
+  publish:
+    name: Publish Preview Release
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Get Version
+        run: |
+          PRE_VERSION=$(grep '^PRE_VERSION_NAME=' nb4a.properties | cut -d'=' -f2 | tr -d '\r\n')
+          echo "PRE_VERSION=$PRE_VERSION" >> $GITHUB_ENV
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: APKs
+          path: artifacts
+      - name: Prepare APKs
+        run: |
+          mkdir -p apks
+          find artifacts -name "*.apk" -exec cp {} apks/ \;
+          ls -la apks/
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.PRE_VERSION }}
+          name: OwnBox v${{ env.PRE_VERSION }}
+          body: |
+            ## OwnBox v${{ env.PRE_VERSION }}
+
+            ### 核心更新与修复
+            - **路由规则修复**：彻底修复中国大陆域名与中国 IP 规则并存时导致的绕过/直连失效问题，自动分流分拆，无需且严禁写死包名。
+            - **实时路由状态显示**：在规则列表右侧实时显示连接数、实时速率及实际出网节点/策略组（点击可直达实时流量连接监控面板）。
+            - **策略组全面升级**：
+              - 升级“负载均衡”为“策略组”，支持 5 种底层真实调度策略：最低延迟 (leastPing)、故障转移 (failover)、随机 (random)、负载均衡 (round_robin)、最稳定 (stable)。
+              - 策略组配置支持多选节点器（支持批量添加、去重与防循环引用校验）。
+            - **内核与协议**：保持 sing-box v1.15.0-alpha.6 官方内核稳定运行，适配 Sing-Tun 协议栈。
+          files: apks/*.apk
+          draft: false
+          prerelease: true
+          make_latest: false

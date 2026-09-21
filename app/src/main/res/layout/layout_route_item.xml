@@ -115,13 +115,26 @@
                     android:textColor="?android:textColorSecondary" />
 
                 <TextView
-                    android:layout_marginTop="4dp"
-                    android:layout_marginBottom="12dp"
                     android:id="@+id/route_outbound"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:layout_marginBottom="4dp"
                     android:textAppearance="?android:attr/textAppearanceSmall"
                     android:textColor="?android:textColorSecondary" />
+
+                <TextView
+                    android:id="@+id/route_live_status"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:layout_marginBottom="10dp"
+                    android:textAppearance="?android:attr/textAppearanceSmall"
+                    android:textSize="12sp"
+                    android:textColor="?attr/colorPrimary"
+                    android:visibility="gone"
+                    tools:visibility="visible"
+                    tools:text="实际出口: 直连 (2条连接)" />
 
             </LinearLayout>
 

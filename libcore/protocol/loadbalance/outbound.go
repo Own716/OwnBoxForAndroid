@@ -38,6 +38,35 @@ var (
 	_ adapter.Referrer                = (*LoadBalance)(nil)
 )
 
+type nodeStats struct {
+	consecutiveFails atomic.Int32
+	lastFailTime     atomic.Int64 // UnixMilli
+	totalDials       atomic.Int64
+	successDials     atomic.Int64
+	latencyEmaMs     atomic.Int64
+}
+
+func (s *nodeStats) recordSuccess(latencyMs int64) {
+	s.consecutiveFails.Store(0)
+	s.totalDials.Add(1)
+	s.successDials.Add(1)
+	if latencyMs > 0 {
+		old := s.latencyEmaMs.Load()
+		if old <= 0 {
+			s.latencyEmaMs.Store(latencyMs)
+		} else {
+			newEma := (old*8 + latencyMs*2) / 10
+			s.latencyEmaMs.Store(newEma)
+		}
+	}
+}
+
+func (s *nodeStats) recordFailure() {
+	s.consecutiveFails.Add(1)
+	s.totalDials.Add(1)
+	s.lastFailTime.Store(time.Now().UnixMilli())
+}
+
 type LoadBalance struct {
 	outbound.Adapter
 	ctx            context.Context
@@ -49,6 +78,7 @@ type LoadBalance struct {
 	outbounds      []adapter.Outbound
 	counter        uint64
 	activeConns    []*atomic.Int64
+	stats          []*nodeStats
 	interruptGroup *interrupt.Group
 }
 
@@ -76,6 +106,7 @@ func (s *LoadBalance) References() []string {
 func (s *LoadBalance) Start() error {
 	s.outbounds = make([]adapter.Outbound, 0, len(s.tags))
 	s.activeConns = make([]*atomic.Int64, len(s.tags))
+	s.stats = make([]*nodeStats, len(s.tags))
 	for i, tag := range s.tags {
 		detour, loaded := s.outbound.Outbound(tag)
 		if !loaded {
@@ -83,6 +114,7 @@ func (s *LoadBalance) Start() error {
 		}
 		s.outbounds = append(s.outbounds, detour)
 		s.activeConns[i] = new(atomic.Int64)
+		s.stats[i] = new(nodeStats)
 	}
 	return nil
 }
@@ -114,6 +146,57 @@ func (s *LoadBalance) candidateIndices(dest M.Socksaddr) []int {
 		indices[i] = i
 	}
 	switch s.strategy {
+	case "failover":
+		now := time.Now().UnixMilli()
+		healthy := make([]int, 0, n)
+		degraded := make([]int, 0, n)
+		for i := 0; i < n; i++ {
+			fails := s.stats[i].consecutiveFails.Load()
+			lastFail := s.stats[i].lastFailTime.Load()
+			// If >= 2 consecutive failures and within 30s cooldown, mark as degraded
+			if fails >= 2 && now-lastFail < 30_000 {
+				degraded = append(degraded, i)
+			} else {
+				healthy = append(healthy, i)
+			}
+		}
+		if len(healthy) == 0 {
+			// All degraded, try in original order
+			return indices
+		}
+		return append(healthy, degraded...)
+	case "stable":
+		now := time.Now().UnixMilli()
+		scores := make([]int64, n)
+		for i := 0; i < n; i++ {
+			total := s.stats[i].totalDials.Load()
+			success := s.stats[i].successDials.Load()
+			var successRate int64 = 100
+			if total > 0 {
+				successRate = (success * 100) / total
+			}
+			fails := int64(s.stats[i].consecutiveFails.Load())
+			lastFail := s.stats[i].lastFailTime.Load()
+			var failPenalty int64 = 0
+			if fails > 0 && now-lastFail < 60_000 {
+				failPenalty = fails * 200
+			}
+			latency := s.stats[i].latencyEmaMs.Load()
+			if latency <= 0 {
+				latency = 50
+			}
+			scores[i] = (successRate * 10) - failPenalty - (latency / 5)
+		}
+		slices.SortStableFunc(indices, func(a, b int) int {
+			sa := scores[a]
+			sb := scores[b]
+			if sa > sb {
+				return -1
+			} else if sa < sb {
+				return 1
+			}
+			return 0
+		})
 	case "leastLoad":
 		// Sort outbounds by active connections ascending
 		slices.SortStableFunc(indices, func(a, b int) int {
@@ -182,6 +265,7 @@ func (s *LoadBalance) DialContext(ctx context.Context, network string, destinati
 			conn net.Conn
 			err  error
 		)
+		start := time.Now()
 		if i < n-1 {
 			candidateCtx, cancel := context.WithTimeout(ctx, 3500*time.Millisecond)
 			conn, err = candidate.DialContext(candidateCtx, network, destination)
@@ -190,6 +274,10 @@ func (s *LoadBalance) DialContext(ctx context.Context, network string, destinati
 			conn, err = candidate.DialContext(ctx, network, destination)
 		}
 		if err == nil {
+			elapsed := time.Since(start).Milliseconds()
+			if idx < len(s.stats) && s.stats[idx] != nil {
+				s.stats[idx].recordSuccess(elapsed)
+			}
 			if s.strategy == "leastLoad" {
 				s.activeConns[idx].Add(1)
 				conn = &trackedConn{
@@ -200,6 +288,9 @@ func (s *LoadBalance) DialContext(ctx context.Context, network string, destinati
 				}
 			}
 			return s.interruptGroup.NewConn(conn, interrupt.IsExternalConnectionFromContext(ctx)), nil
+		}
+		if idx < len(s.stats) && s.stats[idx] != nil {
+			s.stats[idx].recordFailure()
 		}
 		lastErr = err
 	}
@@ -234,6 +325,7 @@ func (s *LoadBalance) ListenPacket(ctx context.Context, destination M.Socksaddr)
 			conn net.PacketConn
 			err  error
 		)
+		start := time.Now()
 		if i < n-1 {
 			candidateCtx, cancel := context.WithTimeout(ctx, 3500*time.Millisecond)
 			conn, err = candidate.ListenPacket(candidateCtx, destination)
@@ -242,6 +334,10 @@ func (s *LoadBalance) ListenPacket(ctx context.Context, destination M.Socksaddr)
 			conn, err = candidate.ListenPacket(ctx, destination)
 		}
 		if err == nil {
+			elapsed := time.Since(start).Milliseconds()
+			if idx < len(s.stats) && s.stats[idx] != nil {
+				s.stats[idx].recordSuccess(elapsed)
+			}
 			if s.strategy == "leastLoad" {
 				s.activeConns[idx].Add(1)
 				conn = &trackedPacketConn{
@@ -252,6 +348,9 @@ func (s *LoadBalance) ListenPacket(ctx context.Context, destination M.Socksaddr)
 				}
 			}
 			return s.interruptGroup.NewPacketConn(conn, interrupt.IsExternalConnectionFromContext(ctx)), nil
+		}
+		if idx < len(s.stats) && s.stats[idx] != nil {
+			s.stats[idx].recordFailure()
 		}
 		lastErr = err
 	}

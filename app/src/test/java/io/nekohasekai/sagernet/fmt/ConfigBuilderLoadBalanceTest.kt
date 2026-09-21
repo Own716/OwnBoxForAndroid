@@ -2,6 +2,7 @@ package io.nekohasekai.sagernet.fmt
 
 import io.nekohasekai.sagernet.Key
 import moe.matsuri.nb4a.SingBoxOptions
+import moe.matsuri.nb4a.makeSingBoxRule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
@@ -74,5 +75,61 @@ class ConfigBuilderLoadBalanceTest {
 
         tunOptions.stack = "gvisor"
         assertEquals("gvisor", tunOptions.asMap()["stack"])
+    }
+
+    @Test
+    fun testAllFiveStrategiesInBalancerBean() {
+        val bean = io.nekohasekai.sagernet.fmt.internal.BalancerBean()
+        bean.proxies = listOf(1L, 2L, 3L)
+
+        bean.strategy = io.nekohasekai.sagernet.fmt.internal.BalancerBean.STRATEGY_LEAST_PING
+        assertEquals("[节点 (3)] 策略: 最低延迟", bean.displayAddress())
+
+        bean.strategy = io.nekohasekai.sagernet.fmt.internal.BalancerBean.STRATEGY_FAILOVER
+        assertEquals("[节点 (3)] 策略: 故障转移", bean.displayAddress())
+
+        bean.strategy = io.nekohasekai.sagernet.fmt.internal.BalancerBean.STRATEGY_RANDOM
+        assertEquals("[节点 (3)] 策略: 随机", bean.displayAddress())
+
+        bean.strategy = io.nekohasekai.sagernet.fmt.internal.BalancerBean.STRATEGY_ROUND_ROBIN
+        assertEquals("[节点 (3)] 策略: 负载均衡", bean.displayAddress())
+
+        bean.strategy = io.nekohasekai.sagernet.fmt.internal.BalancerBean.STRATEGY_STABLE
+        assertEquals("[节点 (3)] 策略: 最稳定", bean.displayAddress())
+    }
+
+    @Test
+    fun testLoadBalanceOutboundAllStrategies() {
+        val members = listOf("n1", "n2", "n3")
+
+        val failover = buildLoadBalanceOutbound(members, "failover")
+        assertEquals("loadbalance", failover.type)
+        assertEquals("failover", failover.strategy)
+
+        val stable = buildLoadBalanceOutbound(members, "stable")
+        assertEquals("loadbalance", stable.type)
+        assertEquals("stable", stable.strategy)
+
+        val roundRobin = buildLoadBalanceOutbound(members, "round_robin")
+        assertEquals("loadbalance", roundRobin.type)
+        assertEquals("round_robin", roundRobin.strategy)
+
+        val random = buildLoadBalanceOutbound(members, "random")
+        assertEquals("loadbalance", random.type)
+        assertEquals("random", random.strategy)
+    }
+
+    @Test
+    fun testMakeSingBoxRulePreservesRuleSetWhenIPPresent() {
+        val rule = moe.matsuri.nb4a.SingBoxOptions.Rule_DefaultOptions().apply {
+            outbound = "bypass"
+            makeSingBoxRule(listOf("geosite:cn"), false)
+            makeSingBoxRule(listOf("geoip:cn"), true)
+        }
+        // Verify rule_set is NOT cleared by isIP
+        val map = rule.asMap()
+        val ruleSets = map["rule_set"] as? List<*>
+        assertEquals("bypass", map["outbound"])
+        assertEquals(listOf("geosite:cn", "geoip:cn"), ruleSets)
     }
 }

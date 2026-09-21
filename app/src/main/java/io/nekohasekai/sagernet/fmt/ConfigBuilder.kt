@@ -876,6 +876,8 @@ fun buildConfig(
                     )
                 } else {
                     val strat = when (balancerBean.strategy) {
+                        "failover" -> "failover"
+                        "stable" -> "stable"
                         "consistent_hash" -> "consistent_hash"
                         "leastLoad" -> "leastLoad"
                         "round_robin", "roundRobin" -> "round_robin"
@@ -1318,196 +1320,214 @@ fun buildConfig(
                 }.toHashSet().filterNotNull()
                 val ruleSets = mutableListOf<RuleSet>()
 
-                val ruleObj = Rule_DefaultOptions().apply {
-                    if (uidList.isNotEmpty()) {
-                        PackageCache.awaitLoadSync()
-                        user_id = uidList
+                val domainList = if (rule.domains.isNotBlank()) rule.domains.listByLineOrComma() else null
+                val ipList = if (rule.ip.isNotBlank()) rule.ip.listByLineOrComma() else null
+
+                // 存储ruleset标签和类型信息: Pair(tag, isIPRuleset)
+                val rulesetTags = mutableListOf<Pair<String, Boolean>>()
+                if (rule.ruleset.isNotBlank()) {
+                    val rulesetUrls = rule.ruleset.listByLineOrComma()
+                    rulesetUrls.forEach { origUrl ->
+                        val (url, isIPRuleset) = processRulesetUrl(origUrl)
+                        val tag = generateRemoteRuleSet(url, ruleSets, DataStore.rulesUpdateInterval)
+                        rulesetTags.add(Pair(tag, isIPRuleset))
                     }
-                    var domainList: List<String>? = null
-                    if (rule.domains.isNotBlank()) {
-                        domainList = rule.domains.listByLineOrComma()
-                        makeSingBoxRule(domainList, false)
+                }
+
+                val hasDomainCriteria = !domainList.isNullOrEmpty()
+                val hasIpCriteria = !ipList.isNullOrEmpty() || rulesetTags.any { it.second }
+                val hasDomainRuleset = rulesetTags.any { !it.second }
+                val isAppOnlyDns =
+                    uidList.isNotEmpty() &&
+                        !hasDomainCriteria &&
+                        !hasIpCriteria &&
+                        !hasDomainRuleset &&
+                        rule.port.isBlank() &&
+                        rule.sourcePort.isBlank() &&
+                        rule.network.isBlank() &&
+                        rule.source.isBlank() &&
+                        rule.protocol.isBlank()
+                val shouldAddDnsRule = hasDomainCriteria || isAppOnlyDns
+
+                fun makeDnsRuleObj(): DNSRule_DefaultOptions {
+                    return DNSRule_DefaultOptions().apply {
+                        if (uidList.isNotEmpty()) user_id = uidList
+                        domainList?.let { makeSingBoxRule(it) }
                     }
-                    if (rule.ip.isNotBlank()) {
-                        makeSingBoxRule(rule.ip.listByLineOrComma(), true)
-                    }
-                    
-                    if (rule_set != null) generateRuleSet(rule_set, ruleSets)
-                    
-		    // 存储ruleset标签和类型信息
-                    val rulesetTags = mutableListOf<Pair<String, Boolean>>()
-                    
-                    // 处理远程ruleset
-                    if (rule.ruleset.isNotBlank()) {
-                        val rulesetUrls = rule.ruleset.listByLineOrComma()
-                        rulesetUrls.forEach { origUrl ->
-                            val (url, isIPRuleset) = processRulesetUrl(origUrl)
-                            
-                            val tag = generateRemoteRuleSet(url, ruleSets, DataStore.rulesUpdateInterval)
-                            
-                            rulesetTags.add(Pair(tag, isIPRuleset))
-                            
-                            rule_set = (rule_set ?: mutableListOf()).apply {
-                                add(tag)
-                            }
+                }
+
+                when (rule.outbound) {
+                    -1L -> {
+                        if (shouldAddDnsRule) {
+                            userDNSRuleList += makeDnsRuleObj().apply { server = "dns-direct" }
                         }
-                    }
-
-                    if (rule.port.isNotBlank()) {
-                        port = mutableListOf<Int>()
-                        port_range = mutableListOf<String>()
-                        rule.port.listByLineOrComma().map {
-                            if (it.contains(":")) {
-                                port_range.add(it)
-                            } else {
-                                it.toIntOrNull()?.apply { port.add(this) }
-                            }
-                        }
-                    }
-                    if (rule.sourcePort.isNotBlank()) {
-                        source_port = mutableListOf<Int>()
-                        source_port_range = mutableListOf<String>()
-                        rule.sourcePort.listByLineOrComma().map {
-                            if (it.contains(":")) {
-                                source_port_range.add(it)
-                            } else {
-                                it.toIntOrNull()?.apply { source_port.add(this) }
-                            }
-                        }
-                    }
-                    if (rule.network.isNotBlank()) {
-                        network = listOf(rule.network)
-                    }
-                    if (rule.source.isNotBlank()) {
-                        source_ip_cidr = rule.source.listByLineOrComma()
-                    }
-                    if (rule.protocol.isNotBlank()) {
-                        protocol = rule.protocol.listByLineOrComma()
-                    }
-
-                    fun makeDnsRuleObj(): DNSRule_DefaultOptions {
-                        return DNSRule_DefaultOptions().apply {
-                            if (uidList.isNotEmpty()) user_id = uidList
-                            domainList?.let { makeSingBoxRule(it) }
-                        }
-                    }
-
-                    val hasDomainCriteria = !domainList.isNullOrEmpty()
-                    val hasIpCriteria =
-                        rule.ip.isNotBlank() || rulesetTags.any { it.second }
-                    val hasDomainRuleset = rulesetTags.any { !it.second }
-                    val isAppOnlyDns =
-                        uidList.isNotEmpty() &&
-                            !hasDomainCriteria &&
-                            !hasIpCriteria &&
-                            !hasDomainRuleset &&
-                            rule.port.isBlank() &&
-                            rule.sourcePort.isBlank() &&
-                            rule.network.isBlank() &&
-                            rule.source.isBlank() &&
-                            rule.protocol.isBlank()
-                    val shouldAddDnsRule = hasDomainCriteria || isAppOnlyDns
-
-                    when (rule.outbound) {
-                        -1L -> {
-                            if (shouldAddDnsRule) {
-                                userDNSRuleList += makeDnsRuleObj().apply { server = "dns-direct" }
-                            }
-
-                            if (rule_set != null && rulesetTags.isNotEmpty()) {
-                                for (tag in rule_set) {
-                                    // 只处理ruleset标签，且必须是非IP类型
-                                    val tagInfo = rulesetTags.find { it.first == tag }
-                                    if (tag.startsWith("ruleset-") && tagInfo != null && !tagInfo.second) {
-                                        userDNSRuleList += DNSRule_DefaultOptions().apply {
-                                            rule_set = mutableListOf(tag)
-                                            server = "dns-direct"
-                                        }
-                                    }
+                        for ((tag, isIP) in rulesetTags) {
+                            if (!isIP) {
+                                userDNSRuleList += DNSRule_DefaultOptions().apply {
+                                    rule_set = mutableListOf(tag)
+                                    server = "dns-direct"
                                 }
                             }
                         }
+                    }
 
-                        -2L -> {
-                            if (shouldAddDnsRule) {
-                                userDNSRuleList += makeDnsRuleObj().apply {
+                    -2L -> {
+                        if (shouldAddDnsRule) {
+                            userDNSRuleList += makeDnsRuleObj().apply { action = "reject" }
+                        }
+                        for ((tag, isIP) in rulesetTags) {
+                            if (!isIP) {
+                                userDNSRuleList += DNSRule_DefaultOptions().apply {
+                                    rule_set = mutableListOf(tag)
                                     action = "reject"
                                 }
                             }
-
-                            if (rule_set != null && rulesetTags.isNotEmpty()) {
-                                for (tag in rule_set) {
-                                    val tagInfo = rulesetTags.find { it.first == tag }
-                                    if (tag.startsWith("ruleset-") && tagInfo != null && !tagInfo.second) {
-                                        userDNSRuleList += DNSRule_DefaultOptions().apply {
-                                            rule_set = mutableListOf(tag)
-                                            action = "reject"
-                                        }
-                                    }
-                                }
-                            }
                         }
+                    }
 
-                        else -> {
-                            if (shouldAddDnsRule) {
-                                if (useFakeDns) userDNSRuleList += makeDnsRuleObj().apply {
+                    else -> {
+                        if (shouldAddDnsRule) {
+                            if (useFakeDns) {
+                                userDNSRuleList += makeDnsRuleObj().apply {
                                     server = "dns-fake"
                                     inbound = listOf("tun-in")
                                     query_type = listOf("A", "AAAA")
+                                }
+                            } else {
+                                userDNSRuleList += makeDnsRuleObj().apply { server = "dns-remote" }
+                            }
+                        }
+                        for ((tag, isIP) in rulesetTags) {
+                            if (!isIP) {
+                                if (useFakeDns) {
+                                    userDNSRuleList += DNSRule_DefaultOptions().apply {
+                                        rule_set = mutableListOf(tag)
+                                        server = "dns-fake"
+                                        inbound = listOf("tun-in")
+                                        query_type = listOf("A", "AAAA")
+                                    }
                                 } else {
-                                    userDNSRuleList += makeDnsRuleObj().apply {
+                                    userDNSRuleList += DNSRule_DefaultOptions().apply {
+                                        rule_set = mutableListOf(tag)
                                         server = "dns-remote"
                                     }
                                 }
                             }
+                        }
+                    }
+                }
 
-                            if (rule_set != null && rulesetTags.isNotEmpty()) {
-                                for (tag in rule_set) {
-                                    val tagInfo = rulesetTags.find { it.first == tag }
-                                    if (tag.startsWith("ruleset-") && tagInfo != null && !tagInfo.second) {
-                                        if (useFakeDns) {
-                                            userDNSRuleList += DNSRule_DefaultOptions().apply {
-                                                rule_set = mutableListOf(tag)
-                                                server = "dns-fake"
-                                                inbound = listOf("tun-in")
-                                                query_type = listOf("A", "AAAA")
-                                            }
-                                        } else {
-                                            userDNSRuleList += DNSRule_DefaultOptions().apply {
-                                                rule_set = mutableListOf(tag)
-                                                server = "dns-remote"
-                                            }
-                                        }
-                                    }
-                                }
+                val targetOutbound = when (val outId = rule.outbound) {
+                    0L -> mainProxyTag
+                    -1L -> TAG_BYPASS
+                    -2L -> TAG_BLOCK
+                    else -> if (outId == proxy.id) mainProxyTag else tagMap[outId] ?: ""
+                }
+
+                fun applyCommonFilters(ruleObj: Rule_DefaultOptions) {
+                    if (uidList.isNotEmpty()) {
+                        ruleObj.user_id = uidList
+                    }
+                    if (rule.port.isNotBlank()) {
+                        ruleObj.port = mutableListOf<Int>()
+                        ruleObj.port_range = mutableListOf<String>()
+                        rule.port.listByLineOrComma().forEach {
+                            if (it.contains(":")) {
+                                ruleObj.port_range.add(it)
+                            } else {
+                                it.toIntOrNull()?.let { p -> ruleObj.port.add(p) }
                             }
                         }
                     }
-                    outbound = when (val outId = rule.outbound) {
-                        0L -> mainProxyTag
-                        -1L -> TAG_BYPASS
-                        -2L -> TAG_BLOCK
-                        else -> if (outId == proxy.id) mainProxyTag else tagMap[outId] ?: ""
+                    if (rule.sourcePort.isNotBlank()) {
+                        ruleObj.source_port = mutableListOf<Int>()
+                        ruleObj.source_port_range = mutableListOf<String>()
+                        rule.sourcePort.listByLineOrComma().forEach {
+                            if (it.contains(":")) {
+                                ruleObj.source_port_range.add(it)
+                            } else {
+                                it.toIntOrNull()?.let { p -> ruleObj.source_port.add(p) }
+                            }
+                        }
                     }
-
-                    _hack_custom_config = rule.config
+                    if (rule.network.isNotBlank()) {
+                        ruleObj.network = listOf(rule.network)
+                    }
+                    if (rule.source.isNotBlank()) {
+                        ruleObj.source_ip_cidr = rule.source.listByLineOrComma()
+                    }
+                    if (rule.protocol.isNotBlank()) {
+                        ruleObj.protocol = rule.protocol.listByLineOrComma()
+                    }
+                    if (targetOutbound == TAG_BLOCK) {
+                        ruleObj.outbound = null
+                        ruleObj.action = "reject"
+                    } else {
+                        ruleObj.outbound = targetOutbound
+                    }
+                    ruleObj._hack_custom_config = rule.config
                 }
 
-                if (!ruleObj.checkEmpty()) {
-                    if (ruleObj.outbound.isNullOrBlank()) {
+                val generatedSubRules = mutableListOf<Rule_DefaultOptions>()
+                val hasDomain = hasDomainCriteria || hasDomainRuleset
+                val hasIp = hasIpCriteria
+
+                if (hasDomain && hasIp) {
+                    // Split into two sub-rules (Domain and IP) to ensure OR semantics in sing-box
+                    val domainSubRule = Rule_DefaultOptions().apply {
+                        domainList?.let { makeSingBoxRule(it, false) }
+                        val domainRulesetTags = rulesetTags.filter { !it.second }.map { it.first }
+                        if (domainRulesetTags.isNotEmpty()) {
+                            rule_set = (rule_set ?: mutableListOf()).apply { addAll(domainRulesetTags) }
+                        }
+                        if (rule_set != null) generateRuleSet(rule_set, ruleSets)
+                        applyCommonFilters(this)
+                    }
+                    if (!domainSubRule.checkEmpty()) generatedSubRules.add(domainSubRule)
+
+                    val ipSubRule = Rule_DefaultOptions().apply {
+                        ipList?.let { makeSingBoxRule(it, true) }
+                        val ipRulesetTags = rulesetTags.filter { it.second }.map { it.first }
+                        if (ipRulesetTags.isNotEmpty()) {
+                            rule_set = (rule_set ?: mutableListOf()).apply { addAll(ipRulesetTags) }
+                        }
+                        if (rule_set != null) generateRuleSet(rule_set, ruleSets)
+                        applyCommonFilters(this)
+                    }
+                    if (!ipSubRule.checkEmpty()) generatedSubRules.add(ipSubRule)
+                } else {
+                    val singleRule = Rule_DefaultOptions().apply {
+                        if (hasDomain) {
+                            domainList?.let { makeSingBoxRule(it, false) }
+                            val domainRulesetTags = rulesetTags.filter { !it.second }.map { it.first }
+                            if (domainRulesetTags.isNotEmpty()) {
+                                rule_set = (rule_set ?: mutableListOf()).apply { addAll(domainRulesetTags) }
+                            }
+                        }
+                        if (hasIp) {
+                            ipList?.let { makeSingBoxRule(it, true) }
+                            val ipRulesetTags = rulesetTags.filter { it.second }.map { it.first }
+                            if (ipRulesetTags.isNotEmpty()) {
+                                rule_set = (rule_set ?: mutableListOf()).apply { addAll(ipRulesetTags) }
+                            }
+                        }
+                        if (rule_set != null) generateRuleSet(rule_set, ruleSets)
+                        applyCommonFilters(this)
+                    }
+                    if (!singleRule.checkEmpty()) generatedSubRules.add(singleRule)
+                }
+
+                for (subRule in generatedSubRules) {
+                    if (subRule.action != "reject" && subRule.outbound.isNullOrBlank()) {
                         Toast.makeText(
                             SagerNet.application,
                             "Warning: " + rule.displayName() + ": A non-existent outbound was specified.",
                             Toast.LENGTH_LONG
                         ).show()
                     } else {
-                        // block 改用新的写法
-                        if (ruleObj.outbound == TAG_BLOCK) {
-                            ruleObj.outbound = null
-                            ruleObj.action = "reject"
-                        }
-                        route.rules.add(ruleObj)
+                        route.rules.add(subRule)
                         route.rule_set.addAll(ruleSets)
+                        Logs.d("[ConfigBuilder] Route rule '${rule.displayName()}' condition added -> ${subRule.outbound ?: subRule.action}")
                     }
                 }
             }
@@ -1522,11 +1542,8 @@ fun buildConfig(
             outbounds.add(Outbound().apply {
                 tag = freedom
                 type = "direct"
-                if (freedom == TAG_DIRECT) {
-                    // A WireGuard endpoint detour cannot target an empty direct outbound.
-                    // Keep MTU unchanged and switch only the Android dialer path.
-                    _hack_config_map["network_strategy"] = "default"
-                }
+                // Ensure both direct and bypass outbounds bind to Android default physical network interface
+                _hack_config_map["network_strategy"] = "default"
                 if (ipv6Mode == IPv6Mode.DISABLE) {
                     _hack_config_map["domain_strategy"] = "ipv4_only"
                 } else if (ipv6Mode == IPv6Mode.ONLY) {
@@ -1674,8 +1691,8 @@ fun buildConfig(
                 })
             }
 
-            // 2. resolve 动作：强制单栈解析杜绝远端 VPS 双栈泄露
-            if (DataStore.resolveDestination || ipv6Mode == IPv6Mode.DISABLE || ipv6Mode == IPv6Mode.ONLY) {
+            // 2. resolve 动作：Fake-IP 模式下填充真实地址池供 IP 规则匹配，强制单栈解析杜绝远端 VPS 双栈泄露
+            if (useFakeDns || DataStore.resolveDestination || ipv6Mode == IPv6Mode.DISABLE || ipv6Mode == IPv6Mode.ONLY) {
                 topRouteRules.add(Rule_DefaultOptions().apply {
                     action = "resolve"
                     strategy = genDomainStrategy(true)

@@ -344,9 +344,9 @@
     <string name="enable_log">启用日志</string>
     <string name="enable_log_sum">调试用途</string>
     <string name="route_rules_official">官方</string>
-    <string name="balancer">负载均衡</string>
-    <string name="balancer_settings">负载均衡设置</string>
-    <string name="balancer_type">类型</string>
+    <string name="balancer">策略组</string>
+    <string name="balancer_settings">策略组设置</string>
+    <string name="balancer_type">策略组类型</string>
     <string name="balancer_strategy">策略</string>
     <string name="list">列表</string>
     <string name="random">随机</string>
@@ -873,26 +873,29 @@
     <string name="traffic_total_download">总下载</string>
     <string name="show_landing_ip">显示落地 IP</string>
     <string name="show_landing_ip_sum">在主页状态栏显示连接节点的出网落地 IP 及归属地</string>
-    <string name="balancer_type_list">列表</string>
-    <string name="balancer_type_group">分组</string>
-    <string name="balancer_strategy_random">随机选择 (random)</string>
-    <string name="balancer_strategy_least_ping">最低延迟优先 (leastPing)</string>
-    <string name="balancer_strategy_least_load">最低负载轮询 (leastLoad)</string>
-    <string name="balancer_strategy_consistent_hash">一致性哈希/会话保持 (consistent_hash)</string>
-    <string name="balancer_custom_url">自定义测试 URL</string>
-    <string name="balancer_custom_url_sum">针对此负载均衡节点的独立探测地址（留空使用全局默认）</string>
-    <string name="balancer_interval">负载均衡观测间隔（秒）</string>
-    <string name="balancer_interval_sum">负载均衡后台定期健康检查与测速的观测间隔 (秒)，默认 300 秒</string>
+    <string name="balancer_type_list">节点列表</string>
+    <string name="balancer_type_group">分组筛选</string>
+    <string name="balancer_strategy_least_ping">最低延迟 (leastPing)</string>
+    <string name="balancer_strategy_failover">故障转移 (failover)</string>
+    <string name="balancer_strategy_random">随机 (random)</string>
+    <string name="balancer_strategy_round_robin">负载均衡 (round_robin)</string>
+    <string name="balancer_strategy_stable">最稳定 (stable)</string>
+    <string name="balancer_strategy_least_load">最低负载 (leastLoad)</string>
+    <string name="balancer_strategy_consistent_hash">一致性哈希 / 会话保持 (consistent_hash)</string>
+    <string name="balancer_custom_url">自定义测速 URL</string>
+    <string name="balancer_custom_url_sum">策略组单独使用的连通性测速地址（留空使用全局默认）</string>
+    <string name="balancer_interval">探测间隔 (秒)</string>
+    <string name="balancer_interval_sum">节点健康检查与周期探测间隔，默认 300 秒</string>
     <string name="balancer_tolerance">切换容差 (Tolerance)</string>
-    <string name="balancer_tolerance_sum">触发切换物理节点的延迟波动容差阈值，建议默认 300ms</string>
-    <string name="balancer_tolerance_unit">容差单位 (Unit)</string>
+    <string name="balancer_tolerance_sum">最低延迟切换阈值，避免微小抖动频繁切换，默认 300ms</string>
+    <string name="balancer_tolerance_unit">容差单位</string>
     <string name="unit_ms">毫秒 (ms)</string>
     <string name="unit_s">秒 (s)</string>
     <string name="balancer_select_group">选择分组</string>
     <string name="balancer_use_front_proxy">使用分组前置代理</string>
     <string name="balancer_use_landing_proxy">使用分组落地代理</string>
-    <string name="balancer_name_exclude">名称排除（正则表达式）</string>
-    <string name="balancer_name_include">名称包含（正则表达式）</string>
+    <string name="balancer_name_exclude">节点名称排除 (正则)</string>
+    <string name="balancer_name_include">节点名称包含 (正则)</string>
 
     <string name="show_subscription_info_card">置顶显示机场资产信息卡片</string>
     <string name="show_subscription_info_card_summary">在订阅分组顶部展示流量配额、剩余与到期时间等资产卡片</string>
@@ -976,5 +979,11 @@
     <string name="show_all_groups_tab">显示全部组标签页</string>
     <string name="show_all_groups_tab_summary">在订阅组标签页最左侧添加"全部"Tab，汇总所有组的节点</string>
     <string name="group_tab_all">全部</string>
+
+    <!-- 策略组多选 -->
+    <string name="selected_count">已选择 %d 项</string>
+    <string name="btn_confirm">确定</string>
+    <string name="select_multi_profile">选择节点</string>
+    <string name="batch_add_nodes">批量添加节点</string>
 
 </resources>

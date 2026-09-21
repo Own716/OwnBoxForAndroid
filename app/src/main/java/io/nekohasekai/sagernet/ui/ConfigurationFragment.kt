@@ -159,7 +159,12 @@ import io.nekohasekai.sagernet.database.SubscriptionBean
 import kotlin.math.abs
 
 class ConfigurationFragment @JvmOverloads constructor(
-    val select: Boolean = false, val selectedItem: ProxyEntity? = null, val titleRes: Int = 0
+    val select: Boolean = false,
+    val selectedItem: ProxyEntity? = null,
+    val titleRes: Int = 0,
+    val multiSelect: Boolean = false,
+    val initialSelectedIds: LongArray? = null,
+    val excludedIds: LongArray? = null
 ) : ToolbarFragment(R.layout.layout_group_list),
     PopupMenu.OnMenuItemClickListener,
     Toolbar.OnMenuItemClickListener,
@@ -168,6 +173,7 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     interface SelectCallback {
         fun returnProfile(profileId: Long)
+        fun onProfileToggled(profileId: Long, isSelected: Boolean, totalSelected: Int) {}
     }
 
     companion object {
@@ -180,6 +186,33 @@ class ConfigurationFragment @JvmOverloads constructor(
     lateinit var groupPager: ViewPager2
 
     val alwaysShowAddress by lazy { DataStore.alwaysShowAddress }
+
+    val multiSelectedIds = java.util.Collections.synchronizedSet(LinkedHashSet<Long>()).apply {
+        if (initialSelectedIds != null) {
+            addAll(initialSelectedIds.toList())
+        }
+    }
+
+    fun toggleMultiSelected(profileId: Long) {
+        val isNowSelected: Boolean
+        val count: Int
+        synchronized(multiSelectedIds) {
+            if (multiSelectedIds.contains(profileId)) {
+                multiSelectedIds.remove(profileId)
+                isNowSelected = false
+            } else {
+                multiSelectedIds.add(profileId)
+                isNowSelected = true
+            }
+            count = multiSelectedIds.size
+        }
+        if (::adapter.isInitialized) {
+            adapter.groupFragments.values.forEach { fragment ->
+                fragment.adapter?.refreshProfileState(setOf(profileId))
+            }
+        }
+        (activity as? SelectCallback)?.onProfileToggled(profileId, isNowSelected, count)
+    }
 
     @Volatile
     private var selectedProxySnapshot = selectedItem?.id ?: 0L
@@ -287,7 +320,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
     }
 
-    private fun isSelectedProfile(profileId: Long) = selectedProxySnapshot == profileId
+    fun isSelectedProfile(profileId: Long) = if (multiSelect) multiSelectedIds.contains(profileId) else selectedProxySnapshot == profileId
 
     private fun isCurrentProfile(profileId: Long) = currentProfileSnapshot == profileId
 
@@ -3372,6 +3405,11 @@ class ConfigurationFragment @JvmOverloads constructor(
                 } else {
                     SagerDatabase.proxyDao.getByGroup(proxyGroup.id)
                 }
+                val pf = parentFragment as? ConfigurationFragment
+                if (pf?.excludedIds != null && pf.excludedIds.isNotEmpty()) {
+                    val excludeSet = pf.excludedIds.toSet()
+                    newProfiles = newProfiles.filter { it.id !in excludeSet }
+                }
                 val currentOrder = if (isAllGroupsTab) DataStore.allGroupsOrder else proxyGroup.order
                 when (currentOrder) {
                     GroupOrder.ORIGIN -> {
@@ -3413,8 +3451,15 @@ class ConfigurationFragment @JvmOverloads constructor(
                 var selectedProfileIndex = -1
 
                 if (selected) {
-                    val selectedProxy = selectedItem?.id ?: DataStore.selectedProxy
-                    selectedProfileIndex = newProfileIds.indexOf(selectedProxy)
+                    if (pf?.multiSelect == true) {
+                        val firstSelected = pf.multiSelectedIds.firstOrNull()
+                        if (firstSelected != null) {
+                            selectedProfileIndex = newProfileIds.indexOf(firstSelected)
+                        }
+                    } else {
+                        val selectedProxy = selectedItem?.id ?: DataStore.selectedProxy
+                        selectedProfileIndex = newProfileIds.indexOf(selectedProxy)
+                    }
                 }
 
                 configurationListView.post {
@@ -3504,7 +3549,12 @@ class ConfigurationFragment @JvmOverloads constructor(
                     if (DataStore.hapticFeedback) it.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                     val proxyEntity = entity
                     if (select) {
-                        (requireActivity() as SelectCallback).returnProfile(proxyEntity.id)
+                        val pf = parentFragment as? ConfigurationFragment
+                        if (pf?.multiSelect == true) {
+                            pf.toggleMultiSelected(proxyEntity.id)
+                        } else {
+                            (requireActivity() as SelectCallback).returnProfile(proxyEntity.id)
+                        }
                     } else {
                         selectProfile(proxyEntity)
                     }

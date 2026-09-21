@@ -22,6 +22,9 @@ public class BalancerBean extends InternalBean {
     public static final String STRATEGY_LEAST_PING = "leastPing";
     public static final String STRATEGY_LEAST_LOAD = "leastLoad";
     public static final String STRATEGY_CONSISTENT_HASH = "consistent_hash";
+    public static final String STRATEGY_FAILOVER = "failover";
+    public static final String STRATEGY_ROUND_ROBIN = "round_robin";
+    public static final String STRATEGY_STABLE = "stable";
 
     public int balancerType = TYPE_LIST; // 0 = list, 1 = group
     public long targetGroupId = 0L;
@@ -63,13 +66,30 @@ public class BalancerBean extends InternalBean {
 
     @Override
     public String displayAddress() {
-        String stratStr = strategy != null ? strategy : STRATEGY_RANDOM;
+        String stratName;
+        if (STRATEGY_LEAST_PING.equals(strategy)) {
+            stratName = "最低延迟";
+        } else if (STRATEGY_FAILOVER.equals(strategy)) {
+            stratName = "故障转移";
+        } else if (STRATEGY_RANDOM.equals(strategy)) {
+            stratName = "随机";
+        } else if (STRATEGY_ROUND_ROBIN.equals(strategy)) {
+            stratName = "负载均衡";
+        } else if (STRATEGY_STABLE.equals(strategy)) {
+            stratName = "最稳定";
+        } else if (STRATEGY_LEAST_LOAD.equals(strategy)) {
+            stratName = "最小负载";
+        } else if (STRATEGY_CONSISTENT_HASH.equals(strategy)) {
+            stratName = "一致性哈希";
+        } else {
+            stratName = strategy != null ? strategy : STRATEGY_RANDOM;
+        }
         if (balancerType == TYPE_GROUP) {
             int gCount = targetGroupIds != null && !targetGroupIds.isEmpty() ? targetGroupIds.size() : (targetGroupId > 0 ? 1 : 0);
-            return "[分组 (" + gCount + ")] 策略: " + stratStr;
+            return "[分组 (" + gCount + ")] 策略: " + stratName;
         } else {
             int count = proxies != null ? proxies.size() : 0;
-            return "[列表 (" + count + ")] 策略: " + stratStr;
+            return "[节点 (" + count + ")] 策略: " + stratName;
         }
     }
 
