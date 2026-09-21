@@ -3,13 +3,13 @@
 <p align="center">
   <img src="docs/logo.png" width="128" height="128" alt="OwnBox Logo">
   <br>
-  <b>基于 Singbox 1.15.0 A4 适用于 Android 的现代化通用代理工具链与网络调试客户端</b>
+  <b>基于 Singbox 1.15.0 Alpha 6 适用于 Android 的现代化通用代理工具链与网络调试客户端</b>
   <br>
   <b>A Modern Universal Proxy Toolchain & Network Debugging Client for Android</b>
 </p>
 
 <p align="center">
-  <a href="https://github.com/Own716/OwnBoxForAndroid/releases"><img src="https://img.shields.io/badge/Release-v2.8.0-blue.svg?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/Own716/OwnBoxForAndroid/releases"><img src="https://img.shields.io/badge/Release-v2.8.1--preview-blue.svg?style=flat-square" alt="Version"></a>
   <a href="https://android-arsenal.com/api?level=21"><img src="https://img.shields.io/badge/Android-5.0%2B%20(API%2021%2B)-brightgreen.svg?style=flat-square" alt="API"></a>
   <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/License-GPL--3.0-orange.svg?style=flat-square" alt="License"></a>
   <a href="https://t.me/OwnBoxs"><img src="https://img.shields.io/badge/Telegram-@OwnBoxs-2CA5E0.svg?logo=telegram&style=flat-square" alt="Telegram"></a>

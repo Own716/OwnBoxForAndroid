@@ -3,6 +3,7 @@ package io.nekohasekai.sagernet.fmt
 import io.nekohasekai.sagernet.Key
 import moe.matsuri.nb4a.SingBoxOptions
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class ConfigBuilderLoadBalanceTest {
@@ -52,5 +53,26 @@ class ConfigBuilderLoadBalanceTest {
             else -> "mixed"
         }
         assertEquals("go", stack)
+    }
+
+    @Test
+    fun verifySingTunStackOmittedInJson() {
+        val tunOptions = moe.matsuri.nb4a.SingBoxOptions.Inbound_TunOptions().apply {
+            type = "tun"
+            tag = "tun-in"
+            interface_name = "tun0"
+            stack = when (io.nekohasekai.sagernet.TunImplementation.SING_TUN) {
+                io.nekohasekai.sagernet.TunImplementation.GVISOR -> "gvisor"
+                io.nekohasekai.sagernet.TunImplementation.SYSTEM -> "system"
+                io.nekohasekai.sagernet.TunImplementation.MIXED -> "mixed"
+                io.nekohasekai.sagernet.TunImplementation.SING_TUN -> null
+                else -> null
+            }
+        }
+        val map = tunOptions.asMap()
+        assertFalse("Sing-Tun must omit stack field completely", map.containsKey("stack"))
+
+        tunOptions.stack = "gvisor"
+        assertEquals("gvisor", tunOptions.asMap()["stack"])
     }
 }

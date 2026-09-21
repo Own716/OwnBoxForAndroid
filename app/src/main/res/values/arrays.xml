@@ -575,10 +575,10 @@
     </string-array>
 
     <string-array name="tun_implementation">
-        <item>gVisor</item>
-        <item>System</item>
-        <item>Mixed</item>
-        <item>Sing-Tun</item>
+        <item>gVisor (兼容模式)</item>
+        <item>System (兼容模式)</item>
+        <item>Mixed (兼容模式)</item>
+        <item>Sing-Tun (官方最新 TUN / 推荐)</item>
     </string-array>
 
     <string-array name="hysteria_protocol">
