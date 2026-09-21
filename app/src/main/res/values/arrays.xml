@@ -752,21 +752,15 @@
 
     <string-array name="balancer_strategy_entries">
         <item>@string/balancer_strategy_least_ping</item>
-        <item>@string/balancer_strategy_failover</item>
+        <item>@string/balancer_strategy_least_load</item>
         <item>@string/balancer_strategy_random</item>
         <item>@string/balancer_strategy_round_robin</item>
-        <item>@string/balancer_strategy_stable</item>
-        <item>@string/balancer_strategy_least_load</item>
-        <item>@string/balancer_strategy_consistent_hash</item>
     </string-array>
     <string-array name="balancer_strategy_values" translatable="false">
         <item>leastPing</item>
-        <item>failover</item>
-        <item>random</item>
-        <item>round_robin</item>
-        <item>stable</item>
         <item>leastLoad</item>
-        <item>consistent_hash</item>
+        <item>random</item>
+        <item>roundRobin</item>
     </string-array>
 
     <string-array name="tolerance_unit_entries">

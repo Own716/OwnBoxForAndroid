@@ -78,24 +78,21 @@ class ConfigBuilderLoadBalanceTest {
     }
 
     @Test
-    fun testAllFiveStrategiesInBalancerBean() {
+    fun testAllFourStrategiesInBalancerBean() {
         val bean = io.nekohasekai.sagernet.fmt.internal.BalancerBean()
         bean.proxies = listOf(1L, 2L, 3L)
 
         bean.strategy = io.nekohasekai.sagernet.fmt.internal.BalancerBean.STRATEGY_LEAST_PING
         assertEquals("[节点 (3)] 策略: 最低延迟", bean.displayAddress())
 
-        bean.strategy = io.nekohasekai.sagernet.fmt.internal.BalancerBean.STRATEGY_FAILOVER
-        assertEquals("[节点 (3)] 策略: 故障转移", bean.displayAddress())
+        bean.strategy = io.nekohasekai.sagernet.fmt.internal.BalancerBean.STRATEGY_LEAST_LOAD
+        assertEquals("[节点 (3)] 策略: 最低负载", bean.displayAddress())
 
         bean.strategy = io.nekohasekai.sagernet.fmt.internal.BalancerBean.STRATEGY_RANDOM
-        assertEquals("[节点 (3)] 策略: 随机", bean.displayAddress())
+        assertEquals("[节点 (3)] 策略: 随机选择", bean.displayAddress())
 
         bean.strategy = io.nekohasekai.sagernet.fmt.internal.BalancerBean.STRATEGY_ROUND_ROBIN
-        assertEquals("[节点 (3)] 策略: 负载均衡", bean.displayAddress())
-
-        bean.strategy = io.nekohasekai.sagernet.fmt.internal.BalancerBean.STRATEGY_STABLE
-        assertEquals("[节点 (3)] 策略: 最稳定", bean.displayAddress())
+        assertEquals("[节点 (3)] 策略: 轮询", bean.displayAddress())
     }
 
     @Test

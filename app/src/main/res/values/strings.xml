@@ -973,11 +973,11 @@
     <string name="balancer_type_list">List</string>
     <string name="balancer_type_group">Group</string>
     <string name="balancer_strategy_least_ping">Lowest Latency (leastPing)</string>
-    <string name="balancer_strategy_failover">Failover (failover)</string>
-    <string name="balancer_strategy_random">Random (random)</string>
-    <string name="balancer_strategy_round_robin">Load Balance (round_robin)</string>
-    <string name="balancer_strategy_stable">Most Stable (stable)</string>
     <string name="balancer_strategy_least_load">Lowest Load (leastLoad)</string>
+    <string name="balancer_strategy_random">Random (random)</string>
+    <string name="balancer_strategy_round_robin">Round Robin (roundRobin)</string>
+    <string name="balancer_strategy_failover">Failover (failover)</string>
+    <string name="balancer_strategy_stable">Most Stable (stable)</string>
     <string name="balancer_strategy_consistent_hash">Consistent Hash / Sticky Session (consistent_hash)</string>
     <string name="balancer_custom_url">Custom Test URL</string>
     <string name="balancer_custom_url_sum">Custom probe URL for this Strategy Group (leave blank to use global default)</string>

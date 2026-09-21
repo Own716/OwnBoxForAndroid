@@ -216,7 +216,11 @@ class StatsBar @JvmOverloads constructor(
     fun onIpDetailClicked() {
         // 就地静默刷新：点击按钮时立刻通过当前实际出口重新发起握手与 IP 查询，绝不弹窗
         (btnIpDetail as? android.widget.ImageView)?.apply {
-            animate().rotationBy(360f).setDuration(600).start()
+            animate().rotationBy(360f).setDuration(400).start()
+        }
+        if (DataStore.showLandingIp) {
+            statusIpText.text = context.getString(R.string.landing_ip_querying)
+            statusIpText.visibility = View.VISIBLE
         }
         refreshLandingIp(forceRefresh = true)
         retestLatencyInPlace()
@@ -413,6 +417,9 @@ class StatsBar @JvmOverloads constructor(
                 if (DataStore.showLandingIp && cached != null && cached.ip.isNotBlank()) {
                     statusIpText.text = "${cached.countryFlag} ${cached.countryCode} ${cached.ip}"
                     statusIpText.visibility = View.VISIBLE
+                } else if (DataStore.showLandingIp && LandingIpManager.isCurrentlyQuerying()) {
+                    statusIpText.text = context.getString(R.string.landing_ip_querying)
+                    statusIpText.visibility = View.VISIBLE
                 } else {
                     statusIpText.visibility = View.GONE
                 }
@@ -495,21 +502,29 @@ class StatsBar @JvmOverloads constructor(
             }
             val currentProfile = DataStore.selectedProxy
             val cached = LandingIpManager.getCachedInfo()
-            if (!forceRefresh && cached != null) {
+            if (!forceRefresh && cached != null && LandingIpManager.cachedProfileId == currentProfile) {
                 btnIpDetail?.visibility = View.VISIBLE
                 updateStatusViews()
                 return@runOnUi
             }
 
             btnIpDetail?.visibility = View.VISIBLE
-            if (cached == null && lastMeasuredLatency <= 0) {
-                updateStatusViews(customStatus = context.getString(R.string.landing_ip_querying))
+            if (forceRefresh || cached == null) {
+                statusIpText.text = context.getString(R.string.landing_ip_querying)
+                statusIpText.visibility = View.VISIBLE
             }
 
             val activity = context as? MainActivity
             val scope = activity?.lifecycleScope ?: CoroutineScope(Dispatchers.Main)
             scope.launch {
-                val result = LandingIpManager.queryLandingIp(currentProfile, forceRefresh = forceRefresh)
+                val result = LandingIpManager.queryLandingIp(currentProfile, forceRefresh = forceRefresh) { intermediateInfo ->
+                    runOnUi {
+                        if (currentState == BaseService.State.Connected && DataStore.showLandingIp) {
+                            statusIpText.text = "${intermediateInfo.countryFlag} ${intermediateInfo.countryCode} ${intermediateInfo.ip}"
+                            statusIpText.visibility = View.VISIBLE
+                        }
+                    }
+                }
                 if (currentState != BaseService.State.Connected) return@launch
                 if (!DataStore.showLandingIp) {
                     btnIpDetail?.visibility = View.GONE
