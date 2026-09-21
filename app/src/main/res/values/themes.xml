@@ -21,6 +21,7 @@
         <item name="colorOnSurface">?android:attr/textColorPrimary</item>
         <item name="colorOnSurfaceVariant">?android:attr/textColorSecondary</item>
         <item name="colorSurfaceVariant">@color/md3_background</item>
+        <item name="colorOutline">@color/card_stroke</item>
 
         <!-- Switch, RadioButton, CheckBox 激活色严格收敛至自定义主题主色 -->
         <item name="colorControlActivated">?colorPrimary</item>
