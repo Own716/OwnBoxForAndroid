@@ -14,8 +14,17 @@ if [ -z "$GOPATH" ]; then
   GOPATH=$(go env GOPATH)
 fi
 
-# 在编译时锁定singbox侧依赖
-go mod tidy || exit 1
+# 在编译时锁定singbox侧依赖，带重试防御 sum.golang.org 瞬态网络抖动
+for i in 1 2 3; do
+  go mod tidy && break || {
+    if [ "$i" -eq 3 ]; then
+      echo ">> ERROR: go mod tidy failed after 3 attempts" >&2
+      exit 1
+    fi
+    echo ">> go mod tidy transient network error, retrying ($i/3)..." >&2
+    sleep 3
+  }
+done
 
 # 官方 sing-box 的 constant.Version 默认为 "unknown"，需经 ldflags -X 在链接期注入；
 # 版本号取自 nb4a.properties 的 SINGBOX_VERSION（与 get_source.sh 克隆的源码版本一致）
