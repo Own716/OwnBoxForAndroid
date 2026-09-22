@@ -112,3 +112,114 @@ func TestStrategies(t *testing.T) {
 		t.Fatalf("expected consistent destination stickiness for same FQDN, got %v and %v", destA1, destA2)
 	}
 }
+
+func TestConsistentHashRing(t *testing.T) {
+	tags := []string{"node-us-east", "node-us-west", "node-hk", "node-sg", "node-jp"}
+	n := len(tags)
+	lb := &LoadBalance{
+		tags:      tags,
+		stats:     make([]*nodeStats, n),
+		strategy:  "consistentHash",
+		outbounds: make([]adapter.Outbound, n),
+	}
+	for i := 0; i < n; i++ {
+		lb.stats[i] = new(nodeStats)
+	}
+
+	// 1. Determinism: Same destination maps to same primary candidate every time
+	dest1 := M.Socksaddr{Fqdn: "api.telegram.org"}
+	c1 := lb.candidateIndices(dest1)
+	c2 := lb.candidateIndices(dest1)
+	if len(c1) != n || len(c2) != n {
+		t.Fatalf("expected length %d, got c1=%d, c2=%d", n, len(c1), len(c2))
+	}
+	if c1[0] != c2[0] {
+		t.Fatalf("expected deterministic primary node for %s, got %d and %d", dest1.Fqdn, c1[0], c2[0])
+	}
+
+	// 2. Ensure candidate list contains all distinct nodes without duplicates
+	seen := make(map[int]bool)
+	for _, idx := range c1 {
+		if seen[idx] {
+			t.Fatalf("duplicate node index %d in candidate list: %v", idx, c1)
+		}
+		seen[idx] = true
+	}
+	if len(seen) != n {
+		t.Fatalf("expected all %d nodes in candidate list, got %d", n, len(seen))
+	}
+
+	// 3. Smooth Failover:
+	// Degrade the primary node chosen for dest1
+	primaryIdx := c1[0]
+	lb.stats[primaryIdx].consecutiveFails.Store(2)
+	lb.stats[primaryIdx].lastFailTime.Store(time.Now().UnixMilli())
+
+	cAfterFail := lb.candidateIndices(dest1)
+	// The primary node should now be degraded and put at the very end
+	if cAfterFail[0] == primaryIdx {
+		t.Fatalf("degraded node %d should not be primary candidate, got %v", primaryIdx, cAfterFail)
+	}
+	if cAfterFail[n-1] != primaryIdx {
+		t.Fatalf("degraded node %d should be put last, got %v", primaryIdx, cAfterFail)
+	}
+	// The new primary candidate should be the second node from c1 (clockwise neighbor)
+	expectedNewPrimary := c1[1]
+	if cAfterFail[0] != expectedNewPrimary {
+		t.Fatalf("expected clockwise failover to node %d, got %d", expectedNewPrimary, cAfterFail[0])
+	}
+
+	// 4. Immunity for unaffected destinations:
+	var otherDest M.Socksaddr
+	var otherC1 []int
+	for _, fqdn := range []string{"google.com", "cloudflare.com", "apple.com", "netflix.com", "github.com", "microsoft.com"} {
+		cand := lb.candidateIndices(M.Socksaddr{Fqdn: fqdn})
+		if cand[0] != primaryIdx && cand[0] != expectedNewPrimary {
+			otherDest = M.Socksaddr{Fqdn: fqdn}
+			otherC1 = cand
+			break
+		}
+	}
+	if otherDest.Fqdn != "" {
+		otherCAfter := lb.candidateIndices(otherDest)
+		if otherCAfter[0] != otherC1[0] {
+			t.Fatalf("unaffected destination %s remapped unexpectedly from %d to %d (consistent hash property violated)",
+				otherDest.Fqdn, otherC1[0], otherCAfter[0])
+		}
+	}
+
+	// 5. Recovery after cooldown:
+	lb.stats[primaryIdx].lastFailTime.Store(time.Now().Add(-35 * time.Second).UnixMilli())
+	cRecovered := lb.candidateIndices(dest1)
+	if cRecovered[0] != primaryIdx {
+		t.Fatalf("expected node %d to reclaim primary slot after cooldown, got %v", primaryIdx, cRecovered)
+	}
+
+	// 6. Test compatibility with "consistent_hash" alias
+	lb.strategy = "consistent_hash"
+	cAlias := lb.candidateIndices(dest1)
+	if cAlias[0] != primaryIdx {
+		t.Fatalf("expected 'consistent_hash' alias to produce same primary node %d, got %v", primaryIdx, cAlias)
+	}
+
+	// 7. Node order independence:
+	// When nodes are reordered in configuration list, the mapping of dest1
+	// must still resolve to the same node tag!
+	reorderedTags := []string{tags[2], tags[4], tags[0], tags[1], tags[3]}
+	lbReordered := &LoadBalance{
+		tags:      reorderedTags,
+		stats:     make([]*nodeStats, n),
+		strategy:  "consistentHash",
+		outbounds: make([]adapter.Outbound, n),
+	}
+	for i := 0; i < n; i++ {
+		lbReordered.stats[i] = new(nodeStats)
+	}
+	reorderedCandidates := lbReordered.candidateIndices(dest1)
+	originalChosenTag := tags[c1[0]]
+	reorderedChosenTag := reorderedTags[reorderedCandidates[0]]
+	if originalChosenTag != reorderedChosenTag {
+		t.Fatalf("node reordering changed mapped tag for %s: originally %s, but reordered got %s",
+			dest1.Fqdn, originalChosenTag, reorderedChosenTag)
+	}
+}

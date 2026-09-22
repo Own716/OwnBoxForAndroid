@@ -882,7 +882,7 @@ fun buildConfig(
                     val strat = when (balancerBean.strategy) {
                         "failover" -> "failover"
                         "stable" -> "stable"
-                        "consistent_hash" -> "consistent_hash"
+                        "consistent_hash", "consistentHash" -> "consistent_hash"
                         "leastLoad" -> "leastLoad"
                         "round_robin", "roundRobin" -> "round_robin"
                         "random" -> "random"

@@ -26,6 +26,7 @@ public class BalancerBean extends InternalBean {
     public static final String STRATEGY_FAILOVER = "failover";
     public static final String STRATEGY_STABLE = "stable";
     public static final String STRATEGY_CONSISTENT_HASH = "consistent_hash";
+    public static final String STRATEGY_CONSISTENT_HASH_CAMEL = "consistentHash";
 
     public int balancerType = TYPE_LIST; // 0 = list, 1 = group
     public long targetGroupId = 0L;
@@ -80,7 +81,7 @@ public class BalancerBean extends InternalBean {
             stratName = "故障转移";
         } else if (STRATEGY_STABLE.equals(strategy)) {
             stratName = "最稳定";
-        } else if (STRATEGY_CONSISTENT_HASH.equals(strategy)) {
+        } else if (STRATEGY_CONSISTENT_HASH.equals(strategy) || STRATEGY_CONSISTENT_HASH_CAMEL.equals(strategy)) {
             stratName = "一致性哈希";
         } else {
             stratName = strategy != null ? strategy : STRATEGY_LEAST_PING;

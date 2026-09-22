@@ -5,6 +5,8 @@ import (
 	"math/rand"
 	"net"
 	"slices"
+	"sort"
+	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -67,6 +69,103 @@ func (s *nodeStats) recordFailure() {
 	s.lastFailTime.Store(time.Now().UnixMilli())
 }
 
+const virtualNodesPerPhysicalNode = 64
+
+type ringEntry struct {
+	hash    uint32
+	nodeIdx int
+}
+
+type consistentHashRing struct {
+	entries []ringEntry
+}
+
+func fnv32(key string) uint32 {
+	var h uint32 = 2166136261
+	for i := 0; i < len(key); i++ {
+		h ^= uint32(key[i])
+		h *= 16777619
+	}
+	return h
+}
+
+func newConsistentHashRing(tags []string) *consistentHashRing {
+	n := len(tags)
+	if n == 0 {
+		return nil
+	}
+	totalVirtual := n * virtualNodesPerPhysicalNode
+	entries := make([]ringEntry, 0, totalVirtual)
+	for idx, tag := range tags {
+		for v := 0; v < virtualNodesPerPhysicalNode; v++ {
+			vKey := tag + "#v" + strconv.Itoa(v)
+			entries = append(entries, ringEntry{
+				hash:    fnv32(vKey),
+				nodeIdx: idx,
+			})
+		}
+	}
+	slices.SortFunc(entries, func(a, b ringEntry) int {
+		if a.hash < b.hash {
+			return -1
+		} else if a.hash > b.hash {
+			return 1
+		}
+		return a.nodeIdx - b.nodeIdx
+	})
+	return &consistentHashRing{entries: entries}
+}
+
+func (r *consistentHashRing) getCandidates(destHash uint32, n int, isDegraded func(int) bool) []int {
+	if r == nil || len(r.entries) == 0 || n <= 0 {
+		return nil
+	}
+	pos := sort.Search(len(r.entries), func(i int) bool {
+		return r.entries[i].hash >= destHash
+	})
+	if pos >= len(r.entries) {
+		pos = 0
+	}
+
+	seen := make([]bool, n)
+	healthy := make([]int, 0, n)
+	degraded := make([]int, 0, n)
+	visitedCount := 0
+
+	totalEntries := len(r.entries)
+	for i := 0; i < totalEntries && visitedCount < n; i++ {
+		entryIdx := (pos + i) % totalEntries
+		nodeIdx := r.entries[entryIdx].nodeIdx
+		if nodeIdx >= 0 && nodeIdx < n && !seen[nodeIdx] {
+			seen[nodeIdx] = true
+			visitedCount++
+			if isDegraded(nodeIdx) {
+				degraded = append(degraded, nodeIdx)
+			} else {
+				healthy = append(healthy, nodeIdx)
+			}
+		}
+	}
+
+	if visitedCount < n {
+		for i := 0; i < n; i++ {
+			if !seen[i] {
+				seen[i] = true
+				if isDegraded(i) {
+					degraded = append(degraded, i)
+				} else {
+					healthy = append(healthy, i)
+				}
+			}
+		}
+	}
+
+	if len(healthy) == 0 {
+		return degraded
+	}
+	return append(healthy, degraded...)
+}
+
 type LoadBalance struct {
 	outbound.Adapter
 	ctx            context.Context
@@ -80,6 +179,7 @@ type LoadBalance struct {
 	activeConns    []*atomic.Int64
 	stats          []*nodeStats
 	interruptGroup *interrupt.Group
+	ring           *consistentHashRing
 }
 
 func NewLoadBalance(ctx context.Context, router adapter.Router, logger log.ContextLogger, tag string, options LoadBalanceOptions) (adapter.Outbound, error) {
@@ -116,6 +216,7 @@ func (s *LoadBalance) Start() error {
 		s.activeConns[i] = new(atomic.Int64)
 		s.stats[i] = new(nodeStats)
 	}
+	s.ring = newConsistentHashRing(s.tags)
 	return nil
 }
 
@@ -128,12 +229,7 @@ func hashDestination(dest M.Socksaddr) uint32 {
 	} else {
 		key = dest.String()
 	}
-	var h uint32 = 2166136261
-	for i := 0; i < len(key); i++ {
-		h ^= uint32(key[i])
-		h *= 16777619
-	}
-	return h
+	return fnv32(key)
 }
 
 func (s *LoadBalance) isNodeDegraded(idx int, now int64) bool {
@@ -247,34 +343,22 @@ func (s *LoadBalance) candidateIndices(dest M.Socksaddr) []int {
 		}
 		return append(healthy, degraded...)
 
-	case "consistent_hash":
-		healthy := make([]int, 0, n)
-		degraded := make([]int, 0, n)
-		for i := 0; i < n; i++ {
-			if s.isNodeDegraded(i, now) {
-				degraded = append(degraded, i)
+	case "consistent_hash", "consistentHash":
+		if s.ring == nil && len(s.tags) > 0 {
+			s.ring = newConsistentHashRing(s.tags)
+		}
+		if s.ring != nil {
+			var h uint32
+			if dest.Fqdn != "" || dest.IsIP() {
+				h = hashDestination(dest)
 			} else {
-				healthy = append(healthy, i)
+				h = uint32(atomic.AddUint64(&s.counter, 1))
 			}
+			return s.ring.getCandidates(h, n, func(idx int) bool {
+				return s.isNodeDegraded(idx, now)
+			})
 		}
-		if len(healthy) == 0 {
-			healthy = indices
-			degraded = nil
-		}
-		hn := len(healthy)
-		rotated := make([]int, hn)
-		if dest.Fqdn != "" || dest.IsIP() {
-			start := int(hashDestination(dest) % uint32(hn))
-			for i := 0; i < hn; i++ {
-				rotated[i] = healthy[(start+i)%hn]
-			}
-		} else {
-			start := int(atomic.AddUint64(&s.counter, 1) % uint64(hn))
-			for i := 0; i < hn; i++ {
-				rotated[i] = healthy[(start+i)%hn]
-			}
-		}
-		return append(rotated, degraded...)
+		return indices
 
 	case "random":
 		healthy := make([]int, 0, n)

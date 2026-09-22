@@ -93,6 +93,12 @@ class ConfigBuilderLoadBalanceTest {
 
         bean.strategy = io.nekohasekai.sagernet.fmt.internal.BalancerBean.STRATEGY_ROUND_ROBIN
         assertEquals("[节点 (3)] 策略: 轮询", bean.displayAddress())
+
+        bean.strategy = io.nekohasekai.sagernet.fmt.internal.BalancerBean.STRATEGY_CONSISTENT_HASH
+        assertEquals("[节点 (3)] 策略: 一致性哈希", bean.displayAddress())
+
+        bean.strategy = io.nekohasekai.sagernet.fmt.internal.BalancerBean.STRATEGY_CONSISTENT_HASH_CAMEL
+        assertEquals("[节点 (3)] 策略: 一致性哈希", bean.displayAddress())
     }
 
     @Test
@@ -114,6 +120,14 @@ class ConfigBuilderLoadBalanceTest {
         val random = buildLoadBalanceOutbound(members, "random")
         assertEquals("loadbalance", random.type)
         assertEquals("random", random.strategy)
+
+        val consistentHash = buildLoadBalanceOutbound(members, "consistent_hash")
+        assertEquals("loadbalance", consistentHash.type)
+        assertEquals("consistent_hash", consistentHash.strategy)
+
+        val consistentHashCamel = buildLoadBalanceOutbound(members, "consistentHash")
+        assertEquals("loadbalance", consistentHashCamel.type)
+        assertEquals("consistentHash", consistentHashCamel.strategy)
     }
 
     @Test
