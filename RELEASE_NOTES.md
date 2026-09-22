@@ -1,8 +1,7 @@
-# OwnBox v2.8.1-preview 预览版
+# OwnBox v2.8.6-preview 预览版
 
-### 内核与底层架构升级
-- **升级 sing-box 内核**：全面升级至官方最新测试版 **sing-box v1.15.0-alpha.6**。
-- **Sing-Tun 全新 TCP/IP 协议栈适配**：深度适配 sing-tun 自有 TCP/IP 栈，提供极佳极限吞吐、超低功耗与内存表现；Sing-Tun 模式下完全省略 stack 字段以无缝激活新栈。
-- **TUN 模式向下兼容**：保留 gVisor、System、Mixed 兼容模式，并在设置界面清晰标明 `Sing-Tun (官方最新 TUN / 推荐)` 与各兼容选项。
-- **全协议链兼容验证**：保持现有 VLESS (XHTTP/SplitHTTP / gRPC / WebSocket / TLS / Reality)、VMess、Trojan、Shadowsocks、Hysteria2、TUIC、Juicity、WireGuard 等代理协议完全稳定可用。
-- **CI/CD 构建缓存修复**：修复 GitHub Actions 构建缓存判定逻辑，将 `nb4a.properties` 纳入构建指纹，确保内核版本升级时必自动重新拉取并编译最新官方内核。
+- **TUN 引擎优化**：默认启用最新 Sing-Tun 纯 Go 原生协议栈，保留全部兼容模式，修复虚拟网卡掩码匹配问题。
+- **后台稳定增强**：优化熄屏与切应用保活逻辑，彻底解决 Telegram 卡 Connecting 及后台长连接断流。
+- **路由分流修复**：补全 Google Play 商店规则集与应用分流；强化微信、QQ 等国内应用直连与 DNS 解析。
+- **重置连接修复**：重构通知栏“重置连接”链路，支持完整平滑重启与 TUN 隧道重建。
+- **协议与核心适配**：全面适配 Sing-box 1.15.0-alpha.7 核心能力与 TLS 证书指纹固定扩展。
