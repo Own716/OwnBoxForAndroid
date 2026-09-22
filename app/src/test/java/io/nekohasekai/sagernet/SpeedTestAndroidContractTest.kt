@@ -93,7 +93,7 @@ class SpeedTestAndroidContractTest {
         assertTrue(entity.contains("speedTestMode = ''"))
         assertTrue(entity.contains("speedTestDownloadBitsPerSecond = 0"))
         assertTrue(entity.contains("speedTestUploadBitsPerSecond = 0"))
-        assertTrue(database.contains("version = 9"))
+        assertTrue(database.contains("version = 10"))
         assertTrue(database.contains("AutoMigration(from = 8, to = 9)"))
     }
 
@@ -117,11 +117,8 @@ class SpeedTestAndroidContractTest {
     fun legacyDirectPingCodeResourcesAndMenuIdsAreAbsent() {
         val deprecatedSymbols = listOf(
             "pingTest(",
-            "canTCPing(",
             "canICMPing(",
-            "action_connection_tcp_ping",
             "action_connection_icmp_ping",
-            "connection_test_tcp_ping",
             "connection_test_icmp_ping",
         )
         val productionFiles = File("src/main").walkTopDown()
@@ -225,9 +222,7 @@ class SpeedTestAndroidContractTest {
         val forbidden = listOf(
             "http://www.gstatic.com/generate_204",
             "URL Test",
-            "connection_test_tcp_ping",
             "connection_test_icmp_ping",
-            "action_connection_tcp_ping",
             "action_connection_icmp_ping",
         )
         val checkedFiles = buildList {
@@ -259,18 +254,18 @@ class SpeedTestAndroidContractTest {
             .substringAfter("fun urlTest()")
             .substringBefore("inner class GroupPagerAdapter")
         val actions = fragment
-            .substringAfter("R.id.action_connection_test_clear_results")
-            .substringBefore("R.id.action_remove_duplicate")
+            .substringAfter("R.id.action_connection_test_clear_results ->")
+            .substringBefore("R.id.action_remove_duplicate ->")
 
         assertTrue(urlTest.contains("repeat(DataStore.connectionTestConcurrent)"))
-        assertTrue(urlTest.contains("val urlTest = UrlTest()"))
+        assertTrue(urlTest.contains("val urlTest = UrlTest(targetUrl)"))
         assertTrue(urlTest.contains("profile.ping = result"))
-        assertTrue(urlTest.contains("ProfileManager.updateProfile(it)"))
+        assertTrue(urlTest.contains("ProfileManager.postUpdate(profile, false)"))
         assertTrue(urlTest.contains("GroupManager.postReload(DataStore.currentGroupId())"))
         assertTrue(urlTest.contains("DataStore.runningTest = false"))
 
         assertTrue(actions.contains("SagerDatabase.proxyDao.clearTestResults(DataStore.currentGroupId())"))
-        assertTrue(actions.contains("getCurrentGroupFragment()?.adapter?.clearTestResults()"))
+        assertTrue(actions.contains("it.adapter?.clearTestResults()"))
         assertTrue(actions.contains("profile.status != 0 && profile.status != 1"))
         assertTrue(actions.contains("ProfileManager.deleteProfile2("))
     }

@@ -51,8 +51,8 @@ class NodeSelectDialogActivity : AppCompatActivity() {
 
     private fun loadGroupsAndNodes() {
         runOnDefaultDispatcher {
-            val allGroups = SagerDatabase.groupDao.allGroups()
-            val initialNodes = SagerDatabase.proxyDao.getAll()
+            val allGroups = SagerDatabase.groupDao.allGroups().filter { !it.ungrouped && !DataStore.isGroupDisabled(it.id) || it.ungrouped }
+            val initialNodes = SagerDatabase.proxyDao.getAll().filter { !DataStore.isGroupDisabled(it.groupId) }
 
             onMainDispatcher {
                 groups.clear()
@@ -82,9 +82,9 @@ class NodeSelectDialogActivity : AppCompatActivity() {
     private fun filterNodes() {
         runOnDefaultDispatcher {
             val nodes = if (currentGroupId == -1L) {
-                SagerDatabase.proxyDao.getAll()
+                SagerDatabase.proxyDao.getAll().filter { !DataStore.isGroupDisabled(it.groupId) }
             } else {
-                SagerDatabase.proxyDao.getByGroup(currentGroupId)
+                if (DataStore.isGroupDisabled(currentGroupId)) emptyList() else SagerDatabase.proxyDao.getByGroup(currentGroupId)
             }
             onMainDispatcher {
                 updateNodeList(nodes)

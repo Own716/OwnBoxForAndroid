@@ -1122,6 +1122,7 @@ public class SingBoxOptions {
         // sing-box 1.13 网络策略（default/fallback/hybrid），替代已移除的 concurrent_dial
         public String default_network_strategy;
 
+        public String default_domain_resolver;
     }
 
 

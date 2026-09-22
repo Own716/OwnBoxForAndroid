@@ -287,29 +287,29 @@ fun buildSingBoxOutboundHysteriaBean(bean: HysteriaBean): SingBoxOptions.SingBox
             up_mbps = bean.uploadMbps
             down_mbps = bean.downloadMbps
             obfs = bean.obfuscation
-            disable_mtu_discovery = bean.disableMtuDiscovery
+            disable_mtu_discovery = bean.disableMtuDiscovery == true
             when (bean.authPayloadType) {
                 HysteriaBean.TYPE_BASE64 -> auth = bean.authPayload
                 HysteriaBean.TYPE_STRING -> auth_str = bean.authPayload
             }
-            if (bean.streamReceiveWindow > 0) {
+            if (bean.streamReceiveWindow != null && bean.streamReceiveWindow > 0) {
                 recv_window_conn = bean.streamReceiveWindow.toLong()
             }
-            if (bean.connectionReceiveWindow > 0) {
+            if (bean.connectionReceiveWindow != null && bean.connectionReceiveWindow > 0) {
                 recv_window_conn = bean.connectionReceiveWindow.toLong()
             }
             tls = SingBoxOptions.OutboundTLSOptions().apply {
-                val effectiveSni = bean.sni.takeIf { it.isNotBlank() } ?: bean.serverAddress
-                if (effectiveSni.isNotBlank()) {
+                val effectiveSni = bean.sni?.takeIf { it.isNotBlank() } ?: bean.serverAddress
+                if (!effectiveSni.isNullOrBlank()) {
                     server_name = effectiveSni
                 }
-                if (bean.alpn.isNotBlank()) {
+                if (!bean.alpn.isNullOrBlank()) {
                     alpn = bean.alpn.listByLineOrComma()
                 }
-                if (bean.caText.isNotBlank()) {
+                if (!bean.caText.isNullOrBlank()) {
                     certificate = bean.caText
                 }
-                insecure = bean.allowInsecure || DataStore.globalAllowInsecure
+                insecure = bean.allowInsecure == true || runCatching { DataStore.globalAllowInsecure }.getOrDefault(false)
                 enabled = true
             }
         }
@@ -317,14 +317,14 @@ fun buildSingBoxOutboundHysteriaBean(bean: HysteriaBean): SingBoxOptions.SingBox
         2 -> SingBoxOptions.Outbound_Hysteria2Options().apply {
             type = "hysteria2"
             server = bean.serverAddress
-            val port = bean.serverPorts.toIntOrNull()
+            val port = bean.serverPorts?.toIntOrNull()
             if (port != null) {
                 server_port = port
             } else {
-                val hopList = hopPortsToSingboxList(bean.serverPorts)
+                val hopList = bean.serverPorts?.let { hopPortsToSingboxList(it) } ?: emptyList()
                 if (hopList.isNotEmpty()) {
                     server_ports = hopList
-                    val interval = if (bean.hopInterval != null && bean.hopInterval >= 15) bean.hopInterval else 30
+                    val interval = if (bean.hopInterval != null && bean.hopInterval > 0) bean.hopInterval else 30
                     hop_interval = "${interval}s"
                 } else {
                     server_port = getFirstPort(bean.serverPorts)
@@ -332,7 +332,7 @@ fun buildSingBoxOutboundHysteriaBean(bean: HysteriaBean): SingBoxOptions.SingBox
             }
             up_mbps = bean.uploadMbps
             down_mbps = bean.downloadMbps
-            if (bean.obfuscation.isNotBlank()) {
+            if (!bean.obfuscation.isNullOrBlank()) {
                 obfs = SingBoxOptions.Hysteria2Obfs().apply {
                     type = "salamander"
                     password = bean.obfuscation
@@ -344,7 +344,7 @@ fun buildSingBoxOutboundHysteriaBean(bean: HysteriaBean): SingBoxOptions.SingBox
             // QUIC & Mobile network resilience optimizations:
             keep_alive_period = "15s"
             idle_timeout = "30s"
-            if (bean.disableMtuDiscovery) {
+            if (bean.disableMtuDiscovery == true) {
                 disable_path_mtu_discovery = true
             }
             if (bean.streamReceiveWindow != null && bean.streamReceiveWindow > 0) {
@@ -356,17 +356,19 @@ fun buildSingBoxOutboundHysteriaBean(bean: HysteriaBean): SingBoxOptions.SingBox
             bbr_profile = "standard"
 
             tls = SingBoxOptions.OutboundTLSOptions().apply {
-                val effectiveSni = bean.sni.takeIf { it.isNotBlank() } ?: bean.serverAddress
-                if (effectiveSni.isNotBlank()) {
+                val effectiveSni = bean.sni?.takeIf { it.isNotBlank() } ?: bean.serverAddress
+                if (!effectiveSni.isNullOrBlank()) {
                     server_name = effectiveSni
                 }
-                if (bean.alpn.isNotBlank()) {
-                    alpn = bean.alpn.listByLineOrComma()
+                alpn = if (!bean.alpn.isNullOrBlank()) {
+                    bean.alpn.listByLineOrComma()
+                } else {
+                    listOf("h3")
                 }
-                if (bean.caText.isNotBlank()) {
+                if (!bean.caText.isNullOrBlank()) {
                     certificate = bean.caText
                 }
-                insecure = bean.allowInsecure || DataStore.globalAllowInsecure
+                insecure = bean.allowInsecure == true || runCatching { DataStore.globalAllowInsecure }.getOrDefault(false)
                 enabled = true
             }
         }

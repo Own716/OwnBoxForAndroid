@@ -82,6 +82,44 @@ func prepareLocalGeoRuleSets(ruleSets []option.RuleSet) error {
 	return nil
 }
 
+// prepareRemoteRuleSets 预处理远端 rule-set，配置本地 initial_path 兜底文件。
+// 当首次启动或无缓存时，生成空 SRS 占位，避免 sing-box 在 box.Start 同步下载超时（context deadline exceeded），
+// 确保核心在几毫秒内秒启并畅通 VPN，随后由内置 RuleSetUpdater 在后台异步平滑拉取并更新规则。
+func prepareRemoteRuleSets(ruleSets []option.RuleSet) error {
+	dir := filepath.Join(externalAssetsPath, "srs")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+	for i := range ruleSets {
+		rs := &ruleSets[i]
+		if rs.Type != C.RuleSetTypeRemote {
+			continue
+		}
+		if rs.RemoteOptions.InitialPath != "" {
+			if _, err := os.Stat(rs.RemoteOptions.InitialPath); err == nil {
+				continue
+			}
+		}
+		tag := ""
+		if len(rs.Tag) > 0 {
+			tag = rs.Tag[0]
+		}
+		safeTag := strings.NewReplacer(":", "_", "/", "_", "\\", "_", "?", "_", "&", "_", "=", "_").Replace(tag)
+		dstPath := filepath.Join(dir, safeTag+".srs")
+
+		info, err := os.Stat(dstPath)
+		if err != nil || info.Size() == 0 {
+			file, createErr := os.Create(dstPath)
+			if createErr == nil {
+				_ = srs.Write(file, option.PlainRuleSet{}, C.RuleSetVersionCurrent)
+				_ = file.Close()
+			}
+		}
+		rs.RemoteOptions.InitialPath = dstPath
+	}
+	return nil
+}
+
 // convertGeoRuleSetToSRS 从 geoip.db/geosite.db 提取指定代码的规则并生成 .srs 缓存文件。
 func convertGeoRuleSetToSRS(tag string, code string, dbPath string, isGeoIP bool) (string, error) {
 	dir := filepath.Join(externalAssetsPath, "srs")

@@ -393,10 +393,21 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
 
                 R.id.action_toggle_group_disabled -> {
                     val currentDisabled = DataStore.isGroupDisabled(proxyGroup.id)
-                    DataStore.setGroupDisabled(proxyGroup.id, !currentDisabled)
+                    val newDisabled = !currentDisabled
+                    DataStore.setGroupDisabled(proxyGroup.id, newDisabled)
                     groupAdapter.notifyItemChanged(bindingAdapterPosition)
-                    val msg = if (!currentDisabled) R.string.subscription_disabled else R.string.subscription_enabled
+                    val msg = if (newDisabled) R.string.subscription_disabled else R.string.subscription_enabled
                     safeSnackbar(msg)
+                    runOnDefaultDispatcher {
+                        if (newDisabled && DataStore.selectedProxy > 0L) {
+                            val currentProxy = SagerDatabase.proxyDao.getById(DataStore.selectedProxy)
+                            if (currentProxy != null && currentProxy.groupId == proxyGroup.id) {
+                                val fallback = SagerDatabase.proxyDao.getAll().firstOrNull { !DataStore.isGroupDisabled(it.groupId) }
+                                DataStore.selectedProxy = fallback?.id ?: 0L
+                            }
+                        }
+                        GroupManager.postReload(proxyGroup.id)
+                    }
                 }
 
                 R.id.action_clear -> {

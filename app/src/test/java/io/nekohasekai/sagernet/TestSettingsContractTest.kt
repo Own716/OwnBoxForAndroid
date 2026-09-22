@@ -14,10 +14,10 @@ class TestSettingsContractTest {
     fun freshInstallDefaultsMatchThroneBaseline() {
         val defaults = defaultResources()
 
-        assertEquals("http://cp.cloudflare.com/", defaults["default_connection_test_url"])
+        assertEquals("https://cp.cloudflare.com/generate_204", defaults["default_connection_test_url"])
         assertEquals("10", defaults["default_connection_test_concurrent"])
-        assertEquals("download_upload", defaults["default_speed_test_mode"])
-        assertEquals("5000", defaults["default_speed_test_timeout_ms"])
+        assertEquals("simple_download", defaults["default_speed_test_mode"])
+        assertEquals("8000", defaults["default_speed_test_timeout_ms"])
         assertEquals(
             "https://www.speedtest.net/api/js/servers",
             defaults["default_speed_test_server_list_url"],
@@ -27,7 +27,7 @@ class TestSettingsContractTest {
             defaults["default_speed_test_fallback_server_list_url"],
         )
         assertEquals(
-            "http://cachefly.cachefly.net/1mb.test",
+            "https://speed.cloudflare.com/__down?bytes=25000000",
             defaults["default_simple_download_url"],
         )
     }

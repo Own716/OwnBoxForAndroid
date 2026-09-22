@@ -1247,7 +1247,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                 val isAll = isCurrentAllGroups()
                 runOnDefaultDispatcher {
                     val profiles = if (isAll) {
-                        SagerDatabase.proxyDao.getAll()
+                        SagerDatabase.proxyDao.getAll().filter { !DataStore.isGroupDisabled(it.groupId) }
                     } else {
                         SagerDatabase.proxyDao.getByGroup(DataStore.currentGroupId())
                     }
@@ -1291,7 +1291,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                 val isAll = isCurrentAllGroups()
                 runOnDefaultDispatcher {
                     val profiles = if (isAll) {
-                        SagerDatabase.proxyDao.getAll()
+                        SagerDatabase.proxyDao.getAll().filter { !DataStore.isGroupDisabled(it.groupId) }
                     } else {
                         SagerDatabase.proxyDao.getByGroup(DataStore.currentGroupId())
                     }
@@ -1338,7 +1338,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                 runOnDefaultDispatcher {
                     val targetGroupId = if (isAll) ALL_GROUPS_SENTINEL_ID else (DataStore.selectedGroup.takeIf { it > 0 } ?: DataStore.currentGroupId())
                     val profiles = if (isAll) {
-                        SagerDatabase.proxyDao.getAll()
+                        SagerDatabase.proxyDao.getAll().filter { !DataStore.isGroupDisabled(it.groupId) }
                     } else {
                         SagerDatabase.proxyDao.getByGroup(targetGroupId)
                     }
@@ -1647,9 +1647,9 @@ class ConfigurationFragment @JvmOverloads constructor(
         speedTestJob = runOnDefaultDispatcher {
             try {
                 val profiles = if (isAll) {
-                    SagerDatabase.proxyDao.getAll()
+                    SagerDatabase.proxyDao.getAll().filter { !DataStore.isGroupDisabled(it.groupId) }
                 } else {
-                    SagerDatabase.proxyDao.getByGroup(group.id)
+                    if (DataStore.isGroupDisabled(group.id)) emptyList() else SagerDatabase.proxyDao.getByGroup(group.id)
                 }
                 if (profiles.isEmpty()) {
                     onMainDispatcher {
@@ -2070,9 +2070,9 @@ class ConfigurationFragment @JvmOverloads constructor(
 
         val mainJob = runOnDefaultDispatcher {
             val profilesList = if (isAll) {
-                SagerDatabase.proxyDao.getAll()
+                SagerDatabase.proxyDao.getAll().filter { !DataStore.isGroupDisabled(it.groupId) }
             } else {
-                SagerDatabase.proxyDao.getByGroup(group.id)
+                if (DataStore.isGroupDisabled(group.id)) emptyList() else SagerDatabase.proxyDao.getByGroup(group.id)
             }
             test.proxyN = profilesList.size
             val profiles = ConcurrentLinkedQueue(profilesList)
@@ -2166,9 +2166,9 @@ class ConfigurationFragment @JvmOverloads constructor(
 
         val mainJob = runOnDefaultDispatcher {
             val profilesList = if (isAll) {
-                SagerDatabase.proxyDao.getAll()
+                SagerDatabase.proxyDao.getAll().filter { !DataStore.isGroupDisabled(it.groupId) }
             } else {
-                SagerDatabase.proxyDao.getByGroup(group.id)
+                if (DataStore.isGroupDisabled(group.id)) emptyList() else SagerDatabase.proxyDao.getByGroup(group.id)
             }
             test.proxyN = profilesList.size
             val profiles = ConcurrentLinkedQueue(profilesList)
@@ -2259,10 +2259,17 @@ class ConfigurationFragment @JvmOverloads constructor(
                     SagerDatabase.groupDao.createGroup(ProxyGroup(ungrouped = true))
                     newGroupList = ArrayList(SagerDatabase.groupDao.allGroups())
                 }
+                // 彻底过滤已禁用的分组，绝不在主界面顶部 Tab 栏与轮播列表中展示
+                newGroupList.removeAll { !it.ungrouped && DataStore.isGroupDisabled(it.id) }
                 newGroupList.find { it.ungrouped }?.let {
                     if (SagerDatabase.proxyDao.countByGroup(it.id) == 0L) {
                         newGroupList.remove(it)
                     }
+                }
+                if (newGroupList.isEmpty()) {
+                    // 若所有分组均被禁用，以未分组作为保底视图，避免白屏或空崩溃
+                    SagerDatabase.groupDao.createGroup(ProxyGroup(ungrouped = true))
+                    newGroupList = ArrayList(SagerDatabase.groupDao.allGroups().filter { it.ungrouped })
                 }
 
                 if (generation != reloadGeneration.get()) return@runOnDefaultDispatcher
@@ -2275,17 +2282,34 @@ class ConfigurationFragment @JvmOverloads constructor(
                 var selectedGroup = if (browsingGroupId > 0L && newGroupList.any { it.id == browsingGroupId }) {
                     browsingGroupId
                 } else {
-                    selectedItem?.groupId ?: DataStore.currentGroupId()
+                    selectedItem?.groupId?.takeIf { gid -> newGroupList.any { it.id == gid } }
+                        ?: newGroupList.firstOrNull { it.id > 0L }?.id
+                        ?: DataStore.currentGroupId()
+                }
+                if (newGroupList.none { it.id == selectedGroup }) {
+                    selectedGroup = newGroupList.firstOrNull()?.id ?: 0L
+                }
+                if (DataStore.selectedGroup != selectedGroup && selectedGroup > 0L) {
+                    DataStore.selectedGroup = selectedGroup
                 }
                 var newSelectedGroupIndex: Int? = null
                 if (selectedGroup > 0L) {
-                    newSelectedGroupIndex = newGroupList.indexOfFirst { it.id == selectedGroup }
-                } else if (newGroupList.size == 1) {
+                    newSelectedGroupIndex = newGroupList.indexOfFirst { it.id == selectedGroup }.takeIf { it >= 0 }
+                } else if (newGroupList.isNotEmpty()) {
                     selectedGroup = newGroupList[0].id
                     if (DataStore.selectedGroup != selectedGroup) {
                         DataStore.selectedGroup = selectedGroup
                     }
                     newSelectedGroupIndex = 0
+                }
+
+                // 校验当前选中节点是否属于已禁用的分组；若属于，则平滑降级切换至首个未禁用的可用节点
+                if (DataStore.selectedProxy > 0L) {
+                    val currentProxy = SagerDatabase.proxyDao.getById(DataStore.selectedProxy)
+                    if (currentProxy != null && DataStore.isGroupDisabled(currentProxy.groupId)) {
+                        val fallback = SagerDatabase.proxyDao.getAll().firstOrNull { !DataStore.isGroupDisabled(it.groupId) }
+                        DataStore.selectedProxy = fallback?.id ?: 0L
+                    }
                 }
 
                 // Inject "All" tab sentinel at position 0 when the setting is enabled
@@ -2390,23 +2414,11 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
 
         override suspend fun groupUpdated(group: ProxyGroup) {
-            val index = groupList.indexOfFirst { it.id == group.id }
-            if (index == -1) return
-
-            tabLayout.post {
-                groupList[index] = group
-                tabLayout.getTabAt(index)?.text = group.displayName()
-            }
+            reload()
         }
 
         override suspend fun groupUpdated(groupId: Long) {
-            val index = groupList.indexOfFirst { it.id == groupId }
-            if (index == -1) return
-            val group = SagerDatabase.groupDao.getById(groupId) ?: return
-            tabLayout.post {
-                groupList[index] = group
-                tabLayout.getTabAt(index)?.text = group.displayName()
-            }
+            reload()
         }
 
         override suspend fun onAdd(profile: ProxyEntity) {
@@ -3400,10 +3412,14 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             fun reloadProfiles() {
                 var newProfiles = if (isAllGroupsTab) {
-                    // All-groups tab: fetch every profile from every group
-                    SagerDatabase.proxyDao.getAll()
+                    // All-groups tab: fetch every profile from non-disabled groups
+                    SagerDatabase.proxyDao.getAll().filter { !DataStore.isGroupDisabled(it.groupId) }
                 } else {
-                    SagerDatabase.proxyDao.getByGroup(proxyGroup.id)
+                    if (!proxyGroup.ungrouped && DataStore.isGroupDisabled(proxyGroup.id)) {
+                        emptyList()
+                    } else {
+                        SagerDatabase.proxyDao.getByGroup(proxyGroup.id)
+                    }
                 }
                 val pf = parentFragment as? ConfigurationFragment
                 if (pf?.excludedIds != null && pf.excludedIds.isNotEmpty()) {
@@ -4020,13 +4036,13 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
 
         if (isAll) {
-            val list = SagerDatabase.proxyDao.getAll()
+            val list = SagerDatabase.proxyDao.getAll().filter { !DataStore.isGroupDisabled(it.groupId) }
             return Pair(list, "all")
         }
 
         val groupId = DataStore.selectedGroup.takeIf { it > 0 } ?: DataStore.currentGroupId()
         val group = SagerDatabase.groupDao.getById(groupId)
-        val list = SagerDatabase.proxyDao.getByGroup(groupId)
+        val list = if (DataStore.isGroupDisabled(groupId)) emptyList() else SagerDatabase.proxyDao.getByGroup(groupId)
         return Pair(list, group?.displayName() ?: "group_$groupId")
     }
 

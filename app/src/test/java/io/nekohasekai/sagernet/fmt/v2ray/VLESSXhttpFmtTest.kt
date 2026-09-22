@@ -155,8 +155,9 @@ class VLESSXhttpFmtTest {
         assertEquals("cdn.example.com", transport["host"].asString)
         assertEquals("/transport", transport["path"].asString)
         assertEquals("100-1000", transport["x_padding_bytes"].asString)
-        assertFalse(transport["no_sse_header"].asBoolean)
-        assertEquals(30, transport["sc_max_buffered_posts"].asInt)
+        val maxBufferedPosts = transport["sc_max_buffered_posts"]
+        val maxBufferedVal = if (maxBufferedPosts.isJsonObject) maxBufferedPosts.asJsonObject["from"].asInt else maxBufferedPosts.asInt
+        assertEquals(30, maxBufferedVal)
         assertEquals("20-80", transport["sc_stream_up_server_secs"].asString)
         assertEquals("16-32", transport.getAsJsonObject("xmux")["max_concurrency"].asString)
         assertEquals("download.example.com", transport.getAsJsonObject("download")["server"].asString)

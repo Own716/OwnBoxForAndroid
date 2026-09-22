@@ -209,6 +209,14 @@ func newSingBoxInstance(config string, localTransport LocalDNSTransport, platfor
 			}
 			return nil, fmt.Errorf("prepare geo rule-sets: %v", err)
 		}
+		err = prepareRemoteRuleSets(options.Route.RuleSet)
+		if err != nil {
+			cancel()
+			if !platformLog {
+				log.Printf("URLTestTrace goId=%d stage=prepare-remote-rulesets failed elapsed=%s error=%v", diagnosticID, time.Since(createStarted), err)
+			}
+			return nil, fmt.Errorf("prepare remote rule-sets: %v", err)
+		}
 	}
 
 	// create box
