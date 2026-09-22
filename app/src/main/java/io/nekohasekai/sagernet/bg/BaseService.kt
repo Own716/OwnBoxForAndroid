@@ -76,16 +76,24 @@ class BaseService {
                     }
                 }
 
-                Action.RESET_UPSTREAM_CONNECTIONS -> runOnDefaultDispatcher {
-                    Libcore.resetAllConnections(true)
-                    LandingIpManager.clearCache()
-                    runOnMainDispatcher {
-                        Util.collapseStatusBar(ctx)
-                        Toast.makeText(
-                            ctx,
-                            ctx.getString(R.string.reset_connections_done),
-                            Toast.LENGTH_SHORT
-                        ).show()
+                Action.RESET_UPSTREAM_CONNECTIONS -> {
+                    Logs.i("BaseService: Action.RESET_UPSTREAM_CONNECTIONS received, resetting connections and restarting runner")
+                    runOnDefaultDispatcher {
+                        try {
+                            Libcore.resetAllConnections(true)
+                        } catch (e: Throwable) {
+                            Logs.w(e)
+                        }
+                        LandingIpManager.clearCache()
+                        service.stopRunner(restart = true)
+                        runOnMainDispatcher {
+                            Util.collapseStatusBar(ctx)
+                            Toast.makeText(
+                                ctx,
+                                ctx.getString(R.string.reset_connections_done),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
                     }
                 }
 
@@ -99,8 +107,10 @@ class BaseService {
                 }
 
                 Intent.ACTION_SCREEN_OFF -> {
-                    proxy?.box?.sleep()
-                    // Screen turned off: in low power / standard mode, reclaim OS memory to keep background RSS minimal
+                    // Do NOT call proxy?.box?.sleep() / pauseManager.DevicePause().
+                    // Pausing the core on screen off kills idle TCP keepalives and marks connections as dead,
+                    // causing Telegram/WeChat to get stuck in "Connecting..." when switching apps or unlocking.
+                    // Instead, only run a memory trim while keeping TUN/network completely alive.
                     if (!DataStore.performancePriorityMode) {
                         Libcore.forceGc()
                         System.gc()

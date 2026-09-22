@@ -742,10 +742,10 @@ fun buildConfig(
                 // inet4_address/inet6_address 与 endpoint_independent_nat 已于 1.12 移除（构造函数硬报错），
                 // address 为合并后的新字段。
                 address = when (ipv6Mode) {
-                    IPv6Mode.DISABLE -> listOf(VpnService.PRIVATE_VLAN4_CLIENT + "/28")
+                    IPv6Mode.DISABLE -> listOf(VpnService.PRIVATE_VLAN4_CLIENT + "/30")
                     IPv6Mode.ONLY -> listOf(VpnService.PRIVATE_VLAN6_CLIENT + "/126")
                     else -> listOf(
-                        VpnService.PRIVATE_VLAN4_CLIENT + "/28",
+                        VpnService.PRIVATE_VLAN4_CLIENT + "/30",
                         VpnService.PRIVATE_VLAN6_CLIENT + "/126"
                     )
                 }
@@ -1740,16 +1740,21 @@ fun buildConfig(
                 })
             }
 
-            // 微信/腾讯直连保活：避免微信文件/图片收发被错误分流或远程双栈丢包
+            // 微信/QQ/腾讯直连保活：避免微信与QQ图片、文件、音视频收发被错误分流或远程双栈丢包
             topRouteRules.add(Rule_DefaultOptions().apply {
                 domain_suffix = listOf(
                     "weixin.qq.com",
                     "wechat.com",
                     "qpic.cn",
+                    "qlogo.cn",
+                    "wx.gtimg.com",
+                    "gtimg.com",
+                    "gtimg.cn",
+                    "qq.com",
+                    "tencent.com",
                     "tenpay.com",
                     "servicewechat.com",
-                    "wx.gtimg.com",
-                    "qlogo.cn"
+                    "idqqimg.com"
                 )
                 outbound = TAG_DIRECT
             })
@@ -1827,17 +1832,22 @@ fun buildConfig(
                     server = "dns-direct"
                 })
             }
-            val wechatDirectDomains = listOf(
+            val tencentDirectDomains = listOf(
                 "domain:weixin.qq.com",
                 "domain:wechat.com",
                 "domain:qpic.cn",
+                "domain:qlogo.cn",
+                "domain:wx.gtimg.com",
+                "domain:gtimg.com",
+                "domain:gtimg.cn",
+                "domain:qq.com",
+                "domain:tencent.com",
                 "domain:tenpay.com",
                 "domain:servicewechat.com",
-                "domain:wx.gtimg.com",
-                "domain:qlogo.cn"
+                "domain:idqqimg.com"
             )
             dns.rules.add(0, DNSRule_DefaultOptions().apply {
-                makeSingBoxRule(wechatDirectDomains)
+                makeSingBoxRule(tencentDirectDomains)
                 server = "dns-direct"
             })
             perGroupResolver.forEach { (gid, resolver) ->

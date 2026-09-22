@@ -1913,6 +1913,10 @@ public class SingBoxOptions {
 
         public String certificate_path;
 
+        public List<String> client_certificate_sha256;
+
+        public List<String> client_certificate_public_key_sha256;
+
         // Generate note: Listable
         public List<String> key;
 
@@ -1949,6 +1953,10 @@ public class SingBoxOptions {
         public String certificate;
 
         public String certificate_path;
+
+        public List<String> certificate_sha256;
+
+        public List<String> certificate_public_key_sha256;
 
         public OutboundECHOptions ech;
 

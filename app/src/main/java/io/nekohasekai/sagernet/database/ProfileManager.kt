@@ -224,7 +224,26 @@ object ProfileManager {
                 if (country == "cn") createRule(
                     RuleEntity(
                         name = app.getString(R.string.route_play_store, displayCountry),
-                        domains = "domain:googleapis.cn\ndomain:xn--ngstr-lra8j.com\ndomain:xn--ngstr-cn-8za9o.com",
+                        domains = listOf(
+                            "geosite:google-play",
+                            "geosite:google@cn",
+                            "domain:googleapis.cn",
+                            "domain:gvt1.com",
+                            "domain:gvt2.com",
+                            "domain:gvt3.com",
+                            "domain:gvt5.com",
+                            "domain:gvt6.com",
+                            "domain:gvt7.com",
+                            "domain:gvt9.com",
+                            "domain:gvt1-cn.com",
+                            "domain:gvt2-cn.com",
+                            "domain:googleusercontent.com",
+                            "domain:play.googleapis.com",
+                            "domain:android.clients.google.com",
+                            "domain:xn--ngstr-lra8j.com",
+                            "domain:xn--ngstr-cn-8za9o.com"
+                        ).joinToString("\n"),
+                        packages = setOf("com.android.vending", "com.google.android.gms")
                     ), false
                 )
                 createRule(
@@ -243,6 +262,40 @@ object ProfileManager {
                 )
             }
             rules = SagerDatabase.rulesDao.allRules()
+        } else if (rules.isNotEmpty()) {
+            // Auto-enrich existing Play Store rules for existing users without resetting DB
+            var needReload = false
+            rules.forEach { rule ->
+                if (rule.domains.contains("googleapis.cn") && !rule.domains.contains("gvt1.com")) {
+                    val currentDomains = rule.domains.split("\n").map { it.trim() }.filter { it.isNotBlank() }
+                    val newDomains = listOf(
+                        "geosite:google-play",
+                        "geosite:google@cn",
+                        "domain:googleapis.cn",
+                        "domain:gvt1.com",
+                        "domain:gvt2.com",
+                        "domain:gvt3.com",
+                        "domain:gvt5.com",
+                        "domain:gvt6.com",
+                        "domain:gvt7.com",
+                        "domain:gvt9.com",
+                        "domain:gvt1-cn.com",
+                        "domain:gvt2-cn.com",
+                        "domain:googleusercontent.com",
+                        "domain:play.googleapis.com",
+                        "domain:android.clients.google.com",
+                        "domain:xn--ngstr-lra8j.com",
+                        "domain:xn--ngstr-cn-8za9o.com"
+                    )
+                    rule.domains = (currentDomains + newDomains).distinct().joinToString("\n")
+                    rule.packages = rule.packages + setOf("com.android.vending", "com.google.android.gms")
+                    SagerDatabase.rulesDao.updateRule(rule)
+                    needReload = true
+                }
+            }
+            if (needReload) {
+                rules = SagerDatabase.rulesDao.allRules()
+            }
         }
         return rules
     }
