@@ -224,7 +224,17 @@ func (s *URLTest) DialContext(ctx context.Context, network string, destination M
 		return s.group.interruptGroup.NewConn(conn, interrupt.IsExternalConnectionFromContext(ctx)), nil
 	}
 	s.logger.ErrorContext(ctx, err)
-	// Stability protection: do not delete urltest history on destination dial error
+
+	// 容灾候选快速故障转移，防止主选节点临时抖动导致全量连接直接断连
+	for _, alt := range s.group.outbounds {
+		if alt == detour || !common.Contains(alt.Network(), network) {
+			continue
+		}
+		altConn, altErr := alt.DialContext(ctx, network, destination)
+		if altErr == nil {
+			return s.group.interruptGroup.NewConn(altConn, interrupt.IsExternalConnectionFromContext(ctx)), nil
+		}
+	}
 	return nil, err
 }
 
@@ -242,7 +252,17 @@ func (s *URLTest) ListenPacket(ctx context.Context, destination M.Socksaddr) (ne
 		return s.group.interruptGroup.NewPacketConn(conn, interrupt.IsExternalConnectionFromContext(ctx)), nil
 	}
 	s.logger.ErrorContext(ctx, err)
-	// Stability protection: do not delete urltest history on destination dial error
+
+	// UDP 候选快速容灾
+	for _, alt := range s.group.outbounds {
+		if alt == detour || !common.Contains(alt.Network(), N.NetworkUDP) {
+			continue
+		}
+		altConn, altErr := alt.ListenPacket(ctx, destination)
+		if altErr == nil {
+			return s.group.interruptGroup.NewPacketConn(altConn, interrupt.IsExternalConnectionFromContext(ctx)), nil
+		}
+	}
 	return nil, err
 }
 
@@ -456,7 +476,7 @@ type urlTestBatch struct {
 }
 
 func URLTestOutbounds(ctx context.Context, outboundManager adapter.OutboundManager, history *urltest.HistoryStorage, logger log.Logger, outbounds []adapter.Outbound, link string, interval time.Duration, force bool) map[string]uint16 {
-	b, _ := batch.New(ctx, batch.WithConcurrencyNum[any](10))
+	b, _ := batch.New(ctx, batch.WithConcurrencyNum[any](6))
 	testBatch := &urlTestBatch{
 		ctx:      ctx,
 		outbound: outboundManager,
@@ -508,11 +528,11 @@ func (b *urlTestBatch) test(outbounds []adapter.Outbound, link string, interval 
 			}
 			b.checked[tag] = true
 			b.batch.Go(tag, func() (any, error) {
-				testCtx, cancel := context.WithTimeout(b.ctx, C.TCPTimeout)
+				testCtx, cancel := context.WithTimeout(b.ctx, 4*time.Second)
 				defer cancel()
 				testChan := make(chan urlTestResult, 1)
 				go func() {
-					delay, testErr := urltest.URLTest(testCtx, link, detour)
+					delay, testErr := ProbeOutbound(testCtx, detour, link, 3500*time.Millisecond)
 					testChan <- urlTestResult{delay, testErr}
 				}()
 				var testResult urlTestResult
@@ -523,7 +543,16 @@ func (b *urlTestBatch) test(outbounds []adapter.Outbound, link string, interval 
 				}
 				if testResult.err != nil {
 					b.logger.Debug("outbound ", tag, " unavailable: ", testResult.err)
-					b.history.DeleteURLTestHistory(tag)
+					oldHist := b.history.LoadURLTestHistory(tag)
+					if oldHist != nil && time.Since(oldHist.Time) < 3*interval {
+						// 节点历史保护：单次超时或网络瞬态抖动不直接抹除历史，增加惩罚延迟保活
+						b.history.StoreURLTestHistory(tag, &adapter.URLTestHistory{
+							Time:  time.Now(),
+							Delay: oldHist.Delay + 300,
+						})
+					} else {
+						b.history.DeleteURLTestHistory(tag)
+					}
 				} else {
 					b.logger.Debug("outbound ", tag, " available: ", testResult.delay, "ms")
 					b.history.StoreURLTestHistory(tag, &adapter.URLTestHistory{

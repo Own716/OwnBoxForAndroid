@@ -4592,6 +4592,16 @@ public class SingBoxOptions {
 
         public String strategy;
 
+        public String url;
+
+        public String interval;
+
+        public Integer tolerance;
+
+        public String idle_timeout;
+
+        public Boolean interrupt_exist_connections;
+
     }
 
     public static class Outbound_URLTestOptions extends Outbound {

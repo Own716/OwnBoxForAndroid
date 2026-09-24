@@ -132,12 +132,29 @@ internal fun buildSelectorOutbound(defaultTag: String?, memberTags: List<String>
         outbounds = memberTags
     }
 
-internal fun buildLoadBalanceOutbound(memberTags: List<String>, strategy: String? = null, customTag: String? = null) =
+internal fun buildLoadBalanceOutbound(
+    memberTags: List<String>,
+    strategy: String? = null,
+    testUrl: String? = null,
+    intervalSec: Long? = null,
+    toleranceMs: Int? = null,
+    idleTimeoutStr: String? = null,
+    interruptExist: Boolean? = null,
+    customTag: String? = null
+) =
     Outbound_SelectorOptions().apply {
         type = "loadbalance"
         tag = customTag?.takeIf { it.isNotBlank() } ?: TAG_PROXY
         outbounds = memberTags
         this.strategy = strategy
+        url = testUrl?.takeIf { it.isNotBlank() }
+            ?: runCatching { DataStore.connectionTestURL }.getOrNull()?.takeIf { it.isNotBlank() }
+            ?: "https://cp.cloudflare.com/generate_204"
+        val iv = (intervalSec?.takeIf { it > 0 } ?: 300L).coerceAtLeast(10L)
+        interval = "${iv}s"
+        tolerance = toleranceMs?.takeIf { it >= 0 } ?: 300
+        idle_timeout = idleTimeoutStr?.takeIf { it.isNotBlank() } ?: "${iv}s"
+        interrupt_exist_connections = interruptExist ?: false
     }
 
 internal fun buildUrlTestOutbound(
@@ -154,7 +171,7 @@ internal fun buildUrlTestOutbound(
         tag = customTag?.takeIf { it.isNotBlank() } ?: TAG_PROXY
         outbounds = memberTags
         url = testUrl?.takeIf { it.isNotBlank() }
-            ?: DataStore.connectionTestURL.takeIf { it.isNotBlank() }
+            ?: runCatching { DataStore.connectionTestURL }.getOrNull()?.takeIf { it.isNotBlank() }
             ?: "https://cp.cloudflare.com/generate_204"
         val iv = (intervalSec?.takeIf { it > 0 } ?: 300L).coerceAtLeast(10L)
         interval = "${iv}s"
@@ -879,6 +896,8 @@ fun buildConfig(
                         customTag = balancerTag
                     )
                 } else {
+                    val iv = balancerBean.interval.toLong().coerceAtLeast(10L)
+                    val toleranceMs = balancerBean.calculateToleranceMs().coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
                     val strat = when (balancerBean.strategy) {
                         "failover" -> "failover"
                         "stable" -> "stable"
@@ -888,9 +907,16 @@ fun buildConfig(
                         "random" -> "random"
                         else -> balancerBean.strategy
                     }
-                    buildLoadBalanceOutbound(memberTags, strat).apply {
-                        tag = balancerTag
-                    }
+                    buildLoadBalanceOutbound(
+                        memberTags = memberTags,
+                        strategy = strat,
+                        testUrl = balancerBean.testUrl,
+                        intervalSec = iv,
+                        toleranceMs = toleranceMs,
+                        idleTimeoutStr = "${iv}s",
+                        interruptExist = false,
+                        customTag = balancerTag
+                    )
                 }
 
                 outbounds.add(balancerOutbound)

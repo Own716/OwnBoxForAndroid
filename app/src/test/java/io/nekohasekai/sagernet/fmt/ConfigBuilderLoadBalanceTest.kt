@@ -143,4 +143,27 @@ class ConfigBuilderLoadBalanceTest {
         assertEquals("bypass", map["outbound"])
         assertEquals(listOf("geosite:cn", "geoip:cn"), ruleSets)
     }
+
+    @Test
+    fun testBuildLoadBalanceOutboundURLTestOptions() {
+        val members = listOf("n1", "n2")
+        val lb = buildLoadBalanceOutbound(
+            memberTags = members,
+            strategy = "leastLoad",
+            testUrl = "https://www.gstatic.com/generate_204",
+            intervalSec = 120,
+            toleranceMs = 150,
+            idleTimeoutStr = "120s",
+            interruptExist = true,
+            customTag = "lb-group"
+        )
+        assertEquals("loadbalance", lb.type)
+        assertEquals("leastLoad", lb.strategy)
+        assertEquals("lb-group", lb.tag)
+        assertEquals("https://www.gstatic.com/generate_204", lb.url)
+        assertEquals("120s", lb.interval)
+        assertEquals(150, lb.tolerance)
+        assertEquals("120s", lb.idle_timeout)
+        assertEquals(true, lb.interrupt_exist_connections)
+    }
 }

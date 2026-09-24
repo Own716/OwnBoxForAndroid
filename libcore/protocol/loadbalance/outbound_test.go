@@ -133,6 +133,26 @@ func TestStrategies(t *testing.T) {
 	if lpAfterFail[0] != 2 || lpAfterFail[len(lpAfterFail)-1] != 1 {
 		t.Fatalf("expected degraded node 1 to be put last and node 2 chosen, got %v", lpAfterFail)
 	}
+
+	// Test 9: leastPing prefers measured healthy nodes over untested nodes (9999 vs 100 bugfix)
+	lb.stats[0].consecutiveFails.Store(0)
+	lb.stats[0].latencyEmaMs.Store(200)
+	lb.stats[1].consecutiveFails.Store(0)
+	lb.stats[1].latencyEmaMs.Store(120)
+	lb.stats[2].consecutiveFails.Store(0)
+	lb.stats[2].latencyEmaMs.Store(0) // Untested node!
+	lpUntested := lb.candidateIndices(M.Socksaddr{})
+	if lpUntested[0] != 1 || lpUntested[1] != 0 || lpUntested[2] != 2 {
+		t.Fatalf("expected tested nodes [1, 0] to be prioritized ahead of untested node 2, got %v", lpUntested)
+	}
+
+	// Test 10: OutboundGroup and URLTestGroup methods
+	if len(lb.All()) != 3 {
+		t.Fatalf("expected 3 outbounds in All(), got %d", len(lb.All()))
+	}
+	if lb.Now() != "n1" {
+		t.Fatalf("expected Now() to report top healthy candidate 'n1', got %s", lb.Now())
+	}
 }
 
 func TestConsistentHashRing(t *testing.T) {
