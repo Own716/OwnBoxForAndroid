@@ -4,6 +4,9 @@
         android:id="@+id/action_test_profile_speed"
         android:title="@string/action_test_profile_speed" />
     <item
+        android:id="@+id/action_urltest"
+        android:title="URLTEST" />
+    <item
         android:id="@+id/action_edit"
         android:title="@string/edit" />
     <item

@@ -1740,25 +1740,6 @@ fun buildConfig(
                 })
             }
 
-            // 微信/QQ/腾讯直连保活：避免微信与QQ图片、文件、音视频收发被错误分流或远程双栈丢包
-            topRouteRules.add(Rule_DefaultOptions().apply {
-                domain_suffix = listOf(
-                    "weixin.qq.com",
-                    "wechat.com",
-                    "qpic.cn",
-                    "qlogo.cn",
-                    "wx.gtimg.com",
-                    "gtimg.com",
-                    "gtimg.cn",
-                    "qq.com",
-                    "tencent.com",
-                    "tenpay.com",
-                    "servicewechat.com",
-                    "idqqimg.com"
-                )
-                outbound = TAG_DIRECT
-            })
-
             // 6. 远程 DNS 硬隔离规则（强制锁定 mainProxyTag，绝不回退或走国内直连）
             if (remoteDomains.isNotEmpty()) {
                 topRouteRules.add(Rule_DefaultOptions().apply {
@@ -1832,24 +1813,6 @@ fun buildConfig(
                     server = "dns-direct"
                 })
             }
-            val tencentDirectDomains = listOf(
-                "domain:weixin.qq.com",
-                "domain:wechat.com",
-                "domain:qpic.cn",
-                "domain:qlogo.cn",
-                "domain:wx.gtimg.com",
-                "domain:gtimg.com",
-                "domain:gtimg.cn",
-                "domain:qq.com",
-                "domain:tencent.com",
-                "domain:tenpay.com",
-                "domain:servicewechat.com",
-                "domain:idqqimg.com"
-            )
-            dns.rules.add(0, DNSRule_DefaultOptions().apply {
-                makeSingBoxRule(tencentDirectDomains)
-                server = "dns-direct"
-            })
             perGroupResolver.forEach { (gid, resolver) ->
                 val hosts = perGroupServerHosts[gid]
                     ?.filter { it.isNotBlank() && isExclusiveCustomHost(it) }

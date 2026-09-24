@@ -171,6 +171,7 @@ object DefaultNetworkListener {
     private val request = NetworkRequest.Builder().apply {
         addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
         addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED)
+        addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
         if (Build.VERSION.SDK_INT == 23) {  // workarounds for OEM bugs
             removeCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
             removeCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL)

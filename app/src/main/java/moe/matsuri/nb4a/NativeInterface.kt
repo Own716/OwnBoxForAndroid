@@ -36,6 +36,21 @@ import libcore.NetworkInterface as LibcoreNetworkInterface
 
 class NativeInterface : BoxPlatformInterface, NB4AInterface {
 
+    companion object {
+        @Volatile
+        private var instance: NativeInterface? = null
+
+        fun clearInterfaceCache() {
+            val inst = instance ?: return
+            inst.cachedInterfaces = null
+            inst.lastInterfaceFetchTime = 0L
+        }
+    }
+
+    init {
+        instance = this
+    }
+
     //  libbox interface
 
     override fun autoDetectInterfaceControl(fd: Int) {
@@ -193,6 +208,7 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
             state.index = interfaceIndex
             state.network = network
             state.suppressed = 0
+            clearInterfaceCache()
             listener.updateDefaultInterface(linkProperties.interfaceName, interfaceIndex)
             return
         }
@@ -201,6 +217,7 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
         state.index = Int.MIN_VALUE
         state.network = null
         state.suppressed = 0
+        clearInterfaceCache()
         listener.updateDefaultInterface("", -1)
     }
 

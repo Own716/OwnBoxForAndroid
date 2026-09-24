@@ -301,6 +301,38 @@ func (s *LoadBalance) candidateIndices(dest M.Socksaddr) []int {
 		})
 		return indices
 
+	case "leastPing", "least_ping":
+		healthy := make([]int, 0, n)
+		degraded := make([]int, 0, n)
+		for i := 0; i < n; i++ {
+			if s.isNodeDegraded(i, now) {
+				degraded = append(degraded, i)
+			} else {
+				healthy = append(healthy, i)
+			}
+		}
+		if len(healthy) == 0 {
+			healthy = indices
+			degraded = nil
+		}
+		slices.SortStableFunc(healthy, func(a, b int) int {
+			la := s.stats[a].latencyEmaMs.Load()
+			lb := s.stats[b].latencyEmaMs.Load()
+			if la <= 0 {
+				la = 100
+			}
+			if lb <= 0 {
+				lb = 100
+			}
+			if la < lb {
+				return -1
+			} else if la > lb {
+				return 1
+			}
+			return 0
+		})
+		return append(healthy, degraded...)
+
 	case "leastLoad":
 		healthy := make([]int, 0, n)
 		degraded := make([]int, 0, n)

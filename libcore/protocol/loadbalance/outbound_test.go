@@ -111,6 +111,28 @@ func TestStrategies(t *testing.T) {
 	if destA1[0] != destA2[0] {
 		t.Fatalf("expected consistent destination stickiness for same FQDN, got %v and %v", destA1, destA2)
 	}
+
+	// Test 8: leastPing strategy
+	lb.strategy = "leastPing"
+	lb.stats[0].consecutiveFails.Store(0)
+	lb.stats[0].latencyEmaMs.Store(250)
+	lb.stats[1].consecutiveFails.Store(0)
+	lb.stats[1].latencyEmaMs.Store(35)
+	lb.stats[2].consecutiveFails.Store(0)
+	lb.stats[2].latencyEmaMs.Store(120)
+
+	lpIndices := lb.candidateIndices(M.Socksaddr{})
+	if lpIndices[0] != 1 || lpIndices[1] != 2 || lpIndices[2] != 0 {
+		t.Fatalf("expected leastPing order [1, 2, 0], got %v", lpIndices)
+	}
+
+	// Degrade node 1 (lowest latency)
+	lb.stats[1].consecutiveFails.Store(2)
+	lb.stats[1].lastFailTime.Store(time.Now().UnixMilli())
+	lpAfterFail := lb.candidateIndices(M.Socksaddr{})
+	if lpAfterFail[0] != 2 || lpAfterFail[len(lpAfterFail)-1] != 1 {
+		t.Fatalf("expected degraded node 1 to be put last and node 2 chosen, got %v", lpAfterFail)
+	}
 }
 
 func TestConsistentHashRing(t *testing.T) {

@@ -24,6 +24,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import libcore.Libcore
+import moe.matsuri.nb4a.NativeInterface
 import moe.matsuri.nb4a.Protocols
 import moe.matsuri.nb4a.utils.Util
 import java.io.File
@@ -532,14 +533,29 @@ class BaseService {
             // 此处不再叠调 resetAllConnections（避免与内核双路径各拆一次）。
             // 「唤醒时重置」见 receiver 内 DataStore.wakeResetConnections。
             DefaultNetworkListener.start(this) { network ->
-                if (network == null) return@start
+                if (network == null) {
+                    SagerNet.underlyingNetwork = null
+                    upstreamInterfaceName = null
+                    NativeInterface.clearInterfaceCache()
+                    DataStore.vpnService?.updateUnderlyingNetwork()
+                    return@start
+                }
                 SagerNet.connectivity.getLinkProperties(network)?.also { link ->
+                    val oldNetwork = SagerNet.underlyingNetwork
                     SagerNet.underlyingNetwork = network
                     DataStore.vpnService?.updateUnderlyingNetwork()
                     val oldName = upstreamInterfaceName
-                    if (oldName != link.interfaceName) {
-                        Logs.d("Network changed: $oldName -> ${link.interfaceName}")
+                    if (oldName != link.interfaceName || oldNetwork != network) {
+                        Logs.d("Network changed: $oldName -> ${link.interfaceName} (network $oldNetwork -> $network)")
                         upstreamInterfaceName = link.interfaceName
+                        NativeInterface.clearInterfaceCache()
+                        if (DataStore.networkChangeResetConnections) {
+                            try {
+                                Libcore.resetAllConnections(true)
+                            } catch (e: Exception) {
+                                Logs.w(e)
+                            }
+                        }
                     }
                 }
             }

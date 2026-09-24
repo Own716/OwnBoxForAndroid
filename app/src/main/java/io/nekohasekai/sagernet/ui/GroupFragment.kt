@@ -421,6 +421,38 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
                         .setNegativeButton(android.R.string.cancel, null)
                         .show()
                 }
+
+                R.id.action_delete_group -> {
+                    if (proxyGroup.ungrouped) return true
+                    MaterialAlertDialogBuilder(requireContext())
+                        .setTitle(R.string.delete)
+                        .setMessage(R.string.group_delete_confirm_prompt)
+                        .setPositiveButton(R.string.yes) { _, _ ->
+                            val groupId = proxyGroup.id
+                            undoManager.flush()
+                            runOnDefaultDispatcher {
+                                if (DataStore.selectedProxy > 0L) {
+                                    val currentProxy = SagerDatabase.proxyDao.getById(DataStore.selectedProxy)
+                                    if (currentProxy != null && currentProxy.groupId == groupId) {
+                                        val fallback = SagerDatabase.proxyDao.getAll().firstOrNull {
+                                            it.groupId != groupId && !DataStore.isGroupDisabled(it.groupId)
+                                        }
+                                        DataStore.selectedProxy = fallback?.id ?: 0L
+                                    }
+                                }
+                                if (DataStore.selectedGroup == groupId) {
+                                    val remaining = SagerDatabase.groupDao.allGroups().filter { it.id != groupId }
+                                    DataStore.selectedGroup = remaining.firstOrNull()?.id ?: DataStore.currentGroupId()
+                                }
+                                GroupManager.deleteGroup(groupId)
+                                onMainDispatcher {
+                                    safeSnackbar(getString(R.string.group_deleted, proxyGroup.displayName()))
+                                }
+                            }
+                        }
+                        .setNegativeButton(android.R.string.cancel, null)
+                        .show()
+                }
             }
 
             return true
@@ -460,6 +492,9 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
 
                 if (proxyGroup.type != GroupType.SUBSCRIPTION) {
                     popup.menu.removeItem(R.id.action_share_subscription)
+                }
+                if (proxyGroup.ungrouped) {
+                    popup.menu.removeItem(R.id.action_delete_group)
                 }
                 popup.setOnMenuItemClickListener(this)
                 popup.show()

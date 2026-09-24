@@ -14,6 +14,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.*
 import io.nekohasekai.sagernet.R
+import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProfileManager
 import io.nekohasekai.sagernet.database.RuleEntity
@@ -67,6 +68,18 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
     lateinit var ruleListView: RecyclerView
     lateinit var ruleAdapter: RuleAdapter
     lateinit var undoManager: UndoSnackbarManager<RuleEntity>
+
+    fun autoReloadServiceIfStarted() {
+        if (DataStore.serviceState.started) {
+            runOnDefaultDispatcher {
+                try {
+                    SagerNet.reloadService()
+                } catch (e: Exception) {
+                    Logs.w(e)
+                }
+            }
+        }
+    }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -160,6 +173,7 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
                             SagerDatabase.rulesDao.reset()
                             DataStore.rulesFirstCreate = false
                             ruleAdapter.reload()
+                            autoReloadServiceIfStarted()
                         }
                     }
                     .setNegativeButton(R.string.no, null)
@@ -207,6 +221,7 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
                                     ProfileManager.createRule(rule)
                                 }
                             }
+                            autoReloadServiceIfStarted()
                             onMainDispatcher {
                                 snackbar(R.string.preset_applied_toast).show()
                                 ruleAdapter.reload()
@@ -294,7 +309,7 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
             if (updated.isNotEmpty()) {
                 SagerDatabase.rulesDao.updateRules(updated.toList())
                 updated.clear()
-                needReload()
+                autoReloadServiceIfStarted()
             }
         }
 
@@ -314,6 +329,7 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
             val rules = actions.map { it.second }
             runOnDefaultDispatcher {
                 ProfileManager.deleteRules(rules)
+                autoReloadServiceIfStarted()
             }
         }
 
@@ -321,7 +337,7 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
             ruleListView.post {
                 ruleList.add(rule)
                 ruleAdapter.notifyItemInserted(ruleList.size)
-                needReload()
+                autoReloadServiceIfStarted()
             }
         }
 
@@ -331,7 +347,7 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
             ruleListView.post {
                 ruleList[index] = rule
                 ruleAdapter.notifyItemChanged(index + 1)
-                needReload()
+                autoReloadServiceIfStarted()
             }
         }
 
@@ -339,12 +355,12 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
             val index = ruleList.indexOfFirst { it.id == ruleId }
             if (index == -1) {
                 onMainDispatcher {
-                    needReload()
+                    autoReloadServiceIfStarted()
                 }
             } else ruleListView.post {
                 ruleList.removeAt(index)
                 ruleAdapter.notifyItemRemoved(index + 1)
-                needReload()
+                autoReloadServiceIfStarted()
             }
         }
 
@@ -352,7 +368,7 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
             ruleListView.post {
                 ruleList.clear()
                 ruleAdapter.notifyDataSetChanged()
-                needReload()
+                autoReloadServiceIfStarted()
             }
         }
 
@@ -398,9 +414,7 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
                     runOnDefaultDispatcher {
                         rule.enabled = isChecked
                         SagerDatabase.rulesDao.updateRule(rule)
-                        onMainDispatcher {
-                            needReload()
-                        }
+                        autoReloadServiceIfStarted()
                     }
                 }
                 editButton.setOnClickListener {

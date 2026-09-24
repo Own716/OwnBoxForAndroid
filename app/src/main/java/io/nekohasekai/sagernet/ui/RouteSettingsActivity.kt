@@ -207,6 +207,9 @@ class RouteSettingsActivity(
             setPositiveButton(R.string.yes) { _, _ ->
                 runOnDefaultDispatcher {
                     ProfileManager.deleteRule(arg.ruleId)
+                    if (DataStore.serviceState.started) {
+                        runCatching { SagerNet.reloadService() }
+                    }
                 }
                 requireActivity().finish()
             }
@@ -286,6 +289,9 @@ class RouteSettingsActivity(
                 return
             }
             ProfileManager.updateRule(entity.apply { serialize() })
+        }
+        if (DataStore.serviceState.started) {
+            runCatching { SagerNet.reloadService() }
         }
         finish()
 
