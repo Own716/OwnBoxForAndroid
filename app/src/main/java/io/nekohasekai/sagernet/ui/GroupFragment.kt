@@ -70,7 +70,7 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
                 recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder
             ): Int {
                 val proxyGroup = (viewHolder as GroupHolder).proxyGroup
-                if (proxyGroup.ungrouped || proxyGroup.id in GroupUpdater.updating) {
+                if (proxyGroup.id in GroupUpdater.updating) {
                     return 0
                 }
                 return super.getSwipeDirs(recyclerView, viewHolder)
@@ -197,7 +197,11 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
 
         suspend fun reload() {
             val groups = SagerDatabase.groupDao.allGroups().toMutableList()
-            if (groups.size > 1 && SagerDatabase.proxyDao.countByGroup(groups.find { it.ungrouped }!!.id) == 0L) groups.removeAll { it.ungrouped }
+            groups.find { it.ungrouped }?.let { ungroupedGroup ->
+                if (groups.size > 1 && SagerDatabase.proxyDao.countByGroup(ungroupedGroup.id) == 0L) {
+                    groups.remove(ungroupedGroup)
+                }
+            }
             groupList.clear()
             groupList.addAll(groups)
             groupListView.post {
@@ -416,6 +420,7 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
                         .setPositiveButton(R.string.yes) { _, _ ->
                             runOnDefaultDispatcher {
                                 GroupManager.clearGroup(proxyGroup.id)
+                                groupAdapter.reload()
                             }
                         }
                         .setNegativeButton(android.R.string.cancel, null)
@@ -423,7 +428,6 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
                 }
 
                 R.id.action_delete_group -> {
-                    if (proxyGroup.ungrouped) return true
                     MaterialAlertDialogBuilder(requireContext())
                         .setTitle(R.string.delete)
                         .setMessage(R.string.group_delete_confirm_prompt)
@@ -492,9 +496,6 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
 
                 if (proxyGroup.type != GroupType.SUBSCRIPTION) {
                     popup.menu.removeItem(R.id.action_share_subscription)
-                }
-                if (proxyGroup.ungrouped) {
-                    popup.menu.removeItem(R.id.action_delete_group)
                 }
                 popup.setOnMenuItemClickListener(this)
                 popup.show()
