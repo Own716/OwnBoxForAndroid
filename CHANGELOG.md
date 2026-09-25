@@ -1,5 +1,11 @@
 # OwnBox for Android 更新日志 (Changelog)
 
+# OwnBox for Android v2.8.11 预览版 (v2.8.11-preview)
+
+* 架构全面回退还原至 v2.8.9 经典版本，恢复原版策略组与落地 IP 探测机制
+* 保持原版纯粹直接的节点交互习惯，确保极致性能与绝对稳定
+* 递增版本号与构建编号（versionCode 314），支持直接覆盖升级安装且无损保留现有全部节点、订阅与配置
+
 # OwnBox for Android v2.8.9 预览版 (v2.8.9-preview)
 
 * 优化策略组延迟测试基准，采用真实往返时延测量并消除虚高延迟
