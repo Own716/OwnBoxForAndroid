@@ -48,7 +48,6 @@ var (
 	_ adapter.PacketConnectionHandler = (*LoadBalance)(nil)
 	_ adapter.Referrer                = (*LoadBalance)(nil)
 	_ adapter.OutboundGroup           = (*LoadBalance)(nil)
-	_ adapter.URLTestGroup            = (*LoadBalance)(nil)
 )
 
 type nodeStats struct {
@@ -302,6 +301,10 @@ func (s *LoadBalance) URLTest(ctx context.Context) (map[string]uint16, error) {
 	return result, nil
 }
 
+func (s *LoadBalance) isLeastPing() bool {
+	return s.strategy == "leastPing" || s.strategy == "least_ping"
+}
+
 func (s *LoadBalance) CheckOutbounds() {
 	ctx, cancel := context.WithTimeout(s.ctx, 15*time.Second)
 	defer cancel()
@@ -309,11 +312,13 @@ func (s *LoadBalance) CheckOutbounds() {
 }
 
 func (s *LoadBalance) PerformUpdateCheck() {
-	go s.CheckOutbounds()
+	if s.isLeastPing() {
+		go s.CheckOutbounds()
+	}
 }
 
 func (s *LoadBalance) Touch() {
-	if !s.started {
+	if !s.started || !s.isLeastPing() {
 		return
 	}
 	s.access.Lock()
@@ -379,7 +384,7 @@ func (s *LoadBalance) PostStart() error {
 	defer s.access.Unlock()
 	s.started = true
 	s.lastActive.Store(time.Now())
-	if s.interval > 0 {
+	if s.interval > 0 && s.isLeastPing() {
 		go s.CheckOutbounds()
 	}
 	return nil
@@ -551,7 +556,7 @@ func (s *LoadBalance) candidateIndices(dest M.Socksaddr) []int {
 		})
 		return append(healthy, degraded...)
 
-	case "leastLoad":
+	case "leastLoad", "least_load":
 		healthy := make([]int, 0, n)
 		degraded := make([]int, 0, n)
 		for i := 0; i < n; i++ {
@@ -565,7 +570,13 @@ func (s *LoadBalance) candidateIndices(dest M.Socksaddr) []int {
 			healthy = indices
 			degraded = nil
 		}
-		slices.SortStableFunc(healthy, func(a, b int) int {
+		hn := len(healthy)
+		rotated := make([]int, hn)
+		start := int(atomic.AddUint64(&s.counter, 1) % uint64(hn))
+		for i := 0; i < hn; i++ {
+			rotated[i] = healthy[(start+i)%hn]
+		}
+		slices.SortStableFunc(rotated, func(a, b int) int {
 			var ca, cb int64
 			if a < len(s.activeConns) && s.activeConns[a] != nil {
 				ca = s.activeConns[a].Load()
@@ -580,28 +591,7 @@ func (s *LoadBalance) candidateIndices(dest M.Socksaddr) []int {
 			}
 			return 0
 		})
-		if (dest.Fqdn != "" || dest.IsIP()) && len(healthy) > 1 {
-			hashIdx := int(hashDestination(dest) % uint32(len(healthy)))
-			bestIdx := healthy[0]
-			targetCandidate := healthy[hashIdx]
-			var targetConns, bestConns int64
-			if targetCandidate < len(s.activeConns) && s.activeConns[targetCandidate] != nil {
-				targetConns = s.activeConns[targetCandidate].Load()
-			}
-			if bestIdx < len(s.activeConns) && s.activeConns[bestIdx] != nil {
-				bestConns = s.activeConns[bestIdx].Load()
-			}
-			if targetConns <= bestConns+3 {
-				for pos, cand := range healthy {
-					if cand == targetCandidate {
-						copy(healthy[1:pos+1], healthy[0:pos])
-						healthy[0] = targetCandidate
-						break
-					}
-				}
-			}
-		}
-		return append(healthy, degraded...)
+		return append(rotated, degraded...)
 
 	case "consistent_hash", "consistentHash":
 		if s.ring == nil && len(s.tags) > 0 {
@@ -660,16 +650,9 @@ func (s *LoadBalance) candidateIndices(dest M.Socksaddr) []int {
 		}
 		hn := len(healthy)
 		rotated := make([]int, hn)
-		if dest.Fqdn != "" || dest.IsIP() {
-			start := int(hashDestination(dest) % uint32(hn))
-			for i := 0; i < hn; i++ {
-				rotated[i] = healthy[(start+i)%hn]
-			}
-		} else {
-			start := int(atomic.AddUint64(&s.counter, 1) % uint64(hn))
-			for i := 0; i < hn; i++ {
-				rotated[i] = healthy[(start+i)%hn]
-			}
+		start := int(atomic.AddUint64(&s.counter, 1) % uint64(hn))
+		for i := 0; i < hn; i++ {
+			rotated[i] = healthy[(start+i)%hn]
 		}
 		return append(rotated, degraded...)
 	}
@@ -706,19 +689,22 @@ func (s *LoadBalance) DialContext(ctx context.Context, network string, destinati
 		)
 		start := time.Now()
 		if i < n-1 {
-			timeout := 2000 * time.Millisecond
-			if idx < len(s.stats) && s.stats[idx] != nil {
-				ema := s.stats[idx].latencyEmaMs.Load()
-				if s.stats[idx].consecutiveFails.Load() > 0 {
-					timeout = 1000 * time.Millisecond
-				} else if ema > 0 {
-					dynamic := time.Duration(ema*3) * time.Millisecond
-					if dynamic < 800*time.Millisecond {
-						timeout = 800 * time.Millisecond
-					} else if dynamic > 2000*time.Millisecond {
-						timeout = 2000 * time.Millisecond
-					} else {
-						timeout = dynamic
+			timeout := 5 * time.Second
+			if s.isLeastPing() {
+				timeout = 2000 * time.Millisecond
+				if idx < len(s.stats) && s.stats[idx] != nil {
+					ema := s.stats[idx].latencyEmaMs.Load()
+					if s.stats[idx].consecutiveFails.Load() > 0 {
+						timeout = 1000 * time.Millisecond
+					} else if ema > 0 {
+						dynamic := time.Duration(ema*3) * time.Millisecond
+						if dynamic < 800*time.Millisecond {
+							timeout = 800 * time.Millisecond
+						} else if dynamic > 2000*time.Millisecond {
+							timeout = 2000 * time.Millisecond
+						} else {
+							timeout = dynamic
+						}
 					}
 				}
 			}
@@ -733,7 +719,7 @@ func (s *LoadBalance) DialContext(ctx context.Context, network string, destinati
 			if idx < len(s.stats) && s.stats[idx] != nil {
 				s.stats[idx].recordSuccess(elapsed)
 			}
-			if s.strategy == "leastLoad" && idx < len(s.activeConns) && s.activeConns[idx] != nil {
+			if (s.strategy == "leastLoad" || s.strategy == "least_load") && idx < len(s.activeConns) && s.activeConns[idx] != nil {
 				s.activeConns[idx].Add(1)
 				conn = &trackedConn{
 					Conn: conn,
@@ -783,19 +769,22 @@ func (s *LoadBalance) ListenPacket(ctx context.Context, destination M.Socksaddr)
 		)
 		start := time.Now()
 		if i < n-1 {
-			timeout := 2000 * time.Millisecond
-			if idx < len(s.stats) && s.stats[idx] != nil {
-				ema := s.stats[idx].latencyEmaMs.Load()
-				if s.stats[idx].consecutiveFails.Load() > 0 {
-					timeout = 1000 * time.Millisecond
-				} else if ema > 0 {
-					dynamic := time.Duration(ema*3) * time.Millisecond
-					if dynamic < 800*time.Millisecond {
-						timeout = 800 * time.Millisecond
-					} else if dynamic > 2000*time.Millisecond {
-						timeout = 2000 * time.Millisecond
-					} else {
-						timeout = dynamic
+			timeout := 5 * time.Second
+			if s.isLeastPing() {
+				timeout = 2000 * time.Millisecond
+				if idx < len(s.stats) && s.stats[idx] != nil {
+					ema := s.stats[idx].latencyEmaMs.Load()
+					if s.stats[idx].consecutiveFails.Load() > 0 {
+						timeout = 1000 * time.Millisecond
+					} else if ema > 0 {
+						dynamic := time.Duration(ema*3) * time.Millisecond
+						if dynamic < 800*time.Millisecond {
+							timeout = 800 * time.Millisecond
+						} else if dynamic > 2000*time.Millisecond {
+							timeout = 2000 * time.Millisecond
+						} else {
+							timeout = dynamic
+						}
 					}
 				}
 			}
@@ -810,7 +799,7 @@ func (s *LoadBalance) ListenPacket(ctx context.Context, destination M.Socksaddr)
 			if idx < len(s.stats) && s.stats[idx] != nil {
 				s.stats[idx].recordSuccess(elapsed)
 			}
-			if s.strategy == "leastLoad" && idx < len(s.activeConns) && s.activeConns[idx] != nil {
+			if (s.strategy == "leastLoad" || s.strategy == "least_load") && idx < len(s.activeConns) && s.activeConns[idx] != nil {
 				s.activeConns[idx].Add(1)
 				conn = &trackedPacketConn{
 					PacketConn: conn,

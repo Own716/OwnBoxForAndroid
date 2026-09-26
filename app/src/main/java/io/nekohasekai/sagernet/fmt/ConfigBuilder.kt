@@ -146,7 +146,7 @@ internal fun buildLoadBalanceOutbound(
         type = "loadbalance"
         tag = customTag?.takeIf { it.isNotBlank() } ?: TAG_PROXY
         outbounds = memberTags
-        this.strategy = strategy
+        this.strategy = strategy ?: "round_robin"
         url = testUrl?.takeIf { it.isNotBlank() }
             ?: runCatching { DataStore.connectionTestURL }.getOrNull()?.takeIf { it.isNotBlank() }
             ?: "https://cp.cloudflare.com/generate_204"
@@ -905,7 +905,7 @@ fun buildConfig(
                         "leastLoad" -> "leastLoad"
                         "round_robin", "roundRobin" -> "round_robin"
                         "random" -> "random"
-                        else -> balancerBean.strategy
+                        else -> balancerBean.strategy?.takeIf { it.isNotBlank() } ?: "round_robin"
                     }
                     buildLoadBalanceOutbound(
                         memberTags = memberTags,

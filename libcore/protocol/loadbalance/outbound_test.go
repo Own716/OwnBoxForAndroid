@@ -103,13 +103,33 @@ func TestStrategies(t *testing.T) {
 		t.Fatalf("expected degraded node 0 to be placed last, got %v", llIndices)
 	}
 
-	// Test 7: destination stickiness
+	// Test 7: round_robin rotation across requests with same FQDN, and consistentHash destination stickiness
 	lb.strategy = "round_robin"
 	destA := M.Socksaddr{Fqdn: "video.youtube.com"}
 	destA1 := lb.candidateIndices(destA)
 	destA2 := lb.candidateIndices(destA)
-	if destA1[0] != destA2[0] {
-		t.Fatalf("expected consistent destination stickiness for same FQDN, got %v and %v", destA1, destA2)
+	if destA1[0] == destA2[0] {
+		t.Fatalf("expected round robin to rotate across calls with same FQDN, got %v and %v", destA1, destA2)
+	}
+
+	lb.strategy = "consistentHash"
+	ch1 := lb.candidateIndices(destA)
+	ch2 := lb.candidateIndices(destA)
+	if ch1[0] != ch2[0] {
+		t.Fatalf("expected consistentHash to keep destination stickiness for same FQDN, got %v and %v", ch1, ch2)
+	}
+
+	// Verify leastLoad does not get overridden by destination hash
+	lb.strategy = "leastLoad"
+	lb.activeConns[0].Store(5)
+	lb.activeConns[1].Store(0)
+	lb.activeConns[2].Store(3)
+	lb.stats[0].consecutiveFails.Store(0)
+	lb.stats[1].consecutiveFails.Store(0)
+	lb.stats[2].consecutiveFails.Store(0)
+	llDest := lb.candidateIndices(destA)
+	if llDest[0] != 1 {
+		t.Fatalf("expected leastLoad with 0 conns to be chosen regardless of destination hash, got %v", llDest)
 	}
 
 	// Test 8: leastPing strategy
