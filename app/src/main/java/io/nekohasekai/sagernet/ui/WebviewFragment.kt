@@ -29,8 +29,7 @@ class WebviewFragment : ToolbarFragment(R.layout.layout_webview), Toolbar.OnMenu
 
     companion object {
         const val DEFAULT_YACD_URL = "http://127.0.0.1:9090/ui"
-        const val PRESET_ZASHBOARD_URL = "https://board.zash.run.place/#/setup?hostname=127.0.0.1&port=9090"
-        const val PRESET_METACUBEXD_URL = "https://metacubex.github.io/metacubexd/#/setup?hostname=127.0.0.1&port=9090"
+        const val PRESET_ZASHBOARD_URL = "https://board.zash.run.place/"
     }
 
     private fun updateToolbarSubtitle() {
@@ -38,7 +37,6 @@ class WebviewFragment : ToolbarFragment(R.layout.layout_webview), Toolbar.OnMenu
         val subtitle = when {
             currentUrl.contains("zash.run.place") -> "Zashboard"
             currentUrl == DEFAULT_YACD_URL || currentUrl.contains("127.0.0.1:9090") -> "YACD"
-            currentUrl.contains("metacubex") -> "Metacubexd"
             else -> "Custom"
         }
         toolbar.subtitle = subtitle
@@ -47,6 +45,11 @@ class WebviewFragment : ToolbarFragment(R.layout.layout_webview), Toolbar.OnMenu
     @SuppressLint("SetJavaScriptEnabled")
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        // 规范化旧版本遗留的 setup 路由，使其直接访问根路径
+        if (DataStore.yacdURL.startsWith("https://board.zash.run.place/#/setup")) {
+            DataStore.yacdURL = PRESET_ZASHBOARD_URL
+        }
 
         // layout
         toolbar.setTitle(R.string.menu_dashboard)
@@ -76,6 +79,9 @@ class WebviewFragment : ToolbarFragment(R.layout.layout_webview), Toolbar.OnMenu
 
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
+                if (url != null && url.contains("zash.run.place")) {
+                    injectZashboardAutoConnect(view)
+                }
             }
         }
         mWebView.webChromeClient = WebChromeClient()
@@ -87,11 +93,48 @@ class WebviewFragment : ToolbarFragment(R.layout.layout_webview), Toolbar.OnMenu
         }
     }
 
+    private fun injectZashboardAutoConnect(view: WebView?) {
+        val js = """
+            (function() {
+                var checkCount = 0;
+                var maxChecks = 30;
+                var checkInterval = setInterval(function() {
+                    checkCount++;
+                    if (checkCount > maxChecks) {
+                        clearInterval(checkInterval);
+                        return;
+                    }
+                    if (window.location.hash.indexOf('setup') !== -1) {
+                        var bodyText = document.body ? document.body.innerText : '';
+                        if (bodyText.indexOf('连接正常') !== -1) {
+                            var alerts = document.querySelectorAll('.el-notification, .el-message, [role="alert"], div[class*="toast"], div[class*="alert"]');
+                            alerts.forEach(function(el) {
+                                if (el.innerText && el.innerText.indexOf('后端连不上') !== -1) {
+                                    el.style.display = 'none';
+                                }
+                            });
+                            var buttons = Array.from(document.querySelectorAll('button'));
+                            var submitBtn = buttons.find(function(b) {
+                                return b.textContent && b.textContent.trim() === '提交';
+                            });
+                            if (submitBtn && !submitBtn.disabled) {
+                                clearInterval(checkInterval);
+                                submitBtn.click();
+                            }
+                        }
+                    } else {
+                        clearInterval(checkInterval);
+                    }
+                }, 200);
+            })();
+        """.trimIndent()
+        view?.evaluateJavascript(js, null)
+    }
+
     private fun loadDashboard(url: String) {
-        val targetUrl = if (url.startsWith("https://board.zash.run.place") && !url.contains("#") && !url.contains("?")) {
-            PRESET_ZASHBOARD_URL
-        } else {
-            url
+        val targetUrl = when {
+            url.startsWith("https://board.zash.run.place/#/setup") -> PRESET_ZASHBOARD_URL
+            else -> url
         }
         mWebView.loadUrl(targetUrl)
         updateToolbarSubtitle()
@@ -148,13 +191,11 @@ class WebviewFragment : ToolbarFragment(R.layout.layout_webview), Toolbar.OnMenu
         val presetNames = listOf(
             getString(R.string.dashboard_preset_zashboard),
             getString(R.string.dashboard_preset_yacd),
-            getString(R.string.dashboard_preset_metacubexd),
             getString(R.string.dashboard_preset_custom)
         )
         val presetUrls = listOf(
             PRESET_ZASHBOARD_URL,
             DEFAULT_YACD_URL,
-            PRESET_METACUBEXD_URL,
             ""
         )
 
@@ -168,8 +209,7 @@ class WebviewFragment : ToolbarFragment(R.layout.layout_webview), Toolbar.OnMenu
         val initialIndex = when {
             currentUrl.contains("zash.run.place") -> 0
             currentUrl == DEFAULT_YACD_URL || currentUrl.contains("127.0.0.1:9090") -> 1
-            currentUrl.contains("metacubex") -> 2
-            else -> 3
+            else -> 2
         }
         spinner.setSelection(initialIndex)
 
@@ -180,7 +220,7 @@ class WebviewFragment : ToolbarFragment(R.layout.layout_webview), Toolbar.OnMenu
                     isFirst = false
                     return
                 }
-                if (position in 0..2) {
+                if (position in 0..1) {
                     val chosenUrl = presetUrls[position]
                     editUrl.setText(chosenUrl)
                     editUrl.setSelection(chosenUrl.length)

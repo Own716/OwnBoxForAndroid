@@ -560,7 +560,6 @@
     <string name="dashboard_preset_label">选择推荐面板预设</string>
     <string name="dashboard_preset_zashboard">Zashboard (现代推荐 · 界面精美)</string>
     <string name="dashboard_preset_yacd">内置 Yacd (官方离线 · 极速轻量)</string>
-    <string name="dashboard_preset_metacubexd">Metacubexd (专业完整 · 功能强大)</string>
     <string name="dashboard_preset_custom">自定义链接 (手动输入或粘贴)</string>
     <string name="dashboard_url_hint">仪表盘 URL (HTTP / HTTPS)</string>
     <string name="dashboard_url_tips">支持输入任意兼容 Clash API 的 Web 仪表盘。已放行混合协议与跨域，打开即自动连接本地内核。</string>

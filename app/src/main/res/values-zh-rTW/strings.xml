@@ -506,7 +506,6 @@
     <string name="dashboard_preset_label">選擇推薦面板預設</string>
     <string name="dashboard_preset_zashboard">Zashboard (現代推薦 · 介面精美)</string>
     <string name="dashboard_preset_yacd">內建 Yacd (官方離線 · 極速輕量)</string>
-    <string name="dashboard_preset_metacubexd">Metacubexd (專業完整 · 功能強大)</string>
     <string name="dashboard_preset_custom">自訂連結 (手動輸入或貼上)</string>
     <string name="dashboard_url_hint">儀表板 URL (HTTP / HTTPS)</string>
     <string name="dashboard_url_tips">支援輸入任何相容 Clash API 的 Web 儀表板。已放行混合通訊協定與跨域，開啟即自動連線本地核心。</string>
