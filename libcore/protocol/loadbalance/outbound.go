@@ -2,12 +2,15 @@ package loadbalance
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
 	"io"
 	"math/rand"
 	"net"
 	"slices"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -47,7 +50,6 @@ var (
 	_ adapter.ConnectionHandler       = (*LoadBalance)(nil)
 	_ adapter.PacketConnectionHandler = (*LoadBalance)(nil)
 	_ adapter.Referrer                = (*LoadBalance)(nil)
-	_ adapter.OutboundGroup           = (*LoadBalance)(nil)
 )
 
 type nodeStats struct {
@@ -79,7 +81,7 @@ func (s *nodeStats) recordFailure() {
 	s.lastFailTime.Store(time.Now().UnixMilli())
 }
 
-const virtualNodesPerPhysicalNode = 64
+const virtualNodesPerPhysicalNode = 160
 
 type ringEntry struct {
 	hash    uint32
@@ -90,13 +92,9 @@ type consistentHashRing struct {
 	entries []ringEntry
 }
 
-func fnv32(key string) uint32 {
-	var h uint32 = 2166136261
-	for i := 0; i < len(key); i++ {
-		h ^= uint32(key[i])
-		h *= 16777619
-	}
-	return h
+func hash32(key string) uint32 {
+	h := sha256.Sum256([]byte(key))
+	return binary.BigEndian.Uint32(h[:4])
 }
 
 func newConsistentHashRing(tags []string) *consistentHashRing {
@@ -110,7 +108,7 @@ func newConsistentHashRing(tags []string) *consistentHashRing {
 		for v := 0; v < virtualNodesPerPhysicalNode; v++ {
 			vKey := tag + "#v" + strconv.Itoa(v)
 			entries = append(entries, ringEntry{
-				hash:    fnv32(vKey),
+				hash:    hash32(vKey),
 				nodeIdx: idx,
 			})
 		}
@@ -252,7 +250,7 @@ func (s *LoadBalance) All() []string {
 }
 
 func (s *LoadBalance) Now() string {
-	candidates := s.candidateIndices(M.Socksaddr{})
+	candidates := s.candidateIndices(nil, M.Socksaddr{})
 	if len(candidates) > 0 && candidates[0] < len(s.tags) {
 		return s.tags[candidates[0]]
 	}
@@ -260,22 +258,6 @@ func (s *LoadBalance) Now() string {
 		return s.tags[0]
 	}
 	return ""
-}
-
-func (s *LoadBalance) Selected(network string) adapter.Outbound {
-	candidates := s.candidateIndices(M.Socksaddr{})
-	for _, idx := range candidates {
-		if idx >= 0 && idx < len(s.outbounds) {
-			detour := s.outbounds[idx]
-			if common.Contains(detour.Network(), network) {
-				return detour
-			}
-		}
-	}
-	if len(s.outbounds) > 0 {
-		return s.outbounds[0]
-	}
-	return nil
 }
 
 func (s *LoadBalance) AttachConnection(closer io.Closer) func() {
@@ -414,16 +396,72 @@ func (s *LoadBalance) Close() error {
 	return nil
 }
 
-func hashDestination(dest M.Socksaddr) uint32 {
-	var key string
-	if dest.Fqdn != "" {
-		key = dest.Fqdn
-	} else if dest.IsIP() {
-		key = dest.Addr.String()
-	} else {
-		key = dest.String()
+func extractRootDomain(fqdn string) string {
+	s := strings.TrimSpace(strings.ToLower(fqdn))
+	s = strings.TrimSuffix(s, ".")
+	if s == "" {
+		return ""
 	}
-	return fnv32(key)
+	if host, _, err := net.SplitHostPort(s); err == nil {
+		s = host
+	} else if idx := strings.IndexByte(s, ':'); idx != -1 {
+		s = s[:idx]
+	}
+
+	parts := strings.Split(s, ".")
+	n := len(parts)
+	if n <= 2 {
+		return s
+	}
+
+	tld := parts[n-1]
+	sld := parts[n-2]
+	if len(tld) == 2 {
+		switch sld {
+		case "com", "net", "org", "edu", "gov", "co", "ne", "ac", "go", "gen", "firm", "ind", "re", "mil":
+			if n >= 3 {
+				return parts[n-3] + "." + sld + "." + tld
+			}
+		}
+	}
+
+	return parts[n-2] + "." + parts[n-1]
+}
+
+func hashDestination(ctx context.Context, dest M.Socksaddr) uint32 {
+	var domain string
+	if dest.Fqdn != "" {
+		domain = dest.Fqdn
+	} else if ctx != nil {
+		if inCtx := adapter.ContextFrom(ctx); inCtx != nil && inCtx.Domain != "" {
+			domain = inCtx.Domain
+		}
+	}
+	if domain != "" {
+		root := extractRootDomain(domain)
+		if root != "" {
+			return hash32(root)
+		}
+		return hash32(strings.ToLower(domain))
+	}
+	if dest.IsIP() {
+		addr := dest.Addr
+		if addr.Is4() {
+			b := addr.As4()
+			key := net.IPv4(b[0], b[1], b[2], 0).String() + "/24"
+			return hash32(key)
+		} else if addr.Is6() {
+			b := addr.As16()
+			key := net.IP{b[0], b[1], b[2], b[3], b[4], b[5], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}.String() + "/48"
+			return hash32(key)
+		}
+		return hash32(addr.String())
+	}
+	s := dest.String()
+	if s != "" && s != "0.0.0.0:0" && s != "[::]:0" {
+		return hash32(s)
+	}
+	return 0
 }
 
 func (s *LoadBalance) isNodeDegraded(idx int, now int64) bool {
@@ -435,7 +473,7 @@ func (s *LoadBalance) isNodeDegraded(idx int, now int64) bool {
 	return fails >= 2 && now-lastFail < 10_000
 }
 
-func (s *LoadBalance) candidateIndices(dest M.Socksaddr) []int {
+func (s *LoadBalance) candidateIndices(ctx context.Context, dest M.Socksaddr) []int {
 	n := len(s.outbounds)
 	if n == 0 {
 		n = len(s.tags)
@@ -599,9 +637,16 @@ func (s *LoadBalance) candidateIndices(dest M.Socksaddr) []int {
 		}
 		if s.ring != nil {
 			var h uint32
-			if dest.Fqdn != "" || dest.IsIP() {
-				h = hashDestination(dest)
-			} else {
+			hasDest := dest.Fqdn != "" || dest.IsIP()
+			if !hasDest && ctx != nil {
+				if inCtx := adapter.ContextFrom(ctx); inCtx != nil && inCtx.Domain != "" {
+					hasDest = true
+				}
+			}
+			if hasDest {
+				h = hashDestination(ctx, dest)
+			}
+			if h == 0 {
 				h = uint32(atomic.AddUint64(&s.counter, 1))
 			}
 			return s.ring.getCandidates(h, n, func(idx int) bool {
@@ -675,7 +720,7 @@ func (c *trackedConn) Close() error {
 
 func (s *LoadBalance) DialContext(ctx context.Context, network string, destination M.Socksaddr) (net.Conn, error) {
 	s.Touch()
-	indices := s.candidateIndices(destination)
+	indices := s.candidateIndices(ctx, destination)
 	n := len(indices)
 	if n == 0 {
 		return nil, E.New("no outbounds available")
@@ -755,7 +800,7 @@ func (c *trackedPacketConn) Close() error {
 
 func (s *LoadBalance) ListenPacket(ctx context.Context, destination M.Socksaddr) (net.PacketConn, error) {
 	s.Touch()
-	indices := s.candidateIndices(destination)
+	indices := s.candidateIndices(ctx, destination)
 	n := len(indices)
 	if n == 0 {
 		return nil, E.New("no outbounds available")
