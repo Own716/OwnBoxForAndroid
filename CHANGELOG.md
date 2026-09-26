@@ -1,5 +1,13 @@
 # OwnBox for Android 更新日志 (Changelog)
 
+# OwnBox for Android v2.8.13 预览版 (v2.8.13-preview)
+
+* 彻底移除“网络工具”菜单组及其包含的 IP 纯净度检测、流媒体解锁检测、连通性测试 3 项功能，精简抽屉导航并清理底层冗余代码与测试逻辑
+* 重构抽屉导航结构，将 Sing-box 实时网络仪表盘移至“日志和工具”下方（即位于“工具”正下方、“Telegram 官方频道”正上方）
+* 保持与 Clash API 开启状态无缝联动（未开启 Clash API 时自动隐匿仪表盘，开启后在“工具”下方展现）
+* 递增版本号至 2.8.13 预览版（versionCode 316），支持无损覆盖升级安装
+
+
 # OwnBox for Android v2.8.12 预览版 (v2.8.12-preview)
 
 * 彻底修复 IPv6 路由“优先”模式导致 IPv4 节点无法使用的严重问题

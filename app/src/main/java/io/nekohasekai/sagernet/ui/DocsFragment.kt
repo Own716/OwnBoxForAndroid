@@ -691,55 +691,22 @@ class DocsFragment : ToolbarFragment(R.layout.layout_docs) {
             )
         )
 
-        // 9. 侧边栏网络工具
+        // 9. 侧边栏 Sing-box 仪表盘
         allItems.add(
             DocListItem.Header(
-                "9. 侧边栏网络工具 (Network Tools)",
-                "侧边栏一键全息体检工具集（提示：受公网 API 波动及多方数据库差异影响，所有网络工具测试结果仅供参考）"
+                "9. 侧边栏 Sing-box 仪表盘 (Dashboard)",
+                "全景掌控内核网络运行脉络，毫秒级捕捉连接路由决策与吞吐速率"
             )
         )
         allItems.add(
             DocListItem.Item(
-                category = "侧边栏网络工具",
-                title = "连通性测试 (tool_connectivity_test)",
-                badge = "仅供参考",
-                desc = "对当前激活的网络连接进行全链路综合体检：依次测试网络接口状态、本地 DNS 解析、核心出站代理隧道、国内知名服务（百度、B站、微信）以及海外骨干节点（Google、Cloudflare、GitHub）的连通性。醒目标注：【本功能仅供参考】！各探针测试易受公网接口限流与机场防火墙干扰，结果仅供参考，不代表网络绝对故障。",
-                prosCons = "【利】一键分段诊断是手机无网、DNS 污染、代理断流还是外部网站异常，大幅缩短排错耗时；【弊】部分机场安全策略可能主动拦截特定自动化探针，偶发局部标红误报。",
-                recommendation = "【最稳推荐：测试结果仅供参考，不作为绝对网络评判标准】若测试中个别项显示异常但实际网页、视频与 App 访问通畅，以实际日常体验为准。",
-                keywords = "连通性 连通性测试 网络诊断 诊断 体检 仅供参考 tool_connectivity_test",
-            )
-        )
-        allItems.add(
-            DocListItem.Item(
-                category = "侧边栏网络工具",
+                category = "侧边栏工具",
                 title = "Sing-box 仪表盘 (menu_dashboard)",
                 badge = "核心工具",
                 desc = "1:1 完整移植的官方纯正 sing-box 实时网络仪表盘。需在「设置 - 进阶设置」中开启「启用 Clash API」后，即可随时从侧边栏快捷进入。全面提供“概览、代理、规则、连接、配置、日志”多 Tab 导航视图，支持实时上传/下载流量动态图表、内核内存占用监控、策略组出站实时切换、活跃与历史连接多维过滤及一键断开等全套网络排查工具。",
                 prosCons = "【利】全景掌控内核网络运行脉络，毫秒级捕捉每个应用与域名的连接路由决策、命中规则与吞吐速率，精准诊断跑流量、解析异常与断流节点；【弊】前台图表与连接高频轮询会占用微量 CPU 运算，退出仪表盘页面即刻自动挂起停止轮询，完全不损耗日常电量。",
                 recommendation = "【推荐：调试必备】日常使用建议常驻开启 Clash API，遇到网络卡顿、分流疑难或需要监控抓包时随时从侧边栏进入仪表盘全景透视。",
                 keywords = "仪表盘 仪表板 sing-box clash api 概览 代理 规则 活跃连接 连接 日志 内存 监控 抓包 menu_dashboard",
-            )
-        )
-        allItems.add(
-            DocListItem.Item(
-                category = "侧边栏网络工具",
-                title = "流媒体解锁检测 (tool_media_unlock)",
-                badge = "仅供参考",
-                desc = "批量探测当前代理出站 IP 针对全球主流流媒体与 AI 服务平台的版权区域解锁状态（涵盖 Netflix 原生/自制剧解锁、YouTube Premium 区域、Disney+、ChatGPT、TikTok 等）。醒目标注：【本功能仅供参考】！各大版权方风控策略动态变化，本工具仅供参考。",
-                prosCons = "【利】一目了然确认节点能否观看 Netflix 非自制剧、是否支持流畅注册与使用 ChatGPT，避免错选不支持的节点；【弊】流媒体平台封锁规则频繁更迭（结合客户端设备指纹、网络抖动等），单一探针难以 100% 覆盖所有客户端表现。",
-                recommendation = "【最稳推荐：测试结果仅供参考】若检测显示未解锁但官方客户端能正常播放高清视频或对话，以实际客户端使用为准。",
-                keywords = "流媒体 解锁 netflix youtube premium disney chatgpt tiktok 仅供参考 tool_media_unlock",
-            )
-        )
-        allItems.add(
-            DocListItem.Item(
-                category = "侧边栏网络工具",
-                title = "IP 纯净度检测 (tool_ip_purity)",
-                badge = "仅供参考",
-                desc = "深度查询当前出站落地 IP 的机房/家宽原生属性、ASN 运营商归属、黑名单历史记录、欺诈评分（Fraud Score）与风控等级。醒目标注：【本功能仅供参考】！各大商业风控数据库算法差异巨大，本功能仅供参考。",
-                prosCons = "【利】获知节点 IP 属于机房托管（Hosting/DataCenter）还是原生住宅宽带（Residential），辅助评估注册海外严控服务的成功率；【弊】不同风控库打分规则不一，机房 IP 绝不等于无法正常科学上网。",
-                recommendation = "【最稳推荐：测试结果仅供参考，切勿盲目追求 0 欺诈分】只要节点日常访问网页流畅、无频繁人机验证验证码即可安心使用。",
-                keywords = "ip 纯净度 欺诈分 风险 家宽 机房 原生 仅供参考 tool_ip_purity",
             )
         )
 

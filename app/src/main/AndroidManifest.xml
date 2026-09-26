@@ -613,20 +613,6 @@
             android:taskAffinity=""
             android:theme="@style/Theme.OwnBox.Dialog" />
 
-        <activity
-            android:name="io.nekohasekai.sagernet.ui.IpPurityActivity"
-            android:configChanges="uiMode"
-            android:label="@string/tool_ip_purity" />
-
-        <activity
-            android:name="io.nekohasekai.sagernet.ui.MediaUnlockActivity"
-            android:configChanges="uiMode"
-            android:label="@string/tool_media_unlock" />
-
-        <activity
-            android:name="io.nekohasekai.sagernet.ui.ConnectivityTestActivity"
-            android:configChanges="uiMode"
-            android:label="@string/tool_connectivity_test" />
 
         <activity
             android:name="io.nekohasekai.sagernet.ui.LanSharingActivity"
