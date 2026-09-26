@@ -16,6 +16,7 @@ import io.nekohasekai.sagernet.fmt.v2ray.isTLS
 import io.nekohasekai.sagernet.ktx.*
 import kotlinx.coroutines.*
 import java.net.Inet4Address
+import java.net.Inet6Address
 import java.net.InetAddress
 import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
@@ -92,7 +93,7 @@ abstract class GroupUpdater {
     protected fun rewriteAddress(
         bean: AbstractBean, addresses: List<InetAddress>, ipv6First: Boolean
     ) {
-        val address = addresses.sortedBy { (it is Inet4Address) xor ipv6First }[0].hostAddress
+        val address = addresses.sortedBy { if (ipv6First) (it !is Inet6Address) else (it !is Inet4Address) }[0].hostAddress
 
         with(bean) {
             when (this) {

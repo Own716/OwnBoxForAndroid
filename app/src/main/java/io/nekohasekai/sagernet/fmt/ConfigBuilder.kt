@@ -718,7 +718,7 @@ fun buildConfig(
             independent_cache = true
         }
 
-        fun autoDnsDomainStrategy(s: String): String? {
+        fun autoDnsDomainStrategy(s: String, isProxied: Boolean = false): String? {
             if (ipv6Mode == IPv6Mode.DISABLE) {
                 return "ipv4_only"
             }
@@ -731,7 +731,7 @@ fun buildConfig(
             return when (ipv6Mode) {
                 IPv6Mode.DISABLE -> "ipv4_only"
                 IPv6Mode.ENABLE -> "prefer_ipv4"
-                IPv6Mode.PREFER -> "prefer_ipv6"
+                IPv6Mode.PREFER -> if (isProxied) "prefer_ipv4" else "prefer_ipv6"
                 IPv6Mode.ONLY -> "ipv6_only"
                 else -> null
             }
@@ -1578,6 +1578,8 @@ fun buildConfig(
                     _hack_config_map["domain_strategy"] = "ipv4_only"
                 } else if (ipv6Mode == IPv6Mode.ONLY) {
                     _hack_config_map["domain_strategy"] = "ipv6_only"
+                } else if (ipv6Mode == IPv6Mode.PREFER) {
+                    _hack_config_map["domain_strategy"] = "prefer_ipv6"
                 }
             })
         }
@@ -1643,7 +1645,7 @@ fun buildConfig(
                 tag = "dns-remote",
                 detour = mainProxyTag,
                 domainResolver = "dns-direct",
-                domainStrategy = autoDnsDomainStrategy(SingBoxOptionsUtil.domainStrategy("dns-remote"))
+                domainStrategy = autoDnsDomainStrategy(SingBoxOptionsUtil.domainStrategy("dns-remote"), isProxied = true)
             )
         )
         if (dnsHosts.isNotEmpty()) {
@@ -1659,6 +1661,8 @@ fun buildConfig(
             dns.strategy = "ipv4_only"
         } else if (ipv6Mode == IPv6Mode.ONLY) {
             dns.strategy = "ipv6_only"
+        } else if (ipv6Mode == IPv6Mode.PREFER) {
+            dns.strategy = "prefer_ipv6"
         }
 
         // dns object user rules
@@ -1721,8 +1725,8 @@ fun buildConfig(
                 })
             }
 
-            // 2. resolve 动作：Fake-IP 模式下填充真实地址池供 IP 规则匹配，强制单栈解析杜绝远端 VPS 双栈泄露
-            if (useFakeDns || DataStore.resolveDestination || ipv6Mode == IPv6Mode.DISABLE || ipv6Mode == IPv6Mode.ONLY) {
+            // 2. resolve 动作：强制单栈解析杜绝远端 VPS 双栈泄露；用户显式开启 resolveDestination 时按策略传出
+            if (DataStore.resolveDestination || ipv6Mode == IPv6Mode.DISABLE || ipv6Mode == IPv6Mode.ONLY) {
                 topRouteRules.add(Rule_DefaultOptions().apply {
                     action = "resolve"
                     strategy = genDomainStrategy(true)
@@ -1818,7 +1822,11 @@ fun buildConfig(
                     inbound = listOf("tun-in")
                     server = "dns-fake"
                     disable_cache = true
-                    query_type = if (ipv6Mode == IPv6Mode.DISABLE) listOf("A") else listOf("A", "AAAA")
+                    query_type = when (ipv6Mode) {
+                        IPv6Mode.DISABLE -> listOf("A")
+                        IPv6Mode.ONLY -> listOf("AAAA")
+                        else -> listOf("A", "AAAA")
+                    }
                 })
             }
             if (dnsHosts.isNotEmpty()) {

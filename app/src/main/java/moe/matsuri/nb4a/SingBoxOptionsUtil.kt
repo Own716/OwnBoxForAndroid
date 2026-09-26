@@ -29,7 +29,7 @@ object SingBoxOptionsUtil {
 
             // server
             else -> {
-                auto2("domain_strategy_for_server", "prefer_ipv4")
+                auto2("domain_strategy_for_server", if (DataStore.ipv6Mode == io.nekohasekai.sagernet.IPv6Mode.PREFER) "prefer_ipv6" else "prefer_ipv4")
             }
         }
     }
