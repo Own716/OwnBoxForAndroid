@@ -147,7 +147,7 @@ class VpnService : BaseVpnService(),
         // address & route & MTU ...... use NB4A GUI config
         val builder = Builder().setConfigureIntent(SagerNet.configureIntent(this))
             .setSession(getString(R.string.app_name))
-            .setMtu(if (DataStore.mtu == 1500) 1400 else DataStore.mtu)
+            .setMtu(DataStore.mtu)
         val ipv6Mode = DataStore.ipv6Mode
 
         // address: 当启用 IPv6 时才添加 IPv6 虚拟地址与路由；当禁用 IPv6 时绝不配置 IPv6 虚拟地址与路由，
@@ -246,8 +246,8 @@ class VpnService : BaseVpnService(),
             }
         }
 
-        // 混合入站存在时始终向系统追加 HTTP 代理（Android 10+）
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !DataStore.mixedInboundDisabled) {
+        // 当未启用应用分流且混合入站可用时，才向系统追加 HTTP 代理（Android 10+），避免破坏绕过/代理应用分流规则
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !DataStore.mixedInboundDisabled && !proxyApps) {
             builder.setHttpProxy(
                 ProxyInfo.buildDirectProxy(
                     LOCALHOST,

@@ -50,6 +50,7 @@ class BaseService {
         var proxy: ProxyInstance? = null
         var notification: ServiceNotification? = null
         var cacheRecoveryAttempts = 0
+        var networkSwitchRetryAttempts = 0
 
         val receiver = broadcastReceiver { ctx, intent ->
             when (intent.action) {
@@ -411,6 +412,7 @@ class BaseService {
             DataStore.mixedInboundAuthed = false
             if (!restart) {
                 data.cacheRecoveryAttempts = 0
+                data.networkSwitchRetryAttempts = 0
             }
 
             val serviceId = Integer.toHexString(System.identityHashCode(data))
@@ -549,6 +551,13 @@ class BaseService {
                         Logs.d("Network changed: $oldName -> ${link.interfaceName} (network $oldNetwork -> $network)")
                         upstreamInterfaceName = link.interfaceName
                         NativeInterface.clearInterfaceCache()
+                        if (data.state == State.Connecting) {
+                            Logs.i("Network changed during Connecting state: cancelling old handshake and retrying on new network")
+                            data.connectingJob?.cancel()
+                            data.connectingJob = null
+                            startRunner()
+                            return@start
+                        }
                         if (DataStore.networkChangeResetConnections) {
                             try {
                                 Libcore.resetAllConnections(true)
@@ -583,7 +592,12 @@ class BaseService {
 
             val data = data
             if (data.state != State.Stopped) return Service.START_STICKY
-            val profile = SagerDatabase.proxyDao.getById(DataStore.selectedProxy)
+            var profile = SagerDatabase.proxyDao.getById(DataStore.selectedProxy)
+            if (profile == null) {
+                profile = SagerDatabase.proxyDao.getAll().firstOrNull()?.also {
+                    DataStore.selectedProxy = it.id
+                }
+            }
             this as Context
             if (profile == null) { // gracefully shutdown: https://stackoverflow.com/q/47337857/2245107
                 data.notification = createNotification("")
@@ -647,10 +661,24 @@ class BaseService {
                     startProcesses()
                     data.changeState(State.Connected)
                     data.cacheRecoveryAttempts = 0
+                    data.networkSwitchRetryAttempts = 0
 
                     lateInit()
                 } catch (_: CancellationException) { // if the job was cancelled, it is canceller's responsibility to call stopRunner
                 } catch (_: UnknownHostException) {
+                    if (data.networkSwitchRetryAttempts < 3) {
+                        data.networkSwitchRetryAttempts++
+                        Logs.w("Network switch / transient DNS failure in startRunner: retrying in 600ms (attempt ${data.networkSwitchRetryAttempts}/3)...")
+                        runCatching {
+                            withContext(Dispatchers.IO) {
+                                proxy.close()
+                            }
+                        }
+                        data.proxy = null
+                        delay(600)
+                        startRunner()
+                        return@runOnMainDispatcher
+                    }
                     stopRunner(false, getString(R.string.invalid_server))
                 } catch (e: PluginManager.PluginNotFoundException) {
                     Toast.makeText(this@Interface, e.readableMessage, Toast.LENGTH_SHORT).show()
@@ -680,6 +708,27 @@ class BaseService {
                         return@runOnMainDispatcher
                     }
                     data.cacheRecoveryAttempts = 0
+
+                    val isNetworkTransient = msg.contains("network unreachable", ignoreCase = true) ||
+                            msg.contains("host unreachable", ignoreCase = true) ||
+                            msg.contains("no route to host", ignoreCase = true) ||
+                            msg.contains("connection refused", ignoreCase = true) ||
+                            msg.contains("i/o timeout", ignoreCase = true) ||
+                            msg.contains("timed out", ignoreCase = true) ||
+                            msg.contains("connection reset", ignoreCase = true)
+                    if (isNetworkTransient && data.networkSwitchRetryAttempts < 3) {
+                        data.networkSwitchRetryAttempts++
+                        Logs.w("Network transient failure in startRunner ($msg): retrying in 600ms (attempt ${data.networkSwitchRetryAttempts}/3)...")
+                        runCatching {
+                            withContext(Dispatchers.IO) {
+                                proxy.close()
+                            }
+                        }
+                        data.proxy = null
+                        delay(600)
+                        startRunner()
+                        return@runOnMainDispatcher
+                    }
 
                     if (exc.javaClass.name.endsWith("proxyerror")) {
                         // error from golang

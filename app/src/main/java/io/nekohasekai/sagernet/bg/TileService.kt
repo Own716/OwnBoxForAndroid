@@ -66,7 +66,10 @@ class TileService : BaseTileService(), SagerConnection.Callback {
             val validProfileName = profileName?.trim()?.takeIf { it.isNotEmpty() && !it.equals("null", ignoreCase = true) }
 
             when (serviceState) {
-                BaseService.State.Idle -> error("serviceState")
+                BaseService.State.Idle, BaseService.State.Stopped -> {
+                    state = Tile.STATE_INACTIVE
+                    label = getString(R.string.app_name)
+                }
                 BaseService.State.Connecting -> {
                     state = Tile.STATE_ACTIVE
                     label = getString(R.string.connecting)
@@ -83,11 +86,6 @@ class TileService : BaseTileService(), SagerConnection.Callback {
                     state = Tile.STATE_UNAVAILABLE
                     label = getString(R.string.stopping)
                 }
-
-                BaseService.State.Stopped -> {
-                    state = Tile.STATE_INACTIVE
-                    label = getString(R.string.app_name)
-                }
             }
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
                 setSubtitle(when (serviceState) {
@@ -95,7 +93,7 @@ class TileService : BaseTileService(), SagerConnection.Callback {
                     BaseService.State.Connected -> getString(R.string.tile_connected)
                     BaseService.State.Connecting -> validProfileName
                     BaseService.State.Stopping -> null
-                    BaseService.State.Stopped -> getString(R.string.not_connected)
+                    BaseService.State.Stopped, BaseService.State.Idle -> getString(R.string.not_connected)
                     else -> null
                 })
             } else {
@@ -107,11 +105,14 @@ class TileService : BaseTileService(), SagerConnection.Callback {
 
     private fun toggle() {
         val service = connection.service
-        if (service == null) tapPending =
-            true else BaseService.State.values()[service.state].let { state ->
-            when {
-                state.canStop -> SagerNet.stopService()
-                state == BaseService.State.Stopped -> SagerNet.startService()
+        if (service == null) {
+            SagerNet.startService()
+        } else {
+            BaseService.State.values()[service.state].let { state ->
+                when {
+                    state.canStop -> SagerNet.stopService()
+                    state == BaseService.State.Stopped || state == BaseService.State.Idle -> SagerNet.startService()
+                }
             }
         }
     }

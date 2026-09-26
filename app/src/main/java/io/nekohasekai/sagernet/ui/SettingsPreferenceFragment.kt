@@ -314,7 +314,10 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat(), OnPreferenceDataS
         trafficSniffing.onPreferenceChangeListener = reloadListener
         bypassLan.onPreferenceChangeListener = reloadListener
         bypassLanInCore.onPreferenceChangeListener = reloadListener
-        mtu.onPreferenceChangeListener = reloadListener
+        mtu.setOnPreferenceChangeListener { _, _ ->
+            needRestart()
+            true
+        }
 
         val dualNetworkAcceleration = findPreference<SwitchPreference>(Key.DUAL_NETWORK_ACCELERATION)!!
         dualNetworkAcceleration.onPreferenceChangeListener = reloadListener
@@ -456,10 +459,6 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat(), OnPreferenceDataS
             }
             
             Toast.makeText(requireContext(), R.string.clear_cache_success, Toast.LENGTH_SHORT).show()
-            
-            Handler(Looper.getMainLooper()).postDelayed({
-                needReload()
-            }, 500)
         } catch (e: Exception) {
             Toast.makeText(requireContext(), getString(R.string.clear_cache_failed, e.message), Toast.LENGTH_SHORT).show()
             e.printStackTrace()

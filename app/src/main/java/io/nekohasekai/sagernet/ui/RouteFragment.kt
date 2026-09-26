@@ -214,7 +214,7 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
                                 2 -> {
                                     val rule = RuleEntity(
                                         name = getString(R.string.route_opt_block_ads),
-                                        domains = "geosite:category-ads-all",
+                                        domains = "geosite:category-ads-all\ndomain:adservice.google.com\ndomain:admob.com\ndomain:doubleclick.net\ndomain:pangolin-sdk-toutiao.com",
                                         outbound = -2L,
                                         enabled = true
                                     )

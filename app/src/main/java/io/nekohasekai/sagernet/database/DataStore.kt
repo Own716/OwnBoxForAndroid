@@ -147,8 +147,8 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     // 记录用户选择"不再显示"的预览版版本号，仅对该版本隐藏提示
     var previewHintDismissedVersion by configurationStore.string(Key.PREVIEW_HINT_DISMISSED_VERSION) { "" }
 
-    var rulesGeositeUrl by configurationStore.string(Key.RULES_GEOSITE_URL) { "https://github.com/SagerNet/sing-geoip/releases/latest/download/geoip.db" }
-    var rulesGeoipUrl by configurationStore.string(Key.RULES_GEOIP_URL) { "https://github.com/SagerNet/sing-geosite/releases/latest/download/geosite.db" }
+    var rulesGeositeUrl by configurationStore.string(Key.RULES_GEOSITE_URL) { "https://github.com/SagerNet/sing-geosite/releases/latest/download/geosite.db" }
+    var rulesGeoipUrl by configurationStore.string(Key.RULES_GEOIP_URL) { "https://github.com/SagerNet/sing-geoip/releases/latest/download/geoip.db" }
     var rulesUpdateInterval by configurationStore.string(Key.RULES_UPDATE_INTERVAL) { "0" } // 默认为0，不自动更新
 
     // hopefully hashCode = mHandle doesn't change, currently this is true from KitKat to Nougat

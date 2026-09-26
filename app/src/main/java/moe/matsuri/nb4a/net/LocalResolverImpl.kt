@@ -84,6 +84,16 @@ object LocalResolverImpl : LocalDNSTransport {
 
                 override fun onError(error: DnsResolver.DnsException) {
                     try {
+                        val fallback = try {
+                            val u = SagerNet.underlyingNetwork
+                            (u?.getAllByName(domain) ?: InetAddress.getAllByName(domain))
+                        } catch (e: Throwable) {
+                            null
+                        }
+                        if (!fallback.isNullOrEmpty()) {
+                            ctx.success(fallback.mapNotNull { it.hostAddress }.joinToString("\n"))
+                            return
+                        }
                         val cause = error.cause
                         if (cause is ErrnoException) {
                             ctx.errnoCode(cause.errno)

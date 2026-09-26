@@ -98,6 +98,7 @@ class SagerNet : Application(),
                     DefaultNetworkListener.start(this@SagerNet) {
                         underlyingNetwork = it
                     }
+                    updateNotificationChannels()
                 }
             }
 

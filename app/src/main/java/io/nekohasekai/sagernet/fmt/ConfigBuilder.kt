@@ -751,7 +751,7 @@ fun buildConfig(
                     TunImplementation.SING_TUN -> null
                     else -> null
                 }
-                mtu = if (DataStore.mtu == 1500) 1400 else DataStore.mtu
+                mtu = DataStore.mtu
                 auto_route = true
                 strict_route = DataStore.strictRoute
                 // sing-box 1.13 移除了入站 sniff/domain_strategy 字段，
@@ -788,6 +788,7 @@ fun buildConfig(
         route = RouteOptions().apply {
             auto_detect_interface = true
             override_android_vpn = true
+            find_process = true
             rules = mutableListOf()
             rule_set = mutableListOf()
 
@@ -1368,7 +1369,7 @@ fun buildConfig(
                 val hasIpCriteria = !ipList.isNullOrEmpty() || rulesetTags.any { it.second }
                 val hasDomainRuleset = rulesetTags.any { !it.second }
                 val isAppOnlyDns =
-                    uidList.isNotEmpty() &&
+                    (uidList.isNotEmpty() || rule.packages.isNotEmpty()) &&
                         !hasDomainCriteria &&
                         !hasIpCriteria &&
                         !hasDomainRuleset &&
@@ -1382,6 +1383,7 @@ fun buildConfig(
                 fun makeDnsRuleObj(): DNSRule_DefaultOptions {
                     return DNSRule_DefaultOptions().apply {
                         if (uidList.isNotEmpty()) user_id = uidList
+                        if (rule.packages.isNotEmpty()) package_name = rule.packages.toList()
                         domainList?.let { makeSingBoxRule(it) }
                     }
                 }
@@ -1457,6 +1459,9 @@ fun buildConfig(
                 fun applyCommonFilters(ruleObj: Rule_DefaultOptions) {
                     if (uidList.isNotEmpty()) {
                         ruleObj.user_id = uidList
+                    }
+                    if (rule.packages.isNotEmpty()) {
+                        ruleObj.package_name = rule.packages.toList()
                     }
                     if (rule.port.isNotBlank()) {
                         ruleObj.port = mutableListOf<Int>()

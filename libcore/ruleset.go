@@ -13,6 +13,7 @@ package libcore
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -145,7 +146,8 @@ func convertGeoRuleSetToSRS(tag string, code string, dbPath string, isGeoIP bool
 		rules, err = loadGeoSiteRules(dbPath, code)
 	}
 	if err != nil {
-		return "", err
+		log.Printf("Warning: failed to load %s rule code '%s' from %s: %v, writing empty SRS fallback", tag, code, dbPath, err)
+		rules = []option.HeadlessRule{}
 	}
 
 	file, err := os.Create(dst)

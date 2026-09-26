@@ -556,6 +556,8 @@ class MainActivity : ThemedActivity(),
         )
         binding.fab.animate().cancel()
         if (showControls) {
+            binding.fab.translationY = 0f
+            binding.fab.translationX = 0f
             binding.fab.show()
         } else {
             binding.fab.hideProgress()
