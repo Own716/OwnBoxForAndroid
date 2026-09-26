@@ -1,8 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<menu xmlns:android="http://schemas.android.com/apk/res/android">
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/action_refresh"
+        android:icon="@drawable/ic_baseline_refresh_24"
+        android:title="@string/action_refresh"
+        app:showAsAction="ifRoom" />
     <item
         android:id="@+id/action_set_url"
-        android:title="@string/set_panel_url" />
+        android:icon="@drawable/ic_baseline_link_24"
+        android:title="@string/set_panel_url"
+        app:showAsAction="ifRoom" />
     <item
         android:id="@+id/close"
         android:title="@string/close" />

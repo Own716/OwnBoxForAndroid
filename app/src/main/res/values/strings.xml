@@ -689,6 +689,15 @@
     <string name="is_outbound_only">The JSON set is outbound</string>
     <string name="save">Save</string>
     <string name="set_panel_url">Set panel URL</string>
+    <string name="dashboard_preset_label">Select Dashboard Preset</string>
+    <string name="dashboard_preset_zashboard">Zashboard (Modern &amp; Recommended)</string>
+    <string name="dashboard_preset_yacd">Built-in Yacd (Offline &amp; Fast)</string>
+    <string name="dashboard_preset_metacubexd">Metacubexd (Feature-Rich &amp; Advanced)</string>
+    <string name="dashboard_preset_custom">Custom URL (Input or Paste)</string>
+    <string name="dashboard_url_hint">Dashboard URL (HTTP / HTTPS)</string>
+    <string name="dashboard_url_tips">Supports any Clash API compatible web dashboard. Mixed content is enabled for seamless local core connection.</string>
+    <string name="dashboard_reset_default">Reset Default</string>
+    <string name="dashboard_switched_toast">Dashboard updated and reloaded</string>
     <string name="enable_clash_api">Enable Clash API</string>
     <string name="log_level">Log Level</string>
     <string name="enable_clash_api_summary">Provide clash api and yacd dashboard at 127.0.0.1:9090</string>
