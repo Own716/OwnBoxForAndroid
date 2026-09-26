@@ -138,6 +138,12 @@ jobs:
           mkdir -p apks
           find artifacts -name "*.apk" -exec cp {} apks/ \;
           ls -la apks/
+      - name: Sync Release Notes
+        run: |
+          if [ -f CHANGELOG.md ]; then
+            awk '/^# OwnBox for Android v/{if(found) exit; found=1} found' CHANGELOG.md > RELEASE_NOTES.md
+          fi
+          cat RELEASE_NOTES.md
       - name: Publish to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
