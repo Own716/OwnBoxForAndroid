@@ -10,8 +10,8 @@
     <color name="md3_top_app_bar">#1E1E1E</color>
     <color name="nav_icon_unselected">#CAC4D0</color>
 
-    <!-- 卡片默认细边框：约 12% 白 -->
-    <color name="card_stroke">#29FFFFFF</color>
+    <!-- 卡片默认细边框：约 10% 白 -->
+    <color name="card_stroke">#1AFFFFFF</color>
 
     <!-- 路由规则类型颜色（夜间，稍浅） -->
     <color name="color_route_block">#EF5350</color>   <!-- 屏蔽：浅红 -->

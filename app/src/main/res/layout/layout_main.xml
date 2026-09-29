@@ -200,38 +200,104 @@
 
     </androidx.coordinatorlayout.widget.CoordinatorLayout>
 
-    <com.google.android.material.navigation.NavigationView
-        android:id="@+id/nav_view"
-        style="@style/Widget.MaterialComponents.NavigationView"
-        app:insetForeground="@android:color/transparent"
-        android:layout_width="wrap_content"
+    <FrameLayout
+        android:id="@+id/drawer_container"
+        android:layout_width="290dp"
         android:layout_height="match_parent"
-        android:layout_gravity="start"
-        app:itemIconTint="@color/navigation_icon"
-        app:itemShapeAppearance="@style/ShapeAppearance.SagerNet.NavItem"
-        app:itemShapeFillColor="@color/nav_item_fill"
-        app:itemShapeInsetStart="8dp"
-        app:itemShapeInsetEnd="8dp"
-        app:itemShapeInsetTop="3dp"
-        app:itemShapeInsetBottom="3dp"
-        app:itemTextColor="@color/navigation_text"
-        app:menu="@menu/main_drawer_menu" />
+        android:layout_gravity="start">
 
-    <com.google.android.material.navigation.NavigationView
-        android:id="@+id/nav_view_black"
-        style="@style/Widget.MaterialComponents.NavigationView"
-        app:insetForeground="@android:color/transparent"
-        android:layout_width="wrap_content"
-        android:layout_height="match_parent"
-        android:layout_gravity="start"
-        app:itemIconTint="@color/navigation_icon"
-        app:itemShapeAppearance="@style/ShapeAppearance.SagerNet.NavItem"
-        app:itemShapeFillColor="@color/nav_item_fill"
-        app:itemShapeInsetStart="8dp"
-        app:itemShapeInsetEnd="8dp"
-        app:itemShapeInsetTop="3dp"
-        app:itemShapeInsetBottom="3dp"
-        app:itemTextColor="@color/navigation_text"
-        app:menu="@menu/main_drawer_menu" />
+        <com.google.android.material.navigation.NavigationView
+            android:id="@+id/nav_view"
+            style="@style/Widget.MaterialComponents.NavigationView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingBottom="96dp"
+            app:headerLayout="@layout/nav_header"
+            app:insetForeground="@android:color/transparent"
+            app:itemIconTint="@color/navigation_icon"
+            app:itemShapeAppearance="@style/ShapeAppearance.SagerNet.NavItem"
+            app:itemShapeFillColor="@color/nav_item_fill"
+            app:itemShapeInsetBottom="2dp"
+            app:itemShapeInsetEnd="12dp"
+            app:itemShapeInsetStart="12dp"
+            app:itemShapeInsetTop="2dp"
+            app:itemIconPadding="16dp"
+            app:itemIconSize="22dp"
+            app:dividerInsetStart="9999dp"
+            app:dividerInsetEnd="0dp"
+            app:itemTextColor="@color/navigation_text"
+            app:menu="@menu/main_drawer_menu" />
+
+        <!-- Floating bottom action bar inside drawer: Left About [ⓘ] ... Right Settings [⚙] -->
+        <LinearLayout
+            android:id="@+id/drawer_bottom_bar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="24dp"
+            android:paddingBottom="24dp"
+            android:paddingTop="12dp"
+            android:clipToPadding="false"
+            android:clipChildren="false">
+
+            <!-- Floating circular button for About (软件关于) - Left bottom -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/btn_drawer_about"
+                android:layout_width="46dp"
+                android:layout_height="46dp"
+                app:cardCornerRadius="23dp"
+                app:cardElevation="3dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/card_stroke"
+                app:cardBackgroundColor="?attr/colorSurface"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?android:attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/menu_about">
+
+                <ImageView
+                    android:id="@+id/iv_drawer_about"
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_baseline_info_24"
+                    app:tint="?android:attr/textColorPrimary" />
+            </com.google.android.material.card.MaterialCardView>
+
+            <Space
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <!-- Floating circular button for Settings (设置) - Right bottom -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/btn_drawer_settings"
+                android:layout_width="46dp"
+                android:layout_height="46dp"
+                app:cardCornerRadius="23dp"
+                app:cardElevation="3dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/card_stroke"
+                app:cardBackgroundColor="?attr/colorSurface"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?android:attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/settings">
+
+                <ImageView
+                    android:id="@+id/iv_drawer_settings"
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_action_settings"
+                    app:tint="?android:attr/textColorPrimary" />
+            </com.google.android.material.card.MaterialCardView>
+
+        </LinearLayout>
+
+    </FrameLayout>
 
 </androidx.drawerlayout.widget.DrawerLayout>

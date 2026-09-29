@@ -110,17 +110,37 @@ class MainActivity : ThemedActivity(),
         }
         binding.fab.backgroundTintList = ColorStateList.valueOf(fabBgColor)
         binding.fab.imageTintList = ColorStateList.valueOf(Color.WHITE)
-        if (themeResId !in intArrayOf(
-                R.style.Theme_SagerNet_Black
-            )
-        ) {
-            navigation = binding.navView
-            binding.drawerLayout.removeView(binding.navViewBlack)
-        } else {
-            navigation = binding.navViewBlack
-            binding.drawerLayout.removeView(binding.navView)
-        }
+        navigation = binding.navView
         navigation.setNavigationItemSelectedListener(this)
+
+        val headerView = binding.navView.getHeaderView(0)
+        headerView?.findViewById<android.widget.TextView>(R.id.nav_header_version)?.text = "v${BuildConfig.VERSION_NAME}"
+
+        val drawerBtnBg = when {
+            Theme.isBlackTheme() -> Color.parseColor("#1C1C1E")
+            else -> Color.WHITE
+        }
+        val drawerBtnTint = when {
+            Theme.isBlackTheme() -> Color.WHITE
+            Theme.isWhiteTheme() -> Color.parseColor("#212121")
+            Theme.isLightGrayTheme() -> Color.parseColor("#1F2937")
+            else -> getColorAttr(android.R.attr.textColorPrimary)
+        }
+        binding.btnDrawerAbout.setCardBackgroundColor(drawerBtnBg)
+        binding.btnDrawerSettings.setCardBackgroundColor(drawerBtnBg)
+        binding.ivDrawerAbout.imageTintList = ColorStateList.valueOf(drawerBtnTint)
+        binding.ivDrawerSettings.imageTintList = ColorStateList.valueOf(drawerBtnTint)
+
+        binding.btnDrawerAbout.setOnClickListener {
+            if (DataStore.hapticFeedback) it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+            binding.drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
+            displayFragmentWithId(R.id.nav_about)
+        }
+        binding.btnDrawerSettings.setOnClickListener {
+            if (DataStore.hapticFeedback) it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+            binding.drawerLayout.closeDrawer(androidx.core.view.GravityCompat.START)
+            displayFragmentWithId(R.id.nav_settings)
+        }
 
         if (savedInstanceState == null) {
             displayFragmentWithId(R.id.nav_configuration)

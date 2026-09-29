@@ -16,11 +16,6 @@
             android:id="@+id/nav_route"
             android:icon="@drawable/ic_maps_directions"
             android:title="@string/menu_route" />
-
-        <item
-            android:id="@+id/nav_settings"
-            android:icon="@drawable/ic_action_settings"
-            android:title="@string/settings" />
     </group>
 
     <group
@@ -51,10 +46,6 @@
             android:id="@+id/nav_docs"
             android:icon="@drawable/ic_baseline_import_contacts_24"
             android:title="@string/menu_documentation" />
-        <item
-            android:id="@+id/nav_about"
-            android:icon="@drawable/ic_baseline_info_24"
-            android:title="@string/menu_about" />
     </group>
 
 </menu>

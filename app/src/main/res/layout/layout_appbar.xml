@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <com.google.android.material.appbar.AppBarLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/appbar"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -15,9 +16,152 @@
         android:background="@android:color/transparent"
         android:theme="?actionBarTheme"
         android:touchscreenBlocksFocus="false"
+        app:contentInsetStart="14dp"
+        app:contentInsetEnd="14dp"
+        app:contentInsetStartWithNavigation="0dp"
         app:titleTextColor="?android:attr/textColorPrimary"
         app:subtitleTextColor="?android:attr/textColorSecondary"
         app:navigationIconTint="?android:attr/textColorPrimary"
-        app:popupTheme="@style/ThemeOverlay.AppCompat.DayNight"
-        app:title="@string/app_name" />
+        app:popupTheme="@style/ThemeOverlay.AppCompat.DayNight">
+
+        <!-- Left Brand & Navigation Area: [☰]  OwnBox -->
+        <LinearLayout
+            android:id="@+id/layout_brand_nav"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="start|center_vertical"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <!-- Left floating circular button for Drawer Hamburger [☰] -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/btn_nav_menu"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                app:cardCornerRadius="19dp"
+                app:cardElevation="2dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/card_stroke"
+                app:cardBackgroundColor="?attr/colorSurface"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?android:attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/menu_configuration">
+
+                <ImageView
+                    android:id="@+id/iv_nav_menu"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_navigation_menu"
+                    app:tint="?android:attr/textColorPrimary" />
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Brand Title: OwnBox -->
+            <TextView
+                android:id="@+id/tv_brand_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:fontFamily="sans-serif-medium"
+                android:text="@string/app_name"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:includeFontPadding="false" />
+
+        </LinearLayout>
+
+        <!-- Right Quick Actions: Floating circular buttons container, DIRECTLY EXPANDED -->
+        <LinearLayout
+            android:id="@+id/layout_quick_actions"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="end|center_vertical"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <!-- Search Floating Circular Button [🔍] -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/btn_floating_search"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginEnd="8dp"
+                app:cardCornerRadius="19dp"
+                app:cardElevation="2dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/card_stroke"
+                app:cardBackgroundColor="?attr/colorSurface"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?android:attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@android:string/search_go">
+
+                <ImageView
+                    android:id="@+id/iv_floating_search"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_baseline_search_24"
+                    app:tint="?android:attr/textColorPrimary" />
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Add Floating Circular Button [＋] -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/btn_floating_add"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginEnd="8dp"
+                app:cardCornerRadius="19dp"
+                app:cardElevation="2dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/card_stroke"
+                app:cardBackgroundColor="?attr/colorSurface"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?android:attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/add_profile">
+
+                <ImageView
+                    android:id="@+id/iv_floating_add"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_baseline_add_24"
+                    app:tint="?android:attr/textColorPrimary" />
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- More / Three Dots Floating Circular Button [⋮] -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/btn_floating_more"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                app:cardCornerRadius="19dp"
+                app:cardElevation="2dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/card_stroke"
+                app:cardBackgroundColor="?attr/colorSurface"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?android:attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/more">
+
+                <ImageView
+                    android:id="@+id/iv_floating_more"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_baseline_more_vert_24"
+                    app:tint="?android:attr/textColorPrimary" />
+            </com.google.android.material.card.MaterialCardView>
+
+        </LinearLayout>
+
+    </com.google.android.material.appbar.MaterialToolbar>
 </com.google.android.material.appbar.AppBarLayout>

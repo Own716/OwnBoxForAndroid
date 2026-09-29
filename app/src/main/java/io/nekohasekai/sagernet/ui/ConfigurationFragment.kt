@@ -3,7 +3,9 @@ package io.nekohasekai.sagernet.ui
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.graphics.Color
+import android.view.Gravity
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.net.Uri
@@ -623,6 +625,184 @@ class ConfigurationFragment @JvmOverloads constructor(
         magBtn?.setColorFilter(textColor)
     }
 
+    private var layoutBrandNav: View? = null
+    private var btnNavMenu: MaterialCardView? = null
+    private var ivNavMenu: ImageView? = null
+    private var layoutQuickActions: View? = null
+    private var btnFloatingSearch: MaterialCardView? = null
+    private var ivFloatingSearch: ImageView? = null
+    private var btnFloatingAdd: MaterialCardView? = null
+    private var ivFloatingAdd: ImageView? = null
+    private var btnFloatingMore: MaterialCardView? = null
+    private var ivFloatingMore: ImageView? = null
+
+    private fun showFloatingOverflowMenu(anchor: View) {
+        val popup = PopupMenu(requireContext(), anchor, Gravity.END)
+        popup.menuInflater.inflate(R.menu.floating_overflow_menu, popup.menu)
+
+        popup.menu.findItem(R.id.action_hide_unavailable)?.isChecked = DataStore.hideUnavailableProfiles
+        popup.menu.findItem(R.id.action_global_mode)?.isChecked = DataStore.globalMode
+
+        val currentGroup = getCurrentGroupFragment()
+        val currentOrder = if (currentGroup?.isAllGroupsTab == true) DataStore.allGroupsOrder else currentGroup?.proxyGroup?.order ?: GroupOrder.ORIGIN
+        when (currentOrder) {
+            GroupOrder.ORIGIN -> popup.menu.findItem(R.id.action_order_origin)?.isChecked = true
+            GroupOrder.BY_NAME -> popup.menu.findItem(R.id.action_order_by_name)?.isChecked = true
+            GroupOrder.BY_DELAY -> popup.menu.findItem(R.id.action_order_by_delay)?.isChecked = true
+        }
+
+        when (DataStore.groupLayoutMode) {
+            0 -> popup.menu.findItem(R.id.action_layout_single)?.isChecked = true
+            1 -> popup.menu.findItem(R.id.action_layout_double)?.isChecked = true
+        }
+
+        when (DataStore.profileCardStyle) {
+            0 -> popup.menu.findItem(R.id.action_card_style_classic)?.isChecked = true
+            1 -> popup.menu.findItem(R.id.action_card_style_stroke)?.isChecked = true
+        }
+
+        popup.setOnMenuItemClickListener { item ->
+            when (item.itemId) {
+                R.id.action_order_origin -> {
+                    item.isChecked = true
+                    currentGroup?.updateOrder(GroupOrder.ORIGIN)
+                    true
+                }
+                R.id.action_order_by_name -> {
+                    item.isChecked = true
+                    currentGroup?.updateOrder(GroupOrder.BY_NAME)
+                    true
+                }
+                R.id.action_order_by_delay -> {
+                    item.isChecked = true
+                    currentGroup?.updateOrder(GroupOrder.BY_DELAY)
+                    true
+                }
+                R.id.action_layout_single -> {
+                    item.isChecked = true
+                    if (DataStore.groupLayoutMode != 0) {
+                        DataStore.groupLayoutMode = 0
+                        switchAllGroupFragmentsLayout()
+                    }
+                    true
+                }
+                R.id.action_layout_double -> {
+                    item.isChecked = true
+                    if (DataStore.groupLayoutMode != 1) {
+                        DataStore.groupLayoutMode = 1
+                        switchAllGroupFragmentsLayout()
+                    }
+                    true
+                }
+                R.id.action_card_style_classic -> {
+                    item.isChecked = true
+                    if (DataStore.profileCardStyle != 0) {
+                        DataStore.profileCardStyle = 0
+                        refreshAllGroupFragmentsCardStyle()
+                    }
+                    true
+                }
+                R.id.action_card_style_stroke -> {
+                    item.isChecked = true
+                    if (DataStore.profileCardStyle != 1) {
+                        DataStore.profileCardStyle = 1
+                        refreshAllGroupFragmentsCardStyle()
+                    }
+                    true
+                }
+                else -> onMenuItemClick(item)
+            }
+        }
+        popup.show()
+    }
+
+    private fun showFloatingAddMenu(anchor: View) {
+        val popup = PopupMenu(requireContext(), anchor, Gravity.END)
+        popup.menuInflater.inflate(R.menu.floating_add_menu, popup.menu)
+        popup.setOnMenuItemClickListener { item ->
+            onMenuItemClick(item)
+        }
+        popup.show()
+    }
+
+    private fun setupQuickActionButtons(rootView: View, primaryTextColor: Int) {
+        layoutBrandNav = toolbar.findViewById(R.id.layout_brand_nav)
+        btnNavMenu = toolbar.findViewById(R.id.btn_nav_menu)
+        ivNavMenu = toolbar.findViewById(R.id.iv_nav_menu)
+        layoutQuickActions = toolbar.findViewById(R.id.layout_quick_actions)
+        btnFloatingSearch = toolbar.findViewById(R.id.btn_floating_search)
+        ivFloatingSearch = toolbar.findViewById(R.id.iv_floating_search)
+        btnFloatingAdd = toolbar.findViewById(R.id.btn_floating_add)
+        ivFloatingAdd = toolbar.findViewById(R.id.iv_floating_add)
+        btnFloatingMore = toolbar.findViewById(R.id.btn_floating_more)
+        ivFloatingMore = toolbar.findViewById(R.id.iv_floating_more)
+
+        layoutBrandNav?.visibility = View.VISIBLE
+        layoutQuickActions?.visibility = View.VISIBLE
+        btnFloatingSearch?.visibility = View.VISIBLE
+        btnFloatingAdd?.visibility = View.VISIBLE
+        btnFloatingMore?.visibility = View.VISIBLE
+
+        toolbar.title = null
+        toolbar.navigationIcon = null
+
+        toolbar.menu.findItem(R.id.action_add)?.isVisible = false
+        toolbar.menu.findItem(R.id.action_misc)?.isVisible = false
+        val searchMenuItem = toolbar.menu.findItem(R.id.action_search)
+        searchMenuItem?.isVisible = false
+
+        btnNavMenu?.setOnClickListener {
+            if (DataStore.hapticFeedback) it.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+            (activity as? MainActivity)?.binding?.drawerLayout?.openDrawer(GravityCompat.START)
+        }
+
+        btnFloatingAdd?.setOnClickListener {
+            if (DataStore.hapticFeedback) it.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+            showFloatingAddMenu(it)
+        }
+
+        btnFloatingMore?.setOnClickListener {
+            if (DataStore.hapticFeedback) it.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+            showFloatingOverflowMenu(it)
+        }
+
+        btnFloatingSearch?.setOnClickListener {
+            if (DataStore.hapticFeedback) it.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+            layoutQuickActions?.visibility = View.GONE
+            toolbar.findViewById<View?>(R.id.tv_brand_title)?.visibility = View.GONE
+
+            searchMenuItem?.isVisible = true
+            val searchView = (searchMenuItem?.actionView as? SearchView) ?: toolbar.findViewById<SearchView>(R.id.action_search)
+            if (searchView != null) {
+                searchView.isIconified = false
+                searchView.requestFocus()
+                val editText = searchView.findViewById<SearchView.SearchAutoComplete>(androidx.appcompat.R.id.search_src_text)
+                showSoftKeyboard(editText)
+            }
+            btnNavMenu?.let { btn ->
+                ivNavMenu?.setImageResource(R.drawable.baseline_arrow_back_24)
+                btn.setOnClickListener {
+                    if (searchView != null) cancelSearch(searchView)
+                }
+            }
+        }
+    }
+
+    private fun applyFloatingButtonsTheme(bgColor: Int, iconTint: Int, strokeColor: Int?) {
+        val list = listOfNotNull(btnNavMenu, btnFloatingMore, btnFloatingAdd, btnFloatingSearch)
+        for (btn in list) {
+            btn.setCardBackgroundColor(bgColor)
+            if (strokeColor != null) {
+                btn.strokeColor = strokeColor
+            }
+        }
+        val iconList = listOfNotNull(ivNavMenu, ivFloatingMore, ivFloatingAdd, ivFloatingSearch)
+        val tintStateList = ColorStateList.valueOf(iconTint)
+        for (iv in iconList) {
+            iv.imageTintList = tintStateList
+        }
+    }
+
     @SuppressLint("DetachAndAttachSameFragment")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -657,6 +837,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             toolbar.menu.findItem(R.id.action_global_mode)?.isChecked = DataStore.globalMode
             toolbar.setOnMenuItemClickListener(this)
             tintMenuIcons(toolbar.menu, primaryTextColor)
+            setupQuickActionButtons(view, primaryTextColor)
         } else {
             toolbar.setTitle(titleRes)
             toolbar.setNavigationIcon(R.drawable.ic_navigation_close)
@@ -668,6 +849,8 @@ class ConfigurationFragment @JvmOverloads constructor(
             toolbar.setNavigationOnClickListener {
                 requireActivity().finish()
             }
+            view.findViewById<View>(R.id.layout_brand_nav)?.visibility = View.GONE
+            view.findViewById<View>(R.id.layout_quick_actions)?.visibility = View.GONE
         }
 
         when {
@@ -689,6 +872,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                     toolbar.overflowIcon = tinted
                 }
                 tintMenuIcons(toolbar.menu, Color.parseColor("#212121"))
+                applyFloatingButtonsTheme(Color.WHITE, Color.parseColor("#212121"), null)
             }
             Theme.isLightGrayTheme() -> {
                 val bg = Color.parseColor("#F5F5F7")
@@ -711,6 +895,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                     toolbar.overflowIcon = tinted
                 }
                 tintMenuIcons(toolbar.menu, textPrimary)
+                applyFloatingButtonsTheme(Color.WHITE, textPrimary, null)
             }
             Theme.isBlackTheme() -> {
                 val bg = Color.BLACK
@@ -731,6 +916,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                     toolbar.overflowIcon = tinted
                 }
                 tintMenuIcons(toolbar.menu, Color.WHITE)
+                applyFloatingButtonsTheme(Color.parseColor("#1C1C1E"), Color.WHITE, Color.parseColor("#333333"))
             }
             else -> {
                 val tabIndicatorColor = requireContext().getColorAttr(R.attr.tabIndicatorColor)
@@ -738,6 +924,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                 val tabUnselectedTextColor = requireContext().getColorAttr(R.attr.tabTextColor)
                 tabLayout.setSelectedTabIndicatorColor(tabIndicatorColor)
                 tabLayout.setTabTextColors(tabUnselectedTextColor, tabSelectedTextColor)
+                applyFloatingButtonsTheme(requireContext().getColorAttr(R.attr.colorSurface), primaryTextColor, null)
             }
         }
 
@@ -2616,6 +2803,28 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
         }
 
+        fun updateOrder(order: Int) {
+            if (isAllGroupsTab) {
+                DataStore.allGroupsOrder = order
+                runOnDefaultDispatcher {
+                    onMainDispatcher {
+                        adapter?.reloadProfiles()
+                    }
+                }
+            } else {
+                val needUpdateDb = proxyGroup.order != order
+                proxyGroup.order = order
+                runOnDefaultDispatcher {
+                    if (needUpdateDb) {
+                        GroupManager.updateGroup(proxyGroup)
+                    }
+                    onMainDispatcher {
+                        adapter?.reloadProfiles()
+                    }
+                }
+            }
+        }
+
         fun checkOrderMenu() {
             if (select) return
 
@@ -2641,26 +2850,9 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
 
             fun updateTo(order: Int) {
-                if (isAllGroupsTab) {
-                    DataStore.allGroupsOrder = order
-                    runOnDefaultDispatcher {
-                        onMainDispatcher {
-                            adapter?.reloadProfiles()
-                        }
-                    }
-                } else {
-                    val needUpdateDb = proxyGroup.order != order
-                    proxyGroup.order = order
-                    runOnDefaultDispatcher {
-                        if (needUpdateDb) {
-                            GroupManager.updateGroup(proxyGroup)
-                        }
-                        onMainDispatcher {
-                            adapter?.reloadProfiles()
-                        }
-                    }
-                }
+                updateOrder(order)
             }
+
 
             origin.setOnMenuItemClickListener {
                 it.isChecked = true
@@ -4089,6 +4281,11 @@ class ConfigurationFragment @JvmOverloads constructor(
     private fun cancelSearch(searchView: SearchView) {
         if (isCancelingSearch) return
         isCancelingSearch = true
+        val primaryColor = when {
+            Theme.isWhiteTheme() -> Color.parseColor("#212121")
+            Theme.isLightGrayTheme() -> Color.parseColor("#1F2937")
+            else -> requireContext().getColorAttr(android.R.attr.textColorPrimary)
+        }
         try {
             currentSearchQuery = ""
             searchJob?.cancel()
@@ -4101,25 +4298,34 @@ class ConfigurationFragment @JvmOverloads constructor(
             searchView.clearFocus()
             searchView.maxWidth = dp2px(48)
 
-            toolbar.menu.findItem(R.id.action_add)?.isVisible = true
-            toolbar.title = getString(R.string.app_name)
-
-            val primaryColor = when {
-                Theme.isWhiteTheme() -> Color.parseColor("#212121")
-                Theme.isLightGrayTheme() -> Color.parseColor("#1F2937")
-                Theme.isBlackTheme() -> Color.WHITE
-                else -> requireContext().getColorAttr(android.R.attr.textColorPrimary)
-            }
-
             if (!select) {
-                toolbar.setNavigationIcon(R.drawable.ic_navigation_menu)
+                toolbar.title = null
+                toolbar.navigationIcon = null
+                toolbar.menu.findItem(R.id.action_add)?.isVisible = false
+                searchItem?.isVisible = false
+
+                layoutBrandNav?.visibility = View.VISIBLE
+                toolbar.findViewById<View?>(R.id.tv_brand_title)?.visibility = View.VISIBLE
+                layoutQuickActions?.visibility = View.VISIBLE
+                btnFloatingSearch?.visibility = View.VISIBLE
+                btnFloatingAdd?.visibility = View.VISIBLE
+                btnFloatingMore?.visibility = View.VISIBLE
+
+                ivNavMenu?.setImageResource(R.drawable.ic_navigation_menu)
+                btnNavMenu?.setOnClickListener {
+                    if (DataStore.hapticFeedback) it.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                    (activity as? MainActivity)?.binding?.drawerLayout?.openDrawer(GravityCompat.START)
+                }
+            } else {
+                toolbar.title = getString(titleRes)
+                toolbar.setNavigationIcon(R.drawable.ic_navigation_close)
                 toolbar.navigationIcon?.let {
                     val tinted = it.mutate()
                     DrawableCompat.setTint(tinted, primaryColor)
                     toolbar.navigationIcon = tinted
                 }
                 toolbar.setNavigationOnClickListener {
-                    (activity as? MainActivity)?.binding?.drawerLayout?.openDrawer(GravityCompat.START)
+                    requireActivity().finish()
                 }
             }
 

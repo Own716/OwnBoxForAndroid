@@ -312,8 +312,8 @@
     <color name="md3_top_app_bar">#FAFAFA</color>
     <color name="nav_icon_unselected">#757575</color>
 
-    <!-- 卡片默认细边框：约 12% 黑（低对比分隔线），夜间见 values-night/colors.xml -->
-    <color name="card_stroke">#29000000</color>
+    <!-- 卡片默认细边框：约 8% 黑（低对比分隔线），夜间见 values-night/colors.xml -->
+    <color name="card_stroke">#14000000</color>
 
     <!-- 立体卡片色调提升表面色（遵循 MD3 标准，统一采用中性表面色） -->
     <color name="card_elevated_pink">@color/md3_surface</color>
