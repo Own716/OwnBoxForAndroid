@@ -684,7 +684,7 @@
     <string name="domain_strategy_for_remote">Domain strategy for Remote</string>
     <string name="domain_strategy_for_direct">Domain strategy for Direct</string>
     <string name="domain_strategy_for_server">Domain strategy for Server address</string>
-    <string name="show_bottom_bar">Show bottom bar like SagerNet</string>
+    <string name="show_bottom_bar">Show bottom bar</string>
     <string name="utls_fingerprint">uTLS fingerprint</string>
     <string name="custom_outbound_json">Custom outbound JSON</string>
     <string name="custom_config_json">Custom config JSON</string>
@@ -935,8 +935,8 @@
         <string name="app_icon_dynamic">Dynamic</string>
         <string name="app_icon_light_mode">Light mode</string>
         <string name="app_icon_dark_mode">Dark mode</string>
-        <string name="app_icon_old_nekobox_plus">Old NekoBox+</string>
-        <string name="app_icon_nekobox" translatable="false">NekoBox</string>
+        <string name="app_icon_old_nekobox_plus">Old OwnBox+</string>
+        <string name="app_icon_nekobox" translatable="false">OwnBox</string>
         <string name="app_icon_midnight">Midnight</string>
         <string name="app_icon_heavens">Heavens</string>
         <string name="app_icon_black_white">Black and White</string>
