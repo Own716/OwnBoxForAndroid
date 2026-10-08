@@ -264,7 +264,7 @@
     <string name="kcp_mtu">mKCP MTU</string>
     <string name="kcp_tti">mKCP TTI</string>
     <string name="kcp_cwnd_multiplier">拥塞窗口倍数</string>
-    <string name="show_bottom_bar">像 SagerNet 一样显示底栏</string>
+    <string name="show_bottom_bar">显示底栏</string>
     <string name="utls_fingerprint">uTLS 指纹</string>
     <string name="grpc_service_name">gRPC 服务名称</string>
     <string name="alpn">应用层协议协商</string>
@@ -838,8 +838,8 @@
         <string name="app_icon_dynamic">动态</string>
         <string name="app_icon_light_mode">浅色模式</string>
         <string name="app_icon_dark_mode">深色模式</string>
-        <string name="app_icon_old_nekobox_plus">旧版 NekoBox+</string>
-        <string name="app_icon_nekobox">NekoBox</string>
+        <string name="app_icon_old_nekobox_plus">旧版 OwnBox+</string>
+        <string name="app_icon_nekobox">OwnBox</string>
         <string name="app_icon_midnight">午夜</string>
         <string name="app_icon_heavens">天空</string>
         <string name="app_icon_black_white">黑白</string>
