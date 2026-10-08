@@ -30,7 +30,7 @@ jobs:
           key: ${{ hashFiles('.github/workflows/*', 'golang_status', 'libcore_status') }}
       - name: Install Golang
         if: steps.cache.outputs.cache-hit != 'true'
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: ^1.25
       - name: Native Build
