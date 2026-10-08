@@ -82,7 +82,7 @@ dependencies {
     implementation("com.blacksquircle.ui:language-base:2.6.0")
     implementation("com.blacksquircle.ui:language-json:2.6.0")
 
-    implementation("com.squareup.okhttp3:okhttp:5.0.0-alpha.3")
+    implementation("com.squareup.okhttp3:okhttp:5.5.0")
     implementation("org.yaml:snakeyaml:1.30")
     implementation("com.github.daniel-stoneuk:material-about-library:3.2.0-rc01")
     implementation("com.jakewharton:process-phoenix:2.1.2")
