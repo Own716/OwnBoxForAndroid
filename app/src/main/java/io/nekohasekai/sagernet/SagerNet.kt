@@ -13,6 +13,7 @@ import android.net.Network
 import android.os.Build
 import android.os.PowerManager
 import android.os.StrictMode
+import android.os.SystemClock
 import android.os.UserManager
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
@@ -266,6 +267,24 @@ class SagerNet : Application(),
             application.sendBroadcast(
                 Intent(Action.SWITCH_PERFORMANCE_MODE).setPackage(application.packageName)
             )
+        }
+
+        @Volatile
+        private var lastThrottledForceGcMs = 0L
+
+        /**
+         * v3.0.5: rate-limited wrapper around Libcore.forceGc().
+         * A full Go GC + FreeOSMemory on every MainActivity.onStop() / Doze entry
+         * caused repeated stop-the-world CPU spikes for users who switch apps
+         * often (and the heap has since grown under GOGC=100/512MiB, making each
+         * spike bigger). The trim intent is preserved, just not more than once
+         * per [minIntervalMs].
+         */
+        fun throttledForceGc(minIntervalMs: Long = 5 * 60 * 1000L) {
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastThrottledForceGcMs < minIntervalMs) return
+            lastThrottledForceGcMs = now
+            Libcore.forceGc()
         }
 
         var underlyingNetwork: Network? = null

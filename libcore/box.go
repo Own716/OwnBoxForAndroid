@@ -366,8 +366,11 @@ func (b *BoxInstance) Close() (err error) {
 		if now-lastUrlTestGc.Load() > 2000 {
 			lastUrlTestGc.Store(now)
 			go func() {
+				// v3.0.5: GC only, no FreeOSMemory. During batch speed tests each
+				// node close used to madvise the whole heap back to the OS, and
+				// the next test instance immediately faulted it back in —
+				// allocate/GC/release churn with measurable CPU spikes.
 				runtime.GC()
-				debug.FreeOSMemory()
 			}()
 		}
 	}

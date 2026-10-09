@@ -1,5 +1,6 @@
 package io.nekohasekai.sagernet.bg.proto
 
+import android.os.SystemClock
 import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.aidl.SpeedDisplayData
 import io.nekohasekai.sagernet.aidl.TrafficData
@@ -23,11 +24,21 @@ class TrafficLooper
 
     companion object {
         private const val TRAFFIC_BATCH_SIZE = 500
+
+        /**
+         * Minimum interval between ActiveOutboundTracker.checkAndUpdate() calls.
+         * That check performs blocking HTTP (Clash API) + multiple Room queries for
+         * strategy-group users; running it on every loop iteration (1s foreground /
+         * 6s bright-background) is the dominant source of sustained background CPU.
+         * The active-node display is informational, so 30s staleness is acceptable.
+         */
+        private const val ACTIVE_CHECK_MIN_INTERVAL_MS = 30_000L
     }
 
     private var job: Job? = null
     private var lastSpeedSnapshot: SpeedDisplayData? = null
     private var wakeupSignal: CompletableDeferred<Unit>? = null
+    private var lastActiveCheckMs = 0L
 
     fun triggerWakeup() {
         wakeupSignal?.complete(Unit)
@@ -213,7 +224,12 @@ class TrafficLooper
                 delay(if (isForegroundUI) baseDelayMs else 3000L)
                 continue
             }
-            if (!proxy.isInitialized()) continue
+            // v3.0.5: never busy-spin when the proxy instance is not initialized yet;
+            // a bare `continue` here used to peg one CPU core at 100%.
+            if (!proxy.isInitialized()) {
+                delay(300L)
+                continue
+            }
 
             val snapshot = withStateLock {
                 val currentConfig = proxy.safeConfig ?: return@withStateLock null
@@ -346,10 +362,20 @@ class TrafficLooper
                         }
                     }
                 }
-                if (ActiveOutboundTracker.checkAndUpdate(data)) {
-                    val newTitle = ActiveOutboundTracker.formatNotificationTitle(proxy.profile)
-                    proxy.displayProfileName = newTitle
-                    data.notification?.postNotificationTitle(newTitle)
+                // v3.0.5: throttle the active-outbound check. checkAndUpdate() does a
+                // blocking Clash-API HTTP request plus several Room queries for
+                // strategy-group users; every loop iteration (1s fg / 6s bg) was
+                // causing sustained background CPU. 30s staleness is acceptable for
+                // an informational title, and updates still happen while the screen
+                // is off (unlike the reverted isInteractive gate).
+                val nowMs = SystemClock.elapsedRealtime()
+                if (nowMs - lastActiveCheckMs >= ACTIVE_CHECK_MIN_INTERVAL_MS) {
+                    lastActiveCheckMs = nowMs
+                    if (ActiveOutboundTracker.checkAndUpdate(data)) {
+                        val newTitle = ActiveOutboundTracker.formatNotificationTitle(proxy.profile)
+                        proxy.displayProfileName = newTitle
+                        data.notification?.postNotificationTitle(newTitle)
+                    }
                 }
                 loopSnapshot
             }
