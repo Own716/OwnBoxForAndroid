@@ -36,39 +36,6 @@ object RegionExtractor {
         RegionRule("阿联酋", listOf("阿联酋", "迪拜", "🇦🇪", "uae", "united arab emirates", "dubai", "ae"))
     )
 
-    // v3.0.5: precompile the ASCII word-boundary regexes once. extractRegionName()
-    // runs on the notification tick path; compiling dozens of Regex objects per
-    // call was pure overhead.
-    private data class CompiledRule(val name: String, val matchers: List<CompiledPattern>)
-
-    private sealed interface CompiledPattern {
-        fun matches(nodeName: String, lower: String): Boolean
-    }
-
-    private class RegexPattern(val regex: Regex) : CompiledPattern {
-        override fun matches(nodeName: String, lower: String) = regex.containsMatchIn(nodeName)
-    }
-
-    private class SubstringPattern(val pattern: String) : CompiledPattern {
-        override fun matches(nodeName: String, lower: String) = lower.contains(pattern)
-    }
-
-    private val compiledRules: List<CompiledRule> = rules.map { rule ->
-        CompiledRule(
-            rule.name,
-            rule.patterns.map { pattern ->
-                if (pattern.all { it.isLetter() && it.code < 128 }) {
-                    // For pure ASCII abbreviations like "jp", "us", "hk", match with word boundary or non-letters
-                    RegexPattern(Regex("(?i)(^|[^a-z0-9])${Regex.escape(pattern)}([^a-z0-9]|\$)"))
-                } else {
-                    SubstringPattern(pattern)
-                }
-            }
-        )
-    }
-
-    private val chineseRegex = Regex("[\\u4e00-\\u9fa5]{2,4}")
-
     /**
      * Extracts a clean 2~4 Chinese character region name for status bar capsule display.
      */
@@ -76,16 +43,24 @@ object RegionExtractor {
         if (nodeName.isNullOrBlank()) return ""
         val lower = nodeName.lowercase()
 
-        for (rule in compiledRules) {
-            for (matcher in rule.matchers) {
-                if (matcher.matches(nodeName, lower)) {
-                    return rule.name
+        for (rule in rules) {
+            for (pattern in rule.patterns) {
+                if (pattern.all { it.isLetter() && it.code < 128 }) {
+                    // For pure ASCII abbreviations like "jp", "us", "hk", match with word boundary or non-letters
+                    val regex = Regex("(?i)(^|[^a-z0-9])${Regex.escape(pattern)}([^a-z0-9]|\$)")
+                    if (regex.containsMatchIn(nodeName)) {
+                        return rule.name
+                    }
+                } else {
+                    if (lower.contains(pattern)) {
+                        return rule.name
+                    }
                 }
             }
         }
 
         // Fallback: extract continuous Chinese characters if available (up to 4 chars)
-        val chineseMatch = chineseRegex.find(nodeName)
+        val chineseMatch = Regex("[\\u4e00-\\u9fa5]{2,4}").find(nodeName)
         if (chineseMatch != null) {
             return chineseMatch.value
         }
