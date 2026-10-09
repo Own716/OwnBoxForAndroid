@@ -38,7 +38,6 @@ import io.nekohasekai.sagernet.bg.SagerConnection
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.GroupManager
 import io.nekohasekai.sagernet.database.ProfileManager
-import libcore.Libcore
 import io.nekohasekai.sagernet.database.ProxyGroup
 import io.nekohasekai.sagernet.database.SubscriptionBean
 import io.nekohasekai.sagernet.database.preference.OnPreferenceDataStoreChangeListener
@@ -724,7 +723,9 @@ class MainActivity : ThemedActivity(),
         connection.updateConnectionId(SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_BACKGROUND)
         super.onStop()
         if (!DataStore.performancePriorityMode) {
-            Libcore.forceGc()
+            // v3.0.5: throttled — a full Go GC on every app-backgrounding caused
+            // repeated CPU spikes for users who switch apps frequently.
+            SagerNet.throttledForceGc()
         }
     }
 
