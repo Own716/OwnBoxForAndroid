@@ -8,7 +8,6 @@ import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
 import kotlinx.coroutines.runBlocking
 import moe.matsuri.nb4a.utils.JavaUtil
-import java.util.concurrent.atomic.AtomicInteger
 
 class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = null) :
     BoxInstance(profile) {
@@ -20,15 +19,6 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = 
 
     // for TrafficLooper
     var looper: TrafficLooper? = null
-
-    /**
-     * v3.0.5: guards the async looper creation in launch() against a close()
-     * that runs first. Previously, if close() executed before the posted block,
-     * the stop was a no-op (looper == null) and the block still created and
-     * started a looper afterwards — leaking a coroutine that wakes the CPU
-     * every 3s forever while holding a stale service reference.
-     */
-    private val looperGeneration = AtomicInteger(0)
 
     override fun buildConfig() {
         super.buildConfig()
@@ -59,18 +49,13 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = 
     override fun launch() {
         box.setAsMain()
         super.launch() // start box
-        val generation = looperGeneration.incrementAndGet()
         runOnDefaultDispatcher {
-            // Drop this creation if a close()/relaunch happened after it was posted.
-            if (looperGeneration.get() != generation) return@runOnDefaultDispatcher
             looper = service?.let { TrafficLooper(it.data, this) }
             looper?.start()
         }
     }
 
     override fun close() {
-        // Invalidate any looper creation still queued on the dispatcher.
-        looperGeneration.incrementAndGet()
         var closeError: Throwable? = null
         try {
             super.close()
