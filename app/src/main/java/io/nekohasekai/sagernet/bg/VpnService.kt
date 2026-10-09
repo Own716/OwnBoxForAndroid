@@ -289,6 +289,9 @@ class VpnService : BaseVpnService(),
     override fun onDestroy() {
         DataStore.vpnService = null
         super.onDestroy()
+        // v3.0.5: destroy the notification (unregisters its SCREEN_ON/OFF
+        // receiver) — previously leaked for the lifetime of the :bg process.
+        data.notification?.destroy()
         data.binder.close()
         SagerNet.notification.cancel(ServiceNotification.notificationId)
     }

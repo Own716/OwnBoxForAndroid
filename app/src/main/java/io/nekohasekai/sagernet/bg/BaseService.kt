@@ -69,7 +69,10 @@ class BaseService {
                             // Pausing TUN inbound during Doze blocks background push notifications & sync,
                             // causing disconnects and socket timeouts when phone is idle for hours.
                             // Instead, only run a memory trim while keeping TUN/network completely alive.
-                            Libcore.forceGc()
+                            // v3.0.5: throttled — Doze entry/exit can cycle (light doze),
+                            // and an unthrottled full Go GC each time spikes CPU exactly
+                            // when the device is trying to sleep.
+                            SagerNet.throttledForceGc()
                         } else {
                             proxy?.box?.wake()
                             if (DataStore.wakeResetConnections) {
@@ -166,7 +169,11 @@ class BaseService {
             }
         }
 
-        val callbackIdMap = mutableMapOf<ISagerNetServiceCallback, Int>()
+        // v3.0.5: ConcurrentHashMap — this map is written on binder threads
+        // (registerCallback/unregisterCallback) and iterated on the Default
+        // dispatcher (TrafficLooper.containsValue); a plain mutableMapOf could
+        // throw ConcurrentModificationException and silently kill the looper.
+        val callbackIdMap = java.util.concurrent.ConcurrentHashMap<ISagerNetServiceCallback, Int>()
 
         override val coroutineContext = Dispatchers.Main.immediate + Job()
 
@@ -691,6 +698,11 @@ class BaseService {
                     data.changeState(State.Connected)
                     data.cacheRecoveryAttempts = 0
                     data.networkSwitchRetryAttempts = 0
+                    // v3.0.5: one-shot Go runtime health snapshot for diagnostics.
+                    // Logs.d is level-gated (debug+), so release builds pay nothing.
+                    Logs.d("Go runtime stats at connect: " + runCatching {
+                        Libcore.runtimeStatsJSON()
+                    }.getOrDefault("{}"))
 
                     lateInit()
                 } catch (_: CancellationException) { // if the job was cancelled, it is canceller's responsibility to call stopRunner
