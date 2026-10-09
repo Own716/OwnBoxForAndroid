@@ -155,7 +155,7 @@ internal fun buildLoadBalanceOutbound(
         interval = "${iv}s"
         tolerance = toleranceMs?.takeIf { it >= 0 } ?: 50
         idle_timeout = idleTimeoutStr?.takeIf { it.isNotBlank() } ?: "${iv}s"
-        interrupt_exist_connections = interruptExist ?: false
+        interrupt_exist_connections = false
     }
 
 internal fun buildUrlTestOutbound(
@@ -753,7 +753,12 @@ fun buildConfig(
                     TunImplementation.SING_TUN -> null // 官方最新自研原生 Go 栈（推荐，默认最高性能）
                     else -> null
                 }
-                mtu = DataStore.mtu
+                // 移动蜂窝网络（4G/5G）与 PPPoE 环境下，外层代理协议（TLS/AEAD/Shadowsocks/Hysteria）
+                // 封装包头开销在 60~100 字节。若 TUN MTU 为 1400，外层大包极易超过运营商 GTP 隧道 MTU（1420-1440），
+                // 引发运营商丢包且屏蔽 ICMP PMTUD 回包（PMTUD 黑洞），导致图片/视频上传降速或断流。
+                // 钳制 TUN MTU 至 1360（WireGuard/Tailscale 标准），Go netstack 会自动把 TCP MSS 钳制至 1320 字节，
+                // 确保外层封装包永不超过物理链路 MTU，彻底解决上传不稳定与大包断流。
+                mtu = (DataStore.mtu).coerceAtMost(1360)
                 auto_route = true
                 strict_route = DataStore.strictRoute
                 udp_timeout = 300L
@@ -1181,6 +1186,7 @@ fun buildConfig(
                     _hack_config_map["domain_strategy"] = defaultServerDomainStrategy
 
                     _hack_config_map["tag"] = tagOut
+                    _hack_config_map["tcp_multi_path"] = false
 
                     _hack_custom_config = bean.customOutboundJson
                 }

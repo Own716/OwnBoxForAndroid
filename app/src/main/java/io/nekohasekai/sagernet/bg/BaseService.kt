@@ -577,15 +577,16 @@ class BaseService {
                     DataStore.vpnService?.updateUnderlyingNetwork()
                     return@start
                 }
-                SagerNet.connectivity.getLinkProperties(network)?.also { link ->
-                    val oldNetwork = SagerNet.underlyingNetwork
-                    SagerNet.underlyingNetwork = network
-                    DataStore.vpnService?.updateUnderlyingNetwork()
-                    val oldName = upstreamInterfaceName
-                    if (oldName != link.interfaceName || oldNetwork != network) {
-                        Logs.d("Network changed: $oldName -> ${link.interfaceName} (network $oldNetwork -> $network)")
-                        upstreamInterfaceName = link.interfaceName
-                        NativeInterface.clearInterfaceCache()
+                val link = SagerNet.connectivity.getLinkProperties(network)
+                val oldNetwork = SagerNet.underlyingNetwork
+                SagerNet.underlyingNetwork = network
+                DataStore.vpnService?.updateUnderlyingNetwork()
+                val oldName = upstreamInterfaceName
+                val newName = link?.interfaceName
+                if (newName != null && (oldName != newName || oldNetwork != network)) {
+                    Logs.d("Network changed: $oldName -> $newName (network $oldNetwork -> $network)")
+                    upstreamInterfaceName = newName
+                    NativeInterface.clearInterfaceCache()
                         if (data.state == State.Connecting) {
                             Logs.i("Network changed during Connecting state: cancelling old handshake and retrying on new network")
                             data.connectingJob?.cancel()
@@ -601,7 +602,6 @@ class BaseService {
                             }
                         }
                     }
-                }
             }
         }
 
