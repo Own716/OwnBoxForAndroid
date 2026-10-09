@@ -560,40 +560,11 @@ func (s *LoadBalance) isNodeDegraded(idx int, now int64) bool {
 	return fails >= 2 && now-lastFail < 10_000
 }
 
-// nodeLatencyMs resolves the effective latency of node i in milliseconds,
-// preferring the live EMA, then the last URL-test history, then a large
-// default for untested nodes. Extracted so callers can snapshot it once
-// instead of paying a locked history lookup per comparison.
-func (s *LoadBalance) nodeLatencyMs(i int) int64 {
-	var l int64
-	if i < len(s.stats) && s.stats[i] != nil {
-		l = s.stats[i].latencyEmaMs.Load()
-	}
-	if l <= 0 && s.history != nil {
-		if i < len(s.tags) {
-			if h := s.history.LoadURLTestHistory(s.tags[i]); h != nil && h.Delay > 0 {
-				l = int64(h.Delay)
-			}
-		}
-		if l <= 0 && i < len(s.outbounds) && s.outbounds[i] != nil {
-			if h := s.history.LoadURLTestHistory(s.outbounds[i].Tag()); h != nil && h.Delay > 0 {
-				l = int64(h.Delay)
-			}
-		}
-	}
-	if l <= 0 {
-		l = 9999
-	}
-	return l
-}
-
 func (s *LoadBalance) candidateIndices(ctx context.Context, dest M.Socksaddr) []int {
-	// v3.0.5: indices must address s.outbounds. The old fallback
-	// `if n == 0 { n = len(s.tags) }` produced indices into an empty/shorter
-	// slice, and DialContext/ListenPacket then panicked with index out of range
-	// on `s.outbounds[idx]`. An empty outbound set is now a clean
-	// "no outbounds available" error instead of a :bg process crash.
 	n := len(s.outbounds)
+	if n == 0 {
+		n = len(s.tags)
+	}
 	if n == 0 {
 		return nil
 	}
@@ -678,18 +649,50 @@ func (s *LoadBalance) candidateIndices(ctx context.Context, dest M.Socksaddr) []
 			healthy = indices
 			degraded = nil
 		}
-		// v3.0.5: snapshot latencies once before sorting. The old comparator
-		// called LoadURLTestHistory (lock + map lookup) 1-2x per comparison,
-		// i.e. O(n log n) locked lookups on every dial. 100 nodes ~= 1300+
-		// lock acquisitions per connection; now it is O(n).
-		latency := make([]int64, n)
-		for i := 0; i < n; i++ {
-			latency[i] = s.nodeLatencyMs(i)
-		}
 		slices.SortStableFunc(healthy, func(a, b int) int {
-			if latency[a] < latency[b] {
+			var la int64
+			if a < len(s.stats) && s.stats[a] != nil {
+				la = s.stats[a].latencyEmaMs.Load()
+			}
+			if la <= 0 && s.history != nil {
+				if a < len(s.tags) {
+					if h := s.history.LoadURLTestHistory(s.tags[a]); h != nil && h.Delay > 0 {
+						la = int64(h.Delay)
+					}
+				}
+				if la <= 0 && a < len(s.outbounds) && s.outbounds[a] != nil {
+					if h := s.history.LoadURLTestHistory(s.outbounds[a].Tag()); h != nil && h.Delay > 0 {
+						la = int64(h.Delay)
+					}
+				}
+			}
+			if la <= 0 {
+				la = 9999
+			}
+
+			var lb int64
+			if b < len(s.stats) && s.stats[b] != nil {
+				lb = s.stats[b].latencyEmaMs.Load()
+			}
+			if lb <= 0 && s.history != nil {
+				if b < len(s.tags) {
+					if h := s.history.LoadURLTestHistory(s.tags[b]); h != nil && h.Delay > 0 {
+						lb = int64(h.Delay)
+					}
+				}
+				if lb <= 0 && b < len(s.outbounds) && s.outbounds[b] != nil {
+					if h := s.history.LoadURLTestHistory(s.outbounds[b].Tag()); h != nil && h.Delay > 0 {
+						lb = int64(h.Delay)
+					}
+				}
+			}
+			if lb <= 0 {
+				lb = 9999
+			}
+
+			if la < lb {
 				return -1
-			} else if latency[a] > latency[b] {
+			} else if la > lb {
 				return 1
 			}
 			return 0

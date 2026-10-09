@@ -224,18 +224,10 @@ func (s *URLTest) DialContext(ctx context.Context, network string, destination M
 	s.logger.ErrorContext(ctx, err)
 
 	// 容灾候选快速故障转移，防止主选节点临时抖动导致全量连接直接断连
-	// v3.0.5: cap at 3 alternates. Previously every remaining outbound was tried
-	// serially; with a dead primary and N nodes a single user connection could
-	// stall for minutes (N x dial timeouts) while burning handshake CPU.
-	failoverTried := 0
 	for _, alt := range s.group.outbounds {
-		if failoverTried >= 3 {
-			break
-		}
 		if alt == detour || !common.Contains(alt.Network(), network) {
 			continue
 		}
-		failoverTried++
 		altConn, altErr := alt.DialContext(ctx, network, destination)
 		if altErr == nil {
 			return s.group.interruptGroup.NewConn(altConn, interrupt.IsExternalConnectionFromContext(ctx)), nil
@@ -260,16 +252,10 @@ func (s *URLTest) ListenPacket(ctx context.Context, destination M.Socksaddr) (ne
 	s.logger.ErrorContext(ctx, err)
 
 	// UDP 候选快速容灾
-	// v3.0.5: same 3-alternate cap as the TCP path (see above).
-	failoverTried := 0
 	for _, alt := range s.group.outbounds {
-		if failoverTried >= 3 {
-			break
-		}
 		if alt == detour || !common.Contains(alt.Network(), N.NetworkUDP) {
 			continue
 		}
-		failoverTried++
 		altConn, altErr := alt.ListenPacket(ctx, destination)
 		if altErr == nil {
 			return s.group.interruptGroup.NewPacketConn(altConn, interrupt.IsExternalConnectionFromContext(ctx)), nil
