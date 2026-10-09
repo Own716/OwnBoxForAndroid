@@ -149,8 +149,8 @@ func SetMemoryProfile(performancePriority bool) {
 		debug.SetGCPercent(100)
 		debug.SetMemoryLimit(-1) // -1 = math.MaxInt64, disables the soft limit
 	} else {
-		// Balanced low-power: GOGC=100, cap at 512 MiB to avoid aggressive GC interrupts while handling high throughput
+		// Balanced low-power: GOGC=100, cap at 128 MiB to proactively return idle dirty pages to Android OS
 		debug.SetGCPercent(100)
-		debug.SetMemoryLimit(512 * 1024 * 1024)
+		debug.SetMemoryLimit(128 * 1024 * 1024)
 	}
 }

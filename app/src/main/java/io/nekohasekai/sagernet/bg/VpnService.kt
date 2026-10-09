@@ -257,22 +257,13 @@ class VpnService : BaseVpnService(),
             }
         }
 
-        // 当未启用应用分流且混合入站可用时，才向系统追加 HTTP 代理（Android 10+），避免破坏绕过/代理应用分流规则
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !DataStore.mixedInboundDisabled && !proxyApps) {
-            builder.setHttpProxy(
-                ProxyInfo.buildDirectProxy(
-                    LOCALHOST,
-                    DataStore.mixedPort,
-                    DataStore.httpProxyBypass.lines().mapNotNull { line ->
-                        line.trim().takeIf { it.isNotBlank() && !it.startsWith("#") }
-                    },
-                )
-            )
-        }
+        // 保持纯 TUN 接口模式：不向系统注册全局 HTTP 代理，消除环回套接字双重代理瓶颈，
+        // 彻底释放 Telegram 等应用在发送大文件/视频时走纯 TUN 的全速上传吞吐量。
 
         metered = DataStore.meteredNetwork
         if (Build.VERSION.SDK_INT >= 29) builder.setMetered(metered)
         conn = builder.establish() ?: throw NullConnectionException()
+        updateUnderlyingNetwork()
 
         return conn!!.fd
     }

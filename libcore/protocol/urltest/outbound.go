@@ -544,11 +544,11 @@ func (b *urlTestBatch) test(outbounds []adapter.Outbound, link string, interval 
 			}
 			b.checked[tag] = true
 			b.batch.Go(tag, func() (any, error) {
-				testCtx, cancel := context.WithTimeout(b.ctx, 4*time.Second)
+				testCtx, cancel := context.WithTimeout(b.ctx, 6*time.Second)
 				defer cancel()
 				testChan := make(chan urlTestResult, 1)
 				go func() {
-					delay, testErr := ProbeOutbound(testCtx, detour, link, 3500*time.Millisecond)
+					delay, testErr := ProbeOutbound(testCtx, detour, link, 5000*time.Millisecond)
 					testChan <- urlTestResult{delay, testErr}
 				}()
 				var testResult urlTestResult

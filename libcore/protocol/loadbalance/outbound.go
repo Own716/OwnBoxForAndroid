@@ -651,10 +651,7 @@ func (s *LoadBalance) candidateIndices(ctx context.Context, dest M.Socksaddr) []
 		}
 		slices.SortStableFunc(healthy, func(a, b int) int {
 			var la int64
-			if a < len(s.stats) && s.stats[a] != nil {
-				la = s.stats[a].latencyEmaMs.Load()
-			}
-			if la <= 0 && s.history != nil {
+			if s.history != nil {
 				if a < len(s.tags) {
 					if h := s.history.LoadURLTestHistory(s.tags[a]); h != nil && h.Delay > 0 {
 						la = int64(h.Delay)
@@ -666,15 +663,15 @@ func (s *LoadBalance) candidateIndices(ctx context.Context, dest M.Socksaddr) []
 					}
 				}
 			}
+			if la <= 0 && a < len(s.stats) && s.stats[a] != nil {
+				la = s.stats[a].latencyEmaMs.Load()
+			}
 			if la <= 0 {
 				la = 9999
 			}
 
 			var lb int64
-			if b < len(s.stats) && s.stats[b] != nil {
-				lb = s.stats[b].latencyEmaMs.Load()
-			}
-			if lb <= 0 && s.history != nil {
+			if s.history != nil {
 				if b < len(s.tags) {
 					if h := s.history.LoadURLTestHistory(s.tags[b]); h != nil && h.Delay > 0 {
 						lb = int64(h.Delay)
@@ -685,6 +682,9 @@ func (s *LoadBalance) candidateIndices(ctx context.Context, dest M.Socksaddr) []
 						lb = int64(h.Delay)
 					}
 				}
+			}
+			if lb <= 0 && b < len(s.stats) && s.stats[b] != nil {
+				lb = s.stats[b].latencyEmaMs.Load()
 			}
 			if lb <= 0 {
 				lb = 9999

@@ -1,6 +1,7 @@
 package io.nekohasekai.sagernet.bg
 
 import android.content.Context
+import android.os.SystemClock
 import android.text.format.Formatter
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.aidl.SpeedDisplayData
@@ -232,13 +233,21 @@ object ActiveOutboundTracker {
         return "$trafficStr · $strategyStr"
     }
 
-    private fun queryClashNowTag(groupTag: String): String? {
+    private var lastQueryTime = 0L
+    private var cachedClashMap: Map<String, String> = emptyMap()
+
+    private fun queryClashMap(): Map<String, String> {
+        if (!DataStore.enableClashAPI && !DataStore.allowAccess) return emptyMap()
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastQueryTime < 3000L && cachedClashMap.isNotEmpty()) {
+            return cachedClashMap
+        }
         var conn: HttpURLConnection? = null
         return try {
-            val url = URL("http://127.0.0.1:9090/proxies/$groupTag")
+            val url = URL("http://127.0.0.1:9090/proxies")
             conn = (url.openConnection() as HttpURLConnection).apply {
-                connectTimeout = 300
-                readTimeout = 300
+                connectTimeout = 800
+                readTimeout = 800
                 requestMethod = "GET"
                 val secret = DataStore.clashApiSecret
                 if (secret.isNotBlank()) {
@@ -248,11 +257,24 @@ object ActiveOutboundTracker {
             if (conn.responseCode == 200) {
                 val reader = BufferedReader(InputStreamReader(conn.inputStream))
                 val content = reader.use { it.readText() }
-                val json = JSONObject(content)
-                json.optString("now").takeIf { it.isNotBlank() }
-            } else null
+                val root = JSONObject(content)
+                val proxies = root.optJSONObject("proxies") ?: return emptyMap()
+                val result = mutableMapOf<String, String>()
+                val keys = proxies.keys()
+                while (keys.hasNext()) {
+                    val key = keys.next()
+                    val p = proxies.optJSONObject(key)
+                    val nowTag = p?.optString("now")
+                    if (!nowTag.isNullOrBlank()) {
+                        result[key] = nowTag
+                    }
+                }
+                lastQueryTime = now
+                cachedClashMap = result
+                result
+            } else emptyMap()
         } catch (_: Exception) {
-            null
+            emptyMap()
         } finally {
             conn?.disconnect()
         }
@@ -294,9 +316,10 @@ object ActiveOutboundTracker {
         // Target tag for this specific strategy group (do not blindly query "proxy")
         val balancerTag = runCatching { proxy.safeConfig?.profileTagMap?.get(profile.id) }.getOrNull()
             ?.takeIf { it.isNotBlank() } ?: profile.displayName()
-        var candidateTag = queryClashNowTag(balancerTag)
+        val clashMap = queryClashMap()
+        var candidateTag = clashMap[balancerTag]
         if (candidateTag.isNullOrBlank() && balancerTag != "proxy" && isGroupStrategy) {
-            candidateTag = queryClashNowTag("proxy")
+            candidateTag = clashMap["proxy"]
         }
 
         var candidateId: Long? = null

@@ -98,10 +98,13 @@ class TrafficLooper
     var selectorNowFakeTag = ""
 
     fun getActiveTransmittingMember(memberIds: List<Long>): Long? {
-        return memberIds.firstOrNull { id ->
+        return memberIds.mapNotNull { id ->
             val item = idMap[id]
-            item != null && (item.hasTrafficDelta || item.rxRate > 0 || item.txRate > 0)
-        }
+            if (item != null && (item.hasTrafficDelta || item.rxRate > 0 || item.txRate > 0)) {
+                val rate = item.rxRate + item.txRate
+                id to rate
+            } else null
+        }.maxByOrNull { it.second }?.first
     }
 
     suspend fun selectMain(id: Long) = withStateLock {

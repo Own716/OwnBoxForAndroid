@@ -42,11 +42,11 @@ func ProbeOutbound(ctx context.Context, detour adapter.Outbound, link string, ti
 		link = DefaultCFURL
 	}
 	if timeout <= 0 {
-		timeout = 3500 * time.Millisecond
+		timeout = 5000 * time.Millisecond
 	}
 
 	primaryTimeout := timeout
-	fallbackTimeout := 2000 * time.Millisecond
+	fallbackTimeout := 3000 * time.Millisecond
 	if timeout > 3500*time.Millisecond {
 		primaryTimeout = timeout - 1500*time.Millisecond
 	}

@@ -122,7 +122,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var trafficSniffing by configurationStore.stringToInt(Key.TRAFFIC_SNIFFING) { 1 }
     var resolveDestination by configurationStore.boolean(Key.RESOLVE_DESTINATION)
 
-    var mtu by configurationStore.stringToInt(Key.MTU) { 1500 }
+    var mtu by configurationStore.stringToInt(Key.MTU) { 1400 }
 
     var bypassLan by configurationStore.boolean(Key.BYPASS_LAN)
     var bypassLanInCore by configurationStore.boolean(Key.BYPASS_LAN_IN_CORE)
@@ -237,7 +237,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
 
     var httpProxyBypass by configurationStore.string(Key.HTTP_PROXY_BYPASS) { "" }
     var dnsHosts by configurationStore.string(Key.DNS_HOSTS) { "" }
-    var strictRoute by configurationStore.boolean(Key.STRICT_ROUTE) { true }
+    var strictRoute by configurationStore.boolean(Key.STRICT_ROUTE) { false }
     // false = extreme low memory GC mode (default); true = high performance, allow high RAM
     var performancePriorityMode by configurationStore.boolean(Key.PERFORMANCE_PRIORITY_MODE) { false }
     private var rawConnectionTestURL by configurationStore.string(Key.CONNECTION_TEST_URL) {
