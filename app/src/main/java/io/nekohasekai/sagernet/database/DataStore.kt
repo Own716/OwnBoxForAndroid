@@ -213,19 +213,6 @@ object DataStore : OnPreferenceDataStoreChangeListener {
         if (configurationStore.getString(Key.MIXED_PORT) == null) {
             mixedPort = mixedPort
         }
-        // v3.0.5: one-time migration for the legacy MTU default.
-        // MTU 9000 was the default until v3.0.4 and proved unstable in real
-        // speed tests (PMTUD blackhole: small requests work, bulk downloads
-        // such as Google Play stall forever). v3.0.4 only changed the default
-        // for new installs; existing users kept the stored 9000. Migrate exactly
-        // the old default value — user-customized values are never touched.
-        if (!configurationStore.getBoolean(Key.MTU_MIGRATED_305, false)) {
-            if (configurationStore.getString(Key.MTU) == "9000") {
-                mtu = 1500
-                Logs.i("DataStore: migrated legacy MTU 9000 -> 1500 (v3.0.5)")
-            }
-            configurationStore.putBoolean(Key.MTU_MIGRATED_305, true)
-        }
     }
 
 

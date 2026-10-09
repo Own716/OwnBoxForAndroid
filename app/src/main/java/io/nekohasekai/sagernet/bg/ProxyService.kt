@@ -24,13 +24,4 @@ class ProxyService : Service(), BaseService.Interface {
     override fun onBind(intent: Intent) = super.onBind(intent)
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int =
         super<BaseService.Interface>.onStartCommand(intent, flags, startId)
-
-    // v3.0.5: previously missing entirely — without it, ServiceNotification's
-    // SCREEN_ON/OFF receiver and the binder coroutine scope leaked whenever the
-    // service was destroyed outside the normal stopRunner path.
-    override fun onDestroy() {
-        data.notification?.destroy()
-        data.binder.close()
-        super.onDestroy()
-    }
 }

@@ -71,8 +71,6 @@ object Key {
     const val LOG_LEVEL = "logLevel"
     const val LOG_BUF_SIZE = "logBufSize"
     const val MTU = "mtu"
-    // v3.0.5 one-time migration marker: legacy default MTU 9000 -> 1500.
-    const val MTU_MIGRATED_305 = "mtuMigrated305"
     const val ALWAYS_SHOW_ADDRESS = "alwaysShowAddress"
 
     const val RULES_GEOSITE_URL = "rulesGeositeUrl"

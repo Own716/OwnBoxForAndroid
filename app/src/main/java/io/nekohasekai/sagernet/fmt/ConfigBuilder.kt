@@ -717,16 +717,8 @@ fun buildConfig(
         dns = DNSOptions().apply {
             servers = mutableListOf()
             rules = mutableListOf()
-            // NOTE (v3.0.5): intentionally no independent_cache / disable_expire here.
-            // - independent_cache is a deprecated no-op in sing-box 1.15 (only logs a
-            //   deprecation warning, a single shared client is used regardless).
-            // - disable_expire=true (added in v3.0.4) makes cached DNS records NEVER
-            //   expire (verified in sing-box v1.15.0-alpha.10 dns/client.go: the cache
-            //   lookup skips every TTL/expireAt check). Stale CDN IPs are then used
-            //   indefinitely, which breaks apps whose edge IPs rotate (e.g. Google
-            //   Play downloads spinning forever). The in-memory cache is already
-            //   bounded (freelru LRU, min 1024 entries), so TTL-respecting expiry
-            //   keeps lookups cheap without risking permanent staleness.
+            independent_cache = true
+            disable_expire = true
         }
 
         fun autoDnsDomainStrategy(s: String, isProxied: Boolean = false): String? {
