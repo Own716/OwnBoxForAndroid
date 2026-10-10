@@ -155,7 +155,7 @@ internal fun buildLoadBalanceOutbound(
         interval = "${iv}s"
         tolerance = toleranceMs?.takeIf { it >= 0 } ?: 50
         idle_timeout = idleTimeoutStr?.takeIf { it.isNotBlank() } ?: "${iv}s"
-        interrupt_exist_connections = false
+        interrupt_exist_connections = interruptExist ?: false
     }
 
 internal fun buildUrlTestOutbound(

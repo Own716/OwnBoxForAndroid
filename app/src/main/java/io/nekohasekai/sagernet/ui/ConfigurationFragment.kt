@@ -2287,21 +2287,11 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             runOnDefaultDispatcher {
                 var newGroupList = ArrayList(SagerDatabase.groupDao.allGroups())
-                if (newGroupList.isEmpty()) {
-                    SagerDatabase.groupDao.createGroup(ProxyGroup(ungrouped = true))
-                    newGroupList = ArrayList(SagerDatabase.groupDao.allGroups())
-                }
                 // 彻底过滤已禁用的分组，绝不在主界面顶部 Tab 栏与轮播列表中展示
                 newGroupList.removeAll { !it.ungrouped && DataStore.isGroupDisabled(it.id) }
-                newGroupList.find { it.ungrouped }?.let {
-                    if (SagerDatabase.proxyDao.countByGroup(it.id) == 0L) {
-                        newGroupList.remove(it)
-                    }
-                }
-                if (newGroupList.isEmpty()) {
-                    // 若所有分组均被禁用，以未分组作为保底视图，避免白屏或空崩溃
-                    SagerDatabase.groupDao.createGroup(ProxyGroup(ungrouped = true))
-                    newGroupList = ArrayList(SagerDatabase.groupDao.allGroups().filter { it.ungrouped })
+                // 若存在其他有效分组且未分组中没有配置，不在主界面顶部 Tab 中冗余展示空未分组
+                if (newGroupList.size > 1) {
+                    newGroupList.removeAll { it.ungrouped && SagerDatabase.proxyDao.countByGroup(it.id) == 0L }
                 }
 
                 if (generation != reloadGeneration.get()) return@runOnDefaultDispatcher
@@ -2316,12 +2306,12 @@ class ConfigurationFragment @JvmOverloads constructor(
                 } else {
                     selectedItem?.groupId?.takeIf { gid -> newGroupList.any { it.id == gid } }
                         ?: newGroupList.firstOrNull { it.id > 0L }?.id
-                        ?: DataStore.currentGroupId()
+                        ?: 0L
                 }
                 if (newGroupList.none { it.id == selectedGroup }) {
                     selectedGroup = newGroupList.firstOrNull()?.id ?: 0L
                 }
-                if (DataStore.selectedGroup != selectedGroup && selectedGroup > 0L) {
+                if (DataStore.selectedGroup != selectedGroup) {
                     DataStore.selectedGroup = selectedGroup
                 }
                 var newSelectedGroupIndex: Int? = null

@@ -54,16 +54,17 @@ object DataStore : OnPreferenceDataStoreChangeListener {
 
     fun currentGroupId(): Long {
         val currentSelected = configurationStore.getLong(Key.PROFILE_GROUP, -1)
-        if (currentSelected > 0L) return currentSelected
+        if (currentSelected > 0L) {
+            val exists = SagerDatabase.groupDao.getById(currentSelected)
+            if (exists != null) return currentSelected
+        }
         val groups = SagerDatabase.groupDao.allGroups()
         if (groups.isNotEmpty()) {
             val groupId = groups[0].id
             selectedGroup = groupId
             return groupId
         }
-        val groupId = SagerDatabase.groupDao.createGroup(ProxyGroup(ungrouped = true))
-        selectedGroup = groupId
-        return groupId
+        return 0L
     }
 
     fun currentGroup(): ProxyGroup {
@@ -75,22 +76,22 @@ object DataStore : OnPreferenceDataStoreChangeListener {
         if (group != null) return group
         val groups = SagerDatabase.groupDao.allGroups()
         if (groups.isEmpty()) {
-            group = ProxyGroup(ungrouped = true).apply {
-                id = SagerDatabase.groupDao.createGroup(this)
-            }
+            return ProxyGroup(ungrouped = true).apply { id = 0L }
         } else {
             group = groups[0]
+            selectedGroup = group.id
+            return group
         }
-        selectedGroup = group.id
-        return group
     }
 
     fun selectedGroupForImport(): Long {
         val current = currentGroup()
-        if (current.type == GroupType.BASIC) return current.id
+        if (current.id > 0L && current.type == GroupType.BASIC) return current.id
         val groups = SagerDatabase.groupDao.allGroups()
         val basicGroup = groups.find { it.type == GroupType.BASIC }
         if (basicGroup != null) return basicGroup.id
+        val ungrouped = groups.find { it.ungrouped }
+        if (ungrouped != null) return ungrouped.id
         return SagerDatabase.groupDao.createGroup(ProxyGroup(ungrouped = true))
     }
 

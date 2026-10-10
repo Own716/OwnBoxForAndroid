@@ -409,16 +409,10 @@ class GroupSettingsActivity(
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.profile_config_menu, menu)
-        if (isUngrouped) {
-            menu.findItem(R.id.action_delete)?.isVisible = false
-        }
         return true
     }
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
-        if (isUngrouped) {
-            menu.findItem(R.id.action_delete)?.isVisible = false
-        }
         return super.onPrepareOptionsMenu(menu)
     }
 
@@ -476,9 +470,7 @@ class GroupSettingsActivity(
 
         override fun onOptionsItemSelected(item: MenuItem) = when (item.itemId) {
             R.id.action_delete -> {
-                if (activity?.isUngrouped == true) {
-                    true
-                } else if (DataStore.editingId == 0L) {
+                if (DataStore.editingId == 0L) {
                     requireActivity().finish()
                 } else {
                     DeleteConfirmationDialogFragment().apply {
