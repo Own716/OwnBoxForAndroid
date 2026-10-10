@@ -15,8 +15,8 @@ fun parseTrojan(server: String): TrojanBean {
 
     return TrojanBean().apply {
         parseDuckSoft(link, nodeName)
-        link.queryParameter("allowInsecure")
-            ?.apply { if (this == "1" || this == "true") allowInsecure = true }
-        link.queryParameter("peer")?.apply { if (this.isNotBlank()) sni = this }
+        val ins = link.queryParameter("allowInsecure") ?: link.queryParameter("allow_insecure") ?: link.queryParameter("insecure")
+        if (ins != null && (ins == "1" || ins.equals("true", ignoreCase = true))) allowInsecure = true
+        (link.queryParameter("peer") ?: link.queryParameter("sni"))?.apply { if (this.isNotBlank()) sni = this }
     }
 }

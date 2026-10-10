@@ -1,5 +1,25 @@
 # OwnBox for Android 更新日志 (Changelog)
 
+# OwnBox for Android v3.0.7 预览版 (v3.0.7-preview)
+
+* **全协议节点与多端口导入彻底修复**：
+  * **Hysteria 1 / 2 端口跳跃与多端口完美导入**：彻底移除对单端口 HTTP 解析器的依赖，采用强健的标准 URI 分段器，完美解析与导入携带端口范围（如 `:56000-59000`）及逗号多端口（`:443,8443`）的节点链接，并在 sing-box 出站配置中精准构建 `server_ports`；
+  * **别名参数与 Emoji 备注全兼容**：兼容 `allowInsecure=true`、`allow_insecure=1`、`insecure=1`；统一 `sni` 与 `peer`；对 Unicode Emoji 表情及特殊字符节点名进行严格 URL 解码，彻底解决从剪贴板导入节点点击无响应的假死问题。
+* **Shadowsocks (SS) 节点与 TLS 伪装配置全面解锁**：
+  * **解除设置界面锁定**：解除 Shadowsocks 节点编辑界面中插件类型（`pluginName`）与插件配置（`pluginConfig`）的写死锁定状态，用户可自由选择 `v2ray-plugin`、`obfs-local` 并随心填入 TLS 伪装参数；
+  * **修复 SS 插件导入丢失**：修复 v2rayN 与 SIP002 格式导入时暴力抹除插件参数的缺陷，完整保留并提取 TLS 伪装、host 及 path 配置；完美适配 Shadowsocks 2022。
+* **TUIC / Juicity / Trojan 参数全面容错**：
+  * 补齐各协议的别名支持（`allowInsecure` / `allow_insecure`、`congestion_control` / `congestion-control`、`peer` / `sni`）；
+  * 优化 Base64 订阅源自动补齐末尾缺失的 `=` 填充符，自动清洗换行与 BOM 脏字符。
+* **首次安装 100% 零分组（彻底杜绝幽灵分组）**：
+  * 彻底移除首次启动和空查询时向数据库静默插入未分组的代码，新安装用户首次启动应用时**分组列表 100% 干净，零分组呈现**，除非用户主动自建分组或导入节点；
+  * 自动去重自愈：应用加载时自动检测并清理历史版本遗留的多余空未分组。
+* **放开全部群组删除控制权**：
+  * 彻底移除针对未分组隐藏删除按钮的限制，所有分组均在三个点菜单中提供【删除】选项；
+  * 配合 Material 二次确认弹窗与活跃节点平滑回退安全机制，杜绝误触与闪退，用户拥有 100% 分组控制权。
+* **原有防断流与低功耗稳定保障**：
+  * MTU 1360/MSS 1320、禁用长连接打断、低内存占用策略持续生效，通信与后台稳定性 100% 保持。
+
 # OwnBox for Android v3.0.6 预览版 (v3.0.6-preview)
 
 * **修复桌面圆形图标显示异常**：彻底修复个别手机（如小米澎湃 OS HyperOS、部分第三方桌面）在桌面设置圆形图标时，OwnBox 图标缩小且出现突兀白色圆盘底衬的 Bug。在 AndroidManifest 根标签及全部 Launcher 启动器别名中补齐并严格绑定 `android:roundIcon`，全分辨率内置原生裁切无损无盘圆形资源，与系统各大应用圆标完美平齐无违和。

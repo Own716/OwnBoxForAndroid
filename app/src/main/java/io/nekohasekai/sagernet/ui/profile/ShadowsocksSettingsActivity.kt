@@ -24,10 +24,8 @@ class ShadowsocksSettingsActivity : ProfileSettingsActivity<ShadowsocksBean>() {
     private val serverPort = pbm.add(PreferenceBinding(Type.TextToInt, "serverPort"))
     private val password = pbm.add(PreferenceBinding(Type.Text, "password"))
     private val method = pbm.add(PreferenceBinding(Type.Text, "method"))
-    private val pluginName =
-        pbm.add(PreferenceBinding(Type.Text, "pluginName").apply { disable = true })
-    private val pluginConfig =
-        pbm.add(PreferenceBinding(Type.Text, "pluginConfig").apply { disable = true })
+    private val pluginName = pbm.add(PreferenceBinding(Type.Text, "pluginName"))
+    private val pluginConfig = pbm.add(PreferenceBinding(Type.Text, "pluginConfig"))
     private val sUoT = pbm.add(PreferenceBinding(Type.Bool, "sUoT"))
     private val enableMux = pbm.add(PreferenceBinding(Type.Bool, "enableMux"))
     private val muxType = pbm.add(PreferenceBinding(Type.TextToInt, "muxType"))
@@ -43,16 +41,22 @@ class ShadowsocksSettingsActivity : ProfileSettingsActivity<ShadowsocksBean>() {
     override fun ShadowsocksBean.init() {
         pbm.writeToCacheAll(this)
 
-        DataStore.profileCacheStore.putString("pluginName", plugin.substringBefore(";"))
-        DataStore.profileCacheStore.putString("pluginConfig", plugin.substringAfter(";"))
+        val pName = if (plugin.contains(";")) plugin.substringBefore(";") else plugin
+        val pConfig = if (plugin.contains(";")) plugin.substringAfter(";") else ""
+        DataStore.profileCacheStore.putString("pluginName", pName)
+        DataStore.profileCacheStore.putString("pluginConfig", pConfig)
     }
 
     override fun ShadowsocksBean.serialize() {
         pbm.fromCacheAll(this)
 
-        val pn = pluginName.readStringFromCache()
-        val pc = pluginConfig.readStringFromCache()
-        plugin = if (pn.isNotBlank()) "$pn;$pc" else ""
+        val pn = pluginName.readStringFromCache().trim()
+        val pc = pluginConfig.readStringFromCache().trim()
+        plugin = when {
+            pn.isBlank() -> ""
+            pc.isBlank() -> pn
+            else -> "$pn;$pc"
+        }
     }
 
     override fun PreferenceFragmentCompat.createPreferences(

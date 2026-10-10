@@ -10,97 +10,165 @@ import org.json.JSONObject
 import java.io.File
 
 
-// hysteria://host:port?auth=123456&peer=sni.domain&insecure=1|0&upmbps=100&downmbps=100&alpn=hysteria&obfs=xplus&obfsParam=123456#remarks
-fun parseHysteria1(url: String): HysteriaBean {
-    val link = url.replace("hysteria://", "https://").toHttpUrlOrNull() ?: error(
-        "invalid hysteria link $url"
-    )
-    return HysteriaBean().apply {
-        protocolVersion = 1
-        serverAddress = link.host
-        serverPorts = link.port.toString()
-        name = link.fragment
+import java.net.URLDecoder
 
-        link.queryParameter("mport")?.also {
-            serverPorts = it
-        }
-        link.queryParameter("peer")?.also {
-            sni = it
-        }
-        link.queryParameter("auth")?.takeIf { it.isNotBlank() }?.also {
-            authPayloadType = HysteriaBean.TYPE_STRING
-            authPayload = it
-        }
-        link.queryParameter("insecure")?.also {
-            allowInsecure = it == "1" || it == "true"
-        }
-        link.queryParameter("upmbps")?.also {
-            uploadMbps = it.toIntOrNull() ?: uploadMbps
-        }
-        link.queryParameter("downmbps")?.also {
-            downloadMbps = it.toIntOrNull() ?: downloadMbps
-        }
-        link.queryParameter("alpn")?.also {
-            if (it != "none") alpn = it
-        }
-        link.queryParameter("obfsParam")?.also {
-            obfuscation = it
-        }
-        link.queryParameter("protocol")?.also {
-            when (it) {
-                "faketcp" -> {
-                    protocol = HysteriaBean.PROTOCOL_FAKETCP
-                }
+data class ParsedHysteriaUri(
+    val auth: String,
+    val host: String,
+    val ports: String,
+    val queryParams: Map<String, String>,
+    val fragment: String
+)
 
-                "wechat-video" -> {
-                    protocol = HysteriaBean.PROTOCOL_WECHAT_VIDEO
+fun parseHysteriaUriString(rawUrl: String, schemePrefixes: List<String>): ParsedHysteriaUri {
+    var working = rawUrl.trim()
+    for (prefix in schemePrefixes) {
+        if (working.startsWith(prefix, ignoreCase = true)) {
+            working = working.substring(prefix.length)
+            break
+        }
+    }
+
+    // 1. Fragment (#remarks)
+    var fragment = ""
+    if (working.contains("#")) {
+        val rawFrag = working.substringAfter("#")
+        working = working.substringBefore("#")
+        fragment = runCatching { URLDecoder.decode(rawFrag, "UTF-8") }.getOrDefault(rawFrag)
+    }
+
+    // 2. Query parameters (?k=v&...)
+    val queryParams = mutableMapOf<String, String>()
+    if (working.contains("?")) {
+        val rawQuery = working.substringAfter("?")
+        working = working.substringBefore("?")
+        rawQuery.split("&").forEach { pair ->
+            if (pair.isNotBlank()) {
+                val kv = pair.split("=", limit = 2)
+                val key = kv[0].trim()
+                val value = if (kv.size > 1) {
+                    runCatching { URLDecoder.decode(kv[1], "UTF-8") }.getOrDefault(kv[1])
+                } else ""
+                if (key.isNotEmpty()) {
+                    queryParams[key] = value
                 }
             }
+        }
+    }
+
+    // 3. Clean trailing slashes from authority
+    while (working.endsWith("/")) {
+        working = working.substring(0, working.length - 1)
+    }
+
+    // 4. Extract Auth [auth@]
+    var auth = ""
+    var hostPort = working
+    if (working.contains("@")) {
+        val rawAuth = working.substringBefore("@")
+        auth = runCatching { URLDecoder.decode(rawAuth, "UTF-8") }.getOrDefault(rawAuth)
+        hostPort = working.substringAfter("@")
+    }
+
+    // 5. Extract Host and Ports
+    var host = ""
+    var ports = "443"
+
+    if (hostPort.startsWith("[")) {
+        // IPv6 address: e.g. [2001:db8::1]:56000-59000
+        val closeBracket = hostPort.indexOf("]")
+        if (closeBracket != -1) {
+            host = hostPort.substring(1, closeBracket)
+            val rest = hostPort.substring(closeBracket + 1)
+            if (rest.startsWith(":")) {
+                ports = rest.substring(1)
+            }
+        } else {
+            host = hostPort.removePrefix("[").removeSuffix("]")
+        }
+    } else {
+        if (hostPort.contains(":")) {
+            host = hostPort.substringBefore(":")
+            ports = hostPort.substringAfter(":")
+        } else {
+            host = hostPort
+        }
+    }
+
+    return ParsedHysteriaUri(auth, host, ports, queryParams, fragment)
+}
+
+// hysteria://host:port?auth=123456&peer=sni.domain&insecure=1|0&upmbps=100&downmbps=100&alpn=hysteria&obfs=xplus&obfsParam=123456#remarks
+fun parseHysteria1(url: String): HysteriaBean {
+    val parsed = parseHysteriaUriString(url, listOf("hysteria://"))
+    return HysteriaBean().apply {
+        protocolVersion = 1
+        serverAddress = parsed.host
+        serverPorts = parsed.ports
+        name = parsed.fragment
+        authPayload = parsed.auth.ifBlank { parsed.queryParams["auth"] ?: "" }
+        if (authPayload.isNotBlank()) {
+            authPayloadType = HysteriaBean.TYPE_STRING
+        }
+
+        parsed.queryParams["mport"]?.takeIf { it.isNotBlank() }?.also {
+            serverPorts = it
+        }
+        (parsed.queryParams["peer"] ?: parsed.queryParams["sni"])?.takeIf { it.isNotBlank() }?.also {
+            sni = it
+        }
+        val ins = parsed.queryParams["insecure"] ?: parsed.queryParams["allowInsecure"] ?: parsed.queryParams["allow_insecure"]
+        if (ins != null) {
+            allowInsecure = ins == "1" || ins.equals("true", ignoreCase = true)
+        }
+        parsed.queryParams["upmbps"]?.toIntOrNull()?.also {
+            uploadMbps = it
+        }
+        parsed.queryParams["downmbps"]?.toIntOrNull()?.also {
+            downloadMbps = it
+        }
+        parsed.queryParams["alpn"]?.takeIf { it.isNotBlank() && it != "none" }?.also {
+            alpn = it
+        }
+        (parsed.queryParams["obfsParam"] ?: parsed.queryParams["obfs-password"] ?: parsed.queryParams["obfs_password"])?.also {
+            obfuscation = it
+        }
+        when (parsed.queryParams["protocol"]) {
+            "faketcp" -> protocol = HysteriaBean.PROTOCOL_FAKETCP
+            "wechat-video" -> protocol = HysteriaBean.PROTOCOL_WECHAT_VIDEO
         }
     }
 }
 
 // hysteria2://[auth@]hostname[:port]/?[key=value]&[key=value]...
 fun parseHysteria2(url: String): HysteriaBean {
-    val link = url
-        .replace("hysteria2://", "https://")
-        .replace("hy2://", "https://")
-        .toHttpUrlOrNull() ?: error("invalid hysteria link $url")
+    val parsed = parseHysteriaUriString(url, listOf("hysteria2://", "hy2://"))
     return HysteriaBean().apply {
         protocolVersion = 2
-        serverAddress = link.host
-        serverPorts = link.port.toString()
-        authPayload = if (link.password.isNotBlank()) {
-            link.username + ":" + link.password
-        } else {
-            link.username
-        }
-        name = link.fragment
+        serverAddress = parsed.host
+        serverPorts = parsed.ports
+        authPayload = parsed.auth
+        name = parsed.fragment
 
-        link.queryParameter("mport")?.also {
+        parsed.queryParams["mport"]?.takeIf { it.isNotBlank() }?.also {
             serverPorts = it
         }
-        link.queryParameter("sni")?.also {
+        (parsed.queryParams["sni"] ?: parsed.queryParams["peer"])?.takeIf { it.isNotBlank() }?.also {
             sni = it
         }
-        link.queryParameter("insecure")?.also {
-            allowInsecure = it == "1" || it == "true"
+        val ins = parsed.queryParams["insecure"] ?: parsed.queryParams["allowInsecure"] ?: parsed.queryParams["allow_insecure"]
+        if (ins != null) {
+            allowInsecure = ins == "1" || ins.equals("true", ignoreCase = true)
         }
-//        link.queryParameter("upmbps")?.also {
-//            uploadMbps = it.toIntOrNull() ?: uploadMbps
-//        }
-//        link.queryParameter("downmbps")?.also {
-//            downloadMbps = it.toIntOrNull() ?: downloadMbps
-//        }
-        link.queryParameter("obfs")?.takeIf { it.isNotBlank() }?.also {
+        (parsed.queryParams["obfs"] ?: parsed.queryParams["obfs-type"] ?: parsed.queryParams["obfs_type"])?.takeIf { it.isNotBlank() }?.also {
             obfsType = it
         }
-        link.queryParameter("obfs-password")?.also {
+        (parsed.queryParams["obfs-password"] ?: parsed.queryParams["obfs_password"] ?: parsed.queryParams["obfsParam"])?.also {
             obfuscation = it
         }
-//        link.queryParameter("pinSHA256")?.also {
-//            // TODO your box do not support it
-//        }
+        parsed.queryParams["alpn"]?.takeIf { it.isNotBlank() && it != "none" }?.also {
+            alpn = it
+        }
     }
 }
 

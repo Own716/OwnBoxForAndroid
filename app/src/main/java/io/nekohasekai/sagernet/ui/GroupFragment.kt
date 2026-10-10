@@ -196,11 +196,19 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
         val groupList = ArrayList<ProxyGroup>()
 
         suspend fun reload() {
-            val groups = SagerDatabase.groupDao.allGroups().toMutableList()
-            groups.find { it.ungrouped }?.let { ungroupedGroup ->
-                if (groups.size > 1 && SagerDatabase.proxyDao.countByGroup(ungroupedGroup.id) == 0L) {
-                    groups.remove(ungroupedGroup)
+            // 自动清理历史遗留的多余空未分组
+            val allInDb = SagerDatabase.groupDao.allGroups()
+            val ungroupedInDb = allInDb.filter { it.ungrouped }
+            if (ungroupedInDb.size > 1) {
+                for (ug in ungroupedInDb) {
+                    if (SagerDatabase.proxyDao.countByGroup(ug.id) == 0L && SagerDatabase.groupDao.allGroups().filter { it.ungrouped }.size > 1) {
+                        SagerDatabase.groupDao.deleteById(ug.id)
+                    }
                 }
+            }
+            val groups = SagerDatabase.groupDao.allGroups().toMutableList()
+            if (groups.size > 1) {
+                groups.removeAll { it.ungrouped && SagerDatabase.proxyDao.countByGroup(it.id) == 0L }
             }
             groupList.clear()
             groupList.addAll(groups)
@@ -446,7 +454,7 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
                                 }
                                 if (DataStore.selectedGroup == groupId) {
                                     val remaining = SagerDatabase.groupDao.allGroups().filter { it.id != groupId }
-                                    DataStore.selectedGroup = remaining.firstOrNull()?.id ?: DataStore.currentGroupId()
+                                    DataStore.selectedGroup = remaining.firstOrNull()?.id ?: 0L
                                 }
                                 GroupManager.deleteGroup(groupId)
                                 onMainDispatcher {
@@ -496,9 +504,6 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
 
                 if (proxyGroup.type != GroupType.SUBSCRIPTION) {
                     popup.menu.removeItem(R.id.action_share_subscription)
-                }
-                if (proxyGroup.ungrouped) {
-                    popup.menu.removeItem(R.id.action_delete_group)
                 }
                 popup.setOnMenuItemClickListener(this)
                 popup.show()

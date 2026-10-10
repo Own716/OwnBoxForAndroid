@@ -29,6 +29,11 @@ fun parseShadowsocks(url: String): ShadowsocksBean {
 
         // ss-android style
 
+        val rawFrag = url.substringAfter("#", "")
+        val remarks = if (rawFrag.isNotBlank()) {
+            runCatching { java.net.URLDecoder.decode(rawFrag, "UTF-8") }.getOrDefault(rawFrag)
+        } else ""
+
         if (link.password.isNotBlank()) {
             return ShadowsocksBean().apply {
                 serverAddress = link.host
@@ -36,7 +41,7 @@ fun parseShadowsocks(url: String): ShadowsocksBean {
                 method = link.username
                 password = link.password
                 plugin = link.queryParameter("plugin") ?: ""
-                name = link.fragment
+                name = remarks.ifBlank { link.fragment ?: "" }
                 fixPluginName()
             }
         }
@@ -49,7 +54,7 @@ fun parseShadowsocks(url: String): ShadowsocksBean {
             method = methodAndPswd.substringBefore(":")
             password = methodAndPswd.substringAfter(":")
             plugin = link.queryParameter("plugin") ?: ""
-            name = link.fragment
+            name = remarks.ifBlank { link.fragment ?: "" }
             fixPluginName()
         }
     } else {
@@ -61,14 +66,19 @@ fun parseShadowsocks(url: String): ShadowsocksBean {
         val link = ("https://" + v2Url.substringAfter("ss://")
             .decodeBase64UrlSafe()).toHttpUrlOrNull() ?: error("invalid v2rayN link $url")
 
+        val rawFrag = url.substringAfter("#", "")
+        val remarks = if (rawFrag.isNotBlank()) {
+            runCatching { java.net.URLDecoder.decode(rawFrag, "UTF-8") }.getOrDefault(rawFrag)
+        } else ""
+
         return ShadowsocksBean().apply {
             serverAddress = link.host
             serverPort = link.port
             method = link.username
             password = link.password
-            plugin = ""
-            val remarks = url.substringAfter("#").unUrlSafe()
-            if (remarks.isNotBlank()) name = remarks
+            plugin = link.queryParameter("plugin") ?: ""
+            name = remarks.ifBlank { link.fragment ?: "" }
+            fixPluginName()
         }
     }
 

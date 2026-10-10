@@ -16,7 +16,11 @@ fun parseTuic(url: String): TuicBean {
     return TuicBean().apply {
         protocolVersion = 5
 
-        name = link.fragment
+        val rawFrag = url.substringAfter("#", "")
+        name = if (rawFrag.isNotBlank()) {
+            runCatching { java.net.URLDecoder.decode(rawFrag, "UTF-8") }.getOrDefault(rawFrag)
+        } else link.fragment
+
         serverAddress = link.host
         serverPort = link.port
 
@@ -32,23 +36,25 @@ fun parseTuic(url: String): TuicBean {
             token = rawPass
         }
 
-        link.queryParameter("sni")?.let {
-            sni = it
+        (link.queryParameter("sni") ?: link.queryParameter("peer"))?.let {
+            if (it.isNotBlank()) sni = it
         }
-        link.queryParameter("congestion_control")?.let {
-            congestionController = it
+        (link.queryParameter("congestion_control") ?: link.queryParameter("congestion-control") ?: link.queryParameter("congestion_controller"))?.let {
+            if (it.isNotBlank()) congestionController = it
         }
         link.queryParameter("udp_relay_mode")?.let {
-            udpRelayMode = it
+            if (it.isNotBlank()) udpRelayMode = it
         }
         link.queryParameter("alpn")?.let {
-            if (it != "none") alpn = it
+            if (it.isNotBlank() && it != "none") alpn = it
         }
-        link.queryParameter("allow_insecure")?.let {
-            if (it == "1") allowInsecure = true
+        val ins = link.queryParameter("allow_insecure") ?: link.queryParameter("allowInsecure") ?: link.queryParameter("insecure")
+        if (ins != null && (ins == "1" || ins.equals("true", ignoreCase = true))) {
+            allowInsecure = true
         }
-        link.queryParameter("disable_sni")?.let {
-            if (it == "1") disableSNI = true
+        val disSni = link.queryParameter("disable_sni") ?: link.queryParameter("disableSni")
+        if (disSni != null && (disSni == "1" || disSni.equals("true", ignoreCase = true))) {
+            disableSNI = true
         }
     }
 }
