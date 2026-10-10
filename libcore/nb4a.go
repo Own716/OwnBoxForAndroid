@@ -149,8 +149,8 @@ func SetMemoryProfile(performancePriority bool) {
 		debug.SetGCPercent(100)
 		debug.SetMemoryLimit(-1) // -1 = math.MaxInt64, disables the soft limit
 	} else {
-		// Balanced low-power: GOGC=100, cap at 128 MiB to proactively return idle dirty pages to Android OS
+		// Balanced mode: GOGC=100, soft limit=512MB. Provides ample headroom for 500Mbps+ speedtests without GC mutator assist throttling
 		debug.SetGCPercent(100)
-		debug.SetMemoryLimit(128 * 1024 * 1024)
+		debug.SetMemoryLimit(512 * 1024 * 1024)
 	}
 }

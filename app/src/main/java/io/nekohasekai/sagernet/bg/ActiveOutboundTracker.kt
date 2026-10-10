@@ -238,8 +238,10 @@ object ActiveOutboundTracker {
 
     private fun queryClashMap(): Map<String, String> {
         if (!DataStore.enableClashAPI && !DataStore.allowAccess) return emptyMap()
+        // 息屏休眠期绝不发起本地网络请求，杜绝频繁唤醒 CPU，保证极致低功耗续航
+        if (!SagerNet.power.isInteractive) return cachedClashMap
         val now = SystemClock.elapsedRealtime()
-        if (now - lastQueryTime < 3000L && cachedClashMap.isNotEmpty()) {
+        if (now - lastQueryTime < 10000L && cachedClashMap.isNotEmpty()) {
             return cachedClashMap
         }
         var conn: HttpURLConnection? = null

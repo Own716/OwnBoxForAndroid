@@ -82,6 +82,7 @@ jobs:
 
           export LOCAL_PROPERTIES="${{ secrets.LOCAL_PROPERTIES }}"
           ./run init action gradle
+          ./run lib assets || true
           ./gradlew app:assemblePreviewRelease
 
           APK=$(find app/build/outputs/apk -name '*arm64-v8a*.apk' | head -n 1)

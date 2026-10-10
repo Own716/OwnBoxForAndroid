@@ -61,20 +61,26 @@ func prepareLocalGeoRuleSets(ruleSets []option.RuleSet) error {
 			dbName = geositeDat
 		}
 
-		// 官方格式优先：已存在的官方 .srs 文件直接使用
-		if !legacy {
-			officialPath := filepath.Join(externalAssetsPath, fmt.Sprintf("%s-%s.srs", dbName[:len(dbName)-3], code))
-			if _, err := os.Stat(officialPath); err == nil {
-				rs.LocalOptions.Path = officialPath
-				continue
-			}
+		// 优先查找本地已存在的官方 .srs 文件（官方编译格式效率更高）
+		officialSRS := filepath.Join(externalAssetsPath, fmt.Sprintf("%s-%s.srs", dbName[:len(dbName)-3], code))
+		if info, err := os.Stat(officialSRS); err == nil && info.Size() > 64 {
+			rs.LocalOptions.Path = officialSRS
+			continue
 		}
 
 		tag := ""
 		if len(rs.Tag) > 0 {
 			tag = rs.Tag[0]
 		}
-		dstPath, err := convertGeoRuleSetToSRS(tag, code, filepath.Join(externalAssetsPath, dbName), isGeoIP)
+		// 探测数据库实际存储路径（external 或 internal）
+		actualDbPath := filepath.Join(externalAssetsPath, dbName)
+		if _, err := os.Stat(actualDbPath); err != nil && internalAssetsPath != "" {
+			altPath := filepath.Join(internalAssetsPath, dbName)
+			if _, err := os.Stat(altPath); err == nil {
+				actualDbPath = altPath
+			}
+		}
+		dstPath, err := convertGeoRuleSetToSRS(tag, code, actualDbPath, isGeoIP)
 		if err != nil {
 			return fmt.Errorf("rule-set %v: %w", rs.Tag, err)
 		}
@@ -131,9 +137,9 @@ func convertGeoRuleSetToSRS(tag string, code string, dbPath string, isGeoIP bool
 	safeTag := strings.NewReplacer(":", "_", "/", "_", "\\", "_").Replace(tag)
 	dst := filepath.Join(dir, safeTag+".srs")
 
-	// 缓存复用：.srs 比 db 新则无需重建
-	if dbInfo, err := os.Stat(dbPath); err == nil {
-		if srsInfo, err := os.Stat(dst); err == nil && srsInfo.ModTime().After(dbInfo.ModTime()) {
+	// 缓存复用：.srs 必须存在且有效（文件大小 > 64 字节，杜绝空 SRS 缓存中毒）
+	if srsInfo, err := os.Stat(dst); err == nil && srsInfo.Size() > 64 {
+		if dbInfo, err := os.Stat(dbPath); err == nil && srsInfo.ModTime().After(dbInfo.ModTime()) {
 			return dst, nil
 		}
 	}
@@ -145,6 +151,29 @@ func convertGeoRuleSetToSRS(tag string, code string, dbPath string, isGeoIP bool
 	} else {
 		rules, err = loadGeoSiteRules(dbPath, code)
 	}
+
+	// 针对 geosite:cn 的自愈兜底：若本地缺失 geosite.db，生成完整包含中国顶级域名的兜底规则
+	if (err != nil || len(rules) == 0) && !isGeoIP && (strings.EqualFold(code, "cn") || strings.EqualFold(code, "china")) {
+		log.Printf("Info: providing built-in CN domain suffix rules for geosite:%s", code)
+		rules = []option.HeadlessRule{
+			{
+				Type: C.RuleTypeDefault,
+				DefaultOptions: option.DefaultHeadlessRule{
+					DomainSuffix: []string{
+						"cn", "com.cn", "net.cn", "org.cn", "gov.cn", "edu.cn",
+						"baidu.com", "qq.com", "tencent.com", "alibaba.com", "alipay.com",
+						"taobao.com", "tmall.com", "jd.com", "bilibili.com", "163.com",
+						"126.com", "sina.com.cn", "weibo.com", "zhihu.com", "douyin.com",
+						"bytedance.com", "toutiao.com", "meituan.com", "kuaishou.com",
+						"xiaomi.com", "huawei.com", "honor.com", "oppo.com", "vivo.com",
+						"speedtest.cn",
+					},
+				},
+			},
+		}
+		err = nil
+	}
+
 	if err != nil {
 		log.Printf("Warning: failed to load %s rule code '%s' from %s: %v, writing empty SRS fallback", tag, code, dbPath, err)
 		rules = []option.HeadlessRule{}

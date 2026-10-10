@@ -319,7 +319,7 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
             Logs.d("other selector: $selectorTag")
             return
         }
-        Libcore.resetAllConnections(true)
+        // 彻底移除 Libcore.resetAllConnections(true)，依靠 sing-box 原生优雅流转机制，杜绝切换与探测时的突发断流
         DataStore.baseService?.apply {
             runOnDefaultDispatcher {
                 val id = data.proxy!!.config.profileTagMap
@@ -344,6 +344,9 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
                         data.notification?.postNotificationTitle(newTitle)
                         ProfileManager.postUpdate(id, true)
                         activeProfile.let { ProfileManager.postUpdate(it.id, true) }
+                        data.binder.broadcast { b ->
+                            b.cbSelectorUpdate(id)
+                        }
                     }
                     return@runOnDefaultDispatcher
                 }

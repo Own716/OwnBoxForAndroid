@@ -19,6 +19,7 @@ func (g *geosite) Open(path string) error {
 }
 
 func (g *geosite) Rules(code string) ([]option.HeadlessRule, error) {
+	code = strings.ToLower(strings.TrimSpace(code))
 	sourceSet, err := g.geositeReader.Read(code)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read geosite code %s :%w", code, err)
