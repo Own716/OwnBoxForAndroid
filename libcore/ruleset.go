@@ -50,7 +50,7 @@ func prepareLocalGeoRuleSets(ruleSets []option.RuleSet) error {
 		if rs.Type != C.RuleSetTypeLocal {
 			continue
 		}
-		code, isGeoIP, legacy, ok := parseGeoRuleSetPath(rs.LocalOptions.Path)
+		code, isGeoIP, _, ok := parseGeoRuleSetPath(rs.LocalOptions.Path)
 		if !ok {
 			continue
 		}

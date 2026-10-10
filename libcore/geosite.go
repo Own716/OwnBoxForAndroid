@@ -2,6 +2,7 @@ package libcore
 
 import (
 	"fmt"
+	"strings"
 
 	geosites "github.com/sagernet/sing-box/common/geosite"
 	C "github.com/sagernet/sing-box/constant"
