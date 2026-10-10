@@ -136,7 +136,7 @@ jobs:
           PRE_VERSION=$(grep '^PRE_VERSION_NAME=' nb4a.properties | cut -d'=' -f2 | tr -d '\r\n')
           echo "PRE_VERSION=$PRE_VERSION" >> $GITHUB_ENV
       - name: Download Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: APKs
           path: artifacts

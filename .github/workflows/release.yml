@@ -67,7 +67,7 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
       - name: Download LibCore AAR
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: libcore-aar
           path: app/libs
@@ -155,7 +155,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Download Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: APKs
           path: artifacts
