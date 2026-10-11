@@ -7,6 +7,7 @@ import io.nekohasekai.sagernet.bg.GuardedProcessPool
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.fmt.buildConfig
+import io.nekohasekai.sagernet.ktx.LogSanitizer
 import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.readableMessage
 import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
@@ -114,7 +115,7 @@ class TestInstance(profile: ProxyEntity, val link: String, private val timeout: 
 
     override suspend fun loadConfig() {
         // don't call destroyAllJsi here
-        if (BuildConfig.DEBUG) Logs.d(config.config)
+        if (BuildConfig.DEBUG) Logs.d(LogSanitizer.summarizeConfig(config.config))
         // 测速实例用 NewTestSingBoxInstance：不注册 PlatformLogWriter，
         // 官方内核不再强制创建 CacheFile/ClashServer（见 libcore/box.go 批注）。
         val started = SystemClock.elapsedRealtime()

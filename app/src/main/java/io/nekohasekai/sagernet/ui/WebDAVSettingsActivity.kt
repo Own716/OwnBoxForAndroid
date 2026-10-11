@@ -80,7 +80,16 @@ class WebDAVSettingsActivity : ThemedActivity() {
                     editText.setSingleLine()
                     editText.setSelection(editText.text.length)
                 }
-                summaryProvider = EditTextPreference.SimpleSummaryProvider.getInstance()
+                summaryProvider = androidx.preference.Preference.SummaryProvider<EditTextPreference> { pref ->
+                    val text = pref.text
+                    if (text.isNullOrBlank()) {
+                        getString(R.string.not_set)
+                    } else if (text.startsWith("http://", ignoreCase = true)) {
+                        "$text ⚠️ (${getString(R.string.cleartext_http_warning)})"
+                    } else {
+                        text
+                    }
+                }
             }
             
             findPreference<EditTextPreference>("webdavUsername")?.apply {

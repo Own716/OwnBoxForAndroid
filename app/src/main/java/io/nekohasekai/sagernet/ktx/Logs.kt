@@ -23,49 +23,49 @@ object Logs {
 
     fun d(message: String) {
         if (!enabled(3)) return
-        Libcore.nekoLogPrintln("[Debug] [${mkTag()}] $message")
+        Libcore.nekoLogPrintln("[Debug] [${mkTag()}] ${LogSanitizer.sanitize(message)}")
     }
 
     fun d(message: String, exception: Throwable) {
         if (!enabled(3)) return
-        Libcore.nekoLogPrintln("[Debug] [${mkTag()}] $message" + "\n" + exception.stackTraceToString())
+        Libcore.nekoLogPrintln("[Debug] [${mkTag()}] ${LogSanitizer.sanitize(message)}\n${LogSanitizer.sanitize(exception.stackTraceToString())}")
     }
 
     fun i(message: String) {
         if (!enabled(2)) return
-        Libcore.nekoLogPrintln("[Info] [${mkTag()}] $message")
+        Libcore.nekoLogPrintln("[Info] [${mkTag()}] ${LogSanitizer.sanitize(message)}")
     }
 
     fun i(message: String, exception: Throwable) {
         if (!enabled(2)) return
-        Libcore.nekoLogPrintln("[Info] [${mkTag()}] $message" + "\n" + exception.stackTraceToString())
+        Libcore.nekoLogPrintln("[Info] [${mkTag()}] ${LogSanitizer.sanitize(message)}\n${LogSanitizer.sanitize(exception.stackTraceToString())}")
     }
 
     fun w(message: String) {
         if (!enabled(1)) return
-        Libcore.nekoLogPrintln("[Warning] [${mkTag()}] $message")
+        Libcore.nekoLogPrintln("[Warning] [${mkTag()}] ${LogSanitizer.sanitize(message)}")
     }
 
     fun w(message: String, exception: Throwable) {
         if (!enabled(1)) return
-        Libcore.nekoLogPrintln("[Warning] [${mkTag()}] $message" + "\n" + exception.stackTraceToString())
+        Libcore.nekoLogPrintln("[Warning] [${mkTag()}] ${LogSanitizer.sanitize(message)}\n${LogSanitizer.sanitize(exception.stackTraceToString())}")
     }
 
     fun w(exception: Throwable) {
         if (!enabled(1)) return
-        Libcore.nekoLogPrintln("[Warning] [${mkTag()}] " + exception.stackTraceToString())
+        Libcore.nekoLogPrintln("[Warning] [${mkTag()}] ${LogSanitizer.sanitize(exception.stackTraceToString())}")
     }
 
     fun e(message: String) {
-        Libcore.nekoLogPrintln("[Error] [${mkTag()}] $message")
+        Libcore.nekoLogPrintln("[Error] [${mkTag()}] ${LogSanitizer.sanitize(message)}")
     }
 
     fun e(message: String, exception: Throwable) {
-        Libcore.nekoLogPrintln("[Error] [${mkTag()}] $message" + "\n" + exception.stackTraceToString())
+        Libcore.nekoLogPrintln("[Error] [${mkTag()}] ${LogSanitizer.sanitize(message)}\n${LogSanitizer.sanitize(exception.stackTraceToString())}")
     }
 
     fun e(exception: Throwable) {
-        Libcore.nekoLogPrintln("[Error] [${mkTag()}] " + exception.stackTraceToString())
+        Libcore.nekoLogPrintln("[Error] [${mkTag()}] ${LogSanitizer.sanitize(exception.stackTraceToString())}")
     }
 
 }
