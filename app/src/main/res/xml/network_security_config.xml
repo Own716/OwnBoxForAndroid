@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <base-config cleartextTrafficPermitted="true"/>
+    <!-- Base config permits cleartext for local controller (127.0.0.1:9090) and user self-hosted endpoints,
+         while explicitly trusting system and user-installed CA certificates for private deployments -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
 </network-security-config>

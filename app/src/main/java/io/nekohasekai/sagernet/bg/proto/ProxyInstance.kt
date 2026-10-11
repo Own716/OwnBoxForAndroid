@@ -4,6 +4,7 @@ import io.nekohasekai.sagernet.BuildConfig
 import io.nekohasekai.sagernet.bg.BaseService
 import io.nekohasekai.sagernet.bg.ServiceNotification
 import io.nekohasekai.sagernet.database.ProxyEntity
+import io.nekohasekai.sagernet.ktx.LogSanitizer
 import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
 import kotlinx.coroutines.runBlocking
@@ -24,7 +25,7 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = 
         super.buildConfig()
         lastSelectorGroupId = super.config.selectorGroupId
         //
-        if (notTmp) Logs.d(config.config)
+        if (notTmp) Logs.d(LogSanitizer.summarizeConfig(config.config))
         if (notTmp && BuildConfig.DEBUG) Logs.d(JavaUtil.gson.toJson(config.trafficMap))
     }
 
@@ -38,7 +39,7 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = 
         super.init()
         pluginConfigs.forEach { (_, plugin) ->
             val (_, content) = plugin
-            Logs.d(content)
+            Logs.d(LogSanitizer.sanitize(content))
         }
     }
 
