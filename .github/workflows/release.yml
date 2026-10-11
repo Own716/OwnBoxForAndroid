@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release Tag matching nb4a.properties (e.g. v3.0.9)"
+        description: "Release Tag matching nb4a.properties (e.g. v3.1.0)"
         required: true
 
 permissions:
