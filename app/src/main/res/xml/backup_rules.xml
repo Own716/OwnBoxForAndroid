@@ -2,14 +2,19 @@
 <data-extraction-rules xmlns:tools="http://schemas.android.com/tools"
     tools:ignore="FullBackupContent">
     <cloud-backup>
+        <!-- Exclude databases containing sensitive credentials (WebDAV passwords, tokens, nodes) from unencrypted cloud backup -->
         <exclude
             domain="database"
             path="sager_net.db" />
-        <include
+        <exclude
+            domain="database"
+            path="configuration.db" />
+        <exclude
             domain="device_database"
             path="configuration.db" />
     </cloud-backup>
     <device-transfer>
+        <!-- Retain encrypted device-to-device migration between user devices -->
         <include
             domain="database"
             path="sager_net.db" />

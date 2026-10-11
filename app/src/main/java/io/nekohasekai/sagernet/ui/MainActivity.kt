@@ -340,15 +340,25 @@ class MainActivity : ThemedActivity(),
 
         val url = uri.getQueryParameter("url")
         if (!url.isNullOrBlank()) {
+            val trimmedUrl = url.trim()
+            if (!trimmedUrl.startsWith("http://", ignoreCase = true) && !trimmedUrl.startsWith("https://", ignoreCase = true)) {
+                onMainDispatcher {
+                    alert("Invalid subscription URL: only http:// and https:// are permitted.").show()
+                }
+                return
+            }
             group = ProxyGroup(type = GroupType.SUBSCRIPTION)
             val subscription = SubscriptionBean()
             group.subscription = subscription
 
             // cleartext format
-            subscription.link = url
+            subscription.link = trimmedUrl
             group.name = uri.getQueryParameter("name")
         } else {
             val data = uri.encodedQuery.takeIf { !it.isNullOrBlank() } ?: return
+            if (data.length > 1024 * 1024) {
+                return
+            }
             try {
                 group = KryoConverters.deserialize(
                     ProxyGroup().apply { export = true }, Util.zlibDecompress(Util.b64Decode(data))

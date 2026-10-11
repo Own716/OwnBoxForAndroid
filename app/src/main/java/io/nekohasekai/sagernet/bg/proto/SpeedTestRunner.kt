@@ -5,6 +5,7 @@ import io.nekohasekai.sagernet.bg.GuardedProcessPool
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.fmt.buildConfig
+import io.nekohasekai.sagernet.ktx.LogSanitizer
 import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.readableMessage
 import kotlinx.coroutines.CancellationException
@@ -110,7 +111,7 @@ class AndroidSpeedTestSession(profile: ProxyEntity) : BoxInstance(profile), Spee
         init()
         launchExternal()
         if (processes.processCount > 0) delay(500)
-        if (BuildConfig.DEBUG) Logs.d(config.config)
+        if (BuildConfig.DEBUG) Logs.d(LogSanitizer.summarizeConfig(config.config))
 
         val session = Libcore.newSpeedTestSession(
             profile.id.toString(),

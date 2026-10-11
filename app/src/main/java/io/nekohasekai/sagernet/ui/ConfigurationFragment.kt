@@ -997,23 +997,49 @@ class ConfigurationFragment @JvmOverloads constructor(
                             }
                     val proxies = mutableListOf<AbstractBean>()
                     if (fileName != null && fileName.endsWith(".zip")) {
-                        // try parse wireguard zip
+                        // try parse wireguard zip with path traversal and size protection
                         val zip =
                             ZipInputStream(requireContext().contentResolver.openInputStream(file)!!)
+                        var entryCount = 0
                         while (true) {
                             val entry = zip.nextEntry ?: break
                             if (entry.isDirectory) continue
-                            val fileText = zip.bufferedReader().readText()
+                            val entryName = entry.name
+                            if (entryName.contains("..") || entryName.startsWith("/") || entryName.startsWith("\\")) {
+                                zip.closeEntry()
+                                continue
+                            }
+                            if (++entryCount > 500) break
+                            val maxEntrySize = 5 * 1024 * 1024
+                            val buffer = java.io.ByteArrayOutputStream()
+                            val chunk = ByteArray(8192)
+                            var totalRead = 0
+                            var n: Int
+                            while (zip.read(chunk).also { n = it } != -1) {
+                                totalRead += n
+                                if (totalRead > maxEntrySize) break
+                                buffer.write(chunk, 0, n)
+                            }
+                            val fileText = buffer.toString(Charsets.UTF_8.name())
                             RawUpdater.parseRaw(fileText, entry.name)
                                 ?.let { pl -> proxies.addAll(pl) }
                             zip.closeEntry()
                         }
                         zip.closeQuietly()
                     } else {
-                        val fileText =
-                            requireContext().contentResolver.openInputStream(file)!!.use {
-                                it.bufferedReader().readText()
+                        val maxFileSize = 10 * 1024 * 1024
+                        val buffer = java.io.ByteArrayOutputStream()
+                        requireContext().contentResolver.openInputStream(file)!!.use { input ->
+                            val chunk = ByteArray(8192)
+                            var totalRead = 0
+                            var n: Int
+                            while (input.read(chunk).also { n = it } != -1) {
+                                totalRead += n
+                                if (totalRead > maxFileSize) break
+                                buffer.write(chunk, 0, n)
                             }
+                        }
+                        val fileText = buffer.toString(Charsets.UTF_8.name())
                         RawUpdater.parseRaw(fileText, fileName ?: "")
                             ?.let { pl -> proxies.addAll(pl) }
                     }
