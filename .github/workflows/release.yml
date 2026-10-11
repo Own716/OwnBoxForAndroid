@@ -6,9 +6,8 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release Tag (e.g. v2.3.9)"
+        description: "Release Tag matching nb4a.properties (e.g. v3.1.0)"
         required: true
-        default: "v2.3.9"
 
 permissions:
   contents: read
@@ -19,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Golang Status
         run: find buildScript libcore/*.sh nb4a.properties | xargs cat | sha1sum > golang_status
       - name: Libcore Status
@@ -60,7 +59,7 @@ jobs:
       - libcore
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -152,7 +151,17 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
+      - name: Validate Version Tag Consistency
+        run: |
+          TARGET_TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          VERSION_NAME=$(grep '^VERSION_NAME=' nb4a.properties | cut -d'=' -f2 | tr -d '\r\n')
+          PRE_VERSION=$(grep '^PRE_VERSION_NAME=' nb4a.properties | cut -d'=' -f2 | tr -d '\r\n')
+          if [ "$TARGET_TAG" != "v$VERSION_NAME" ] && [ "$TARGET_TAG" != "v$PRE_VERSION" ] && [ "$TARGET_TAG" != "$VERSION_NAME" ]; then
+            echo "::error::Target tag '$TARGET_TAG' does not match repository version '$VERSION_NAME' / '$PRE_VERSION'. Aborting publish to prevent mismatched release."
+            exit 1
+          fi
+          echo "Verified release tag '$TARGET_TAG' matches repository version."
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
