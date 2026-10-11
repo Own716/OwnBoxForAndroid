@@ -37,8 +37,10 @@ import moe.matsuri.nb4a.utils.Util
 import org.json.JSONArray
 import org.json.JSONObject
 import org.json.JSONTokener
+import org.yaml.snakeyaml.LoaderOptions
 import org.yaml.snakeyaml.TypeDescription
 import org.yaml.snakeyaml.Yaml
+import org.yaml.snakeyaml.constructor.SafeConstructor
 import androidx.core.net.toUri
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
@@ -401,10 +403,24 @@ object RawUpdater : GroupUpdater() {
             // clash & meta
 
             try {
+                // Safety: Limit input size to 10MB to prevent DoS / memory exhaustion
+                val maxAllowedSize = 10 * 1024 * 1024
+                if (text.length > maxAllowedSize) {
+                    Logs.w("YAML content length (${text.length}) exceeds safety limit ($maxAllowedSize)")
+                    return null
+                }
 
-                val yaml = Yaml().apply {
+                val loaderOptions = LoaderOptions().apply {
+                    codePointLimit = maxAllowedSize
+                    maxAliasesForCollections = 50
+                    nestingDepthLimit = 50
+                }
+                val safeConstructor = SafeConstructor(loaderOptions)
+                val parser = Yaml(safeConstructor).apply {
                     addTypeDescription(TypeDescription(String::class.java, "str"))
-                }.loadAs(text, Map::class.java)
+                }
+                @Suppress("UNCHECKED_CAST")
+                val yaml = parser.load<Any>(text) as? Map<String, Any?> ?: return null
 
                 val globalClientFingerprint = yaml["global-client-fingerprint"]?.toString() ?: ""
 
