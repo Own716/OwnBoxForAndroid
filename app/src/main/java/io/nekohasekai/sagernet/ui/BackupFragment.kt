@@ -438,18 +438,36 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
 
                 // 根据文件类型处理内容
                 val backupContent = if (latestBackup.endsWith(".zip")) {
-                    // ZIP 文件处理
+                    // ZIP 文件处理：防止 Zip Slip 和解压炸弹
                     ZipInputStream(content.inputStream()).use { zis ->
-                        zis.nextEntry?.let { entry ->
-                            if (entry.name.endsWith(".json")) {
-                                zis.readBytes().toString(Charsets.UTF_8)
-                            } else {
-                                throw Exception("Invalid backup file format")
+                        val entry = zis.nextEntry ?: throw Exception("Invalid backup file: empty archive")
+                        val entryName = entry.name
+                        if (entryName.contains("..") || entryName.startsWith("/") || entryName.startsWith("\\")) {
+                            throw SecurityException("Invalid backup file: unsafe entry path $entryName")
+                        }
+                        if (!entryName.endsWith(".json", ignoreCase = true)) {
+                            throw Exception("Invalid backup file format: expected .json inside archive")
+                        }
+                        val maxBackupSize = 20 * 1024 * 1024 // 20MB limit
+                        val buffer = java.io.ByteArrayOutputStream()
+                        val chunk = ByteArray(8192)
+                        var totalRead = 0
+                        var n: Int
+                        while (zis.read(chunk).also { n = it } != -1) {
+                            totalRead += n
+                            if (totalRead > maxBackupSize) {
+                                throw IllegalStateException("Backup content exceeds maximum allowable size (20MB)")
                             }
-                        } ?: throw Exception("Invalid backup file format")
+                            buffer.write(chunk, 0, n)
+                        }
+                        buffer.toString(Charsets.UTF_8.name())
                     }
                 } else {
-                    // JSON 文件处理
+                    // JSON 文件处理：限制最大大小
+                    val maxBackupSize = 20 * 1024 * 1024
+                    if (content.size > maxBackupSize) {
+                        throw IllegalStateException("Backup file exceeds maximum allowable size (20MB)")
+                    }
                     content.toString(Charsets.UTF_8)
                 }
 
