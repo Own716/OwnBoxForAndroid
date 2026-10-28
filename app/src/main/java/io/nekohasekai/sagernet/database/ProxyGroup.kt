@@ -27,6 +27,9 @@ data class ProxyGroup(
     @Transient
     var export = false
 
+    @Transient
+    var testSortBy: Int = 0
+
     override fun initializeDefaultValues() {
         subscription?.applyDefaultValues()
     }
@@ -127,6 +130,7 @@ data class ProxyGroup(
     }
 
     companion object {
+        const val TABLE = "proxy_groups"
         @JvmField
         val CREATOR = object : Serializable.CREATOR<ProxyGroup>() {
 

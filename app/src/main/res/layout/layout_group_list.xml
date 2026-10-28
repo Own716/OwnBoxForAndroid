@@ -31,9 +31,49 @@
         app:tabTextAppearance="@style/Widget.SagerNet.TabLayout.TextAppearance"
         app:tabUnboundedRipple="false" />
 
-    <androidx.viewpager2.widget.ViewPager2
-        android:id="@+id/group_pager"
+    <com.google.android.material.progressindicator.LinearProgressIndicator
+        android:id="@+id/group_progress"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="wrap_content"
+        android:indeterminate="true"
+        android:visibility="gone"
+        app:trackThickness="2dp" />
+
+    <TextView
+        android:id="@+id/runtime_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?android:attr/selectableItemBackground"
+        android:ellipsize="end"
+        android:focusable="true"
+        android:maxLines="2"
+        android:paddingStart="16dp"
+        android:paddingTop="6dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="6dp"
+        android:textAppearance="?android:attr/textAppearanceSmall"
+        android:textColor="?android:attr/textColorSecondary"
+        android:visibility="gone" />
+
+    <include layout="@layout/layout_subscription_card" />
+
+    <androidx.coordinatorlayout.widget.CoordinatorLayout
+        android:id="@+id/profiles_content"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <androidx.viewpager2.widget.ViewPager2
+            android:id="@+id/group_pager"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <FrameLayout
+            android:id="@+id/test_panel_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom" />
+
+    </androidx.coordinatorlayout.widget.CoordinatorLayout>
 
 </LinearLayout>

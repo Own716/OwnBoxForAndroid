@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true"
+    android:gravity="center_vertical"
+    android:minHeight="44dp"
+    android:orientation="horizontal"
+    android:paddingStart="16dp"
+    android:paddingTop="6dp"
+    android:paddingEnd="16dp"
+    android:paddingBottom="6dp">
+
+    <TextView
+        android:id="@+id/rank_index"
+        android:layout_width="24dp"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:importantForAccessibility="no"
+        android:textColor="?android:attr/textColorSecondary"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        tools:text="1" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:layout_weight="1"
+        android:importantForAccessibility="noHideDescendants"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/rank_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:singleLine="true"
+            android:textColor="?android:attr/textColorPrimary"
+            android:textSize="14sp"
+            tools:text="Frankfurt 1" />
+
+        <io.nekohasekai.sagernet.ui.test.SpeedBarsView
+            android:id="@+id/rank_bars"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:visibility="gone" />
+
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/rank_value"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:gravity="end"
+        android:importantForAccessibility="no"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        tools:text="42 ms" />
+
+</LinearLayout>

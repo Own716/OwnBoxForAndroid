@@ -2,4 +2,6 @@
 <resources>
     <item name="nav_settings" type="id" />
     <item name="nav_about" type="id" />
+    <item name="inset_padding_base" type="id" />
+    <item name="inset_margin_base" type="id" />
 </resources>

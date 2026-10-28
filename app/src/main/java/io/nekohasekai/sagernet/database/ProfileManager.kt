@@ -319,4 +319,49 @@ object ProfileManager {
         return rules
     }
 
+    fun memberIds(groupId: Long): List<Long> {
+        return SagerDatabase.proxyDao.getByGroup(groupId).map { it.id }
+    }
+
+    fun members(groupId: Long): List<ProxyEntity> {
+        return SagerDatabase.proxyDao.getByGroup(groupId)
+    }
+
+    fun runningProfileId(): Long = DataStore.currentProfile
+
+    suspend fun clearGroupTestResults(groupId: Long) {
+        val list = SagerDatabase.proxyDao.getByGroup(groupId)
+        list.forEach {
+            it.status = 0
+            it.ping = 0
+            it.error = null
+        }
+        SagerDatabase.proxyDao.updateProxy(list)
+    }
+
+    class DeleteOutcome(
+        @JvmField val ok: Boolean,
+        @JvmField val deleted: List<Long>,
+        @JvmField val kept: List<Long>,
+    )
+
+    suspend fun batchDeleteProfiles(
+        profileIds: List<Long>,
+        stopRunning: Boolean = false,
+    ): DeleteOutcome {
+        val deleted = ArrayList<Long>()
+        val kept = ArrayList<Long>()
+        val runningId = runningProfileId()
+        for (id in profileIds) {
+            if (!stopRunning && id == runningId) {
+                kept.add(id)
+                continue
+            }
+            val profile = getProfile(id) ?: continue
+            deleteProfile(profile.groupId, id)
+            deleted.add(id)
+        }
+        return DeleteOutcome(true, deleted, kept)
+    }
+
 }

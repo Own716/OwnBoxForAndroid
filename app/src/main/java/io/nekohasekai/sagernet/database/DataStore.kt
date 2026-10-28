@@ -32,6 +32,11 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     @Volatile
     var serviceState = BaseService.State.Idle
 
+    var testConcurrent: Int
+        get() = connectionTestConcurrent
+        set(value) { connectionTestConcurrent = value }
+    var skipDeleteConfirmation: Boolean = false
+
     @Volatile
     var mixedInboundAuthed: Boolean = false
 

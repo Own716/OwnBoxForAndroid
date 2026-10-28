@@ -89,7 +89,50 @@ data class ProxyEntity(
     @ColumnInfo(defaultValue = "NULL") var balancerBean: BalancerBean? = null,
 ) : Serializable() {
 
+    val latency: Int get() = status
+    val latencyAt: Long get() = 0L
+    val testError: String get() = error.orEmpty()
+    fun isUnavailable(): Boolean = status < 0
+    fun latencyColor(): Int = latencyColor(status)
+
     companion object {
+        const val TABLE = "proxy_entities"
+        const val LATENCY_CONNECT_ONLY = -2
+        const val COLOR_CONNECT_ONLY = 0xFF00ACC1.toInt()
+        const val COLOR_FAILED = 0xFF9E9E9E.toInt()
+        const val COLOR_FAST = 0xFF43A047.toInt()
+        const val COLOR_MEDIUM = 0xFFF9A825.toInt()
+        const val COLOR_SLOW = 0xFFE53935.toInt()
+
+        @JvmStatic
+        fun isWorking(latency: Int): Boolean = latency > 0 || latency == LATENCY_CONNECT_ONLY
+
+        @JvmStatic
+        fun isUnavailable(latency: Int): Boolean = latency < 0 && latency != LATENCY_CONNECT_ONLY
+
+        @JvmStatic
+        fun isTestAborted(error: String): Boolean =
+            error.contains("test aborted") || error.contains("context canceled")
+
+        @JvmStatic
+        fun countryFlag(code: String): String {
+            val sb = StringBuilder()
+            code.uppercase().forEach { c ->
+                if (c in 'A'..'Z') sb.appendCodePoint(c.code + 0x1F1A5)
+            }
+            return sb.toString()
+        }
+
+        @JvmStatic
+        fun latencyColor(latency: Int): Int = when {
+            latency == LATENCY_CONNECT_ONLY -> COLOR_CONNECT_ONLY
+            latency < 0 -> COLOR_FAILED
+            latency == 0 -> 0
+            latency <= 100 -> COLOR_FAST
+            latency <= 300 -> COLOR_MEDIUM
+            else -> COLOR_SLOW
+        }
+
         const val TYPE_SOCKS = 0
         const val TYPE_HTTP = 1
         const val TYPE_SS = 2

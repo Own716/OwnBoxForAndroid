@@ -31,7 +31,22 @@ data class SpeedTestSnapshot(
     val error: String = "",
     val cancelled: Boolean = false,
     val done: Boolean = false,
-)
+) {
+    val dlBps: Long get() = downloadBitsPerSecond
+    val ulBps: Long get() = uploadBitsPerSecond
+    val downloadSpeed: Long get() = downloadBitsPerSecond
+    val uploadSpeed: Long get() = uploadBitsPerSecond
+
+    companion object {
+        const val STAGE_DISCOVERY = "discovery"
+        const val STAGE_COMPLETE = "complete"
+        const val STAGE_CANCELLED = "cancelled"
+        const val STAGE_ERROR = "error"
+        const val STAGE_LATENCY = "latency"
+        const val STAGE_DOWNLOAD = "download"
+        const val STAGE_UPLOAD = "upload"
+    }
+}
 
 internal fun completedSpeedTestCount(index: Int, total: Int, done: Boolean): Int {
     if (total <= 0) return 0

@@ -17,6 +17,21 @@ fun Context.alert(text: String): AlertDialog {
 
 fun Fragment.alert(text: String) = requireContext().alert(text)
 
+fun Context.confirmAction(title: CharSequence, message: CharSequence?, @androidx.annotation.StringRes action: Int, onConfirm: () -> Unit) {
+    MaterialAlertDialogBuilder(this)
+        .setTitle(title)
+        .setMessage(message)
+        .setNegativeButton(android.R.string.cancel, null)
+        .setPositiveButton(action) { _, _ -> onConfirm() }
+        .show()
+}
+
+fun Context.nameList(names: List<String>, limit: Int = 10, total: Int = names.size): String {
+    val shown = names.take(limit).joinToString("\n")
+    val more = total - minOf(limit, names.size)
+    return if (more > 0) "$shown\n... (+$more)" else shown
+}
+
 internal fun Context.resolveActivity(): WrappedHostResolution<Activity> = resolveWrappedHost(
     initial = this,
     hostOrNull = { it as? Activity },

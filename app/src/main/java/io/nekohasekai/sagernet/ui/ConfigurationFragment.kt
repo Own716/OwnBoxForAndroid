@@ -78,6 +78,11 @@ import io.nekohasekai.sagernet.database.GroupManager
 import io.nekohasekai.sagernet.database.ProfileManager
 import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.database.ProxyGroup
+import io.nekohasekai.sagernet.ui.test.TestPanelController
+import io.nekohasekai.sagernet.ui.test.TestSessionClient
+import io.nekohasekai.sagernet.ui.profiles.SubscriptionInfoCard
+import io.nekohasekai.sagernet.ui.AutoSelectorStatusLine
+import io.nekohasekai.sagernet.bg.test.TestSpec
 import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.database.preference.OnPreferenceDataStoreChangeListener
 import io.nekohasekai.sagernet.databinding.LayoutProfileListBinding
@@ -511,6 +516,20 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
     }
 
+    fun setRuntimeStatus(text: CharSequence?, onClick: (() -> Unit)? = null) {
+        val pos = if (::groupPager.isInitialized) groupPager.currentItem else adapter.selectedGroupIndex
+        val group = adapter.groupList.getOrNull(pos) ?: return
+        val currentFrag = adapter.groupFragments[group.id] ?: return
+        val tv = currentFrag.view?.findViewById<TextView>(R.id.runtime_status) ?: return
+        if (text.isNullOrBlank()) {
+            tv.visibility = View.GONE
+        } else {
+            tv.visibility = View.VISIBLE
+            tv.text = text
+            tv.setOnClickListener { onClick?.invoke() }
+        }
+    }
+
     private fun showSoftKeyboard(view: View?) {
         if (view == null) return
         view.post {
@@ -890,6 +909,10 @@ class ConfigurationFragment @JvmOverloads constructor(
                 fragment.configurationListView.scrollTo(0)
             }
 
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            AutoSelectorStatusLine.follow(this@ConfigurationFragment)
         }
 
         DataStore.profileCacheStore.registerChangeListener(this)
@@ -1535,7 +1558,20 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
 
             R.id.action_connection_url_test -> {
+                val pos = if (::groupPager.isInitialized) groupPager.currentItem else adapter.selectedGroupIndex
+                val group = adapter.groupList.getOrNull(pos)
+                val isAll = group?.id == ALL_GROUPS_SENTINEL_ID
+                val gid = if (isAll) 0L else (group?.id ?: 0L)
+                TestSessionClient.startGroup(TestSpec.KIND_URL, gid)
                 urlTest()
+            }
+
+            R.id.action_test_ip -> {
+                val pos = if (::groupPager.isInitialized) groupPager.currentItem else adapter.selectedGroupIndex
+                val group = adapter.groupList.getOrNull(pos)
+                val isAll = group?.id == ALL_GROUPS_SENTINEL_ID
+                val gid = if (isAll) 0L else (group?.id ?: 0L)
+                TestSessionClient.startGroup(TestSpec.KIND_IP, gid)
             }
 
             R.id.action_connection_tcp_ping -> {
@@ -2761,6 +2797,20 @@ class ConfigurationFragment @JvmOverloads constructor(
                 setupBottomBarScrollDriver()
             }
             updateSubscriptionInfoCard(view)
+
+            val newCardView = view.findViewById<View>(R.id.subscription_card)
+            if (newCardView != null && ::proxyGroup.isInitialized) {
+                SubscriptionInfoCard(newCardView).bind(proxyGroup)
+            }
+            val panelContainer = view.findViewById<ViewGroup>(R.id.test_panel_container)
+            if (panelContainer != null && !select) {
+                TestPanelController(this@GroupFragment, panelContainer, side = false).apply {
+                    onSelectProfile = { id ->
+                        DataStore.selectedProxy = id
+                        DataStore.currentProfile = id
+                    }
+                }
+            }
         }
 
         fun updateSubscriptionInfoCard(targetView: View? = this.view) {
