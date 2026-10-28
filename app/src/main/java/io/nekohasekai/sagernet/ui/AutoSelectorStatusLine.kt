@@ -44,7 +44,8 @@ object AutoSelectorStatusLine {
                         var displayName = profile.displayName()
                         var latency = profile.status
                         if (profile.type == ProxyEntity.TYPE_BALANCER) {
-                            val activeLeaf = ActiveOutboundTracker.getActiveLeafNodeDisplay(profile)
+                            val activeLeaf = DataStore.activeLeafNodeName.takeIf { it.isNotBlank() }
+                                ?: ActiveOutboundTracker.getActiveLeafNodeDisplay(profile)
                             if (!activeLeaf.isNullOrBlank()) {
                                 displayName = activeLeaf
                             } else {

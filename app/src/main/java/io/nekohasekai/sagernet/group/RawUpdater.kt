@@ -356,9 +356,9 @@ object RawUpdater : GroupUpdater() {
             }
         }
         if (toDelete.isNotEmpty()) {
-            SagerDatabase.proxyDao.deleteProxy(toDelete).also {
-                Logs.d("Deleted profiles: $it")
-            }
+            val ids = toDelete.map { it.id }
+            val deletedCount = SagerDatabase.proxyDao.deleteByIds(ids)
+            Logs.d("Deleted profiles: $deletedCount (of ${ids.size})")
         }
 
         val existCount = SagerDatabase.proxyDao.countByGroup(proxyGroup.id).toInt()

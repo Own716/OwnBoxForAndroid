@@ -695,6 +695,9 @@ data class ProxyEntity(
         @Query("DELETE FROM proxy_entities WHERE id IN (:proxyId)")
         fun deleteById(proxyId: Long): Int
 
+        @Query("DELETE FROM proxy_entities WHERE id IN (:proxyIds)")
+        fun deleteByIds(proxyIds: List<Long>): Int
+
         @Query("DELETE FROM proxy_entities WHERE groupId = :groupId")
         fun deleteByGroup(groupId: Long)
 

@@ -48,6 +48,8 @@ object DataStore : OnPreferenceDataStoreChangeListener {
 
     var selectedProxy by configurationStore.long(Key.PROFILE_ID)
     var selectedGroup by configurationStore.long(Key.PROFILE_GROUP) { currentGroupId() } // "ungrouped" group id = 1
+    var activeLeafNodeName by configurationStore.string(Key.ACTIVE_LEAF_NODE_NAME) { "" }
+    var activeLeafNodeId by configurationStore.long(Key.ACTIVE_LEAF_NODE_ID) { 0L }
 
     // only in bg process
     var vpnService: VpnService? = null
@@ -119,7 +121,8 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     //
 
     var isExpert by configurationStore.boolean(Key.APP_EXPERT)
-    var appTheme by configurationStore.int(Key.APP_THEME) { Theme.LIGHT_GRAY }
+    var appTheme by configurationStore.int(Key.APP_THEME) { Theme.WHITE }
+    var amoledTheme by configurationStore.boolean(Key.AMOLED_THEME) { false }
     val useSystemTheme: Boolean get() = false
     var nightTheme by configurationStore.stringToInt(Key.NIGHT_THEME)
     var appIconMode by configurationStore.stringToInt(Key.APP_ICON_MODE) { 0 }

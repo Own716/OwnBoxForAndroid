@@ -108,8 +108,7 @@ class MainActivity : ThemedActivity(),
         val isNight = Theme.usingNightMode(this)
         val fabBgColor = when {
             Theme.isBlackTheme(this) -> Color.BLACK
-            Theme.isWhiteTheme(this) -> Color.parseColor("#212121")
-            Theme.isLightGrayTheme(this) -> Color.parseColor("#1F2937")
+            Theme.isWhiteTheme(this) -> ContextCompat.getColor(this, R.color.color_white_theme_fab)
             else -> {
                 val bg = getColorAttr(R.attr.fabColorBackground)
                 if (isNight && ColorUtils.calculateLuminance(bg) > 0.75) {
@@ -129,6 +128,7 @@ class MainActivity : ThemedActivity(),
         val drawerRoot: View
         if (themeResId !in intArrayOf(
                 R.style.Theme_SagerNet_Black,
+                R.style.Theme_SagerNet_White,
                 R.style.Theme_SagerNet_White_Night
             )
         ) {

@@ -31,14 +31,12 @@ abstract class ThemedActivity : AppCompatActivity {
     var uiMode = 0
     open val isDialog = false
     private var lastUseSystemTheme: Boolean = false
-    private var lastWallpaperColor: Int? = null
     private var lastAppTheme: Int = 0
     private var lastNightTheme: Int = 0
     private var lastUsingNight: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         lastUseSystemTheme = DataStore.useSystemTheme
-        lastWallpaperColor = if (DataStore.useSystemTheme) Theme.getSystemWallpaperColor(this) else null
         lastAppTheme = DataStore.appTheme
         lastNightTheme = DataStore.nightTheme
         lastUsingNight = Theme.usingNightMode(this)
@@ -65,9 +63,11 @@ abstract class ThemedActivity : AppCompatActivity {
 
             val insetController = WindowCompat.getInsetsController(window, window.decorView)
             val isDark = Theme.isBlackTheme(this)
+            val primary = getColorAttr(R.attr.colorPrimary)
+            val isLightPrimary = ColorUtils.calculateLuminance(primary) > 0.5
             val isLightSurface = !isDark && ColorUtils.calculateLuminance(getColorAttr(R.attr.colorSurface)) > 0.45
 
-            insetController.isAppearanceLightStatusBars = isLightSurface
+            insetController.isAppearanceLightStatusBars = if (Theme.isWhiteTheme(this)) true else (isLightPrimary && !isDark)
             insetController.isAppearanceLightNavigationBars = isLightSurface
         }
 
@@ -114,10 +114,8 @@ abstract class ThemedActivity : AppCompatActivity {
         if (DataStore.appIconMode == AppIconManager.MODE_FOLLOW_SYSTEM) {
             AppIconManager.applyIconMode(this)
         }
-        val currentWallpaperColor = if (DataStore.useSystemTheme) Theme.getSystemWallpaperColor(this) else null
         val currentUsingNight = Theme.usingNightMode(this)
         if (lastUseSystemTheme != DataStore.useSystemTheme ||
-            (DataStore.useSystemTheme && lastWallpaperColor != currentWallpaperColor) ||
             (!DataStore.useSystemTheme && lastAppTheme != DataStore.appTheme) ||
             lastNightTheme != DataStore.nightTheme ||
             lastUsingNight != currentUsingNight) {

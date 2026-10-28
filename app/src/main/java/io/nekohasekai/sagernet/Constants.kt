@@ -11,6 +11,7 @@ object Key {
 
     const val APP_EXPERT = "isExpert"
     const val APP_THEME = "appTheme"
+    const val AMOLED_THEME = "amoledTheme"
     const val USE_SYSTEM_THEME = "useSystemTheme"
     const val NIGHT_THEME = "nightTheme"
     const val APP_ICON_MODE = "appIconMode"
@@ -41,6 +42,8 @@ object Key {
     const val CONCURRENT_DIAL = "concurrentDial" // 留作未来补回并发拨号功能
     const val DUAL_NETWORK_ACCELERATION = "dualNetworkAcceleration"
     const val AUTO_SELECT_LOWEST_LATENCY = "autoSelectLowestLatency"
+    const val ACTIVE_LEAF_NODE_NAME = "activeLeafNodeName"
+    const val ACTIVE_LEAF_NODE_ID = "activeLeafNodeId"
 
     const val MIXED_PORT = "mixedPort"
     const val DISABLE_MIXED_INBOUND = "disableMixedInbound"

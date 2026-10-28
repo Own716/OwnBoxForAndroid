@@ -32,6 +32,10 @@ object ActiveOutboundTracker {
     fun reset() {
         activeLeafProfileId = 0L
         activeLeafProfileName = ""
+        runCatching {
+            DataStore.activeLeafNodeId = 0L
+            DataStore.activeLeafNodeName = ""
+        }
     }
 
     fun getStrategyDisplayName(profile: ProxyEntity): String {
@@ -71,6 +75,10 @@ object ActiveOutboundTracker {
     fun updateActiveLeaf(candidateId: Long, candidateName: String) {
         activeLeafProfileId = candidateId
         activeLeafProfileName = candidateName
+        runCatching {
+            DataStore.activeLeafNodeId = candidateId
+            DataStore.activeLeafNodeName = candidateName
+        }
     }
 
     fun getActiveLeafNodeDisplay(profile: ProxyEntity): String? {
@@ -82,11 +90,15 @@ object ActiveOutboundTracker {
         )
         if (!isBalancer && !isGroupStrategy) return null
 
-        val leafId = activeLeafProfileId
+        val leafId = activeLeafProfileId.takeIf { it > 0L } ?: runCatching { DataStore.activeLeafNodeId }.getOrDefault(0L)
+        val directName = activeLeafProfileName.takeIf { it.isNotBlank() } ?: runCatching { DataStore.activeLeafNodeName }.getOrNull()?.takeIf { it.isNotBlank() }
         if (leafId > 0L && leafId != profile.id) {
-            val name = activeLeafProfileName.takeIf { it.isNotBlank() }
+            val name = directName
                 ?: runCatching { SagerDatabase.proxyDao.getById(leafId)?.displayName() }.getOrNull()
             return name?.takeIf { it.isNotBlank() }
+        }
+        if (!directName.isNullOrBlank() && directName != profile.displayName()) {
+            return directName
         }
         return null
     }

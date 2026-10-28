@@ -432,28 +432,50 @@ object ProfileManager {
             val targetGids = when {
                 bean.targetGroupIds.isNotEmpty() -> bean.targetGroupIds
                 bean.targetGroupId > 0L -> listOf(bean.targetGroupId)
-                else -> emptyList()
+                else -> SagerDatabase.groupDao.allGroups().map { it.id }
             }
             var list = targetGids.flatMap { gid ->
                 SagerDatabase.proxyDao.getByGroup(gid)
             }.distinctBy { it.id }
 
             if (!bean.nameInclude.isNullOrBlank()) {
-                val regex = runCatching { Regex(bean.nameInclude) }.getOrNull()
-                if (regex != null) {
-                    list = list.filter { regex.containsMatchIn(it.displayName()) }
+                val pattern = bean.nameInclude.trim()
+                val regex = runCatching { Regex(pattern) }.getOrNull()
+                list = list.filter {
+                    regex?.containsMatchIn(it.displayName()) ?: it.displayName().contains(pattern, ignoreCase = true)
                 }
             }
             if (!bean.nameExclude.isNullOrBlank()) {
-                val regex = runCatching { Regex(bean.nameExclude) }.getOrNull()
-                if (regex != null) {
-                    list = list.filterNot { regex.containsMatchIn(it.displayName()) }
+                val pattern = bean.nameExclude.trim()
+                val regex = runCatching { Regex(pattern) }.getOrNull()
+                list = list.filterNot {
+                    regex?.containsMatchIn(it.displayName()) ?: it.displayName().contains(pattern, ignoreCase = true)
                 }
             }
             list
         } else {
             val rawEntities = SagerDatabase.proxyDao.getEntities(bean.proxies).associateBy { it.id }
-            bean.proxies.mapNotNull { rawEntities[it] }
+            var list = bean.proxies.mapNotNull { rawEntities[it] }
+            if (list.isEmpty() && (!bean.nameInclude.isNullOrBlank() || !bean.nameExclude.isNullOrBlank())) {
+                list = SagerDatabase.groupDao.allGroups().flatMap { gid ->
+                    SagerDatabase.proxyDao.getByGroup(gid.id)
+                }.distinctBy { it.id }
+                if (!bean.nameInclude.isNullOrBlank()) {
+                    val pattern = bean.nameInclude.trim()
+                    val regex = runCatching { Regex(pattern) }.getOrNull()
+                    list = list.filter {
+                        regex?.containsMatchIn(it.displayName()) ?: it.displayName().contains(pattern, ignoreCase = true)
+                    }
+                }
+                if (!bean.nameExclude.isNullOrBlank()) {
+                    val pattern = bean.nameExclude.trim()
+                    val regex = runCatching { Regex(pattern) }.getOrNull()
+                    list = list.filterNot {
+                        regex?.containsMatchIn(it.displayName()) ?: it.displayName().contains(pattern, ignoreCase = true)
+                    }
+                }
+            }
+            list
         }).filter {
             it.id != balancerEntity.id && it.type != ProxyEntity.TYPE_BALANCER
         }

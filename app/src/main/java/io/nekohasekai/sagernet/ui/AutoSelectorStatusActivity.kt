@@ -29,7 +29,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class AutoSelectorStatusActivity : AppCompatActivity() {
+class AutoSelectorStatusActivity : ThemedActivity() {
 
     companion object {
         const val EXTRA_SELECTOR_ID = "selector_id"
@@ -136,7 +136,8 @@ class AutoSelectorStatusActivity : AppCompatActivity() {
                 if (p != null) {
                     if (p.type == ProxyEntity.TYPE_BALANCER) {
                         leafName = ActiveOutboundTracker.getActiveLeafNodeDisplay(p)
-                        ProfileManager.resolveBalancerMembers(p)
+                        val members = ProfileManager.resolveBalancerMembers(p)
+                        if (members.isNotEmpty()) members else SagerDatabase.proxyDao.getByGroup(p.groupId).filter { it.type != ProxyEntity.TYPE_BALANCER }
                     } else {
                         SagerDatabase.proxyDao.getByGroup(p.groupId)
                     }
@@ -162,10 +163,18 @@ class AutoSelectorStatusActivity : AppCompatActivity() {
                 ?: profiles.filter { it.status > 0 }.minByOrNull { it.status }
         }
         val targetProfile = if (selectorId > 0) ProfileManager.getProfile(selectorId) else null
-        val headlineName = activeMember?.displayName()
-            ?: (if (targetProfile != null && targetProfile.type != ProxyEntity.TYPE_BALANCER) targetProfile.displayName() else null)
-            ?: targetProfile?.displayName()
-            ?: ""
+        val headlineName = if (targetProfile != null && targetProfile.type == ProxyEntity.TYPE_BALANCER) {
+            val leaf = activeMember?.displayName()
+            if (!leaf.isNullOrBlank()) {
+                "${targetProfile.displayName()} · $leaf"
+            } else {
+                targetProfile.displayName()
+            }
+        } else {
+            activeMember?.displayName()
+                ?: targetProfile?.displayName()
+                ?: ""
+        }
 
         val workingCount = profiles.count { it.status > 0 }
         val totalCount = profiles.size
@@ -189,11 +198,14 @@ class AutoSelectorStatusActivity : AppCompatActivity() {
         )
         binding.detail.isVisible = true
 
-        val displayList = if (onlyProblems) {
+        val displayList = (if (onlyProblems) {
             profiles.filter { it.status < 0 }
         } else {
             profiles
-        }
+        }).sortedWith(compareBy(
+            { it.status <= 0 },
+            { if (it.status > 0) it.status else Int.MAX_VALUE }
+        ))
 
         binding.empty.isVisible = displayList.isEmpty()
         adapter.submitList(displayList, activeMember?.id ?: DataStore.selectedProxy)

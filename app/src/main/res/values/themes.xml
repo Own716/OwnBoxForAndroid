@@ -92,6 +92,7 @@
         <item name="actionOverflowMenuStyle">@style/Widget.SagerNet.PopupMenu.Overflow</item>
         <item name="bottomSheetDialogTheme">@style/ThemeOverlay.SagerNet.BottomSheetDialog</item>
         <item name="materialButtonStyle">@style/Widget.SagerNet.Button</item>
+        <item name="materialButtonOutlinedStyle">@style/Widget.SagerNet.Button.OutlinedButton</item>
 
     </style>
 
@@ -173,6 +174,7 @@
         <item name="actionOverflowMenuStyle">@style/Widget.SagerNet.PopupMenu.Overflow</item>
         <item name="bottomSheetDialogTheme">@style/ThemeOverlay.SagerNet.BottomSheetDialog</item>
         <item name="materialButtonStyle">@style/Widget.SagerNet.Button</item>
+        <item name="materialButtonOutlinedStyle">@style/Widget.SagerNet.Button.OutlinedButton</item>
 
         <item name="android:dialogCornerRadius">@dimen/dialog_corner_radius</item>
 
@@ -349,6 +351,14 @@
     </style>
     <style name="Widget.SagerNet.Button" parent="Widget.MaterialComponents.Button">
         <item name="shapeAppearanceOverlay">@style/ShapeAppearanceOverlay.SagerNet.Button</item>
+    </style>
+
+    <style name="Widget.SagerNet.Button.OutlinedButton" parent="Widget.MaterialComponents.Button.OutlinedButton">
+        <item name="shapeAppearanceOverlay">@style/ShapeAppearanceOverlay.SagerNet.Button</item>
+        <item name="android:textColor">?android:attr/textColorPrimary</item>
+        <item name="iconTint">?android:attr/textColorPrimary</item>
+        <item name="strokeColor">@color/card_stroke</item>
+        <item name="rippleColor">?colorControlHighlight</item>
     </style>
 
     <style name="ShapeAppearanceOverlay.SagerNet.DrawerButton" parent="">
@@ -775,9 +785,6 @@
         <item name="colorPrimaryDark">@color/color_white_theme_dark</item>
         <item name="colorAccent">@color/color_white_theme_accent</item>
         <item name="cardElevatedSurfaceColor">@color/card_elevated_white</item>
-        <item name="colorSurface">@color/color_white_theme</item>
-        <item name="android:colorBackground">@color/color_white_theme</item>
-        <item name="android:windowBackground">@color/color_white_theme</item>
 
         <!-- Dark text and icons on white -->
         <item name="actionBarTheme">@style/ThemeOverlay.MaterialComponents.ActionBar</item>
@@ -792,43 +799,10 @@
         <item name="selectedColorPrimary">@color/black</item>
         <item name="itemShapeFillColor">@color/color_white_theme_nav_fill</item>
         <item name="accentOrTextSecondary">?android:textColorSecondary</item>
-        <item name="accentOrTextPrimary">?android:textColorPrimary</item>
         <item name="primaryOrTextSecondary">?android:textColorSecondary</item>
         <item name="primaryOrTextPrimary">?android:textColorPrimary</item>
-        <item name="android:textColorPrimary">@color/black</item>
-        <item name="android:textColorSecondary">#66000000</item>
     </style>
-    <style name="Theme.SagerNet.LightGray" parent="Theme.SagerNet">
-        <item name="colorPrimary">@color/color_light_gray_primary</item>
-        <item name="colorPrimaryDark">@color/color_light_gray_primary_dark</item>
-        <item name="colorAccent">@color/color_light_gray_accent</item>
-        <item name="colorMaterial100">@color/color_light_gray_material_100</item>
-        <item name="colorMaterial300">@color/color_light_gray_material_300</item>
-        <item name="cardElevatedSurfaceColor">@color/color_light_gray_surface</item>
-        <item name="colorSurface">@color/color_light_gray_surface</item>
-        <item name="colorOnPrimary">@color/white</item>
-        <item name="colorOnSurface">@color/color_light_gray_text_primary</item>
-        <item name="colorOnSurfaceVariant">@color/color_light_gray_text_secondary</item>
-        <item name="android:textColorPrimary">@color/color_light_gray_text_primary</item>
-        <item name="android:textColorSecondary">@color/color_light_gray_text_secondary</item>
-        <item name="android:colorBackground">@color/color_light_gray_bg</item>
-        <item name="android:windowBackground">@color/color_light_gray_bg</item>
-        <item name="actionBarTheme">@style/ThemeOverlay.AppCompat.ActionBar</item>
-        <item name="actionBarPopupTheme">@style/ThemeOverlay.MaterialComponents.Light</item>
-        <item name="tabTextColor">@color/color_light_gray_tab_unselected</item>
-        <item name="tabSelectedTextColor">@color/color_light_gray_tab_selected</item>
-        <item name="tabIndicatorColor">@color/color_light_gray_tab_selected</item>
-        <item name="tabRippleColor">@color/color_light_gray_ripple</item>
-        <item name="whiteOrTextPrimary">@color/color_light_gray_text_primary</item>
-        <item name="fabColorBackground">@color/color_light_gray_primary</item>
-        <item name="selectedColorPrimary">@color/color_light_gray_primary</item>
-        <item name="itemShapeFillColor">@color/color_light_gray_material_300</item>
-        <item name="accentOrTextSecondary">?android:textColorSecondary</item>
-        <item name="accentOrTextPrimary">?android:textColorPrimary</item>
-        <item name="primaryOrTextSecondary">?android:textColorSecondary</item>
-        <item name="primaryOrTextPrimary">?android:textColorPrimary</item>
-        <item name="appBarLayoutStyle">@style/Widget.SagerNet.AppBarLayout.LightGray</item>
-    </style>
+
     <style name="Theme.SagerNet.Dialog.Black" parent="Theme.SagerNet.Dialog">
         <item name="colorPrimary">@color/white</item>
         <item name="colorPrimaryDark">@color/color_black_theme_primary_dark</item>
@@ -868,26 +842,19 @@
         <item name="colorPrimaryDark">@color/color_white_theme_dark</item>
         <item name="colorAccent">@color/color_white_theme_accent</item>
         <item name="cardElevatedSurfaceColor">@color/card_elevated_white</item>
-        <item name="colorSurface">@color/color_white_theme</item>
-        <item name="actionBarTheme">@style/ThemeOverlay.MaterialComponents.ActionBar</item>
+        <item name="whiteOrTextPrimary">@color/black</item>
+
         <item name="colorOnPrimary">@color/black</item>
         <item name="selectedColorPrimary">@color/black</item>
         <item name="itemShapeFillColor">@color/color_white_theme_nav_fill</item>
+        <item name="accentOrTextSecondary">?android:textColorSecondary</item>
+        <item name="primaryOrTextSecondary">?android:textColorSecondary</item>
+        <item name="primaryOrTextPrimary">?android:textColorPrimary</item>
     </style>
 
-    <style name="Theme.SagerNet.Dialog.LightGray" parent="Theme.SagerNet.Dialog">
-        <item name="colorPrimary">@color/color_light_gray_primary</item>
-        <item name="colorPrimaryDark">@color/color_light_gray_primary_dark</item>
-        <item name="colorAccent">@color/color_light_gray_accent</item>
-        <item name="colorMaterial100">@color/color_light_gray_material_100</item>
-        <item name="colorMaterial300">@color/color_light_gray_material_300</item>
-        <item name="cardElevatedSurfaceColor">@color/color_light_gray_surface</item>
-        <item name="colorSurface">@color/color_light_gray_surface</item>
-        <item name="colorOnSurface">@color/color_light_gray_text_primary</item>
-        <item name="android:textColorPrimary">@color/color_light_gray_text_primary</item>
-        <item name="android:textColorSecondary">@color/color_light_gray_text_secondary</item>
-        <item name="fabColorBackground">@color/color_light_gray_primary</item>
-        <item name="selectedColorPrimary">@color/color_light_gray_primary</item>
+    <style name="Theme.SagerNet.Amoled.White" parent="">
+        <item name="colorPrimary">@android:color/black</item>
+        <item name="colorPrimaryDark">@android:color/black</item>
     </style>
 
     <style name="Theme.SagerNet.Monet" parent="Theme.SagerNet" />
@@ -904,24 +871,15 @@
         <item name="windowNoTitle">true</item>
     </style>
 
-    <style name="Theme.SagerNet.Amoled" parent="Theme.SagerNet">
-        <item name="android:colorBackground">@color/black</item>
-        <item name="android:windowBackground">@color/black</item>
-        <item name="colorSurface">@color/black</item>
-        <item name="cardElevatedSurfaceColor">@color/color_amoled_card_elevated</item>
-        <item name="android:textColorPrimary">@color/white</item>
-        <item name="android:textColorSecondary">@color/color_amoled_text_secondary</item>
-        <item name="android:textColorTertiary">@color/color_amoled_text_tertiary</item>
-        <item name="colorOnSurface">@color/white</item>
-        <item name="colorOnSurfaceVariant">@color/color_amoled_text_secondary</item>
-        <item name="colorOnPrimary">@color/white</item>
-        <item name="colorPrimary">@color/white</item>
-        <item name="colorAccent">@color/white</item>
-        <item name="selectedColorPrimary">@color/white</item>
-        <item name="primaryOrTextPrimary">@color/white</item>
-        <item name="primaryOrTextSecondary">@color/color_amoled_text_secondary</item>
-        <item name="accentOrTextPrimary">@color/white</item>
-        <item name="accentOrTextSecondary">@color/color_amoled_text_secondary</item>
+    <!-- AMOLED black overlay: applied at night by Theme.apply/applyDialog; only background, surface and card colours.
+         parent="" cuts the implicit dotted-name inheritance (Theme.SagerNet would be layered on and lock the colours) -->
+    <style name="Theme.SagerNet.Amoled" parent="">
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:colorBackground">@android:color/black</item>
+        <item name="colorSurface">@android:color/black</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_amoled</item>
+        <!-- No elevation overlay on OLED black: it would lighten black surfaces by elevation (a 4dp toolbar becomes #181818) -->
+        <item name="elevationOverlayEnabled">false</item>
     </style>
 
 
