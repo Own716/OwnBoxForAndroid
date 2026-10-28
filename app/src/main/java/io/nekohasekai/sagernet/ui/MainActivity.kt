@@ -128,7 +128,8 @@ class MainActivity : ThemedActivity(),
         binding.fab.imageTintList = ColorStateList.valueOf(Color.WHITE)
         val drawerRoot: View
         if (themeResId !in intArrayOf(
-                R.style.Theme_SagerNet_Black
+                R.style.Theme_SagerNet_Black,
+                R.style.Theme_SagerNet_White_Night
             )
         ) {
             drawerRoot = binding.navView

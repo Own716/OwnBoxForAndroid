@@ -425,4 +425,39 @@ object ProfileManager {
         GroupRepo.postReload(targetGroupId)
     }
 
+    fun resolveBalancerMembers(balancerEntity: ProxyEntity): List<ProxyEntity> {
+        if (balancerEntity.type != ProxyEntity.TYPE_BALANCER) return emptyList()
+        val bean = balancerEntity.balancerBean ?: (runCatching { balancerEntity.requireBean() as? io.nekohasekai.sagernet.fmt.internal.BalancerBean }.getOrNull()) ?: return emptyList()
+        val members = (if (bean.balancerType == io.nekohasekai.sagernet.fmt.internal.BalancerBean.TYPE_GROUP) {
+            val targetGids = when {
+                bean.targetGroupIds.isNotEmpty() -> bean.targetGroupIds
+                bean.targetGroupId > 0L -> listOf(bean.targetGroupId)
+                else -> emptyList()
+            }
+            var list = targetGids.flatMap { gid ->
+                SagerDatabase.proxyDao.getByGroup(gid)
+            }.distinctBy { it.id }
+
+            if (!bean.nameInclude.isNullOrBlank()) {
+                val regex = runCatching { Regex(bean.nameInclude) }.getOrNull()
+                if (regex != null) {
+                    list = list.filter { regex.containsMatchIn(it.displayName()) }
+                }
+            }
+            if (!bean.nameExclude.isNullOrBlank()) {
+                val regex = runCatching { Regex(bean.nameExclude) }.getOrNull()
+                if (regex != null) {
+                    list = list.filterNot { regex.containsMatchIn(it.displayName()) }
+                }
+            }
+            list
+        } else {
+            val rawEntities = SagerDatabase.proxyDao.getEntities(bean.proxies).associateBy { it.id }
+            bean.proxies.mapNotNull { rawEntities[it] }
+        }).filter {
+            it.id != balancerEntity.id && it.type != ProxyEntity.TYPE_BALANCER
+        }
+        return if (members.isNotEmpty()) members else SagerDatabase.proxyDao.getByGroup(balancerEntity.groupId).filter { it.id != balancerEntity.id && it.type != ProxyEntity.TYPE_BALANCER }
+    }
+
 }

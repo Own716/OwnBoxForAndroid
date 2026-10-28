@@ -15,6 +15,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import io.nekohasekai.sagernet.R
+import io.nekohasekai.sagernet.bg.ActiveOutboundTracker
 import io.nekohasekai.sagernet.bg.test.TestSpec
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProfileManager
@@ -42,6 +43,7 @@ class AutoSelectorStatusActivity : AppCompatActivity() {
     private var selectorId: Long = -1L
     private var onlyProblems = false
     private var profiles: List<ProxyEntity> = emptyList()
+    private var activeLeafDisplayName: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -60,13 +62,27 @@ class AutoSelectorStatusActivity : AppCompatActivity() {
         binding.list.adapter = adapter
 
         binding.recheck.setOnClickListener {
-            val gid = if (selectorId > 0) {
-                ProfileManager.getProfile(selectorId)?.groupId ?: selectorId
-            } else {
-                DataStore.selectedGroup
+            lifecycleScope.launch(Dispatchers.IO) {
+                if (selectorId > 0) {
+                    val p = ProfileManager.getProfile(selectorId)
+                    if (p != null && p.type == ProxyEntity.TYPE_BALANCER) {
+                        val members = ProfileManager.resolveBalancerMembers(p)
+                        if (members.isNotEmpty()) {
+                            TestSessionClient.startProfiles(TestSpec.KIND_URL, members.map { it.id }, p.groupId)
+                        } else {
+                            TestSessionClient.startGroup(TestSpec.KIND_URL, p.groupId)
+                        }
+                    } else {
+                        val gid = p?.groupId ?: selectorId
+                        TestSessionClient.startGroup(TestSpec.KIND_URL, gid)
+                    }
+                } else {
+                    TestSessionClient.startGroup(TestSpec.KIND_URL, DataStore.selectedGroup)
+                }
+                withContext(Dispatchers.Main) {
+                    reload()
+                }
             }
-            TestSessionClient.startGroup(TestSpec.KIND_URL, gid)
-            reload()
         }
 
         binding.automatic.setOnClickListener {
@@ -114,14 +130,24 @@ class AutoSelectorStatusActivity : AppCompatActivity() {
 
     private fun reload() {
         lifecycleScope.launch(Dispatchers.IO) {
+            var leafName: String? = null
             val list = if (selectorId > 0) {
                 val p = ProfileManager.getProfile(selectorId)
-                if (p != null) SagerDatabase.proxyDao.getByGroup(p.groupId)
-                else SagerDatabase.proxyDao.getByGroup(selectorId)
+                if (p != null) {
+                    if (p.type == ProxyEntity.TYPE_BALANCER) {
+                        leafName = ActiveOutboundTracker.getActiveLeafNodeDisplay(p)
+                        ProfileManager.resolveBalancerMembers(p)
+                    } else {
+                        SagerDatabase.proxyDao.getByGroup(p.groupId)
+                    }
+                } else {
+                    SagerDatabase.proxyDao.getByGroup(selectorId)
+                }
             } else {
                 SagerDatabase.proxyDao.getByGroup(DataStore.selectedGroup)
             }
             profiles = list
+            activeLeafDisplayName = leafName
             withContext(Dispatchers.Main) {
                 render()
             }
@@ -129,15 +155,25 @@ class AutoSelectorStatusActivity : AppCompatActivity() {
     }
 
     private fun render() {
-        val selectedId = DataStore.selectedProxy
-        val selectedProfile = profiles.firstOrNull { it.id == selectedId }
+        val activeMember = if (!activeLeafDisplayName.isNullOrBlank()) {
+            profiles.firstOrNull { it.displayName() == activeLeafDisplayName }
+        } else {
+            profiles.firstOrNull { it.id == DataStore.selectedProxy }
+                ?: profiles.filter { it.status > 0 }.minByOrNull { it.status }
+        }
+        val targetProfile = if (selectorId > 0) ProfileManager.getProfile(selectorId) else null
+        val headlineName = activeMember?.displayName()
+            ?: (if (targetProfile != null && targetProfile.type != ProxyEntity.TYPE_BALANCER) targetProfile.displayName() else null)
+            ?: targetProfile?.displayName()
+            ?: ""
+
         val workingCount = profiles.count { it.status > 0 }
         val totalCount = profiles.size
 
-        if (selectedProfile != null) {
+        if (headlineName.isNotBlank()) {
             binding.headline.text = getString(
                 R.string.autosel_status_on_working,
-                selectedProfile.displayName(),
+                headlineName,
                 workingCount,
                 totalCount
             )
@@ -160,14 +196,16 @@ class AutoSelectorStatusActivity : AppCompatActivity() {
         }
 
         binding.empty.isVisible = displayList.isEmpty()
-        adapter.submitList(displayList)
+        adapter.submitList(displayList, activeMember?.id ?: DataStore.selectedProxy)
     }
 
     private inner class MemberAdapter : RecyclerView.Adapter<MemberViewHolder>() {
         private var items = listOf<ProxyEntity>()
+        private var activeId: Long = -1L
 
-        fun submitList(list: List<ProxyEntity>) {
+        fun submitList(list: List<ProxyEntity>, activeProfileId: Long = -1L) {
             items = list
+            activeId = activeProfileId
             notifyDataSetChanged()
         }
 
@@ -179,7 +217,7 @@ class AutoSelectorStatusActivity : AppCompatActivity() {
         }
 
         override fun onBindViewHolder(holder: MemberViewHolder, position: Int) {
-            holder.bind(items[position], position + 1)
+            holder.bind(items[position], position + 1, activeId)
         }
 
         override fun getItemCount(): Int = items.size
@@ -189,13 +227,13 @@ class AutoSelectorStatusActivity : AppCompatActivity() {
         val itemBinding: LayoutAutoSelectorMemberBinding
     ) : RecyclerView.ViewHolder(itemBinding.root) {
 
-        fun bind(profile: ProxyEntity, rankIndex: Int) {
+        fun bind(profile: ProxyEntity, rankIndex: Int, activeId: Long) {
             itemBinding.rank.text = rankIndex.toString()
             itemBinding.name.text = profile.displayName()
 
-            val isSelected = profile.id == DataStore.selectedProxy
-            itemBinding.note.isVisible = isSelected
-            if (isSelected) {
+            val isActive = profile.id == activeId || profile.id == DataStore.selectedProxy
+            itemBinding.note.isVisible = isActive
+            if (isActive) {
                 itemBinding.note.text = getString(R.string.autosel_note_selected)
             }
 

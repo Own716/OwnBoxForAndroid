@@ -91,7 +91,7 @@ object Theme {
 
     fun getTheme(context: Context = app): Int {
         if (usingNightMode(context)) {
-            return R.style.Theme_SagerNet_Black
+            return if (DataStore.appTheme == WHITE) R.style.Theme_SagerNet_White_Night else R.style.Theme_SagerNet_Black
         }
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && DataStore.useSystemTheme) {
             val wallpaperColor = getSystemWallpaperColor(context)
@@ -108,7 +108,7 @@ object Theme {
 
     fun getDialogTheme(context: Context = app): Int {
         if (usingNightMode(context)) {
-            return R.style.Theme_SagerNet_Dialog_Black
+            return if (DataStore.appTheme == WHITE) R.style.Theme_SagerNet_Dialog_White_Night else R.style.Theme_SagerNet_Dialog_Black
         }
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && DataStore.useSystemTheme) {
             val wallpaperColor = getSystemWallpaperColor(context)
@@ -126,7 +126,7 @@ object Theme {
     fun getTheme(theme: Int): Int {
         return when (theme) {
             BLACK -> R.style.Theme_SagerNet_Black
-            WHITE -> R.style.Theme_SagerNet_White
+            WHITE -> if (usingNightMode()) R.style.Theme_SagerNet_White_Night else R.style.Theme_SagerNet_White
             LIGHT_GRAY -> R.style.Theme_SagerNet_LightGray
             else -> {
                 if (DataStore.appTheme !in setOf(BLACK, WHITE, LIGHT_GRAY)) {
@@ -140,7 +140,7 @@ object Theme {
     fun getDialogTheme(theme: Int): Int {
         return when (theme) {
             BLACK -> R.style.Theme_SagerNet_Dialog_Black
-            WHITE -> R.style.Theme_SagerNet_Dialog_White
+            WHITE -> if (usingNightMode()) R.style.Theme_SagerNet_Dialog_White_Night else R.style.Theme_SagerNet_Dialog_White
             LIGHT_GRAY -> R.style.Theme_SagerNet_Dialog_LightGray
             else -> {
                 if (DataStore.appTheme !in setOf(BLACK, WHITE, LIGHT_GRAY)) {

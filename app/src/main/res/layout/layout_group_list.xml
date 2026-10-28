@@ -25,7 +25,7 @@
         app:tabPaddingStart="16dp"
         app:tabRippleColor="?tabRippleColor"
         app:tabSelectedTextColor="?tabSelectedTextColor"
-        app:tabTextAppearance="@style/Widget.SagerNet.TabLayout.TextAppearance"
+        app:tabTextAppearance="@style/TextAppearance.SagerNet.Tab"
         app:tabTextColor="?tabTextColor"
         app:tabUnboundedRipple="false" />
 

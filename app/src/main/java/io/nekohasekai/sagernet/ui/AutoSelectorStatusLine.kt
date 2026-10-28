@@ -3,9 +3,13 @@ package io.nekohasekai.sagernet.ui
 import androidx.preference.PreferenceDataStore
 import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.R
+import io.nekohasekai.sagernet.bg.ActiveOutboundTracker
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProfileManager
+import io.nekohasekai.sagernet.database.ProxyEntity
+import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.database.preference.OnPreferenceDataStoreChangeListener
+import io.nekohasekai.sagernet.fmt.internal.BalancerBean
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,9 +41,23 @@ object AutoSelectorStatusLine {
                 if (context != null && profileId > 0) {
                     val profile = withContext(Dispatchers.IO) { ProfileManager.getProfile(profileId) }
                     if (profile != null) {
-                        val latency = profile.status
+                        var displayName = profile.displayName()
+                        var latency = profile.status
+                        if (profile.type == ProxyEntity.TYPE_BALANCER) {
+                            val activeLeaf = ActiveOutboundTracker.getActiveLeafNodeDisplay(profile)
+                            if (!activeLeaf.isNullOrBlank()) {
+                                displayName = activeLeaf
+                            } else {
+                                val members = withContext(Dispatchers.IO) { ProfileManager.resolveBalancerMembers(profile) }
+                                val leaf = members.filter { it.status > 0 }.minByOrNull { it.status } ?: members.firstOrNull()
+                                if (leaf != null) {
+                                    displayName = leaf.displayName()
+                                    if (leaf.status > 0) latency = leaf.status
+                                }
+                            }
+                        }
                         val latencyStr = if (latency > 0) "${latency} ms" else if (latency < 0) "不可用" else "未测试"
-                        val text = "当前配置：${profile.displayName()} · $latencyStr"
+                        val text = "当前配置：$displayName · $latencyStr"
                         fragment.setRuntimeStatus(text) {
                             fragment.context?.let { ctx ->
                                 fragment.startActivity(AutoSelectorStatusActivity.intent(ctx, profileId))
