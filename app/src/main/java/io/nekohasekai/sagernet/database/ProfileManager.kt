@@ -364,4 +364,65 @@ object ProfileManager {
         return DeleteOutcome(true, deleted, kept)
     }
 
+
+    suspend fun emplace(groupId: Long, from: Int, to: Int): Boolean {
+        val list = SagerDatabase.proxyDao.getByGroup(groupId).toMutableList()
+        if (from !in list.indices || to !in list.indices) return false
+        val item = list.removeAt(from)
+        list.add(to, item)
+        list.forEachIndexed { index, proxy ->
+            proxy.userOrder = (index + 1).toLong()
+        }
+        SagerDatabase.proxyDao.updateProxy(list)
+        GroupRepo.postReload(groupId)
+        return true
+    }
+
+    suspend fun setOrder(groupId: Long, ids: List<Long>) {
+        val list = SagerDatabase.proxyDao.getByGroup(groupId).associateBy { it.id }.toMutableMap()
+        var order = 1L
+        val updated = mutableListOf<ProxyEntity>()
+        for (id in ids) {
+            val p = list.remove(id) ?: continue
+            p.userOrder = order++
+            updated.add(p)
+        }
+        for ((_, p) in list) {
+            p.userOrder = order++
+            updated.add(p)
+        }
+        SagerDatabase.proxyDao.updateProxy(updated)
+        GroupRepo.postReload(groupId)
+    }
+
+    fun clearTestResults(profileIds: List<Long>) {
+        if (profileIds.isEmpty()) return
+        val list = getProfiles(profileIds)
+        for (p in list) {
+            p.status = 0
+            p.ping = 0
+            p.error = null
+            p.speedTestDownloadBitsPerSecond = 0
+            p.speedTestUploadBitsPerSecond = 0
+            p.speedTestMode = ""
+        }
+        SagerDatabase.proxyDao.updateProxy(list)
+    }
+
+    suspend fun moveToGroup(profileIds: List<Long>, targetGroupId: Long) = moveProfilesToGroup(profileIds, targetGroupId)
+
+    suspend fun moveProfilesToGroup(profileIds: List<Long>, targetGroupId: Long) {
+        val targetList = SagerDatabase.proxyDao.getByGroup(targetGroupId)
+        var maxOrder = targetList.maxOfOrNull { it.userOrder } ?: 0L
+        val profiles = getProfiles(profileIds)
+        val sources = profiles.map { it.groupId }.distinct()
+        for (p in profiles) {
+            p.groupId = targetGroupId
+            p.userOrder = ++maxOrder
+        }
+        SagerDatabase.proxyDao.updateProxy(profiles)
+        sources.forEach { GroupRepo.postReload(it) }
+        GroupRepo.postReload(targetGroupId)
+    }
+
 }

@@ -81,6 +81,7 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
     companion object {
         const val EXTRA_PROFILE_ID = "id"
         const val EXTRA_IS_SUBSCRIPTION = "sub"
+        const val EXTRA_RESTART_NEEDED = "restartNeeded"
     }
 
     abstract fun createEntity(): T

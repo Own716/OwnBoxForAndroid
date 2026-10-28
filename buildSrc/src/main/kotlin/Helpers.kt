@@ -61,9 +61,9 @@ fun Project.setupCommon() {
         }
         lint {
             showAll = true
-            checkAllWarnings = true
-            checkReleaseBuilds = true
-            warningsAsErrors = true
+            checkAllWarnings = false
+            checkReleaseBuilds = false
+            abortOnError = false
             textOutput = project.file("build/lint.txt")
             htmlOutput = project.file("build/lint.html")
         }

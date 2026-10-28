@@ -13,10 +13,6 @@ data class GroupSortAction(
 
 enum class SortInput { MEMBERSHIP, CONFIG, TEST_RESULT, TRAFFIC }
 
-enum class TestBy(val value: Int) {
-    LATENCY(0), DL_SPEED(1), UL_SPEED(2), IP(3), SPEED(1)
-}
-
 object GroupSort {
 
     suspend fun sortProfiles(groupId: Long, action: GroupSortAction): Boolean {
@@ -30,6 +26,10 @@ object GroupSort {
         SagerDatabase.groupDao.updateGroup(group)
         GroupManager.postReload(groupId)
         return true
+    }
+
+    suspend fun setSort(groupId: Long, action: GroupSortAction) {
+        sortProfiles(groupId, action)
     }
 
     fun repositionLater(dirty: Collection<Long>, input: SortInput) {}

@@ -3,6 +3,7 @@ package io.nekohasekai.sagernet.ui.profiles
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.net.Uri
 import android.text.SpannableStringBuilder
 import android.text.Spanned
@@ -15,48 +16,31 @@ import androidx.appcompat.widget.TooltipCompat
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.isVisible
+import androidx.core.widget.ImageViewCompat
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.progressindicator.LinearProgressIndicator
-import io.nekohasekai.sagernet.GroupType
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.ProxyGroup
 import io.nekohasekai.sagernet.database.SubUserInfo
+import io.nekohasekai.sagernet.database.subInfo
+import io.nekohasekai.sagernet.database.subLastUpdate
+import io.nekohasekai.sagernet.database.subOptions
 import io.nekohasekai.sagernet.ktx.getColorAttr
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
 
-val ProxyGroup.isSubscription: Boolean
-    get() = type == GroupType.SUBSCRIPTION || (subscription?.link?.isNotEmpty() == true)
-
-val ProxyGroup.subInfo: SubUserInfo
-    get() {
-        val raw = subscription?.subscriptionUserinfo
-        if (!raw.isNullOrBlank()) {
-            val parsed = SubUserInfo.parseHeader(raw)
-            if (parsed.valid) return parsed
-        }
-        val used = subscription?.bytesUsed ?: 0L
-        val remain = subscription?.bytesRemaining ?: 0L
-        val total = if (used > 0L || remain > 0L) used + remain else 0L
-        val expire = (subscription?.expiryDate ?: 0).toLong()
-        if (total > 0L || expire > 0L) {
-            return SubUserInfo(valid = true, hasQuota = total > 0L, upload = 0L, download = used, total = total, expire = expire)
-        }
-        return SubUserInfo()
-    }
-
-val ProxyGroup.subLastUpdate: Long
-    get() = (subscription?.lastUpdated ?: 0).toLong()
-
 /**
  * SubscriptionInfoCard (SubscriptionInfoCard.cpp) for the current group: its name and the provider's title, the quota
- * bar, the time left, the portal and support links and the announcement.
+ * bar, the time left, the portal and support links and the announcement (two lines, the whole text in a dialog). It is
+ * wanted for a subscription whose last fetch said something, unless the group turned it off (Android-only
+ * SubscriptionOptions.showInfoCard); [ProfilesHeader] shows it, and hides it with the header in a compact height.
  */
-class SubscriptionInfoCard(val view: View) {
+internal class SubscriptionInfoCard(val view: View) {
 
     companion object {
         private val SIZE_UNITS = arrayOf("B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB")
+        private val WHITESPACE = Regex("\\s+")
 
         // Panels stamping expire as fetch time + N days land on a unit boundary; a count this close to stepping down shows stepped.
         private const val COUNTDOWN_GRACE = 5 * 60L
@@ -93,6 +77,7 @@ class SubscriptionInfoCard(val view: View) {
 
         /**
          * ParseSubInfo (GroupItem.cpp:15-30) for the groups screen: the quota with the expiry date, then the time left.
+         * Unlike the desktop, a missing expiry is left out instead of printing "None".
          */
         fun summary(context: Context, info: SubUserInfo): String {
             if (!info.valid) return ""
@@ -155,10 +140,9 @@ class SubscriptionInfoCard(val view: View) {
         announce.setOnClickListener { showAnnouncement() }
     }
 
-    /** [group]: the current tab's, null for none. Also redraws the time left. */
+    /** [group]: the current tab's, null for none (the picker). Also redraws the time left. */
     fun bind(group: ProxyGroup?) {
-        wanted = group != null && group.isSubscription && render(group, group.subInfo)
-        view.isVisible = wanted
+        wanted = group != null && group.isSubscription && group.subOptions.showInfoCard && render(group, group.subInfo)
     }
 
     /** updateData (SubscriptionInfoCard.cpp:469-544); false when there is nothing to show. */
@@ -177,42 +161,43 @@ class SubscriptionInfoCard(val view: View) {
         quota.isVisible = info.hasQuota
         if (info.hasQuota) {
             val percent = info.percentUsed.toInt()
-            quotaBar.progress = percent
-            val color = if (percent >= 90) danger else ok
-            quotaBar.setIndicatorColor(color)
-            quotaLabel.text = context.getString(
-                if (info.total > 0) R.string.subinfo_quota else R.string.subinfo_quota_unlimited,
-                readableSize(info.used),
-                readableSize(info.total),
-                percent,
-            )
+            quotaBar.setProgressCompat(if (info.total > 0) percent else 100, false)
+            quotaBar.setIndicatorColor(if (info.isExpired(now) || (info.total > 0 && percent >= 90)) danger else ok)
+            val used = readableSize(info.used)
+            quotaLabel.text = if (info.total > 0) {
+                context.getString(R.string.subinfo_quota, used, readableSize(info.total), percent)
+            } else {
+                context.getString(R.string.subinfo_quota_unlimited, used)
+            }
         }
 
-        val left = expiryText(context, info.expire, now)
-        expiry.isVisible = left.isNotEmpty()
-        if (left.isNotEmpty()) {
-            expiryLabel.text = left
-            val expired = info.isExpired(now)
-            val color = if (expired) danger else secondary
+        expiry.isVisible = info.expire > 0
+        if (info.expire > 0) {
+            val urgent = (info.expire - now - COUNTDOWN_GRACE) / 86400 <= 3
+            val color = if (urgent) danger else secondary
+            expiryIcon.setImageResource(if (urgent) R.drawable.ic_baseline_warning_24 else R.drawable.ic_baseline_hourglass_empty_24)
+            ImageViewCompat.setImageTintList(expiryIcon, ColorStateList.valueOf(color))
             expiryLabel.setTextColor(color)
-            expiryIcon.imageTintList = android.content.res.ColorStateList.valueOf(color)
-            val expires = displayTime(info.expire)
-            TooltipCompat.setTooltipText(expiry, context.getString(R.string.subinfo_expires, expires))
+            expiryLabel.text = expiryText(context, info.expire, now)
+            val expires = context.getString(R.string.subinfo_expires, displayTime(info.expire))
+            expiry.contentDescription = expires
+            TooltipCompat.setTooltipText(expiry, expires)
         }
 
         portalUri = linkUri(info.webUrl, allowTg = false)
-        portal.isVisible = portalUri != null
-        portalUri?.let { TooltipCompat.setTooltipText(portal, context.getString(R.string.subinfo_portal_tip, it.toString())) }
-
         supportUri = linkUri(info.supportUrl, allowTg = true)
+        portal.isVisible = portalUri != null
         support.isVisible = supportUri != null
-        supportUri?.let { TooltipCompat.setTooltipText(support, context.getString(R.string.subinfo_support_tip, it.toString())) }
+        TooltipCompat.setTooltipText(portal, context.getString(R.string.subinfo_portal_tip, info.webUrl.trim()))
+        TooltipCompat.setTooltipText(support, context.getString(R.string.subinfo_support_tip, info.supportUrl.trim()))
 
-        fullAnnounce = info.announce.trim()
-        val oneliner = fullAnnounce.replace(Regex("\\s+"), " ")
-        announce.isVisible = oneliner.isNotEmpty()
-        announceLabel.text = oneliner
-        return true
+        val text = info.announce.trim()
+        fullAnnounce = if (text.equals("base64:", ignoreCase = true)) "" else text
+        announce.isVisible = fullAnnounce.isNotEmpty()
+        announceLabel.text = fullAnnounce.replace(WHITESPACE, " ")
+
+        return info.hasQuota || info.expire > 0 || portalUri != null || supportUri != null ||
+            fullAnnounce.isNotEmpty() || provider != null
     }
 
     /** QDesktopServices::openUrl: the browser, or the app of a tg: link. */

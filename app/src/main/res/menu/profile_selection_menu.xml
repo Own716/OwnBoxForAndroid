@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <group
+        android:id="@+id/group_selection_toolbar"
+        android:visible="false">
+        <item
+            android:id="@+id/action_selection_test"
+            android:icon="@drawable/ic_baseline_speed_24"
+            android:title="@string/profiles_test"
+            app:showAsAction="ifRoom">
+            <menu>
+                <item
+                    android:id="@+id/action_selection_test_url"
+                    android:title="@string/profiles_test_url" />
+                <item
+                    android:id="@+id/action_selection_test_ip"
+                    android:title="@string/profiles_test_ip" />
+                <item
+                    android:id="@+id/action_selection_test_speed"
+                    android:title="@string/profiles_test_speed" />
+            </menu>
+        </item>
+        <item
+            android:id="@+id/action_selection_delete"
+            android:icon="@drawable/ic_action_delete"
+            android:title="@string/delete"
+            app:showAsAction="ifRoom" />
+        <item
+            android:id="@+id/action_selection_all"
+            android:title="@string/profiles_select_all"
+            app:showAsAction="never" />
+        <item
+            android:id="@+id/action_selection_clear_results"
+            android:title="@string/connection_test_clear_results"
+            app:showAsAction="never" />
+        <item
+            android:id="@+id/action_selection_move"
+            android:title="@string/profiles_move_to_group"
+            app:showAsAction="never" />
+        <item
+            android:id="@+id/action_selection_copy"
+            android:title="@string/profiles_copy_links"
+            app:showAsAction="never">
+            <menu>
+                <item
+                    android:id="@+id/action_selection_copy_links"
+                    android:title="@string/profiles_copy_share_links" />
+                <item
+                    android:id="@+id/action_selection_copy_throne"
+                    android:title="@string/profiles_copy_throne_links" />
+            </menu>
+        </item>
+    </group>
+</menu>

@@ -95,9 +95,26 @@ data class ProxyEntity(
     fun isUnavailable(): Boolean = status < 0
     fun latencyColor(): Int = latencyColor(status)
 
+    @Ignore @Transient var testCountry: String? = null
+    @Ignore @Transient var ipOut: String? = null
+    @Ignore @Transient var dlSpeed: String? = null
+        get() = if (speedTestDownloadBitsPerSecond > 0) "${speedTestDownloadBitsPerSecond / 1_000_000} Mbps" else field
+    @Ignore @Transient var ulSpeed: String? = null
+        get() = if (speedTestUploadBitsPerSecond > 0) "${speedTestUploadBitsPerSecond / 1_000_000} Mbps" else field
+
+    val outbound: FakeOutbound get() = FakeOutbound(this)
+    val outboundJson: String get() = uuid.ifEmpty { "${displayName()}/${displayAddress()}" }
+
+    fun exportLink(): String = toStdLink()
+    fun exportJsonLink(strip: Boolean = false): String = exportConfig().second
+    fun dedupKey(): String = "${displayAddress()}/${displayName()}"
+    fun isChain(): Boolean = chainBean != null
+    fun profileSettingsIntent(ctx: Context, isSubscription: Boolean): Intent = settingIntent(ctx, isSubscription)
+
     companion object {
         const val TABLE = "proxy_entities"
         const val LATENCY_CONNECT_ONLY = -2
+        const val SPEED_NA = "N/A"
         const val COLOR_CONNECT_ONLY = 0xFF00ACC1.toInt()
         const val COLOR_FAILED = 0xFF9E9E9E.toInt()
         const val COLOR_FAST = 0xFF43A047.toInt()
@@ -655,6 +672,10 @@ data class ProxyEntity(
 
         @Query("SELECT * FROM proxy_entities WHERE groupId = :groupId ORDER BY userOrder")
         fun getByGroup(groupId: Long): List<ProxyEntity>
+
+        fun getNamesByGroup(groupId: Long): List<ProfileName> {
+            return getByGroup(groupId).map { ProfileName(it.id, it.groupId, it.displayType(), it.displayName()) }
+        }
 
         @Query("SELECT * FROM proxy_entities WHERE type = :type")
         fun getByType(type: Int): List<ProxyEntity>

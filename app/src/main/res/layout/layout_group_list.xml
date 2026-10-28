@@ -15,20 +15,18 @@
     <com.google.android.material.tabs.TabLayout
         android:id="@+id/group_tab"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="?android:attr/colorBackground"
+        android:layout_height="40dp"
+        android:background="?colorPrimary"
         android:elevation="0dp"
         android:visibility="gone"
-        app:tabIndicatorColor="?attr/tabIndicatorColor"
-        app:tabIndicatorHeight="3dp"
+        app:tabIndicatorColor="?tabIndicatorColor"
         app:tabIndicatorFullWidth="false"
         app:tabMode="scrollable"
         app:tabPaddingStart="16dp"
-        app:tabPaddingEnd="16dp"
         app:tabRippleColor="?tabRippleColor"
-        app:tabSelectedTextColor="?attr/tabSelectedTextColor"
-        app:tabTextColor="?attr/tabTextColor"
+        app:tabSelectedTextColor="?tabSelectedTextColor"
         app:tabTextAppearance="@style/Widget.SagerNet.TabLayout.TextAppearance"
+        app:tabTextColor="?tabTextColor"
         app:tabUnboundedRipple="false" />
 
     <com.google.android.material.progressindicator.LinearProgressIndicator
@@ -68,6 +66,8 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
 
+        <!-- Down to the bottom edge: the panel keeps its content above MainActivity's stats bar and FAB.
+             A wide landscape window puts it at the end side instead, full height (ConfigurationFragment). -->
         <FrameLayout
             android:id="@+id/test_panel_container"
             android:layout_width="match_parent"
