@@ -15,6 +15,7 @@ import androidx.appcompat.widget.SearchView
 import androidx.appcompat.widget.Toolbar
 import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.DrawableCompat
 import androidx.core.os.bundleOf
 import androidx.core.view.GravityCompat
 import androidx.core.view.ViewCompat
@@ -362,6 +363,19 @@ class ConfigurationFragment : ToolbarFragment(R.layout.layout_group_list),
             }
         }
         toolbar.setOnMenuItemClickListener(this)
+        val actionIconTint = if (Theme.isWhiteTheme(requireContext())) {
+            ContextCompat.getColor(requireContext(), R.color.black)
+        } else {
+            ContextCompat.getColor(requireContext(), R.color.white)
+        }
+        for (i in 0 until toolbar.menu.size()) {
+            val item = toolbar.menu.getItem(i)
+            item.icon?.let { icon ->
+                val tinted = icon.mutate()
+                DrawableCompat.setTint(tinted, actionIconTint)
+                item.icon = tinted
+            }
+        }
         searchView = (toolbar.menu.findItem(R.id.action_search)?.actionView as? SearchView)?.apply {
             setOnQueryTextListener(this@ConfigurationFragment)
             maxWidth = Int.MAX_VALUE

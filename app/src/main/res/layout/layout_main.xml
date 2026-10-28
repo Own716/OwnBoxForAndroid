@@ -85,6 +85,7 @@
                             android:layout_height="wrap_content"
                             android:ellipsize="end"
                             android:maxLines="1"
+                            android:textColor="?whiteOrTextPrimary"
                             android:textSize="12sp"
                             app:autoSizeMaxTextSize="13sp"
                             app:autoSizeMinTextSize="9sp"
@@ -99,6 +100,7 @@
                             android:layout_marginTop="2dp"
                             android:ellipsize="end"
                             android:maxLines="1"
+                            android:textColor="?whiteOrTextPrimary"
                             android:textSize="12sp"
                             app:autoSizeMaxTextSize="13sp"
                             app:autoSizeMinTextSize="9sp"
@@ -135,6 +137,7 @@
                                 android:ellipsize="end"
                                 android:gravity="end"
                                 android:maxLines="1"
+                                android:textColor="?whiteOrTextPrimary"
                                 android:textSize="11sp"
                                 android:visibility="gone"
                                 app:autoSizeMaxTextSize="11sp"
@@ -151,6 +154,7 @@
                                 android:ellipsize="end"
                                 android:gravity="end"
                                 android:maxLines="1"
+                                android:textColor="?whiteOrTextPrimary"
                                 android:textSize="13sp"
                                 android:textStyle="bold"
                                 app:autoSizeMaxTextSize="13sp"
@@ -171,6 +175,7 @@
                             android:padding="2dp"
                             android:src="@drawable/ic_baseline_refresh_24"
                             android:visibility="gone"
+                            app:tint="?whiteOrTextPrimary"
                             tools:visibility="visible" />
 
                     </LinearLayout>
@@ -185,6 +190,7 @@
                     android:layout_marginTop="4dp"
                     android:ellipsize="end"
                     android:maxLines="2"
+                    android:textColor="?whiteOrTextPrimary"
                     android:textSize="13sp"
                     android:textStyle="bold"
                     android:visibility="gone"
@@ -229,9 +235,12 @@
 
             <com.google.android.material.navigation.NavigationView
                 android:id="@+id/nav_menu_view"
+                style="@style/Widget.Design.NavigationView"
                 android:layout_width="0dp"
                 android:layout_height="0dp"
                 android:visibility="gone"
+                app:itemIconTint="@color/navigation_icon"
+                app:itemTextColor="@color/navigation_icon"
                 app:menu="@menu/main_drawer_menu" />
 
             <ScrollView
@@ -339,9 +348,12 @@
 
             <com.google.android.material.navigation.NavigationView
                 android:id="@+id/nav_menu_view_black"
+                style="@style/Widget.Design.NavigationView"
                 android:layout_width="0dp"
                 android:layout_height="0dp"
                 android:visibility="gone"
+                app:itemIconTint="@color/navigation_icon"
+                app:itemTextColor="@color/navigation_icon"
                 app:menu="@menu/main_drawer_menu" />
 
             <ScrollView

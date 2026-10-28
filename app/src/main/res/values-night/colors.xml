@@ -43,6 +43,13 @@
     <color name="card_elevated_black">@color/md3_surface</color>
     <color name="card_elevated_verdant_mint">@color/md3_surface</color>
 
+    <!-- Dialog button text: the 200 tones (4.8:1 or more on the dialog surface) -->
+    <color name="dialog_button_purple">#CE93D8</color>
+    <color name="dialog_button_deep_purple">#B39DDB</color>
+    <color name="dialog_button_indigo">#9FA8DA</color>
+    <color name="dialog_button_brown">#BCAAA4</color>
+    <color name="dialog_button_blue_grey">#B0BEC5</color>
+
     <!-- 纯黑主题在深色模式下的颜色映射 -->
     <color name="color_ng_black_accent">#FFFFFF</color>
     <color name="color_ng_black_primary">#2C2C2E</color>

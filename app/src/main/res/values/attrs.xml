@@ -10,6 +10,18 @@
     <attr name="fabColorBackground" format="color" />
     <attr name="selectedColorPrimary" format="color" />
     <attr name="whiteOrTextPrimary" format="color" />
-    <!-- 立体卡片（路由/分组）的"色调提升表面色"，各主题变体朝自身 primary 染色 -->
+    <!-- Text of the dialog buttons: primaryOrTextPrimary, a lighter tone at night where that is unreadable -->
+    <attr name="dialogButtonColor" format="color" />
+    <!-- Tinted elevated surface of the raised cards (routes, groups); each theme tints it towards its primary -->
     <attr name="cardElevatedSurfaceColor" format="color" />
+
+    <!-- JSON editor preference -->
+    <declare-styleable name="EditConfigPreference">
+        <!-- Schema roots of the document, `|`-separated JSON pointers into assets/schema/sing-box.json ("#" = the whole config). -->
+        <attr name="jsonSchema" format="string" />
+        <!-- A blank document is saved as "not set". -->
+        <attr name="jsonAllowEmpty" format="boolean" />
+        <!-- The document must be a JSON object (default true). -->
+        <attr name="jsonRequireObject" format="boolean" />
+    </declare-styleable>
 </resources>

@@ -37,7 +37,7 @@ open class ToolbarFragment : Fragment {
             val primaryTextColor = if (Theme.isWhiteTheme(requireContext())) {
                 ContextCompat.getColor(requireContext(), R.color.black)
             } else {
-                requireContext().getColorAttr(android.R.attr.textColorPrimary)
+                ContextCompat.getColor(requireContext(), R.color.white)
             }
             toolbar.setTitleTextColor(primaryTextColor)
             toolbar.navigationIcon?.let {
