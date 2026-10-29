@@ -427,7 +427,7 @@ class GroupSettingsActivity(
     }
 
     override fun onSupportNavigateUp(): Boolean {
-        onBackPressed()
+        if (!super.onSupportNavigateUp()) finish()
         return true
     }
 

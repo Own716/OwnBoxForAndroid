@@ -27,38 +27,6 @@ data class ProxyGroup(
     @Transient
     var export = false
 
-    @Transient
-    var testSortBy: Int = 0
-
-    @Transient
-    var scrollLastProfile: Int = -1
-
-    @Transient
-    var testItemsToShow: Int = 3
-
-    @Transient
-    var sortDescending: Boolean = false
-
-    @Transient
-    var trafficSortBy: Int = 0
-
-    @Transient
-    var typeSortBy: Int = 0
-
-    val isSubscription: Boolean get() = type == GroupType.SUBSCRIPTION && subscription != null
-
-    fun keepsSorted(): Boolean = order != GroupOrder.ORIGIN
-    val sort: GroupSortAction
-        get() {
-            val method = when (order) {
-                GroupOrder.BY_NAME -> GroupSortMethod.BY_NAME
-                GroupOrder.BY_DELAY -> GroupSortMethod.BY_LATENCY
-                else -> GroupSortMethod.RAW
-            }
-            return GroupSortAction(method, method != GroupSortMethod.RAW && sortDescending)
-        }
-
-
     override fun initializeDefaultValues() {
         subscription?.applyDefaultValues()
     }
@@ -159,7 +127,6 @@ data class ProxyGroup(
     }
 
     companion object {
-        const val TABLE = "proxy_groups"
         @JvmField
         val CREATOR = object : Serializable.CREATOR<ProxyGroup>() {
 

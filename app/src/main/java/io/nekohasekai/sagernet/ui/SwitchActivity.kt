@@ -15,26 +15,22 @@ class SwitchActivity : ThemedActivity(R.layout.layout_empty),
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        if (savedInstanceState != null) return
         supportFragmentManager.beginTransaction()
             .replace(
                 R.id.fragment_holder,
-                ConfigurationFragment.forSelection(null, R.string.action_switch)
+                ConfigurationFragment(true, null, R.string.action_switch)
             )
             .commitAllowingStateLoss()
     }
 
-    /** A running service switches in place (a no-op for its own profile); a stopped one only changes the selection. */
     override fun returnProfile(profileId: Long) {
         val old = DataStore.selectedProxy
         DataStore.selectedProxy = profileId
         runOnMainDispatcher {
             ProfileManager.postUpdate(old, true)
             ProfileManager.postUpdate(profileId, true)
-            if (DataStore.serviceState.connected) {
-                SagerNet.reloadService()
-            }
         }
+        SagerNet.reloadService()
         finish()
     }
 }

@@ -7,30 +7,6 @@
         android:id="@+id/action_share"
         android:title="@string/share" />
     <item
-        android:id="@+id/action_test"
-        android:title="@string/profiles_test">
-        <menu>
-            <item
-                android:id="@+id/action_test_url"
-                android:title="@string/profiles_test_url" />
-            <item
-                android:id="@+id/action_test_ip"
-                android:title="@string/profiles_test_ip" />
-            <item
-                android:id="@+id/action_test_speed"
-                android:title="@string/profiles_test_speed" />
-        </menu>
-    </item>
-    <item
-        android:id="@+id/action_resolve_domain"
-        android:title="@string/profiles_resolve_domain" />
-    <item
-        android:id="@+id/action_move_up"
-        android:title="@string/profiles_move_up" />
-    <item
-        android:id="@+id/action_move_down"
-        android:title="@string/profiles_move_down" />
-    <item
         android:id="@+id/action_delete"
         android:title="@string/delete" />
 </menu>

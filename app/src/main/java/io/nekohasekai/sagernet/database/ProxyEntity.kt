@@ -89,67 +89,7 @@ data class ProxyEntity(
     @ColumnInfo(defaultValue = "NULL") var balancerBean: BalancerBean? = null,
 ) : Serializable() {
 
-    val latency: Int get() = status
-    val latencyAt: Long get() = 0L
-    val testError: String get() = error.orEmpty()
-    fun isUnavailable(): Boolean = status < 0
-    fun latencyColor(): Int = latencyColor(status)
-
-    @Ignore @Transient var testCountry: String? = null
-    @Ignore @Transient var ipOut: String? = null
-    @Ignore @Transient var dlSpeed: String? = null
-        get() = if (speedTestDownloadBitsPerSecond > 0) "${speedTestDownloadBitsPerSecond / 1_000_000} Mbps" else field
-    @Ignore @Transient var ulSpeed: String? = null
-        get() = if (speedTestUploadBitsPerSecond > 0) "${speedTestUploadBitsPerSecond / 1_000_000} Mbps" else field
-
-    val outbound: FakeOutbound get() = FakeOutbound(this)
-    val outboundJson: String get() = uuid.ifEmpty { "${displayName()}/${displayAddress()}" }
-
-    fun exportLink(): String = toStdLink()
-    fun exportJsonLink(strip: Boolean = false): String = exportConfig().second
-    fun dedupKey(): String = "${displayAddress()}/${displayName()}"
-    fun isChain(): Boolean = chainBean != null
-    fun profileSettingsIntent(ctx: Context, isSubscription: Boolean): Intent = settingIntent(ctx, isSubscription)
-
     companion object {
-        const val TABLE = "proxy_entities"
-        const val LATENCY_CONNECT_ONLY = -2
-        const val SPEED_NA = "N/A"
-        const val COLOR_CONNECT_ONLY = 0xFF00ACC1.toInt()
-        const val COLOR_FAILED = 0xFF9E9E9E.toInt()
-        const val COLOR_FAST = 0xFF43A047.toInt()
-        const val COLOR_MEDIUM = 0xFFF9A825.toInt()
-        const val COLOR_SLOW = 0xFFE53935.toInt()
-
-        @JvmStatic
-        fun isWorking(latency: Int): Boolean = latency > 0 || latency == LATENCY_CONNECT_ONLY
-
-        @JvmStatic
-        fun isUnavailable(latency: Int): Boolean = latency < 0 && latency != LATENCY_CONNECT_ONLY
-
-        @JvmStatic
-        fun isTestAborted(error: String): Boolean =
-            error.contains("test aborted") || error.contains("context canceled")
-
-        @JvmStatic
-        fun countryFlag(code: String): String {
-            val sb = StringBuilder()
-            code.uppercase().forEach { c ->
-                if (c in 'A'..'Z') sb.appendCodePoint(c.code + 0x1F1A5)
-            }
-            return sb.toString()
-        }
-
-        @JvmStatic
-        fun latencyColor(latency: Int): Int = when {
-            latency == LATENCY_CONNECT_ONLY -> COLOR_CONNECT_ONLY
-            latency < 0 -> COLOR_FAILED
-            latency == 0 -> 0
-            latency <= 100 -> COLOR_FAST
-            latency <= 300 -> COLOR_MEDIUM
-            else -> COLOR_SLOW
-        }
-
         const val TYPE_SOCKS = 0
         const val TYPE_HTTP = 1
         const val TYPE_SS = 2
@@ -673,10 +613,6 @@ data class ProxyEntity(
         @Query("SELECT * FROM proxy_entities WHERE groupId = :groupId ORDER BY userOrder")
         fun getByGroup(groupId: Long): List<ProxyEntity>
 
-        fun getNamesByGroup(groupId: Long): List<ProfileName> {
-            return getByGroup(groupId).map { ProfileName(it.id, it.groupId, it.displayType(), it.displayName()) }
-        }
-
         @Query("SELECT * FROM proxy_entities WHERE type = :type")
         fun getByType(type: Int): List<ProxyEntity>
 
@@ -694,9 +630,6 @@ data class ProxyEntity(
 
         @Query("DELETE FROM proxy_entities WHERE id IN (:proxyId)")
         fun deleteById(proxyId: Long): Int
-
-        @Query("DELETE FROM proxy_entities WHERE id IN (:proxyIds)")
-        fun deleteByIds(proxyIds: List<Long>): Int
 
         @Query("DELETE FROM proxy_entities WHERE groupId = :groupId")
         fun deleteByGroup(groupId: Long)

@@ -5,7 +5,6 @@ import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
 import androidx.appcompat.widget.Toolbar
-import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.DrawableCompat
 import androidx.core.view.GravityCompat
 import androidx.core.view.ViewCompat
@@ -34,11 +33,7 @@ open class ToolbarFragment : Fragment {
             toolbar.setNavigationOnClickListener {
                 (activity as? MainActivity)?.binding?.drawerLayout?.openDrawer(GravityCompat.START)
             }
-            val primaryTextColor = if (Theme.isWhiteTheme(requireContext())) {
-                ContextCompat.getColor(requireContext(), R.color.black)
-            } else {
-                ContextCompat.getColor(requireContext(), R.color.white)
-            }
+            val primaryTextColor = requireContext().getColorAttr(android.R.attr.textColorPrimary)
             toolbar.setTitleTextColor(primaryTextColor)
             toolbar.navigationIcon?.let {
                 val tinted = it.mutate()

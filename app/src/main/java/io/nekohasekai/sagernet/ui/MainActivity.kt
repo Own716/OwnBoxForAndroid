@@ -108,7 +108,8 @@ class MainActivity : ThemedActivity(),
         val isNight = Theme.usingNightMode(this)
         val fabBgColor = when {
             Theme.isBlackTheme(this) -> Color.BLACK
-            Theme.isWhiteTheme(this) -> ContextCompat.getColor(this, R.color.color_white_theme_fab)
+            Theme.isWhiteTheme(this) -> Color.parseColor("#212121")
+            Theme.isLightGrayTheme(this) -> Color.parseColor("#1F2937")
             else -> {
                 val bg = getColorAttr(R.attr.fabColorBackground)
                 if (isNight && ColorUtils.calculateLuminance(bg) > 0.75) {
@@ -125,13 +126,11 @@ class MainActivity : ThemedActivity(),
         }
         binding.fab.backgroundTintList = ColorStateList.valueOf(fabBgColor)
         binding.fab.imageTintList = ColorStateList.valueOf(Color.WHITE)
-        val isBlackThemeDrawer = themeResId in intArrayOf(
-            R.style.Theme_SagerNet_Black,
-            R.style.Theme_SagerNet_White,
-            R.style.Theme_SagerNet_White_Night
-        )
         val drawerRoot: View
-        if (!isBlackThemeDrawer) {
+        if (themeResId !in intArrayOf(
+                R.style.Theme_SagerNet_Black
+            )
+        ) {
             drawerRoot = binding.navView
             navigation = drawerRoot.findViewById(R.id.nav_menu_view)
             drawerSettingsButton = drawerRoot.findViewById(R.id.drawer_settings_button)
@@ -179,8 +178,8 @@ class MainActivity : ThemedActivity(),
         ViewCompat.requestApplyInsets(drawerRoot)
         attachDrawerScrollFades(
             drawerRoot,
-            if (!isBlackThemeDrawer) R.id.drawer_top_fade else R.id.drawer_top_fade_black,
-            if (!isBlackThemeDrawer) R.id.drawer_bottom_fade else R.id.drawer_bottom_fade_black,
+            if (themeResId !in intArrayOf(R.style.Theme_SagerNet_Black)) R.id.drawer_top_fade else R.id.drawer_top_fade_black,
+            if (themeResId !in intArrayOf(R.style.Theme_SagerNet_Black)) R.id.drawer_bottom_fade else R.id.drawer_bottom_fade_black,
         )
 
         if (savedInstanceState == null) {
@@ -602,13 +601,7 @@ class MainActivity : ThemedActivity(),
 
     private fun attachDrawerScrollFades(drawerRoot: View, topFadeId: Int, bottomFadeId: Int) {
         val topFade = drawerRoot.findViewById<View>(topFadeId)
-            ?: drawerRoot.findViewById<View>(R.id.drawer_top_fade)
-            ?: drawerRoot.findViewById<View>(R.id.drawer_top_fade_black)
-            ?: return
         val bottomFade = drawerRoot.findViewById<View>(bottomFadeId)
-            ?: drawerRoot.findViewById<View>(R.id.drawer_bottom_fade)
-            ?: drawerRoot.findViewById<View>(R.id.drawer_bottom_fade_black)
-            ?: return
         val surface = getColorAttr(R.attr.colorSurface)
         val transparentSurface = ColorUtils.setAlphaComponent(surface, 0)
         topFade.background = GradientDrawable(

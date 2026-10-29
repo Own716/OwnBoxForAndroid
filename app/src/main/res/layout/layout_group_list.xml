@@ -15,65 +15,25 @@
     <com.google.android.material.tabs.TabLayout
         android:id="@+id/group_tab"
         android:layout_width="match_parent"
-        android:layout_height="40dp"
-        android:background="?colorPrimary"
+        android:layout_height="wrap_content"
+        android:background="?android:attr/colorBackground"
         android:elevation="0dp"
         android:visibility="gone"
-        app:tabIndicatorColor="?tabIndicatorColor"
+        app:tabIndicatorColor="?attr/tabIndicatorColor"
+        app:tabIndicatorHeight="3dp"
         app:tabIndicatorFullWidth="false"
         app:tabMode="scrollable"
         app:tabPaddingStart="16dp"
+        app:tabPaddingEnd="16dp"
         app:tabRippleColor="?tabRippleColor"
-        app:tabSelectedTextColor="?tabSelectedTextColor"
-        app:tabTextAppearance="@style/TextAppearance.SagerNet.Tab"
-        app:tabTextColor="?tabTextColor"
+        app:tabSelectedTextColor="?attr/tabSelectedTextColor"
+        app:tabTextColor="?attr/tabTextColor"
+        app:tabTextAppearance="@style/Widget.SagerNet.TabLayout.TextAppearance"
         app:tabUnboundedRipple="false" />
 
-    <com.google.android.material.progressindicator.LinearProgressIndicator
-        android:id="@+id/group_progress"
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/group_pager"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:indeterminate="true"
-        android:visibility="gone"
-        app:trackThickness="2dp" />
-
-    <TextView
-        android:id="@+id/runtime_status"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="?android:attr/selectableItemBackground"
-        android:ellipsize="end"
-        android:focusable="true"
-        android:maxLines="2"
-        android:paddingStart="16dp"
-        android:paddingTop="6dp"
-        android:paddingEnd="16dp"
-        android:paddingBottom="6dp"
-        android:textAppearance="?android:attr/textAppearanceSmall"
-        android:textColor="?android:attr/textColorSecondary"
-        android:visibility="gone" />
-
-    <include layout="@layout/layout_subscription_card" />
-
-    <androidx.coordinatorlayout.widget.CoordinatorLayout
-        android:id="@+id/profiles_content"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1">
-
-        <androidx.viewpager2.widget.ViewPager2
-            android:id="@+id/group_pager"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-
-        <!-- Down to the bottom edge: the panel keeps its content above MainActivity's stats bar and FAB.
-             A wide landscape window puts it at the end side instead, full height (ConfigurationFragment). -->
-        <FrameLayout
-            android:id="@+id/test_panel_container"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="bottom" />
-
-    </androidx.coordinatorlayout.widget.CoordinatorLayout>
+        android:layout_height="match_parent" />
 
 </LinearLayout>

@@ -457,12 +457,6 @@
             android:parentActivityName="io.nekohasekai.sagernet.ui.MainActivity" />
 
         <activity
-            android:name="io.nekohasekai.sagernet.ui.AutoSelectorStatusActivity"
-            android:configChanges="uiMode"
-            android:label="@string/autosel_stats_title"
-            android:parentActivityName="io.nekohasekai.sagernet.ui.MainActivity" />
-
-        <activity
             android:name="io.nekohasekai.sagernet.ui.SwitchActivity"
             android:configChanges="uiMode"
             android:excludeFromRecents="true"
