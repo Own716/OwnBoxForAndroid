@@ -376,6 +376,11 @@ class ConfigurationFragment : ToolbarFragment(R.layout.layout_group_list),
                 item.icon = tinted
             }
         }
+        toolbar.overflowIcon?.let { icon ->
+            val tinted = icon.mutate()
+            DrawableCompat.setTint(tinted, actionIconTint)
+            toolbar.overflowIcon = tinted
+        }
         searchView = (toolbar.menu.findItem(R.id.action_search)?.actionView as? SearchView)?.apply {
             setOnQueryTextListener(this@ConfigurationFragment)
             maxWidth = Int.MAX_VALUE
