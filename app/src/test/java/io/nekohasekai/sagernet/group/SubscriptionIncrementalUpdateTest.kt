@@ -94,9 +94,7 @@ class SubscriptionIncrementalUpdateTest {
         if (entity.status == 1 && entity.ping > 0) return true
         // 3. Has data transfer traffic
         if (entity.rx > 0L || entity.tx > 0L) return true
-        // 4. Untested node (status == 0) - safely retain
-        if (entity.status == 0) return true
-        // 5. Test failed or invalid
+        // 4. Untested, failed, or defunct
         return false
     }
 
@@ -122,7 +120,7 @@ class SubscriptionIncrementalUpdateTest {
         assertTrue("Mode B retains node with successful test", shouldRetainProfileHelper(successNode, currentProfileId = 999, retainValidNodes = true))
         assertTrue("Mode B retains active profile node", shouldRetainProfileHelper(currentProfileNode, currentProfileId = 102, retainValidNodes = true))
         assertTrue("Mode B retains node with traffic history", shouldRetainProfileHelper(trafficNode, currentProfileId = 999, retainValidNodes = true))
-        assertTrue("Mode B retains untested node", shouldRetainProfileHelper(untestedNode, currentProfileId = 999, retainValidNodes = true))
+        assertFalse("Mode B does not retain untested node", shouldRetainProfileHelper(untestedNode, currentProfileId = 999, retainValidNodes = true))
         assertFalse("Mode B does not retain dead/failed node", shouldRetainProfileHelper(deadNode, currentProfileId = 999, retainValidNodes = true))
     }
 

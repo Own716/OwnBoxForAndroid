@@ -316,14 +316,12 @@ object RawUpdater : GroupUpdater() {
 
         fun shouldRetainProfile(entity: ProxyEntity): Boolean {
             // 1. 保护当前正在连接或选中的活跃节点
-            if (entity.id == DataStore.currentProfile) return true
+            if (entity.id == DataStore.currentProfile || entity.id == DataStore.selectedProxy) return true
             // 2. 上次测试成功的有效节点 (status == 1 且 ping > 0)
             if (entity.status == 1 && entity.ping > 0) return true
             // 3. 有数据传输记录的节点
             if (entity.rx > 0L || entity.tx > 0L) return true
-            // 4. 从未测速的节点 (status == 0) - 安全保留，避免未测试的新节点被误删
-            if (entity.status == 0) return true
-            // 5. 测速失败 (status == 3) 或插件缺失 (status == 2) 且不在订阅中 -> 允许删除清理
+            // 4. 其余节点（从未测速、测速失败或插件缺失）且已不在新订阅中，不保留并执行清理
             return false
         }
 
@@ -342,15 +340,13 @@ object RawUpdater : GroupUpdater() {
         } else {
             toDelete.addAll(remainingExists)
         }
-        val isShrunkTooMuch = !isFilterActive && exists.size >= 10 && proxies.size < exists.size * 0.70
-        if (isShrunkTooMuch) {
-            Logs.w("RawUpdater circuit breaker triggered: exists=${exists.size}, fetched=${proxies.size}, skipping deletion")
-        } else if (toDelete.isNotEmpty()) {
+
+        if (toDelete.isNotEmpty()) {
             changed += toDelete.size
         }
-        val deleted = if (isShrunkTooMuch) emptyList() else toDelete.map { it.displayName() }
+        val deleted = toDelete.map { it.displayName() }
 
-        Logs.d("toDelete profiles (orphans/removed/duplicates): ${toDelete.size}, isShrunkTooMuch=$isShrunkTooMuch")
+        Logs.d("toDelete profiles (orphans/removed): ${toDelete.size}")
         Logs.d("toInsert profiles: ${toInsert.size}")
         Logs.d("toUpdate profiles: ${toUpdate.size}")
 
@@ -362,7 +358,10 @@ object RawUpdater : GroupUpdater() {
                 Logs.d("Updated profiles: $it")
             }
         }
-        if (!isShrunkTooMuch && toDelete.isNotEmpty()) {
+        if (toDelete.isNotEmpty()) {
+            if (DataStore.selectedProxy != 0L && toDelete.any { it.id == DataStore.selectedProxy }) {
+                DataStore.selectedProxy = 0L
+            }
             SagerDatabase.proxyDao.deleteProxy(toDelete).also {
                 Logs.d("Deleted profiles: $it")
             }
