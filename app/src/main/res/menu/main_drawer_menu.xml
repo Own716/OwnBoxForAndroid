@@ -27,6 +27,10 @@
             android:icon="@drawable/ic_baseline_health_and_safety_24"
             android:title="@string/menu_diagnostics" />
         <item
+            android:id="@+id/nav_apps"
+            android:icon="@drawable/ic_navigation_apps"
+            android:title="@string/proxied_apps" />
+        <item
             android:id="@+id/nav_tools"
             android:icon="@drawable/baseline_construction_24"
             android:title="@string/menu_tools" />

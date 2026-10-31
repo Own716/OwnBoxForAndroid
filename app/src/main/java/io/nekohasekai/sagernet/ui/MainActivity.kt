@@ -779,6 +779,11 @@ class MainActivity : ThemedActivity(),
             R.id.nav_settings -> displayFragment(SettingsFragment())
             R.id.nav_dashboard -> displayFragment(WebviewFragment())
             R.id.nav_diagnostics -> displayFragment(DiagnosticsFragment())
+            R.id.nav_apps -> {
+                startActivity(Intent(this, AppManagerActivity::class.java))
+                binding.drawerLayout.closeDrawers()
+                return false
+            }
             R.id.nav_tools -> displayFragment(ToolsFragment())
             R.id.nav_logcat -> displayFragment(LogcatFragment())
             R.id.nav_faq -> {
