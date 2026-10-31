@@ -156,8 +156,9 @@ class AppearanceSettingsFragment : PreferenceFragmentCompat() {
 
         fun bindFormatField(pref: EditTextPreference?, onSave: (String) -> Unit) {
             pref?.setOnPreferenceChangeListener { _, newValue ->
-                val str = (newValue as? String).orEmpty().trim()
+                val str = (newValue as? String).orEmpty().trim().replace('｛', '{').replace('｝', '}')
                 onSave(str)
+                pref.text = str
                 DataStore.liveUpdatePreset = LiveUpdateFormatter.PRESET_CUSTOM
                 liveUpdatePreset?.value = LiveUpdateFormatter.PRESET_CUSTOM
                 view?.post {
@@ -200,14 +201,22 @@ class AppearanceSettingsFragment : PreferenceFragmentCompat() {
             true
         }
 
-        findPreference<SwitchPreference>("showDirectSpeed")?.setOnPreferenceChangeListener { _, _ ->
+        findPreference<SwitchPreference>("showDirectSpeed")?.setOnPreferenceChangeListener { _, newValue ->
+            DataStore.showDirectSpeed = newValue as Boolean
             needReload()
-            view?.post { notifyNotificationUpdate() }
+            view?.post {
+                updateLiveUpdatePreview()
+                notifyNotificationUpdate()
+            }
             true
         }
 
-        findPreference<SwitchPreference>("showGroupInNotification")?.setOnPreferenceChangeListener { _, _ ->
-            view?.post { notifyNotificationUpdate() }
+        findPreference<SwitchPreference>("showGroupInNotification")?.setOnPreferenceChangeListener { _, newValue ->
+            DataStore.showGroupInNotification = newValue as Boolean
+            view?.post {
+                updateLiveUpdatePreview()
+                notifyNotificationUpdate()
+            }
             true
         }
 
@@ -219,10 +228,12 @@ class AppearanceSettingsFragment : PreferenceFragmentCompat() {
                     .ifEmpty { getString(androidx.preference.R.string.not_set) }
             }
             setOnPreferenceChangeListener { _, newValue ->
-                if ((newValue as Set<*>).size > 3) {
+                val set = (newValue as Set<*>).map { it.toString() }.toMutableSet()
+                if (set.size > 3) {
                     Toast.makeText(requireContext(), R.string.notification_actions_too_many, Toast.LENGTH_SHORT).show()
                     false
                 } else {
+                    DataStore.configurationStore.putStringSet(Key.NOTIFICATION_ACTIONS, set)
                     view?.post { notifyNotificationUpdate() }
                     true
                 }

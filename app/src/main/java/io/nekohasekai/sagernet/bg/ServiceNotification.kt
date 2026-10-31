@@ -90,6 +90,7 @@ class ServiceNotification(
         subText: String?
     ) {
         builder.setOngoing(true)
+        val extras = builder.extras
         if (showCapsule) {
             builder.setCategory(NotificationCompat.CATEGORY_STATUS)
             builder.priority = NotificationCompat.PRIORITY_LOW
@@ -99,24 +100,22 @@ class ServiceNotification(
                 method.invoke(builder, true)
             } catch (_: Throwable) {}
 
-            builder.addExtras(Bundle().apply {
-                putBoolean("android.requestPromotedOngoing", true)
-                putCharSequence("android.shortCriticalText", collapsedTitle)
-                putString("capsule_text", collapsedTitle)
-                try {
-                    val focusParam = JSONObject().apply {
-                        put("type", 1)
-                        put("baseInfo", JSONObject().apply {
-                            put("title", collapsedTitle)
-                            put("content", contentText)
-                            if (!subText.isNullOrEmpty()) {
-                                put("subTitle", subText)
-                            }
-                        })
-                    }
-                    putString("miui.focus.param", focusParam.toString())
-                } catch (_: Throwable) {}
-            })
+            extras.putBoolean("android.requestPromotedOngoing", true)
+            extras.putCharSequence("android.shortCriticalText", collapsedTitle)
+            extras.putString("capsule_text", collapsedTitle)
+            try {
+                val focusParam = JSONObject().apply {
+                    put("type", 1)
+                    put("baseInfo", JSONObject().apply {
+                        put("title", collapsedTitle)
+                        put("content", contentText)
+                        if (!subText.isNullOrEmpty()) {
+                            put("subTitle", subText)
+                        }
+                    })
+                }
+                extras.putString("miui.focus.param", focusParam.toString())
+            } catch (_: Throwable) {}
         } else {
             builder.setCategory(NotificationCompat.CATEGORY_SERVICE)
             builder.priority = NotificationCompat.PRIORITY_LOW
@@ -126,12 +125,16 @@ class ServiceNotification(
                 method.invoke(builder, false)
             } catch (_: Throwable) {}
 
-            builder.addExtras(Bundle().apply {
-                putBoolean("android.requestPromotedOngoing", false)
-                remove("miui.focus.param")
-                remove("capsule_text")
-                remove("android.shortCriticalText")
-            })
+            extras.putBoolean("android.requestPromotedOngoing", false)
+            extras.remove("capsule_text")
+            extras.remove("android.shortCriticalText")
+            extras.remove("miui.focus.param")
+            try {
+                val focusParam = JSONObject().apply {
+                    put("type", 0)
+                }
+                extras.putString("miui.focus.param", focusParam.toString())
+            } catch (_: Throwable) {}
         }
     }
 
@@ -399,6 +402,51 @@ class ServiceNotification(
 
         runOnMainDispatcher {
             updateActions()
+            if (DataStore.liveUpdateEnabled) {
+                val profileId = service.data.proxy?.profile?.id ?: DataStore.selectedProxy
+                val profile = service.data.proxy?.profile ?: SagerDatabase.proxyDao.getById(profileId)
+                val info = LiveUpdateFormatter.buildInfo(
+                    service as Context,
+                    profile,
+                    lastStats,
+                    connectStartTime,
+                    currentEgressIp,
+                    currentEgressCountry
+                )
+                val tpls = LiveUpdateFormatter.getTemplates()
+
+                val formattedCollapsed = LiveUpdateFormatter.format(tpls.collapsed, info).ifEmpty { title }
+                val formattedTitle = LiveUpdateFormatter.format(tpls.title, info).ifEmpty { title }
+                val formattedContent = LiveUpdateFormatter.format(tpls.content, info)
+                val formattedSubText = LiveUpdateFormatter.format(tpls.subText, info)
+
+                builder.setContentTitle(formattedCollapsed)
+                builder.setContentText(formattedContent.ifEmpty { null })
+                if (formattedSubText.isNotEmpty()) {
+                    builder.setSubText(formattedSubText)
+                } else {
+                    builder.setSubText(null)
+                }
+
+                val bigTextStyle = NotificationCompat.BigTextStyle()
+                bigTextStyle.setBigContentTitle(formattedTitle)
+                bigTextStyle.bigText(formattedContent.ifEmpty { formattedTitle })
+                if (formattedSubText.isNotEmpty()) {
+                    bigTextStyle.setSummaryText(formattedSubText)
+                } else {
+                    bigTextStyle.setSummaryText(null)
+                }
+                builder.setStyle(bigTextStyle)
+
+                applyLiveUpdateProperties(
+                    builder,
+                    DataStore.liveUpdateShowCapsule,
+                    formattedCollapsed,
+                    formattedTitle,
+                    formattedContent,
+                    formattedSubText
+                )
+            }
             show()
         }
     }

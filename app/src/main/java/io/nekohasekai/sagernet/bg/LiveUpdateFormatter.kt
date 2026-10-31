@@ -92,28 +92,28 @@ object LiveUpdateFormatter {
         if (name.isEmpty()) return ""
         val n = name.lowercase(Locale.ROOT)
         return when {
-            name.contains("🇯🇵") || name.contains("日本") || n.contains("japan") || n.contains("tokyo") || n.contains("osaka") -> "日本"
-            name.contains("🇭🇰") || name.contains("香港") || n.contains("hong kong") || n.contains("hongkong") -> "香港"
-            name.contains("🇹🇼") || name.contains("台湾") || name.contains("臺灣") || n.contains("taiwan") || n.contains("taipei") -> "台湾"
-            name.contains("🇸🇬") || name.contains("新加坡") || name.contains("狮城") || n.contains("singapore") -> "新加坡"
-            name.contains("🇺🇸") || name.contains("美国") || name.contains("美國") || n.contains("united states") || n.contains("usa") || n.contains("los angeles") || n.contains("silicon") -> "美国"
-            name.contains("🇬🇧") || name.contains("英国") || name.contains("英國") || n.contains("united kingdom") || n.contains("london") -> "英国"
-            name.contains("🇰🇷") || name.contains("韩国") || name.contains("韓國") || n.contains("korea") || n.contains("seoul") -> "韩国"
-            name.contains("🇩🇪") || name.contains("德国") || name.contains("德國") || n.contains("germany") || n.contains("frankfurt") -> "德国"
-            name.contains("🇫🇷") || name.contains("法国") || name.contains("法國") || n.contains("france") || n.contains("paris") -> "法国"
-            name.contains("🇨🇦") || name.contains("加拿大") || n.contains("canada") || n.contains("toronto") || n.contains("vancouver") -> "加拿大"
-            name.contains("🇦🇺") || name.contains("澳大利亚") || name.contains("澳洲") || n.contains("australia") || n.contains("sydney") -> "澳大利亚"
-            name.contains("🇷🇺") || name.contains("俄罗斯") || name.contains("俄羅斯") || n.contains("russia") || n.contains("moscow") -> "俄罗斯"
-            name.contains("🇲🇾") || name.contains("马来西亚") || name.contains("馬來西亞") || n.contains("malaysia") -> "马来西亚"
-            name.contains("🇹🇭") || name.contains("泰国") || name.contains("泰國") || n.contains("thailand") || n.contains("bangkok") -> "泰国"
-            name.contains("🇵🇭") || name.contains("菲律宾") || name.contains("菲律賓") || n.contains("philippines") -> "菲律宾"
-            name.contains("🇮🇳") || name.contains("印度") || n.contains("india") -> "印度"
-            name.contains("🇻🇳") || name.contains("越南") || n.contains("vietnam") -> "越南"
-            name.contains("🇹🇷") || name.contains("土耳其") || n.contains("turkey") || n.contains("istanbul") -> "土耳其"
-            name.contains("🇦🇷") || name.contains("阿根廷") || n.contains("argentina") -> "阿根廷"
-            name.contains("🇧🇷") || name.contains("巴西") || n.contains("brazil") -> "巴西"
-            name.contains("🇳🇱") || name.contains("荷兰") || name.contains("荷蘭") || n.contains("netherlands") || n.contains("amsterdam") -> "荷兰"
-            name.contains("🇨🇳") || name.contains("回国") || name.contains("国内") -> "中国"
+            name.contains("🇯🇵") || name.contains("日本") || n.contains("japan") || n.contains("tokyo") || n.contains("osaka") || n.contains("jp") -> "日本"
+            name.contains("🇭🇰") || name.contains("香港") || n.contains("hong kong") || n.contains("hongkong") || n.contains("hk") -> "香港"
+            name.contains("🇹🇼") || name.contains("台湾") || name.contains("臺灣") || n.contains("taiwan") || n.contains("taipei") || n.contains("tw") -> "台湾"
+            name.contains("🇸🇬") || name.contains("新加坡") || name.contains("狮城") || n.contains("singapore") || n.contains("sg") -> "新加坡"
+            name.contains("🇺🇸") || name.contains("美国") || name.contains("美國") || n.contains("united states") || n.contains("usa") || n.contains("los angeles") || n.contains("silicon") || n.contains("us") -> "美国"
+            name.contains("🇬🇧") || name.contains("英国") || name.contains("英國") || n.contains("united kingdom") || n.contains("london") || n.contains("uk") -> "英国"
+            name.contains("🇰🇷") || name.contains("韩国") || name.contains("韓國") || n.contains("korea") || n.contains("seoul") || n.contains("kr") -> "韩国"
+            name.contains("🇩🇪") || name.contains("德国") || name.contains("德國") || n.contains("germany") || n.contains("frankfurt") || n.contains("de") -> "德国"
+            name.contains("🇫🇷") || name.contains("法国") || name.contains("法國") || n.contains("france") || n.contains("paris") || n.contains("fr") -> "法国"
+            name.contains("🇨🇦") || name.contains("加拿大") || n.contains("canada") || n.contains("toronto") || n.contains("vancouver") || n.contains("ca") -> "加拿大"
+            name.contains("🇦🇺") || name.contains("澳大利亚") || name.contains("澳洲") || n.contains("australia") || n.contains("sydney") || n.contains("au") -> "澳大利亚"
+            name.contains("🇷🇺") || name.contains("俄罗斯") || name.contains("俄羅斯") || n.contains("russia") || n.contains("moscow") || n.contains("ru") -> "俄罗斯"
+            name.contains("🇲🇾") || name.contains("马来西亚") || name.contains("馬來西亞") || n.contains("malaysia") || n.contains("my") -> "马来西亚"
+            name.contains("🇹🇭") || name.contains("泰国") || name.contains("泰國") || n.contains("thailand") || n.contains("bangkok") || n.contains("th") -> "泰国"
+            name.contains("🇵🇭") || name.contains("菲律宾") || name.contains("菲律賓") || n.contains("philippines") || n.contains("ph") -> "菲律宾"
+            name.contains("🇮🇳") || name.contains("印度") || n.contains("india") || n.contains("in") -> "印度"
+            name.contains("🇻🇳") || name.contains("越南") || n.contains("vietnam") || n.contains("vn") -> "越南"
+            name.contains("🇹🇷") || name.contains("土耳其") || n.contains("turkey") || n.contains("istanbul") || n.contains("tr") -> "土耳其"
+            name.contains("🇦🇷") || name.contains("阿根廷") || n.contains("argentina") || n.contains("ar") -> "阿根廷"
+            name.contains("🇧🇷") || name.contains("巴西") || n.contains("brazil") || n.contains("br") -> "巴西"
+            name.contains("🇳🇱") || name.contains("荷兰") || name.contains("荷蘭") || n.contains("netherlands") || n.contains("amsterdam") || n.contains("nl") -> "荷兰"
+            name.contains("🇨🇳") || name.contains("回国") || name.contains("国内") || n.contains("china") -> "中国"
             else -> ""
         }
     }
@@ -134,6 +134,9 @@ object LiveUpdateFormatter {
         var server = ""
         var protocol = ""
         var latency = ""
+
+        val showGroup = runCatching { DataStore.showGroupInNotification }.getOrDefault(true)
+        val showDirect = runCatching { DataStore.showDirectSpeed }.getOrDefault(true)
 
         if (country.isEmpty()) {
             val cachedLanding = LandingIpManager.getCachedInfo()
@@ -156,12 +159,13 @@ object LiveUpdateFormatter {
         val isStrategy = isBalancer || isGroupStrategy
 
         if (isStrategy && profile != null) {
-            groupName = profile.displayName()
+            val actualGroupName = profile.displayName()
+            groupName = if (showGroup) actualGroupName else ""
             val leafNode = ActiveOutboundTracker.getActiveLeafNodeDisplay(profile)
             val leafId = ActiveOutboundTracker.activeLeafProfileId
             val leafEntity = if (leafId > 0L) runCatching { SagerDatabase.proxyDao.getById(leafId) }.getOrNull() else null
 
-            profileName = leafNode ?: leafEntity?.displayName() ?: ActiveOutboundTracker.activeLeafProfileName.takeIf { it.isNotBlank() } ?: groupName
+            profileName = leafNode ?: leafEntity?.displayName() ?: ActiveOutboundTracker.activeLeafProfileName.takeIf { it.isNotBlank() } ?: actualGroupName
 
             val refProfile = leafEntity ?: profile
             if (ip.isEmpty()) {
@@ -171,7 +175,7 @@ object LiveUpdateFormatter {
             protocol = refProfile.displayType().uppercase(Locale.getDefault())
             if (refProfile.ping > 0) latency = "${refProfile.ping}ms"
         } else if (profile != null) {
-            groupName = group?.displayName().orEmpty()
+            groupName = if (showGroup) group?.displayName().orEmpty() else ""
             profileName = profile.displayName()
             if (ip.isEmpty()) {
                 ip = profile.displayAddress()
@@ -205,6 +209,10 @@ object LiveUpdateFormatter {
             }
         }
 
+        if (country.isEmpty()) {
+            country = profileName.ifEmpty { groupName }
+        }
+
         val downSpeed = Formatter.formatFileSize(context, stats.rxRateProxy) + "/s"
         val upSpeed = Formatter.formatFileSize(context, stats.txRateProxy) + "/s"
         val totalDownTraffic = Formatter.formatFileSize(context, stats.rxTotal)
@@ -221,8 +229,8 @@ object LiveUpdateFormatter {
             String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds)
         }
 
-        val directDownSpeed = Formatter.formatFileSize(context, stats.rxRateDirect) + "/s"
-        val directUpSpeed = Formatter.formatFileSize(context, stats.txRateDirect) + "/s"
+        val directDownSpeed = if (showDirect) Formatter.formatFileSize(context, stats.rxRateDirect) + "/s" else ""
+        val directUpSpeed = if (showDirect) Formatter.formatFileSize(context, stats.txRateDirect) + "/s" else ""
 
         return LiveUpdateInfo(
             profileName = profileName,
@@ -245,9 +253,11 @@ object LiveUpdateFormatter {
 
     fun getMockInfo(context: Context): LiveUpdateInfo {
         val isZh = Locale.getDefault().language == "zh"
+        val showDirect = runCatching { DataStore.showDirectSpeed }.getOrDefault(true)
+        val showGroup = runCatching { DataStore.showGroupInNotification }.getOrDefault(true)
         return LiveUpdateInfo(
             profileName = "Hong Kong 01",
-            groupName = "Premium",
+            groupName = if (showGroup) "Premium" else "",
             downSpeed = "12.5 MB/s",
             upSpeed = "1.2 MB/s",
             totalDownTraffic = "1.4 GB",
@@ -256,35 +266,49 @@ object LiveUpdateFormatter {
             duration = "01:23:45",
             protocol = "VLESS",
             latency = "45ms",
-            directDownSpeed = "0 B/s",
-            directUpSpeed = "0 B/s",
+            directDownSpeed = if (showDirect) "0 B/s" else "",
+            directUpSpeed = if (showDirect) "0 B/s" else "",
             ip = "104.28.19.24",
             server = "hk01.example.com",
             country = if (isZh) "香港" else "Hong Kong",
         )
     }
 
+    fun normalizeTemplate(template: String): String {
+        return template
+            .replace('｛', '{')
+            .replace('｝', '}')
+            .replace('（', '(')
+            .replace('）', ')')
+            .replace('【', '[')
+            .replace('】', ']')
+    }
+
     fun format(template: String, info: LiveUpdateInfo): String {
         if (template.isEmpty()) return ""
-        var res = template
-            .replace("{profile}", info.profileName)
-            .replace("{group}", info.groupName)
-            .replace("{country}", info.country)
-            .replace("{location}", info.country)
-            .replace("{ip_location}", info.country)
-            .replace("{country_name}", info.country)
-            .replace("{ip}", info.ip)
-            .replace("{server}", info.server)
-            .replace("{down}", info.downSpeed)
-            .replace("{up}", info.upSpeed)
-            .replace("{traffic_down}", info.totalDownTraffic)
-            .replace("{traffic_up}", info.totalUpTraffic)
-            .replace("{traffic_total}", info.totalTraffic)
-            .replace("{duration}", info.duration)
-            .replace("{protocol}", info.protocol)
-            .replace("{latency}", info.latency)
-            .replace("{direct_down}", info.directDownSpeed)
-            .replace("{direct_up}", info.directUpSpeed)
+        val normalized = normalizeTemplate(template)
+
+        val variableRegex = Regex("""\{\s*([a-zA-Z0-9_]+)\s*\}""")
+        var res = variableRegex.replace(normalized) { match ->
+            when (match.groupValues[1].lowercase(Locale.ROOT)) {
+                "profile", "node", "name" -> info.profileName
+                "group", "subscription", "sub" -> info.groupName
+                "country", "location", "ip_location", "country_name", "region", "city" -> info.country
+                "ip", "egress_ip", "outbound_ip" -> info.ip
+                "server", "host", "address" -> info.server
+                "down", "download", "rx", "speed_down", "down_speed" -> info.downSpeed
+                "up", "upload", "tx", "speed_up", "up_speed" -> info.upSpeed
+                "traffic_down", "total_down", "rx_total" -> info.totalDownTraffic
+                "traffic_up", "total_up", "tx_total" -> info.totalUpTraffic
+                "traffic_total", "total_traffic", "traffic" -> info.totalTraffic
+                "duration", "time", "uptime" -> info.duration
+                "protocol", "proto", "type" -> info.protocol
+                "latency", "ping", "delay" -> info.latency
+                "direct_down", "direct_rx" -> info.directDownSpeed
+                "direct_up", "direct_tx" -> info.directUpSpeed
+                else -> ""
+            }
+        }
 
         if (info.groupName.isEmpty()) {
             res = res.replace("[]", "").replace("【】", "")
@@ -295,9 +319,16 @@ object LiveUpdateFormatter {
         if (info.country.isEmpty()) {
             res = res.replace("()", "").replace("（）", "")
         }
-        res = res.replace(Regex("\\|\\s*\\|"), "|")
+        if (info.directDownSpeed.isEmpty() && info.directUpSpeed.isEmpty()) {
+            res = res.replace(Regex("""直连[:：]\s*(↑\s*)?(↓\s*)?"""), "")
+        }
+        if (info.downSpeed.isEmpty() && info.upSpeed.isEmpty()) {
+            res = res.replace(Regex("""代理[:：]\s*(↑\s*)?(↓\s*)?"""), "")
+        }
+
+        res = res.replace(Regex("""\|\s*\|"""), "|")
         res = res.trim().removePrefix("|").removeSuffix("|").trim()
-        return res.replace(Regex("\\s+"), " ").trim()
+        return res.replace(Regex("""\s+"""), " ").trim()
     }
 
     fun getTemplates(): Templates {
