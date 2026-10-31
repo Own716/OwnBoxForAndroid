@@ -7,6 +7,13 @@
         app:key="categoryUI"
         app:title="@string/ui_settings">
 
+        <Preference
+            app:fragment="io.nekohasekai.sagernet.ui.AppearanceSettingsFragment"
+            app:icon="@drawable/ic_baseline_color_lens_24"
+            app:key="settingsAppearance"
+            app:summary="@string/settings_appearance_sum"
+            app:title="@string/settings_appearance" />
+
         <moe.matsuri.nb4a.ui.SimpleMenuPreference
             app:defaultValue="0"
             app:entries="@array/card_style_entries"

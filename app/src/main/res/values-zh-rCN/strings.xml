@@ -1118,4 +1118,44 @@
     <string name="service_status_available">可用</string>
     <string name="service_status_failed">检测失败</string>
     <string name="diagnostics_not_connected">未连接代理节点，请先开启连接</string>
+
+    <!-- Live Update & Notification -->
+    <string name="live_update">实况通知岛 (Live Update)</string>
+    <string name="live_update_sum">在状态栏与锁屏以动态灵动岛/实况胶囊形式展示实时连接与流量状态</string>
+    <string name="live_update_channel">实况通知</string>
+    <string name="live_update_show_capsule">收起时显示灵动胶囊</string>
+    <string name="live_update_show_capsule_sum">在状态栏以灵动胶囊呈现（ColorOS 流体云、HyperOS 焦点通知等）；关闭后收起状态下不显示胶囊</string>
+    <string name="live_update_preset">通知岛模板预设</string>
+    <string name="live_update_preset_group_first">策略组模式（推荐：胶囊策略组 + 展开节点与 IP）</string>
+    <string name="live_update_preset_node_first">节点优先模式（胶囊与标题均为主节点 + 展开 IP）</string>
+    <string name="live_update_preset_minimal_ip">极简 IP 模式（胶囊节点与 IP + 实时网速）</string>
+    <string name="live_update_preset_full_stats">全能监控模式（策略组 + 节点 + 网速 + IP + 流量时长）</string>
+    <string name="live_update_preset_custom">完全自定义</string>
+    <string name="live_update_collapsed_format">收起时标题模板 (灵动胶囊)</string>
+    <string name="live_update_collapsed_format_sum">状态栏胶囊/收起状态显示的文字。支持 {group}、{profile}、{country}、{ip} 等</string>
+    <string name="live_update_title_format">展开时主标题模板</string>
+    <string name="live_update_title_format_sum">下拉通知栏与锁屏卡片的主标题。支持 {group}、{profile}、{country}、{ip} 等</string>
+    <string name="live_update_content_format">展开时详细内容模板</string>
+    <string name="live_update_content_format_sum">下拉卡片第一行正文。支持 {down}、{up}、{country}、{ip} 等</string>
+    <string name="live_update_subtext_format">展开时次要摘要模板</string>
+    <string name="live_update_subtext_format_sum">下拉卡片第二行次要信息（可留空）。支持 {profile}、{country}、{ip}、{traffic_total} 等</string>
+    <string name="live_update_preview">效果预览与变量说明</string>
+    <string name="live_update_preview_summary_format">收起胶囊：%1$s\n展开卡片：%2$s | %3$s | %4$s</string>
+    <string name="live_update_preview_summary_format_no_sub">收起胶囊：%1$s\n展开卡片：%2$s | %3$s</string>
+    <string name="live_update_preview_dialog_title">实况通知岛预览与变量说明</string>
+    <string name="live_update_preview_dialog_message">当前渲染效果预览：\n\n【收起时 (状态栏灵动胶囊)】\n%1$s\n\n【展开时 (通知栏卡片)】\n主标题：%2$s\n详细内容：%3$s\n次要摘要：%4$s\n\n支持的变量占位符：\n• {profile} ：当前连接节点名称（策略组下自动对应选中的实际节点）\n• {group} ：策略组或节点所属订阅/分组名称\n• {ip} ：当前节点的 IP 地址（测试出站 IP 或服务器连接地址）\n• {country} 或 {location} ：当前 IP 所在地点/归属国家（如：日本、香港、美国）\n• {server} ：节点服务器域名或连接地址\n• {down} ：实时下载速度（自动带单位）\n• {up} ：实时上传速度（自动带单位）\n• {traffic_down} ：本次连接已接收总流量\n• {traffic_up} ：本次连接已发送总流量\n• {traffic_total} ：本次连接总消耗流量\n• {duration} ：连接持续运行时长\n• {protocol} ：节点出站协议类型\n• {latency} ：节点延迟\n• {direct_down} ：直连下载速度\n• {direct_up} ：直连上传速度</string>
+    <string name="cag_notification">通知</string>
+    <string name="notification_actions">通知按钮</string>
+    <string name="notification_actions_too_many">最多选择 3 个按钮</string>
+    <string name="notification_next">下一个</string>
+    <string name="notification_permission">通知</string>
+    <string name="notification_permission_allowed">已允许</string>
+    <string name="notification_permission_blocked">已阻止：服务通知及其按钮被隐藏。点按以允许。</string>
+    <string name="notification_permission_rationale">VPN 运行时 OwnBox 会显示带停止与切换服务器按钮的通知。请允许通知以查看它。</string>
+    <string name="notification_previous">上一个</string>
+    <string name="notification_switch">切换…</string>
+    <string name="notification_switching">切换中…</string>
+    <string name="settings_appearance">外观</string>
+    <string name="settings_appearance_sum">主题、语言、通知</string>
+
 </resources>

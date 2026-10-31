@@ -63,6 +63,14 @@ class BaseService {
                     Logs.i("BaseService: received Action.RESTART, forcing full stopRunner(restart = true)")
                     service.stopRunner(restart = true)
                 }
+                Action.SWITCH_NEXT -> service.switchRelative(1)
+                Action.SWITCH_PREVIOUS -> service.switchRelative(-1)
+                Action.SWITCH_PROFILE -> service.switchProfile(intent.getLongExtra(Action.EXTRA_PROFILE_ID, 0L))
+                Action.REFRESH_NOTIFICATION -> {
+                    runOnDefaultDispatcher {
+                        notification?.refreshLiveUpdate()
+                    }
+                }
                 // Action.SWITCH_WAKE_LOCK -> runOnDefaultDispatcher { service.switchWakeLock() }
                 PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED -> {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -281,6 +289,18 @@ class BaseService {
 
         fun onBind(intent: Intent): IBinder? =
             if (intent.action == Action.SERVICE) data.binder else null
+
+        fun switchProfile(id: Long) {
+            if (id <= 0L) return
+            DataStore.selectedProxy = id
+            reload()
+        }
+
+        fun switchRelative(step: Int) {
+            val current = DataStore.selectedProxy.takeIf { it > 0L } ?: data.proxy?.profile?.id ?: return
+            val target = io.nekohasekai.sagernet.database.ProfileOrder.neighbour(current, step) ?: return
+            switchProfile(target.id)
+        }
 
         fun reload() {
             if (DataStore.selectedProxy == 0L) {
@@ -669,6 +689,10 @@ class BaseService {
                     addAction(Action.RESTART)
                     addAction(Intent.ACTION_SHUTDOWN)
                     addAction(Action.CLOSE)
+                    addAction(Action.SWITCH_NEXT)
+                    addAction(Action.SWITCH_PREVIOUS)
+                    addAction(Action.SWITCH_PROFILE)
+                    addAction(Action.REFRESH_NOTIFICATION)
                     // addAction(Action.SWITCH_WAKE_LOCK)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                         addAction(PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED)

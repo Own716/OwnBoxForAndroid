@@ -1201,4 +1201,44 @@
     <string name="service_status_available">Available</string>
     <string name="service_status_failed">Failed</string>
     <string name="diagnostics_not_connected">Proxy not connected. Please connect first.</string>
+
+    <!-- Live Update & Notification -->
+    <string name="live_update">Live Update (Notification Island)</string>
+    <string name="live_update_sum">Display real-time traffic and connection status as a dynamic capsule/island on the status bar and lock screen</string>
+    <string name="live_update_channel">Live Update</string>
+    <string name="live_update_show_capsule">Show Status Bar Capsule</string>
+    <string name="live_update_show_capsule_sum">Show live dynamic capsule in status bar when collapsed (e.g. ColorOS Fluid Cloud, HyperOS); turn off to hide in collapsed state</string>
+    <string name="live_update_preset">Island Template Preset</string>
+    <string name="live_update_preset_group_first">Strategy Group Mode (Recommended)</string>
+    <string name="live_update_preset_node_first">Node First Mode</string>
+    <string name="live_update_preset_minimal_ip">Minimal &amp; IP Mode</string>
+    <string name="live_update_preset_full_stats">Full Monitoring Mode</string>
+    <string name="live_update_preset_custom">Custom</string>
+    <string name="live_update_collapsed_format">Collapsed Title Format (Capsule)</string>
+    <string name="live_update_collapsed_format_sum">Status bar island/capsule text when collapsed. Supported: {profile}, {group}, {country}, {ip}, etc.</string>
+    <string name="live_update_title_format">Expanded Title Format</string>
+    <string name="live_update_title_format_sum">Main card title when expanded in notification shade. Supported: {group}, {profile}, {country}, {ip}, etc.</string>
+    <string name="live_update_content_format">Expanded Content Format</string>
+    <string name="live_update_content_format_sum">Card primary body text. Supported: {down}, {up}, {country}, {ip}, etc.</string>
+    <string name="live_update_subtext_format">Expanded Secondary Summary Format</string>
+    <string name="live_update_subtext_format_sum">Card secondary/trailing text (optional). Supported: {profile}, {country}, {ip}, {traffic_total}, etc.</string>
+    <string name="live_update_preview">Live Preview &amp; Variables</string>
+    <string name="live_update_preview_summary_format">Capsule: %1$s\nCard: %2$s | %3$s | %4$s</string>
+    <string name="live_update_preview_summary_format_no_sub">Capsule: %1$s\nCard: %2$s | %3$s</string>
+    <string name="live_update_preview_dialog_title">Live Update Preview &amp; Help</string>
+    <string name="live_update_preview_dialog_message">Current Preview:\n\n[Collapsed Capsule]\n%1$s\n\n[Expanded Notification Card]\nTitle: %2$s\nContent: %3$s\nSubtext: %4$s\n\nSupported Variable Placeholders:\n• {profile} : Active node/profile name\n• {group} : Subscription/group name\n• {ip} : Active node IP address (egress IP or server host)\n• {country} or {location} : Active IP location / country name (e.g. Japan, Hong Kong, United States)\n• {server} : Node server address/host\n• {down} : Real-time download speed\n• {up} : Real-time upload speed\n• {traffic_down} : Total session downloaded traffic\n• {traffic_up} : Total session uploaded traffic\n• {traffic_total} : Total session traffic (down + up)\n• {duration} : Connection duration (hh:mm:ss)\n• {protocol} : Outbound protocol type\n• {latency} : Node latency\n• {direct_down} : Direct download speed\n• {direct_up} : Direct upload speed</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_appearance_sum">Theme, language, notification</string>
+    <string name="cag_notification">Notification</string>
+    <string name="notification_next">Next</string>
+    <string name="notification_previous">Previous</string>
+    <string name="notification_switch">Switch…</string>
+    <string name="notification_switching">Switching…</string>
+    <string name="notification_actions">Notification buttons</string>
+    <string name="notification_actions_too_many">Choose at most 3 buttons</string>
+    <string name="notification_permission">Notifications</string>
+    <string name="notification_permission_allowed">Allowed</string>
+    <string name="notification_permission_blocked">Blocked: the service notification and its buttons are hidden. Tap to allow.</string>
+    <string name="notification_permission_rationale">OwnBox shows a notification while the VPN runs, with buttons to stop it and to switch servers. Allow notifications to see it.</string>
+
 </resources>

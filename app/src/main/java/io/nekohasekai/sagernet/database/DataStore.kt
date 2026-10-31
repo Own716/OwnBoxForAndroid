@@ -20,6 +20,7 @@ import io.nekohasekai.sagernet.ktx.int
 import io.nekohasekai.sagernet.ktx.long
 import io.nekohasekai.sagernet.ktx.parsePort
 import io.nekohasekai.sagernet.ktx.string
+import io.nekohasekai.sagernet.ktx.stringSet
 import io.nekohasekai.sagernet.ktx.stringToInt
 import io.nekohasekai.sagernet.ktx.stringToIntIfExists
 import io.nekohasekai.sagernet.ktx.stringToLong
@@ -134,7 +135,15 @@ object DataStore : OnPreferenceDataStoreChangeListener {
 
     var allowAccess by configurationStore.boolean(Key.ALLOW_ACCESS)
     var speedInterval by configurationStore.stringToInt(Key.SPEED_INTERVAL)
-    var showGroupInNotification by configurationStore.boolean("showGroupInNotification")
+    var showGroupInNotification by configurationStore.boolean(Key.SHOW_GROUP_IN_NOTIFICATION)
+    var liveUpdateEnabled by configurationStore.boolean(Key.LIVE_UPDATE_ENABLED)
+    var liveUpdateShowCapsule by configurationStore.boolean(Key.LIVE_UPDATE_SHOW_CAPSULE) { true }
+    var liveUpdatePreset by configurationStore.string(Key.LIVE_UPDATE_PRESET) { "group_first" }
+    var liveUpdateCollapsedFormat by configurationStore.string(Key.LIVE_UPDATE_COLLAPSED_FORMAT) { "{group}" }
+    var liveUpdateTitleFormat by configurationStore.string(Key.LIVE_UPDATE_TITLE_FORMAT) { "{group}" }
+    var liveUpdateContentFormat by configurationStore.string(Key.LIVE_UPDATE_CONTENT_FORMAT) { "↓ {down}   ↑ {up}" }
+    var liveUpdateSubtextFormat by configurationStore.string(Key.LIVE_UPDATE_SUBTEXT_FORMAT) { "{profile} | {ip}" }
+    var notificationActions by configurationStore.stringSet(Key.NOTIFICATION_ACTIONS) { setOf("stop", "next", "switch") }
 
     var globalCustomConfig by configurationStore.string(Key.GLOBAL_CUSTOM_CONFIG) { "" }
 

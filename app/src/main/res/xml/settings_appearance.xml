@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <PreferenceCategory app:title="@string/theme">
+        <moe.matsuri.nb4a.ui.ColorPickerPreference
+            android:title="@string/theme"
+            app:icon="@drawable/ic_baseline_color_lens_24"
+            app:key="appTheme" />
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:defaultValue="0"
+            app:entries="@array/night_mode"
+            app:entryValues="@array/int_array_4"
+            app:icon="@drawable/ic_baseline_wb_sunny_24"
+            app:key="nightTheme"
+            app:title="@string/night_mode"
+            app:useSimpleSummaryProvider="true" />
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:defaultValue=""
+            app:entries="@array/language_entries"
+            app:entryValues="@array/language_values"
+            app:icon="@drawable/baseline_translate_24"
+            app:key="appLanguage"
+            app:title="@string/language"
+            app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="@string/cag_notification">
+        <SwitchPreference
+            app:defaultValue="false"
+            app:icon="@drawable/ic_baseline_stream_24"
+            app:key="liveUpdateEnabled"
+            app:summary="@string/live_update_sum"
+            app:title="@string/live_update" />
+        <SwitchPreference
+            app:defaultValue="true"
+            app:dependency="liveUpdateEnabled"
+            app:icon="@drawable/ic_baseline_fiber_manual_record_24"
+            app:key="liveUpdateShowCapsule"
+            app:summary="@string/live_update_show_capsule_sum"
+            app:title="@string/live_update_show_capsule" />
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:defaultValue="group_first"
+            app:dependency="liveUpdateEnabled"
+            app:entries="@array/live_update_preset_entries"
+            app:entryValues="@array/live_update_preset_values"
+            app:icon="@drawable/ic_baseline_tune_24"
+            app:key="liveUpdatePreset"
+            app:title="@string/live_update_preset"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:dependency="liveUpdateEnabled"
+            app:icon="@drawable/ic_baseline_center_focus_weak_24"
+            app:key="liveUpdateCollapsedFormat"
+            app:summary="@string/live_update_collapsed_format_sum"
+            app:title="@string/live_update_collapsed_format"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:dependency="liveUpdateEnabled"
+            app:icon="@drawable/ic_baseline_format_align_left_24"
+            app:key="liveUpdateTitleFormat"
+            app:summary="@string/live_update_title_format_sum"
+            app:title="@string/live_update_title_format"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:dependency="liveUpdateEnabled"
+            app:icon="@drawable/ic_baseline_timelapse_24"
+            app:key="liveUpdateContentFormat"
+            app:summary="@string/live_update_content_format_sum"
+            app:title="@string/live_update_content_format"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:dependency="liveUpdateEnabled"
+            app:icon="@drawable/ic_baseline_chat_bubble_outline_24"
+            app:key="liveUpdateSubtextFormat"
+            app:summary="@string/live_update_subtext_format_sum"
+            app:title="@string/live_update_subtext_format"
+            app:useSimpleSummaryProvider="true" />
+        <Preference
+            app:dependency="liveUpdateEnabled"
+            app:icon="@drawable/ic_baseline_info_24"
+            app:key="liveUpdatePreview"
+            app:persistent="false"
+            app:title="@string/live_update_preview" />
+        <SwitchPreference
+            app:defaultValue="true"
+            app:icon="@drawable/ic_baseline_speed_24"
+            app:key="showDirectSpeed"
+            app:summary="@string/show_direct_speed_sum"
+            app:title="@string/show_direct_speed" />
+        <SwitchPreference
+            app:key="showGroupInNotification"
+            app:title="@string/show_group_in_notification" />
+        <MultiSelectListPreference
+            app:defaultValue="@array/notification_action_defaults"
+            app:entries="@array/notification_action_entries"
+            app:entryValues="@array/notification_action_values"
+            app:icon="@drawable/ic_baseline_compare_arrows_24"
+            app:key="notificationActions"
+            app:title="@string/notification_actions" />
+        <Preference
+            app:icon="@drawable/ic_baseline_info_24"
+            app:key="notificationPermission"
+            app:persistent="false"
+            app:title="@string/notification_permission" />
+    </PreferenceCategory>
+</PreferenceScreen>

@@ -118,7 +118,11 @@ class VpnService : BaseVpnService(),
     override val data = BaseService.Data(this)
     override val tag = "SagerNetVpnService"
     override fun createNotification(profileName: String) =
-        ServiceNotification(this, profileName, "service-vpn-v2", true)
+        ServiceNotification(
+            this, profileName,
+            if (DataStore.liveUpdateEnabled) "service-live-update" else "service-vpn-v2",
+            true
+        )
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (DataStore.serviceMode == Key.MODE_VPN) {

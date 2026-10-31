@@ -790,4 +790,39 @@
     <string-array name="empty_array">
     </string-array>
 
+    <string-array name="live_update_preset_entries">
+        <item>@string/live_update_preset_group_first</item>
+        <item>@string/live_update_preset_node_first</item>
+        <item>@string/live_update_preset_minimal_ip</item>
+        <item>@string/live_update_preset_full_stats</item>
+        <item>@string/live_update_preset_custom</item>
+    </string-array>
+    <string-array name="live_update_preset_values" translatable="false">
+        <item>group_first</item>
+        <item>node_first</item>
+        <item>minimal_ip</item>
+        <item>full_stats</item>
+        <item>custom</item>
+    </string-array>
+
+    <string-array name="notification_action_entries">
+        <item>@string/stop</item>
+        <item>@string/notification_previous</item>
+        <item>@string/notification_next</item>
+        <item>@string/notification_switch</item>
+        <item>@string/reset_connections</item>
+    </string-array>
+    <string-array name="notification_action_values" translatable="false">
+        <item>stop</item>
+        <item>previous</item>
+        <item>next</item>
+        <item>switch</item>
+        <item>reset</item>
+    </string-array>
+    <string-array name="notification_action_defaults" translatable="false">
+        <item>stop</item>
+        <item>next</item>
+        <item>switch</item>
+    </string-array>
+
 </resources>

@@ -221,6 +221,11 @@ class SagerNet : Application(),
                 notification.createNotificationChannels(
                     listOf(
                         NotificationChannel(
+                            "service-live-update",
+                            application.getText(R.string.live_update_channel),
+                            NotificationManager.IMPORTANCE_LOW
+                        ),
+                        NotificationChannel(
                             "service-vpn-v2",
                             application.getText(R.string.service_vpn),
                             NotificationManager.IMPORTANCE_LOW
