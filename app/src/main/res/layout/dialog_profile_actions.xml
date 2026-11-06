@@ -1,0 +1,336 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingTop="20dp"
+    android:paddingBottom="16dp">
+
+    <!-- Node Header: Name and Type badge -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp"
+        android:paddingBottom="12dp">
+
+        <TextView
+            android:id="@+id/dialog_profile_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:textColor="?android:attr/textColorPrimary"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            tools:text="Hong Kong 01 [VIP]" />
+
+        <TextView
+            android:id="@+id/dialog_profile_type"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:background="@drawable/bg_chip_rounded"
+            android:paddingStart="10dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="10dp"
+            android:paddingBottom="4dp"
+            android:textColor="?attr/primaryOrTextPrimary"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            tools:text="Shadowsocks" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginBottom="8dp"
+        android:alpha="0.12"
+        android:background="?android:attr/dividerHorizontal" />
+
+    <!-- Action 1: Test Speed -->
+    <LinearLayout
+        android:id="@+id/action_speed_test_node"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp">
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:contentDescription="@string/action_test_profile_speed"
+            android:src="@drawable/ic_baseline_speed_24"
+            app:tint="?android:attr/textColorPrimary" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_weight="1"
+            android:text="@string/action_test_profile_speed"
+            android:textColor="?android:attr/textColorPrimary"
+            android:textSize="16sp" />
+    </LinearLayout>
+
+    <!-- Action 2: Edit Profile -->
+    <LinearLayout
+        android:id="@+id/action_edit_node"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp">
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:contentDescription="@string/edit"
+            android:src="@drawable/ic_image_edit"
+            app:tint="?android:attr/textColorPrimary" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_weight="1"
+            android:text="@string/edit"
+            android:textColor="?android:attr/textColorPrimary"
+            android:textSize="16sp" />
+    </LinearLayout>
+
+    <!-- Action 3: QR Code -->
+    <LinearLayout
+        android:id="@+id/action_qr_code_node"
+        android:layout_width="match_parent"
+        android:layout_height="58dp"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp">
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:contentDescription="@string/share_qr_nfc"
+            android:src="@drawable/ic_action_qrcode"
+            app:tint="?android:attr/textColorPrimary" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/share_qr_nfc"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textSize="15sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/share_qr_sum"
+                android:textColor="?android:attr/textColorSecondary"
+                android:textSize="11sp" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- Action 4: Export Standard Link -->
+    <LinearLayout
+        android:id="@+id/action_export_clipboard_std"
+        android:layout_width="match_parent"
+        android:layout_height="58dp"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp">
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:contentDescription="@string/export_standard_link"
+            android:src="@drawable/ic_content_copy"
+            app:tint="?android:attr/textColorPrimary" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/export_standard_link"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textSize="15sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/export_standard_link_sum"
+                android:textColor="?android:attr/textColorSecondary"
+                android:textSize="11sp" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- Action 5: Export SN Link -->
+    <LinearLayout
+        android:id="@+id/action_export_clipboard_sn"
+        android:layout_width="match_parent"
+        android:layout_height="58dp"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp">
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:contentDescription="@string/export_sn_link"
+            android:src="@drawable/ic_social_share"
+            app:tint="?android:attr/textColorPrimary" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/export_sn_link"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textSize="15sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/export_sn_link_sum"
+                android:textColor="?android:attr/textColorSecondary"
+                android:textSize="11sp" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- Action 6: Export to File -->
+    <LinearLayout
+        android:id="@+id/action_export_file_node"
+        android:layout_width="match_parent"
+        android:layout_height="58dp"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp">
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:contentDescription="@string/export_to_file"
+            android:src="@drawable/ic_action_description"
+            app:tint="?android:attr/textColorPrimary" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/export_to_file"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textSize="15sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/export_to_file_sum"
+                android:textColor="?android:attr/textColorSecondary"
+                android:textSize="11sp" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="4dp"
+        android:alpha="0.12"
+        android:background="?android:attr/dividerHorizontal" />
+
+    <!-- Action 5: Delete node (High risk / Red) -->
+    <LinearLayout
+        android:id="@+id/action_delete_node"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp">
+
+        <ImageView
+            android:id="@+id/iv_delete_node"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:contentDescription="@string/delete"
+            android:src="@drawable/ic_action_delete"
+            app:tint="@color/material_red_500" />
+
+        <TextView
+            android:id="@+id/tv_delete_node"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_weight="1"
+            android:text="@string/delete"
+            android:textColor="@color/material_red_500"
+            android:textSize="16sp" />
+    </LinearLayout>
+
+</LinearLayout>

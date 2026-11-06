@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <androidx.camera.view.PreviewView
+        android:id="@+id/previewView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <com.king.zxing.ViewfinderView
+        android:id="@+id/viewfinderView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <ImageButton
+        android:id="@+id/ivFlashlight"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_gravity="bottom|start"
+        android:layout_marginStart="24dp"
+        android:layout_marginBottom="32dp"
+        android:background="@drawable/scanner_action_background"
+        android:contentDescription="@string/scanner_toggle_flashlight"
+        android:padding="14dp"
+        android:scaleType="centerInside"
+        android:src="@drawable/zxl_flashlight_selector" />
+
+    <ImageButton
+        android:id="@+id/ivPhotoLibrary"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="24dp"
+        android:layout_marginBottom="32dp"
+        android:background="@drawable/scanner_action_background"
+        android:contentDescription="@string/scanner_select_image"
+        android:padding="16dp"
+        android:scaleType="centerInside"
+        android:src="@drawable/ic_image_photo"
+        android:tint="@android:color/white" />
+</FrameLayout>

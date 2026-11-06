@@ -1,0 +1,661 @@
+package io.nekohasekai.sagernet.ui
+
+import android.os.Bundle
+import android.provider.OpenableColumns
+import android.text.format.DateFormat
+import android.view.Menu
+import android.view.MenuItem
+import android.view.ViewGroup
+import android.text.InputType
+import android.net.Uri
+import android.widget.EditText
+import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
+import android.widget.LinearLayout
+import android.widget.TextView
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import androidx.core.view.isInvisible
+import androidx.core.view.isVisible
+import com.google.android.material.button.MaterialButton
+import androidx.recyclerview.widget.ItemTouchHelper
+import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.snackbar.Snackbar
+import io.nekohasekai.sagernet.R
+import io.nekohasekai.sagernet.database.DataStore
+import io.nekohasekai.sagernet.databinding.LayoutAssetItemBinding
+import io.nekohasekai.sagernet.databinding.LayoutAssetsBinding
+import io.nekohasekai.sagernet.ktx.*
+import io.nekohasekai.sagernet.widget.UndoSnackbarManager
+import libcore.Libcore
+import moe.matsuri.nb4a.utils.Util
+import org.json.JSONObject
+import java.io.File
+import java.io.FileWriter
+import java.util.*
+import java.util.concurrent.atomic.AtomicInteger
+
+class AssetsActivity : ThemedActivity() {
+
+    lateinit var adapter: AssetAdapter
+    lateinit var layout: LayoutAssetsBinding
+    lateinit var undoManager: UndoSnackbarManager<File>
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        val binding = LayoutAssetsBinding.inflate(layoutInflater)
+        layout = binding
+        setContentView(binding.root)
+
+        setSupportActionBar(findViewById(R.id.toolbar))
+        supportActionBar?.apply {
+            setTitle(R.string.route_assets)
+            setDisplayHomeAsUpEnabled(true)
+            setHomeAsUpIndicator(R.drawable.ic_navigation_close)
+        }
+
+        binding.recyclerView.layoutManager = FixedLinearLayoutManager(binding.recyclerView)
+        adapter = AssetAdapter()
+        binding.recyclerView.adapter = adapter
+
+        binding.refreshLayout.setOnRefreshListener {
+            adapter.reloadAssets()
+            binding.refreshLayout.isRefreshing = false
+        }
+        binding.refreshLayout.setColorSchemeColors(getColorAttr(R.attr.primaryOrTextPrimary))
+
+        undoManager = UndoSnackbarManager(this, adapter)
+
+        ItemTouchHelper(object : ItemTouchHelper.SimpleCallback(
+            0, ItemTouchHelper.START
+        ) {
+
+            override fun getSwipeDirs(
+                recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder
+            ): Int {
+                val index = viewHolder.bindingAdapterPosition
+                if (index < 2) return 0
+                return super.getSwipeDirs(recyclerView, viewHolder)
+            }
+
+            override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
+                val index = viewHolder.bindingAdapterPosition
+                adapter.remove(index)
+                undoManager.remove(index to (viewHolder as AssetHolder).file)
+            }
+
+            override fun onMove(
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder,
+                target: RecyclerView.ViewHolder
+            ) = false
+
+        }).attachToRecyclerView(binding.recyclerView)
+    }
+
+    override fun snackbarInternal(text: CharSequence): Snackbar {
+        return Snackbar.make(layout.coordinator, text, Snackbar.LENGTH_LONG)
+    }
+
+    val assetNames = arrayOf("geoip.db", "geosite.db")
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.import_asset_menu, menu)
+        return true
+    }
+
+    val importFile = registerForActivityResult(ActivityResultContracts.GetContent()) { file ->
+        if (file != null) {
+            val fileName = contentResolver.query(file, null, null, null, null)?.use { cursor ->
+                cursor.moveToFirst()
+                cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME).let(cursor::getString)
+            }?.takeIf { it.isNotBlank() } ?: file.pathSegments.last()
+                .substringAfterLast('/')
+                .substringAfter(':')
+
+            if (!fileName.endsWith(".db")) {
+                alert(getString(R.string.route_not_asset, fileName)).show()
+                return@registerForActivityResult
+            }
+            val filesDir = getExternalFilesDir(null) ?: filesDir
+
+            runOnDefaultDispatcher {
+                val outFile = File(filesDir, fileName).apply {
+                    parentFile?.mkdirs()
+                }
+
+                contentResolver.openInputStream(file)?.use(outFile.outputStream())
+
+                File(outFile.parentFile, outFile.nameWithoutExtension + ".version.txt").apply {
+                    if (isFile) delete()
+                    createNewFile()
+                    val fw = FileWriter(this)
+                    fw.write("Custom")
+                    fw.close()
+                }
+
+                adapter.reloadAssets()
+            }
+
+        }
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        when (item.itemId) {
+            R.id.action_import_file -> {
+                startFilesForResult(importFile, "*/*")
+                return true
+            }
+        }
+        return false
+    }
+
+    inner class AssetAdapter : RecyclerView.Adapter<AssetHolder>(),
+        UndoSnackbarManager.Interface<File> {
+
+        val assets = ArrayList<File>()
+
+        init {
+            reloadAssets()
+        }
+
+        fun reloadAssets() {
+            val filesDir = getExternalFilesDir(null) ?: filesDir
+            val files = filesDir.listFiles()
+                ?.filter { it.isFile && it.name.endsWith(".db") && it.name !in assetNames }
+            assets.clear()
+            assets.add(File(filesDir, "geoip.db"))
+            assets.add(File(filesDir, "geosite.db"))
+            if (files != null) assets.addAll(files)
+
+            layout.refreshLayout.post {
+                notifyDataSetChanged()
+            }
+        }
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): AssetHolder {
+            return AssetHolder(LayoutAssetItemBinding.inflate(layoutInflater, parent, false))
+        }
+
+        override fun onBindViewHolder(holder: AssetHolder, position: Int) {
+            holder.bind(assets[position])
+        }
+
+        override fun getItemCount(): Int {
+            return assets.size
+        }
+
+        fun remove(index: Int) {
+            assets.removeAt(index)
+            notifyItemRemoved(index)
+        }
+
+        override fun undo(actions: List<Pair<Int, File>>) {
+            for ((index, item) in actions) {
+                assets.add(index, item)
+                notifyItemInserted(index)
+            }
+        }
+
+        override fun commit(actions: List<Pair<Int, File>>) {
+            val groups = actions.map { it.second }.toTypedArray()
+            runOnDefaultDispatcher {
+                groups.forEach { it.deleteRecursively() }
+            }
+        }
+
+    }
+
+    val updating = AtomicInteger()
+
+    inner class AssetHolder(val binding: LayoutAssetItemBinding) :
+        RecyclerView.ViewHolder(binding.root) {
+        lateinit var file: File
+
+        fun bind(file: File) {
+            this.file = file
+
+            binding.assetName.text = file.name
+            val versionFile = File(file.parentFile, "${file.nameWithoutExtension}.version.txt")
+
+            val localVersion = if (file.isFile) {
+                if (versionFile.isFile) {
+                    try {
+                        versionFile.readText().trim()
+                    } catch (e: Throwable) {
+                        snackbar(e.readableMessage)
+                        "<unknown>"
+                    }
+                } else {
+                    "Unknown-" + DateFormat.getDateFormat(app).format(Date(file.lastModified()))
+                }
+            } else {
+                "<unknown>"
+            }
+
+            binding.assetStatus.text = getString(R.string.route_asset_status, localVersion)
+
+            val isGeoip = file.name.contains("geoip", ignoreCase = true)
+            val isGeosite = file.name.contains("geosite", ignoreCase = true)
+            val isActive = when {
+                isGeoip -> DataStore.activeGeoipDb == file.name || (DataStore.activeGeoipDb.isBlank() && file.name == "geoip.db")
+                isGeosite -> DataStore.activeGeositeDb == file.name || (DataStore.activeGeositeDb.isBlank() && file.name == "geosite.db")
+                else -> false
+            }
+
+            binding.assetActiveBadge.isVisible = isActive
+            binding.btnSetActive.isVisible = !isActive && (isGeoip || isGeosite)
+
+            binding.btnSetActive.setOnClickListener {
+                val filesDir = getExternalFilesDir(null) ?: filesDir
+                runOnDefaultDispatcher {
+                    if (isGeoip) {
+                        DataStore.activeGeoipDb = file.name
+                        if (file.name != "geoip.db") {
+                            file.copyTo(File(filesDir, "geoip.db"), overwrite = true)
+                            if (versionFile.isFile) {
+                                versionFile.copyTo(File(filesDir, "geoip.version.txt"), overwrite = true)
+                            }
+                        }
+                    } else if (isGeosite) {
+                        DataStore.activeGeositeDb = file.name
+                        if (file.name != "geosite.db") {
+                            file.copyTo(File(filesDir, "geosite.db"), overwrite = true)
+                            if (versionFile.isFile) {
+                                versionFile.copyTo(File(filesDir, "geosite.version.txt"), overwrite = true)
+                            }
+                        }
+                    }
+                    onMainDispatcher {
+                        Toast.makeText(this@AssetsActivity, getString(R.string.asset_set_active_success, file.name), Toast.LENGTH_SHORT).show()
+                        adapter.reloadAssets()
+                    }
+                }
+            }
+
+            val isCustom = file.name !in assetNames
+            binding.rulesUpdate.isVisible = true
+            binding.rulesUpdate.setOnClickListener {
+                if (isCustom && DataStore.getAssetUpdateUrl(file.name).isBlank()) {
+                    promptSetAssetUpdateUrl(file) {
+                        doUpdate(file, versionFile, localVersion, binding)
+                    }
+                } else {
+                    doUpdate(file, versionFile, localVersion, binding)
+                }
+            }
+
+            binding.root.setOnLongClickListener {
+                if (isCustom) {
+                    promptSetAssetUpdateUrl(file) {
+                        doUpdate(file, versionFile, localVersion, binding)
+                    }
+                    true
+                } else false
+            }
+
+        }
+
+        private fun doUpdate(file: File, versionFile: File, localVersion: String, binding: LayoutAssetItemBinding) {
+            updating.incrementAndGet()
+            layout.refreshLayout.isEnabled = false
+            binding.subscriptionUpdateProgress.isInvisible = false
+            binding.rulesUpdate.isInvisible = true
+            Toast.makeText(this@AssetsActivity, "正在检查并更新 ${file.name}...", Toast.LENGTH_SHORT).show()
+            runOnDefaultDispatcher {
+                runCatching {
+                    updateAsset(file, versionFile, localVersion)
+                }.onSuccess { updated ->
+                    onMainDispatcher {
+                        if (updated) {
+                            Toast.makeText(this@AssetsActivity, "${file.name} 更新成功！", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(this@AssetsActivity, "${file.name} 已经是最新版本", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }.onFailure {
+                    onMainDispatcher {
+                        Toast.makeText(this@AssetsActivity, "${file.name} 更新失败: ${it.readableMessage}", Toast.LENGTH_LONG).show()
+                        alert(it.readableMessage).tryToShow()
+                    }
+                }
+
+                onMainDispatcher {
+                    binding.rulesUpdate.isInvisible = false
+                    binding.subscriptionUpdateProgress.isInvisible = true
+                    if (updating.decrementAndGet() == 0) {
+                        layout.refreshLayout.isEnabled = true
+                    }
+                }
+            }
+        }
+
+    }
+
+    private val rulesProviders = listOf(
+        RuleAssetsProvider(
+            "SagerNet/sing-geoip",
+            "SagerNet/sing-geosite",
+        ),
+        RuleAssetsProvider(
+            "soffchen/sing-geoip",
+            "soffchen/sing-geosite",
+        ),
+        RuleAssetsProvider(
+            "Chocolate4U/Iran-sing-box-rules"
+        ),
+        RuleAssetsProvider(
+            "L11R/antizapret-sing-box-geo"
+        ),
+    )
+
+    companion object {
+        fun normalizeAssetUpdateUrl(input: String, fileName: String): String {
+            var raw = input.trim()
+            if (raw.isBlank()) return ""
+            if (!raw.startsWith("http://") && !raw.startsWith("https://")) {
+                raw = "https://$raw"
+            }
+            val uri = runCatching { Uri.parse(raw) }.getOrNull() ?: return raw
+            val host = uri.host?.lowercase().orEmpty()
+
+            if (host == "github.com" || host.endsWith(".github.com")) {
+                val pathSegments = uri.pathSegments.filter { it.isNotBlank() }
+                if (pathSegments.size >= 2) {
+                    val owner = pathSegments[0]
+                    val repo = pathSegments[1].removeSuffix(".git")
+
+                    if (raw.contains("/releases/download/") || raw.contains("/releases/latest/download/") ||
+                        raw.endsWith(".db") || raw.endsWith(".dat") || raw.endsWith(".srs")
+                    ) {
+                        return raw
+                    }
+
+                    return "https://github.com/$owner/$repo/releases/latest/download/$fileName"
+                }
+            }
+            return raw
+        }
+    }
+
+    private fun promptSetAssetUpdateUrl(file: File, onSaved: (() -> Unit)? = null) {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            val padH = dp2px(20)
+            val padV = dp2px(12)
+            setPadding(padH, padV, padH, padV)
+        }
+
+        val msgView = TextView(this).apply {
+            text = getString(R.string.asset_update_url_dialog_msg)
+            textSize = 13f
+            setTextColor(ContextCompat.getColor(this@AssetsActivity, R.color.material_on_surface_emphasis_medium))
+            setPadding(0, 0, 0, dp2px(8))
+        }
+        container.addView(msgView)
+
+        val input = EditText(this).apply {
+            hint = "https://github.com/owner/repo"
+            setText(DataStore.getAssetUpdateUrl(file.name))
+            isSingleLine = true
+        }
+        container.addView(input)
+
+        val isGeosite = file.name.contains("geosite", ignoreCase = true)
+        val isGeoip = file.name.contains("geoip", ignoreCase = true)
+        if (isGeosite || isGeoip) {
+            val presets = if (isGeosite) {
+                listOf(
+                    Pair(getString(R.string.asset_preset_soffchen), "https://github.com/soffchen/sing-geosite/releases/latest/download/geosite.db"),
+                    Pair(getString(R.string.asset_preset_metacubex), "https://github.com/MetaCubeX/meta-rules-dat/releases/latest/download/geosite.db"),
+                    Pair(getString(R.string.asset_preset_sagernet), "https://github.com/SagerNet/sing-geosite/releases/latest/download/geosite.db")
+                )
+            } else {
+                listOf(
+                    Pair(getString(R.string.asset_preset_soffchen), "https://github.com/soffchen/sing-geoip/releases/latest/download/geoip.db"),
+                    Pair(getString(R.string.asset_preset_metacubex), "https://github.com/MetaCubeX/meta-rules-dat/releases/latest/download/geoip.db"),
+                    Pair(getString(R.string.asset_preset_sagernet), "https://github.com/SagerNet/sing-geoip/releases/latest/download/geoip.db")
+                )
+            }
+
+            val scroll = HorizontalScrollView(this).apply {
+                isHorizontalScrollBarEnabled = false
+                setPadding(0, dp2px(8), 0, 0)
+            }
+            val btnRow = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+            }
+            for ((label, url) in presets) {
+                val btn = MaterialButton(this, null, com.google.android.material.R.attr.borderlessButtonStyle).apply {
+                    text = label
+                    textSize = 12f
+                    setPadding(dp2px(6), dp2px(2), dp2px(6), dp2px(2))
+                    setOnClickListener {
+                        input.setText(url)
+                        input.setSelection(url.length)
+                    }
+                }
+                btnRow.addView(btn)
+            }
+            scroll.addView(btnRow)
+            container.addView(scroll)
+        }
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.asset_configure_update_url, file.name))
+            .setView(container)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val rawUrl = input.text.toString().trim()
+                val resolvedUrl = normalizeAssetUpdateUrl(rawUrl, file.name)
+                DataStore.setAssetUpdateUrl(file.name, resolvedUrl)
+                if (resolvedUrl.isNotBlank()) {
+                    Toast.makeText(this, "已保存更新地址", Toast.LENGTH_SHORT).show()
+                    onSaved?.invoke()
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    suspend fun updateAsset(file: File, versionFile: File, localVersion: String): Boolean {
+        if (DataStore.rulesProvider == 4 || file.name !in assetNames) {
+            return updateCustomAsset(file, versionFile)
+        }
+        val fileName = file.name
+        val repo = rulesProviders[DataStore.rulesProvider].repoByFileName[fileName]
+            ?: error("No repository configured for $fileName")
+
+        val client = Libcore.newHttpClient().apply {
+                    modernTLS()
+                    keepAlive()
+                    tryProxyOutbound()
+                }
+
+        try {
+            var tagName = ""
+            var browserDownloadUrl = ""
+
+            val apiSameVersion = runCatching {
+                val response = client.newRequest().apply {
+                    setURL("https://api.github.com/repos/$repo/releases/latest")
+                }.execute()
+
+                val release = JSONObject(Util.getStringBox(response.contentString))
+                val tag = release.optString("tag_name")
+
+                if (tag.isNotBlank() && tag == localVersion) {
+                    tagName = tag
+                    return@runCatching true
+                }
+
+                if (release.has("assets")) {
+                    val releaseAssets = release.getJSONArray("assets").filterIsInstance<JSONObject>()
+                    val assetToDownload = releaseAssets.find { it.getStr("name") == fileName }
+                    if (assetToDownload != null) {
+                        tagName = tag
+                        browserDownloadUrl = assetToDownload.optString("browser_download_url")
+                    }
+                }
+                false
+            }.getOrDefault(false)
+
+            if (apiSameVersion && tagName == localVersion) {
+                onMainDispatcher {
+                    snackbar(R.string.route_asset_no_update).show()
+                }
+                return false
+            }
+
+            // 遇到 GitHub API 403 限频或解析失败时，直接使用 GitHub Releases 直连下载地址降级兜底
+            if (browserDownloadUrl.isBlank()) {
+                browserDownloadUrl = "https://github.com/$repo/releases/latest/download/$fileName"
+                if (tagName.isBlank()) {
+                    tagName = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.getDefault()).format(java.util.Date())
+                }
+            }
+
+            val response = client.newRequest().apply {
+                setURL(browserDownloadUrl)
+            }.execute()
+
+            val cacheFile = File(file.parentFile, fileName + ".tmp")
+            cacheFile.parentFile?.mkdirs()
+
+            response.writeTo(cacheFile.canonicalPath)
+
+            if (fileName.endsWith(".xz")) {
+                Libcore.unxz(cacheFile.absolutePath, file.absolutePath)
+                cacheFile.delete()
+            } else {
+                cacheFile.renameTo(file)
+            }
+
+            versionFile.writeText(tagName)
+
+            adapter.reloadAssets()
+
+            onMainDispatcher {
+                snackbar(R.string.route_asset_updated).show()
+            }
+            return true
+        } finally {
+            client.close()
+        }
+    }
+
+    suspend fun updateCustomAsset(file: File, versionFile: File): Boolean {
+        val fileName = file.name
+        val customUrl = DataStore.getAssetUpdateUrl(fileName)
+        var url: String = when {
+            customUrl.isNotBlank() -> normalizeAssetUpdateUrl(customUrl, fileName)
+            fileName == "geoip.db" -> DataStore.rulesGeoipUrl
+            fileName == "geosite.db" -> DataStore.rulesGeositeUrl
+            else -> ""
+        }
+        if (url.isBlank()) {
+            error(getString(R.string.asset_update_url_hint))
+        }
+        val client = Libcore.newHttpClient().apply {
+            modernTLS()
+            keepAlive()
+            tryProxyOutbound()
+        }
+        try {
+            var response = runCatching {
+                client.newRequest().apply {
+                    setURL(url)
+                }.execute()
+            }.getOrNull()
+
+            // If initial request failed/404 and filename has -lite, fallback to base .db name in url
+            if (response == null && fileName.contains("-lite")) {
+                val baseFileName = if (fileName.contains("geosite")) "geosite.db" else "geoip.db"
+                val fallbackUrl = url.replace(fileName, baseFileName)
+                if (fallbackUrl != url) {
+                    response = runCatching {
+                        client.newRequest().apply {
+                            setURL(fallbackUrl)
+                        }.execute()
+                    }.getOrNull()
+                }
+            }
+
+            if (response == null) {
+                error("无法连接到更新服务器或链接无效: $url")
+            }
+
+            val cacheFile = File(file.parentFile, fileName + ".tmp")
+            cacheFile.parentFile?.mkdirs()
+            response.writeTo(cacheFile.canonicalPath)
+
+            if (!cacheFile.exists() || cacheFile.length() < 100) {
+                cacheFile.delete()
+                error(getString(R.string.asset_update_empty_error))
+            }
+
+            val headerBytes = ByteArray(512)
+            val readLen = cacheFile.inputStream().use { it.read(headerBytes) }
+            val headerText = if (readLen > 0) String(headerBytes, 0, readLen, Charsets.UTF_8).lowercase() else ""
+            if (headerText.contains("<!doctype html") || headerText.contains("<html") || headerText.contains("404: not found")) {
+                cacheFile.delete()
+                error(getString(R.string.asset_update_html_error))
+            }
+
+            cacheFile.renameTo(file)
+
+            val currentDate = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.getDefault()).format(java.util.Date())
+            versionFile.writeText(currentDate)
+
+            val filesDir = getExternalFilesDir(null) ?: filesDir
+            if (DataStore.activeGeoipDb == fileName && fileName != "geoip.db") {
+                file.copyTo(File(filesDir, "geoip.db"), overwrite = true)
+                versionFile.copyTo(File(filesDir, "geoip.version.txt"), overwrite = true)
+            } else if (DataStore.activeGeositeDb == fileName && fileName != "geosite.db") {
+                file.copyTo(File(filesDir, "geosite.db"), overwrite = true)
+                versionFile.copyTo(File(filesDir, "geosite.version.txt"), overwrite = true)
+            }
+
+            adapter.reloadAssets()
+            onMainDispatcher {
+                snackbar(R.string.route_asset_updated).show()
+            }
+            return true
+        } finally {
+            client.close()
+        }
+    }
+
+    override fun onSupportNavigateUp(): Boolean {
+        finish()
+        return true
+    }
+
+    override fun onBackPressed() {
+        finish()
+    }
+
+    override fun onResume() {
+        super.onResume()
+
+        if (::adapter.isInitialized) {
+            adapter.reloadAssets()
+        }
+    }
+
+    private data class RuleAssetsProvider(
+        val repoByFileName: Map<String, String>
+    ) {
+        constructor(
+            geoipRepo: String,
+            geositeRepo: String = geoipRepo,
+        ) : this(
+            mapOf(
+                "geoip.db" to geoipRepo,
+                "geosite.db" to geositeRepo,
+            )
+        )
+    }
+}

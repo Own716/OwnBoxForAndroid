@@ -1,0 +1,400 @@
+package io.nekohasekai.sagernet.fmt.v2ray;
+
+import com.esotericsoftware.kryo.io.ByteBufferInput;
+import com.esotericsoftware.kryo.io.ByteBufferOutput;
+
+import io.nekohasekai.sagernet.fmt.AbstractBean;
+import io.nekohasekai.sagernet.fmt.trojan.TrojanBean;
+import moe.matsuri.nb4a.utils.JavaUtil;
+
+public abstract class StandardV2RayBean extends AbstractBean {
+
+    public String uuid;
+    public String encryption; // or VLESS flow
+    public String vlessEncryption; // VLESS ncryption
+
+    //////// End of VMess & VLESS ////////
+
+    // "V2Ray Transport" tcp/http/ws/quic/grpc/httpupgrade
+    public String type;
+
+    public String host;
+
+    public String path;
+
+    // --------------------------------------- tls?
+
+    public String security;
+
+    public String sni;
+
+    public String alpn;
+
+    public String utlsFingerprint;
+
+    public Boolean allowInsecure;
+
+    // --------------------------------------- reality
+
+
+    public String realityPubKey;
+
+    public String realityShortId;
+
+
+    // --------------------------------------- //
+
+    public Integer wsMaxEarlyData;
+    public String earlyDataHeaderName;
+
+    public String certificates;
+
+    // --------------------------------------- xhttp
+
+    public String xhttpMode;
+    public String xhttpExtra;
+
+    // --------------------------------------- kcp
+
+    public String mKcpSeed;
+    public String headerType;
+    public Integer kcpMtu;
+    public Integer kcpTti;
+    public Integer kcpCwndMultiplier;
+
+    // --------------------------------------- ech
+
+    public Boolean enableECH;
+
+    public String echConfig;
+
+    // sing-box ech.query_server_name：ECH HTTPS 记录查询域名（链接 ech=<domain>+<doh> 的域名部分）
+    public String echQueryServerName;
+
+    // --------------------------------------- Mux
+
+    public Boolean enableMux;
+    public Boolean muxPadding;
+    public Integer muxType;
+    public Integer muxConcurrency;  // max_streams
+    public Integer muxMode;         // 0: max_streams, 1: connections
+    public Integer muxMaxConnections;
+    public Integer muxMinStreams;
+    public Boolean muxBrutal;
+    public Integer muxBrutalUpMbps;
+    public Integer muxBrutalDownMbps;
+
+
+    // --------------------------------------- //
+
+    public Integer packetEncoding; // 1:packet 2:xudp
+
+    @Override
+    public void initializeDefaultValues() {
+        super.initializeDefaultValues();
+
+        if (JavaUtil.isNullOrBlank(uuid)) uuid = "";
+
+        if (JavaUtil.isNullOrBlank(encryption)) encryption = "";
+        if (JavaUtil.isNullOrBlank(vlessEncryption)) vlessEncryption = "";
+
+        if (JavaUtil.isNullOrBlank(type)) type = "tcp";
+        else if ("h2".equals(type)) type = "http";
+
+        type = type.toLowerCase();
+
+        if (JavaUtil.isNullOrBlank(host)) host = "";
+        if (JavaUtil.isNullOrBlank(path)) path = "";
+
+        if (JavaUtil.isNullOrBlank(security)) {
+            if (this instanceof TrojanBean) {
+                security = "tls";
+            } else {
+                security = "none";
+            }
+        }
+        if (JavaUtil.isNullOrBlank(sni)) sni = "";
+        if (JavaUtil.isNullOrBlank(alpn)) alpn = "";
+
+        if (JavaUtil.isNullOrBlank(certificates)) certificates = "";
+        if (JavaUtil.isNullOrBlank(earlyDataHeaderName)) earlyDataHeaderName = "";
+        if (JavaUtil.isNullOrBlank(utlsFingerprint)) utlsFingerprint = "";
+
+        if (wsMaxEarlyData == null) wsMaxEarlyData = 0;
+        if (allowInsecure == null) allowInsecure = false;
+        if (packetEncoding == null) packetEncoding = 0;
+
+        if (realityPubKey == null) realityPubKey = "";
+        if (realityShortId == null) realityShortId = "";
+
+        if (enableECH == null) enableECH = false;
+        if (JavaUtil.isNullOrBlank(echConfig)) echConfig = "";
+        if (JavaUtil.isNullOrBlank(echQueryServerName)) echQueryServerName = "";
+
+        if (enableMux == null) enableMux = false;
+        if (muxPadding == null) muxPadding = false;
+        if (muxType == null) muxType = 0;
+        if (muxConcurrency == null) muxConcurrency = 8;
+        if (muxMode == null) muxMode = 0;
+        if (muxMaxConnections == null) muxMaxConnections = 4;
+        if (muxMinStreams == null) muxMinStreams = 4;
+        if (muxBrutal == null) muxBrutal = false;
+        if (muxBrutalUpMbps == null) muxBrutalUpMbps = 100;
+        if (muxBrutalDownMbps == null) muxBrutalDownMbps = 100;
+
+        if (JavaUtil.isNullOrBlank(xhttpMode)) xhttpMode = "auto";
+        if (JavaUtil.isNullOrBlank(xhttpExtra)) xhttpExtra = "";
+
+        if (JavaUtil.isNullOrBlank(mKcpSeed)) mKcpSeed = "";
+        if (JavaUtil.isNullOrBlank(headerType)) headerType = "none";
+        // kcpMtu、kcpTti 和 kcpCwndMultiplier 保持 null，不设置默认值
+    }
+
+    @Override
+    public void serialize(ByteBufferOutput output) {
+        output.writeInt(12);
+        super.serialize(output);
+        output.writeString(uuid);
+        output.writeString(encryption);
+        output.writeString(vlessEncryption);
+        if (this instanceof VMessBean) {
+            output.writeInt(((VMessBean) this).alterId);
+        }
+
+        output.writeString(type);
+        switch (type) {
+            case "tcp":
+            case "quic": {
+                break;
+            }
+            case "ws": {
+                output.writeString(host);
+                output.writeString(path);
+                output.writeInt(wsMaxEarlyData);
+                output.writeString(earlyDataHeaderName);
+                break;
+            }
+            case "http": {
+                output.writeString(host);
+                output.writeString(path);
+                break;
+            }
+            case "grpc": {
+                output.writeString(path);
+                break;
+            }
+            case "httpupgrade": {
+                output.writeString(host);
+                output.writeString(path);
+                break;
+            }
+            case "xhttp": {
+                output.writeString(host);
+                output.writeString(path);
+                output.writeString(xhttpMode);
+                output.writeString(xhttpExtra);
+                break;
+            }
+            case "kcp": {
+                output.writeString(mKcpSeed);
+                output.writeString(headerType);
+                output.writeInt(kcpMtu == null ? 0 : kcpMtu);
+                output.writeInt(kcpTti == null ? 0 : kcpTti);
+                output.writeInt(kcpCwndMultiplier == null ? 0 : kcpCwndMultiplier);
+                break;
+            }
+        }
+
+        output.writeString(security);
+        if ("tls".equals(security) || "reality".equals(security)) {
+            output.writeString(sni);
+            output.writeString(alpn);
+            output.writeString(certificates);
+            output.writeBoolean(allowInsecure);
+            output.writeString(utlsFingerprint);
+            output.writeString(realityPubKey);
+            output.writeString(realityShortId);
+        }
+
+        output.writeBoolean(enableECH);
+        output.writeString(echConfig);
+        // v11
+        output.writeString(echQueryServerName);
+
+        output.writeInt(packetEncoding);
+
+        output.writeBoolean(enableMux);
+        output.writeBoolean(muxPadding);
+        output.writeInt(muxType);
+        output.writeInt(muxConcurrency);
+        // v7
+        output.writeInt(muxMode);
+        output.writeInt(muxMaxConnections);
+        output.writeInt(muxMinStreams);
+        // v8
+        output.writeBoolean(muxBrutal);
+        output.writeInt(muxBrutalUpMbps);
+        output.writeInt(muxBrutalDownMbps);
+    }
+
+    @Override
+    public void deserialize(ByteBufferInput input) {
+        int version = input.readInt();
+        super.deserialize(input);
+        uuid = input.readString();
+        encryption = input.readString();
+        if (version >= 5) {
+            vlessEncryption = input.readString();
+        }
+        if (this instanceof VMessBean) {
+            ((VMessBean) this).alterId = input.readInt();
+        }
+
+        type = input.readString();
+        switch (type) {
+            case "tcp":
+            case "quic": {
+                break;
+            }
+            case "ws": {
+                host = input.readString();
+                path = input.readString();
+                wsMaxEarlyData = input.readInt();
+                earlyDataHeaderName = input.readString();
+                break;
+            }
+            case "http": {
+                host = input.readString();
+                path = input.readString();
+                break;
+            }
+            case "grpc": {
+                path = input.readString();
+                if (version < 4) {
+                    // 解决老版本数据的读取问题
+                    input.readString();
+                    input.readString();
+                }
+                break;
+            }
+            case "httpupgrade": {
+                host = input.readString();
+                path = input.readString();
+                break;
+            }
+            case "xhttp": {
+                if (version >= 4) {
+                    host = input.readString();
+                    path = input.readString();
+                    xhttpMode = input.readString();
+                    xhttpExtra = input.readString();
+                }
+                break;
+            }
+            case "kcp": {
+                if (version >= 6) {
+                    mKcpSeed = input.readString();
+                    headerType = input.readString();
+                    if (version >= 9) {
+                        int mtu = input.readInt();
+                        int tti = input.readInt();
+                        kcpMtu = mtu == 0 ? null : mtu;
+                        kcpTti = tti == 0 ? null : tti;
+                        if (version >= 10) {
+                            int cwnd = input.readInt();
+                            kcpCwndMultiplier = cwnd == 0 ? null : cwnd;
+                        }
+                    }
+                }
+                break;
+            }
+        }
+
+        security = input.readString();
+        boolean shouldReadTls = "tls".equals(security) || (version >= 12 && "reality".equals(security));
+        if (shouldReadTls) {
+            sni = input.readString();
+            alpn = input.readString();
+            certificates = input.readString();
+            allowInsecure = input.readBoolean();
+            utlsFingerprint = input.readString();
+            if (version >= 12) {
+                realityPubKey = input.readString();
+                realityShortId = input.readString();
+            } else {
+                realityPubKey = "";
+                realityShortId = "";
+            }
+        }
+
+        if (version >= 1) {
+            enableECH = input.readBoolean();
+            if (version >= 3) {
+                echConfig = input.readString();
+            } else {
+                if (enableECH) {
+                    input.readBoolean();
+                    input.readBoolean();
+                    echConfig = input.readString();
+                }
+            }
+        } else if (version == 0) {
+            // 从老版本升级上来但是 version == 0, 可能有 enableECH 也可能没有，需要做判断
+            int position = input.getByteBuffer().position(); // 当前位置
+
+            boolean tmpEnableECH = input.readBoolean();
+            int tmpPacketEncoding = input.readInt();
+
+            input.setPosition(position); // 读后归位
+
+            if (tmpPacketEncoding != 1 && tmpPacketEncoding != 2) {
+                enableECH = tmpEnableECH;
+                if (enableECH) {
+                    input.readBoolean();
+                    input.readBoolean();
+                    echConfig = input.readString();
+                }
+            } // 否则后一位就是 packetEncoding
+        }
+
+        // v11
+        if (version >= 11) {
+            echQueryServerName = input.readString();
+        }
+
+        packetEncoding = input.readInt();
+
+        if (version >= 2) {
+            enableMux = input.readBoolean();
+            muxPadding = input.readBoolean();
+            muxType = input.readInt();
+            muxConcurrency = input.readInt();
+        }
+
+        // v7
+        if (version >= 7) {
+            muxMode = input.readInt();
+            muxMaxConnections = input.readInt();
+            muxMinStreams = input.readInt();
+        }
+
+        // v8
+        if (version >= 8) {
+            muxBrutal = input.readBoolean();
+            muxBrutalUpMbps = input.readInt();
+            muxBrutalDownMbps = input.readInt();
+        }
+
+        // Note: xhttp fields are read in the switch case above when version >= 4
+        // Note: kcp fields are read in the switch case above when version >= 6
+    }
+
+    public boolean isVLESS() {
+        if (this instanceof VMessBean) {
+            Integer aid = ((VMessBean) this).alterId;
+            return aid != null && aid == -1;
+        }
+        return false;
+    }
+
+}

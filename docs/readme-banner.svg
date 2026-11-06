@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-labelledby="title desc">
+  <title id="title">OwnBox for Android</title>
+  <desc id="desc">A dark, modern banner with a mint-blue network motif and the OwnBox brand.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07111F"/>
+      <stop offset="0.52" stop-color="#0C1B2D"/>
+      <stop offset="1" stop-color="#101A32"/>
+    </linearGradient>
+    <linearGradient id="mint" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#2DD4BF"/>
+      <stop offset="1" stop-color="#60A5FA"/>
+    </linearGradient>
+    <radialGradient id="glowA" cx="72%" cy="44%" r="52%">
+      <stop offset="0" stop-color="#0EA5E9" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#0EA5E9" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowB" cx="24%" cy="0%" r="70%">
+      <stop offset="0" stop-color="#14B8A6" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#14B8A6" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="34" height="34" patternUnits="userSpaceOnUse">
+      <path d="M 34 0 L 0 0 0 34" fill="none" stroke="#94A3B8" stroke-opacity="0.08" stroke-width="1"/>
+    </pattern>
+    <filter id="softGlow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="1200" height="360" rx="28" fill="url(#bg)"/>
+  <rect width="1200" height="360" rx="28" fill="url(#glowA)"/>
+  <rect width="1200" height="360" rx="28" fill="url(#glowB)"/>
+  <rect width="1200" height="360" rx="28" fill="url(#grid)"/>
+
+  <g opacity="0.5" fill="none" stroke="#38BDF8" stroke-width="1.5">
+    <path d="M650 305 C760 250 720 160 825 145 S980 190 1080 75" stroke-opacity="0.35"/>
+    <path d="M620 330 C745 270 745 210 845 205 S1005 230 1150 125" stroke-opacity="0.22"/>
+    <path d="M690 25 C790 100 830 25 925 75 S1060 130 1180 35" stroke-opacity="0.18"/>
+  </g>
+  <g fill="#5EEAD4" opacity="0.85">
+    <circle cx="825" cy="145" r="4"/>
+    <circle cx="845" cy="205" r="3"/>
+    <circle cx="1080" cy="75" r="4"/>
+    <circle cx="925" cy="75" r="3"/>
+  </g>
+
+  <g transform="translate(92 86)">
+    <rect x="0" y="0" width="6" height="42" rx="3" fill="#5EEAD4"/>
+    <rect x="17" y="-12" width="6" height="54" rx="3" fill="#4FD1C5"/>
+    <rect x="34" y="-26" width="6" height="68" rx="3" fill="#38BDF8"/>
+    <rect x="51" y="-3" width="6" height="45" rx="3" fill="#60A5FA"/>
+    <circle cx="29" cy="-39" r="4" fill="#A7F3D0" filter="url(#softGlow)"/>
+  </g>
+
+  <text x="92" y="190" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="72" font-weight="750" letter-spacing="-2" fill="#F8FAFC">OwnBox</text>
+  <text x="96" y="232" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="20" font-weight="650" letter-spacing="4.6" fill="#5EEAD4">FOR ANDROID</text>
+  <text x="96" y="279" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="19" fill="#CBD5E1">Proxy connections  ·  Network diagnostics  ·  Native sing-box</text>
+
+  <g transform="translate(890 95)">
+    <rect x="0" y="0" width="210" height="170" rx="24" fill="#0F2237" fill-opacity="0.76" stroke="#64748B" stroke-opacity="0.34"/>
+    <rect x="20" y="20" width="170" height="130" rx="16" fill="#081625" stroke="#2DD4BF" stroke-opacity="0.22"/>
+    <g transform="translate(45 46)">
+      <rect x="0" y="28" width="12" height="48" rx="6" fill="#2DD4BF"/>
+      <rect x="23" y="8" width="12" height="68" rx="6" fill="#34D399"/>
+      <rect x="46" y="0" width="12" height="76" rx="6" fill="#38BDF8"/>
+      <rect x="69" y="17" width="12" height="59" rx="6" fill="#60A5FA"/>
+      <rect x="92" y="38" width="12" height="38" rx="6" fill="#818CF8"/>
+    </g>
+    <path d="M36 130 L63 115 L88 122 L114 98 L139 107 L168 79" fill="none" stroke="url(#mint)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="168" cy="79" r="4" fill="#99F6E4" filter="url(#softGlow)"/>
+  </g>
+
+  <text x="92" y="326" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="12" font-weight="600" letter-spacing="2" fill="#64748B">OPEN SOURCE  /  GPL-3.0</text>
+</svg>

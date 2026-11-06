@@ -1,0 +1,1026 @@
+package io.nekohasekai.sagernet.ui
+
+import android.Manifest.permission.POST_NOTIFICATIONS
+import android.annotation.SuppressLint
+import android.app.ActivityManager
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.content.res.ColorStateList
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
+import android.net.Uri
+import android.os.Build
+import android.os.Bundle
+import android.os.RemoteException
+import android.view.Gravity
+import android.view.KeyEvent
+import android.view.Menu
+import android.view.MenuItem
+import android.view.View
+import android.view.ViewGroup
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
+import androidx.activity.addCallback
+import androidx.annotation.IdRes
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import androidx.core.graphics.ColorUtils
+import androidx.core.view.GravityCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
+import androidx.preference.PreferenceDataStore
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.navigation.NavigationView
+import com.google.android.material.snackbar.Snackbar
+import io.nekohasekai.sagernet.BuildConfig
+import io.nekohasekai.sagernet.GroupType
+import io.nekohasekai.sagernet.Key
+import io.nekohasekai.sagernet.R
+import io.nekohasekai.sagernet.SagerNet
+import io.nekohasekai.sagernet.aidl.ISagerNetService
+import io.nekohasekai.sagernet.aidl.SpeedDisplayData
+import io.nekohasekai.sagernet.aidl.TrafficDataBatch
+import io.nekohasekai.sagernet.bg.BaseService
+import io.nekohasekai.sagernet.bg.SagerConnection
+import io.nekohasekai.sagernet.database.DataStore
+import io.nekohasekai.sagernet.database.GroupManager
+import io.nekohasekai.sagernet.database.ProfileManager
+import libcore.Libcore
+import io.nekohasekai.sagernet.database.ProxyGroup
+import io.nekohasekai.sagernet.database.SubscriptionBean
+import io.nekohasekai.sagernet.database.preference.OnPreferenceDataStoreChangeListener
+import io.nekohasekai.sagernet.databinding.LayoutMainBinding
+import io.nekohasekai.sagernet.utils.Theme
+import io.nekohasekai.sagernet.utils.LandingIpManager
+import io.nekohasekai.sagernet.utils.UiScaleManager
+import io.nekohasekai.sagernet.fmt.AbstractBean
+import io.nekohasekai.sagernet.fmt.KryoConverters
+import io.nekohasekai.sagernet.fmt.PluginEntry
+import io.nekohasekai.sagernet.group.GroupInterfaceAdapter
+import io.nekohasekai.sagernet.group.GroupUpdater
+import io.nekohasekai.sagernet.ktx.deduplicateProxies
+import io.nekohasekai.sagernet.ktx.getColorAttr
+import io.nekohasekai.sagernet.ktx.alert
+import io.nekohasekai.sagernet.ktx.isPlay
+import io.nekohasekai.sagernet.ktx.isPreview
+import io.nekohasekai.sagernet.ktx.launchCustomTab
+import io.nekohasekai.sagernet.ktx.onMainDispatcher
+import io.nekohasekai.sagernet.ktx.parseProxies
+import io.nekohasekai.sagernet.ktx.readableMessage
+import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
+import io.nekohasekai.sagernet.ktx.runOnMainDispatcher
+import io.nekohasekai.sagernet.ui.MessageStore
+import io.nekohasekai.sagernet.ktx.Logs
+import moe.matsuri.nb4a.utils.Util
+
+class MainActivity : ThemedActivity(),
+    SagerConnection.Callback,
+    OnPreferenceDataStoreChangeListener,
+    NavigationView.OnNavigationItemSelectedListener {
+
+    lateinit var binding: LayoutMainBinding
+    lateinit var navigation: NavigationView
+    private lateinit var drawerSettingsButton: View
+    private lateinit var drawerAboutButton: View
+    private lateinit var drawerMenuItems: LinearLayout
+    private lateinit var drawerMenuScroll: ScrollView
+    private var currentMainFragment: ToolbarFragment? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        MessageStore.setCurrentActivity(this)
+        val animateInitialControls = savedInstanceState == null
+
+        binding = LayoutMainBinding.inflate(layoutInflater)
+        binding.fab.initProgress(binding.fabProgress)
+        val bottomFactor = UiScaleManager.bottomBarFactor()
+        if (bottomFactor != 1.0f) {
+            binding.fab.scaleX = bottomFactor
+            binding.fab.scaleY = bottomFactor
+            binding.fabProgress.scaleX = bottomFactor
+            binding.fabProgress.scaleY = bottomFactor
+        }
+        val isNight = Theme.usingNightMode(this)
+        val fabBgColor = when {
+            Theme.isBlackTheme(this) -> Color.BLACK
+            Theme.isWhiteTheme(this) -> Color.parseColor("#212121")
+            Theme.isLightGrayTheme(this) -> Color.parseColor("#1F2937")
+            else -> {
+                val bg = getColorAttr(R.attr.fabColorBackground)
+                if (isNight && ColorUtils.calculateLuminance(bg) > 0.75) {
+                    val primary = getColorAttr(R.attr.colorPrimary)
+                    if (ColorUtils.calculateLuminance(primary) > 0.75) {
+                        Color.parseColor("#2C2C2E")
+                    } else {
+                        primary
+                    }
+                } else {
+                    bg
+                }
+            }
+        }
+        binding.fab.backgroundTintList = ColorStateList.valueOf(fabBgColor)
+        binding.fab.imageTintList = ColorStateList.valueOf(Color.WHITE)
+        val drawerRoot: View
+        if (themeResId !in intArrayOf(
+                R.style.Theme_SagerNet_Black
+            )
+        ) {
+            drawerRoot = binding.navView
+            navigation = drawerRoot.findViewById(R.id.nav_menu_view)
+            drawerSettingsButton = drawerRoot.findViewById(R.id.drawer_settings_button)
+            drawerAboutButton = drawerRoot.findViewById(R.id.drawer_about_button)
+            drawerMenuItems = drawerRoot.findViewById(R.id.drawer_menu_items)
+            drawerMenuScroll = drawerRoot.findViewById(R.id.drawer_menu_scroll)
+            binding.drawerLayout.removeView(binding.navViewBlack)
+        } else {
+            drawerRoot = binding.navViewBlack
+            navigation = drawerRoot.findViewById(R.id.nav_menu_view_black)
+            drawerSettingsButton = drawerRoot.findViewById(R.id.drawer_settings_button_black)
+            drawerAboutButton = drawerRoot.findViewById(R.id.drawer_about_button_black)
+            drawerMenuItems = drawerRoot.findViewById(R.id.drawer_menu_items_black)
+            drawerMenuScroll = drawerRoot.findViewById(R.id.drawer_menu_scroll_black)
+            binding.drawerLayout.removeView(binding.navView)
+        }
+        val drawerFactor = UiScaleManager.drawerFactor()
+        val baseDrawerWidthDp = 265f
+        val drawerWidth = minOf(
+            (baseDrawerWidthDp * resources.displayMetrics.density * drawerFactor.coerceIn(0.8f, 1.15f)).toInt(),
+            resources.displayMetrics.widthPixels - (72 * resources.displayMetrics.density).toInt(),
+        )
+        drawerRoot.layoutParams = drawerRoot.layoutParams.apply { width = drawerWidth }
+        val drawerRadius = resources.getDimension(R.dimen.drawer_corner_radius)
+        drawerRoot.outlineProvider = object : android.view.ViewOutlineProvider() {
+            override fun getOutline(view: View, outline: android.graphics.Outline) {
+                outline.setRoundRect(-drawerRadius.toInt(), 0, view.width, view.height, drawerRadius)
+            }
+        }
+        drawerRoot.clipToOutline = true
+        drawerRoot.elevation = dp(8).toFloat()
+        if (drawerFactor != 1.0f) {
+            drawerSettingsButton.scaleX = drawerFactor
+            drawerSettingsButton.scaleY = drawerFactor
+            drawerAboutButton.scaleX = drawerFactor
+            drawerAboutButton.scaleY = drawerFactor
+        }
+        navigation.setNavigationItemSelectedListener(this)
+        rebuildDrawerItems()
+        drawerSettingsButton.setOnClickListener {
+            if (isCurrentFragment(R.id.nav_settings)) {
+                binding.drawerLayout.closeDrawers()
+            } else {
+                displayFragmentWithId(R.id.nav_settings)
+            }
+        }
+        drawerAboutButton.setOnClickListener {
+            if (isCurrentFragment(R.id.nav_about)) {
+                binding.drawerLayout.closeDrawers()
+            } else {
+                displayFragmentWithId(R.id.nav_about)
+            }
+        }
+        ViewCompat.setOnApplyWindowInsetsListener(drawerRoot) { view, insets ->
+            val systemBars = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
+            )
+            view.updatePadding(top = systemBars.top, bottom = systemBars.bottom)
+            insets
+        }
+        ViewCompat.requestApplyInsets(drawerRoot)
+        attachDrawerScrollFades(
+            drawerRoot,
+            if (themeResId !in intArrayOf(R.style.Theme_SagerNet_Black)) R.id.drawer_top_fade else R.id.drawer_top_fade_black,
+            if (themeResId !in intArrayOf(R.style.Theme_SagerNet_Black)) R.id.drawer_bottom_fade else R.id.drawer_bottom_fade_black,
+        )
+
+        if (savedInstanceState == null) {
+            displayFragmentWithId(R.id.nav_configuration)
+        } else {
+            currentMainFragment =
+                supportFragmentManager.findFragmentById(R.id.fragment_holder) as? ToolbarFragment
+            val currentNavigationItem = when (currentMainFragment) {
+                is ConfigurationFragment -> R.id.nav_configuration
+                is GroupFragment -> R.id.nav_group
+                is RouteFragment -> R.id.nav_route
+                is SettingsFragment -> R.id.nav_settings
+                is WebviewFragment -> R.id.nav_dashboard
+                is DiagnosticsFragment -> R.id.nav_diagnostics
+                is ToolsFragment -> R.id.nav_tools
+                is LogcatFragment -> R.id.nav_logcat
+                is DocsFragment -> R.id.nav_docs
+                is AboutFragment -> R.id.nav_about
+                else -> null
+            }
+            currentNavigationItem?.let { setCheckedItem(it) }
+        }
+        onBackPressedDispatcher.addCallback {
+            if (binding.drawerLayout.isDrawerOpen(GravityCompat.START) || binding.drawerLayout.isOpen) {
+                binding.drawerLayout.closeDrawers()
+                return@addCallback
+            }
+            if (binding.menuScrimOverlay?.visibility == View.VISIBLE) {
+                hideMenuScrim()
+                val fragment = supportFragmentManager.findFragmentById(R.id.fragment_holder) as? ToolbarFragment
+                if (fragment?.isToolbarInitialized == true) {
+                    try {
+                        fragment.toolbar.dismissPopupMenus()
+                    } catch (_: Throwable) {}
+                }
+                return@addCallback
+            }
+            val fragment = supportFragmentManager.findFragmentById(R.id.fragment_holder) as? ToolbarFragment
+            if (fragment?.onBackPressed() == true) return@addCallback
+            if (fragment is ConfigurationFragment) {
+                moveTaskToBack(true)
+            } else {
+                displayFragmentWithId(R.id.nav_configuration)
+            }
+        }
+
+        binding.fab.setOnClickListener {
+            if (DataStore.hapticFeedback) it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+            if (DataStore.serviceState.canStop) SagerNet.stopService() else connect.launch(
+                null
+            )
+        }
+        binding.stats.setOnClickListener {
+            if (DataStore.hapticFeedback) it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+            if (DataStore.serviceState.connected) binding.stats.onIpDetailClicked()
+        }
+
+        setContentView(binding.root)
+        currentMainFragment =
+            supportFragmentManager.findFragmentById(R.id.fragment_holder) as? ToolbarFragment
+                ?: currentMainFragment
+        if (!animateInitialControls) {
+            syncMainControls(showWhenConnected = false, animate = false)
+        }
+        changeState(
+            BaseService.State.Idle,
+            animate = false,
+            animateControls = animateInitialControls,
+        )
+        connection.connect(this, this)
+        DataStore.configurationStore.registerChangeListener(this)
+        GroupManager.userInterface = GroupInterfaceAdapter(this)
+
+        if (intent?.action == Intent.ACTION_VIEW) {
+            onNewIntent(intent)
+        }
+
+        refreshNavMenu(DataStore.enableClashAPI)
+
+        // sdk 33 notification
+        if (Build.VERSION.SDK_INT >= 33) {
+            val checkPermission =
+                ContextCompat.checkSelfPermission(this@MainActivity, POST_NOTIFICATIONS)
+            if (checkPermission != PackageManager.PERMISSION_GRANTED) {
+                //动态申请
+                ActivityCompat.requestPermissions(
+                    this@MainActivity, arrayOf(POST_NOTIFICATIONS), 0
+                )
+            }
+        }
+
+        val isPreRelease = isPreview && (BuildConfig.PRE_VERSION_NAME.contains("preview", true) || BuildConfig.PRE_VERSION_NAME.contains("beta", true) || BuildConfig.PRE_VERSION_NAME.contains("alpha", true))
+        if (isPreRelease && DataStore.previewHintDismissedVersion != BuildConfig.PRE_VERSION_NAME) {
+            MaterialAlertDialogBuilder(this)
+                .setTitle(BuildConfig.PRE_VERSION_NAME)
+                .setMessage(R.string.preview_version_hint)
+                .setPositiveButton(android.R.string.ok, null)
+                .setNeutralButton(R.string.preview_hint_dont_show_again) { _, _ ->
+                    DataStore.previewHintDismissedVersion = BuildConfig.PRE_VERSION_NAME
+                }
+                .show()
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        MessageStore.setCurrentActivity(this)
+
+        if (DataStore.hideFromRecentApps) {
+            applyHideFromRecentApps(DataStore.hideFromRecentApps)
+        }
+
+        checkClipboardOnResume()
+        binding.stats.refreshDisplay()
+        refreshNavMenu(DataStore.enableClashAPI)
+    }
+
+    private var lastPromptedClipboard: String = ""
+
+    private fun checkClipboardOnResume() {
+        try {
+            val text = SagerNet.getClipboardText().trim()
+            if (text.isBlank() || text == lastPromptedClipboard || text.length < 8) return
+            val looksLikeProxy = text.startsWith("vless://", ignoreCase = true) ||
+                    text.startsWith("vmess://", ignoreCase = true) ||
+                    text.startsWith("ss://", ignoreCase = true) ||
+                    text.startsWith("ssr://", ignoreCase = true) ||
+                    text.startsWith("trojan://", ignoreCase = true) ||
+                    text.startsWith("hysteria://", ignoreCase = true) ||
+                    text.startsWith("hysteria2://", ignoreCase = true) ||
+                    text.startsWith("hy2://", ignoreCase = true) ||
+                    text.startsWith("tuic://", ignoreCase = true) ||
+                    text.startsWith("sn://", ignoreCase = true) ||
+                    text.startsWith("clash://", ignoreCase = true)
+
+            if (!looksLikeProxy) return
+            lastPromptedClipboard = text
+
+            com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.action_import)
+                .setMessage(R.string.import_clipboard_prompt)
+                .setPositiveButton(R.string.action_import) { _, _ ->
+                    runOnDefaultDispatcher {
+                        try {
+                            val rawProxies = io.nekohasekai.sagernet.group.RawUpdater.parseRaw(text)
+                            val currentGroup = DataStore.currentGroup()
+                            val targetId = DataStore.selectedGroupForImport()
+                            val targetGroup = io.nekohasekai.sagernet.database.SagerDatabase.groupDao.getById(targetId)
+                            val shouldDeduplicate = (targetGroup?.subscription?.deduplication == true) || (currentGroup.subscription?.deduplication == true)
+                            val proxies = if (shouldDeduplicate) rawProxies?.deduplicateProxies() else rawProxies
+                            if (!proxies.isNullOrEmpty()) {
+                                proxies.forEach { profile ->
+                                    ProfileManager.createProfile(targetId, profile)
+                                }
+                                onMainDispatcher {
+                                    displayFragmentWithId(R.id.nav_configuration)
+                                    snackbar(resources.getQuantityString(R.plurals.added, proxies.size, proxies.size)).show()
+                                }
+                            }
+                        } catch (e: io.nekohasekai.sagernet.ktx.SubscriptionFoundException) {
+                            if (e.link.startsWith("sn://")) {
+                                importSubscription(android.net.Uri.parse(e.link))
+                            } else {
+                                onMainDispatcher {
+                                    val subscriptionLink = android.net.Uri.parse(e.link).getQueryParameter("url") ?: e.link
+                                    startActivity(Intent(this@MainActivity, GroupSettingsActivity::class.java).apply {
+                                        putExtra(GroupSettingsActivity.EXTRA_FROM_CLIPBOARD, true)
+                                        putExtra(GroupSettingsActivity.EXTRA_GROUP_SUBSCRIPTION_LINK, subscriptionLink)
+                                    })
+                                }
+                            }
+                        } catch (e: Exception) {
+                            io.nekohasekai.sagernet.ktx.Logs.w(e)
+                            onMainDispatcher {
+                                snackbar(e.readableMessage).show()
+                            }
+                        }
+                    }
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        } catch (e: Exception) {
+            io.nekohasekai.sagernet.ktx.Logs.w(e)
+        }
+    }
+
+    override fun onPostResume() {
+        super.onPostResume()
+        val restoredFragment =
+            supportFragmentManager.findFragmentById(R.id.fragment_holder) as? ToolbarFragment
+        if (restoredFragment != null && restoredFragment !== currentMainFragment) {
+            currentMainFragment = restoredFragment
+            syncMainControls(
+                fragment = restoredFragment,
+                showWhenConnected = DataStore.serviceState == BaseService.State.Connected,
+                animate = false,
+            )
+        }
+    }
+
+    fun applyHideFromRecentApps(hide: Boolean) {
+        try {
+            val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            val tasks = activityManager.appTasks
+            if (tasks.isNotEmpty()) {
+                val task = tasks[0]
+                task.setExcludeFromRecents(hide)
+            }
+        } catch (e: Exception) {
+            Logs.w("Failed to set excludeFromRecents: ${e.message}")
+        }
+    }
+
+    fun refreshNavMenu(clashApi: Boolean) {
+        navigation.menu.findItem(R.id.nav_dashboard)?.isVisible = clashApi
+        rebuildDrawerItems()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+
+        val uri = intent.data ?: return
+
+        runOnDefaultDispatcher {
+            if (uri.scheme == "sn" && uri.host == "subscription" || uri.scheme == "clash") {
+                importSubscription(uri)
+            } else {
+                importProfile(uri)
+            }
+        }
+    }
+
+    fun urlTest(): Int {
+        if (!DataStore.serviceState.connected || connection.service == null) {
+            error("not started")
+        }
+        return connection.service!!.urlTest()
+    }
+
+    suspend fun importSubscription(uri: Uri) {
+        val group: ProxyGroup
+
+        val url = uri.getQueryParameter("url")
+        if (!url.isNullOrBlank()) {
+            group = ProxyGroup(type = GroupType.SUBSCRIPTION)
+            val subscription = SubscriptionBean()
+            group.subscription = subscription
+
+            // cleartext format
+            subscription.link = url
+            group.name = uri.getQueryParameter("name")
+        } else {
+            val data = uri.encodedQuery.takeIf { !it.isNullOrBlank() } ?: return
+            try {
+                group = KryoConverters.deserialize(
+                    ProxyGroup().apply { export = true }, Util.zlibDecompress(Util.b64Decode(data))
+                ).apply {
+                    export = false
+                }
+            } catch (e: Exception) {
+                onMainDispatcher {
+                    alert(e.readableMessage).show()
+                }
+                return
+            }
+        }
+
+        val name = group.name.takeIf { !it.isNullOrBlank() } ?: group.subscription?.link
+        ?: group.subscription?.token
+        if (name.isNullOrBlank()) return
+
+        if (group.name.isNullOrBlank()) {
+            val candidate = group.subscription?.link?.takeIf { it.isNotBlank() }?.let {
+                io.nekohasekai.sagernet.group.RawUpdater.extractAirportName(it)
+            }
+            group.name = candidate ?: ("Subscription #" + System.currentTimeMillis())
+        }
+
+        onMainDispatcher {
+
+            displayFragmentWithId(R.id.nav_group)
+
+            MaterialAlertDialogBuilder(this@MainActivity).setTitle(R.string.subscription_import)
+                .setMessage(getString(R.string.subscription_import_message, name))
+                .setPositiveButton(R.string.yes) { _, _ ->
+                    runOnDefaultDispatcher {
+                        finishImportSubscription(group)
+                    }
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+
+        }
+
+    }
+
+    private suspend fun finishImportSubscription(subscription: ProxyGroup) {
+        GroupManager.createGroup(subscription)
+        GroupUpdater.startUpdate(subscription, true)
+    }
+
+    suspend fun importProfile(uri: Uri) {
+        val profile = try {
+            parseProxies(uri.toString()).getOrNull(0) ?: error(getString(R.string.no_proxies_found))
+        } catch (e: Exception) {
+            onMainDispatcher {
+                alert(e.readableMessage).show()
+            }
+            return
+        }
+
+        onMainDispatcher {
+            MaterialAlertDialogBuilder(this@MainActivity).setTitle(R.string.profile_import)
+                .setMessage(getString(R.string.profile_import_message, profile.displayName()))
+                .setPositiveButton(R.string.yes) { _, _ ->
+                    runOnDefaultDispatcher {
+                        finishImportProfile(profile)
+                    }
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        }
+
+    }
+
+    private suspend fun finishImportProfile(profile: AbstractBean) {
+        val targetId = DataStore.selectedGroupForImport()
+
+        ProfileManager.createProfile(targetId, profile)
+
+        onMainDispatcher {
+            displayFragmentWithId(R.id.nav_configuration)
+
+            snackbar(resources.getQuantityString(R.plurals.added, 1, 1)).show()
+        }
+    }
+
+    override fun missingPlugin(profileName: String, pluginName: String) {
+        val pluginEntity = PluginEntry.find(pluginName)
+
+        // unknown exe or neko plugin
+        if (pluginEntity == null) {
+            snackbar(getString(R.string.plugin_unknown, pluginName)).show()
+            return
+        }
+
+        // official exe
+
+        MaterialAlertDialogBuilder(this).setTitle(R.string.missing_plugin)
+            .setMessage(
+                getString(
+                    R.string.profile_requiring_plugin, profileName, pluginEntity.displayName
+                )
+            )
+            .setPositiveButton(R.string.action_download) { _, _ ->
+                showDownloadDialog(pluginEntity)
+            }
+            .setNeutralButton(android.R.string.cancel, null)
+            .setNeutralButton(R.string.action_learn_more) { _, _ ->
+                launchCustomTab("https://t.me/OwnBoxs")
+            }
+            .show()
+    }
+
+    private fun showDownloadDialog(pluginEntry: PluginEntry) {
+        var index = 0
+        var playIndex = -1
+        var fdroidIndex = -1
+
+        val items = mutableListOf<String>()
+        if (pluginEntry.downloadSource.playStore) {
+            items.add(getString(R.string.install_from_play_store))
+            playIndex = index++
+        }
+        if (pluginEntry.downloadSource.fdroid) {
+            items.add(getString(R.string.install_from_fdroid))
+            fdroidIndex = index++
+        }
+
+        items.add(getString(R.string.download))
+        val downloadIndex = index
+
+        MaterialAlertDialogBuilder(this).setTitle(pluginEntry.name)
+            .setItems(items.toTypedArray()) { _, which ->
+                when (which) {
+                    playIndex -> launchCustomTab("https://play.google.com/store/apps/details?id=${pluginEntry.packageName}")
+                    fdroidIndex -> launchCustomTab("https://f-droid.org/packages/${pluginEntry.packageName}/")
+                    downloadIndex -> launchCustomTab(pluginEntry.downloadSource.downloadLink)
+                }
+            }
+            .show()
+    }
+
+    fun isCurrentFragment(@IdRes id: Int): Boolean {
+        val current = currentMainFragment
+            ?: supportFragmentManager.findFragmentById(R.id.fragment_holder)
+        return when (id) {
+            R.id.nav_configuration -> current is ConfigurationFragment
+            R.id.nav_group -> current is GroupFragment
+            R.id.nav_route -> current is RouteFragment
+            R.id.nav_settings -> current is SettingsFragment
+            R.id.nav_dashboard -> current is WebviewFragment
+            R.id.nav_diagnostics -> current is DiagnosticsFragment
+            R.id.nav_tools -> current is ToolsFragment
+            R.id.nav_logcat -> current is LogcatFragment
+            R.id.nav_docs -> current is DocsFragment
+            R.id.nav_about -> current is AboutFragment
+            else -> false
+        }
+    }
+
+    fun setCheckedItem(@IdRes id: Int) {
+        val menu = navigation.menu
+        fun uncheckAll(m: Menu) {
+            for (i in 0 until m.size()) {
+                val item = m.getItem(i)
+                if (item.hasSubMenu()) {
+                    item.subMenu?.let { uncheckAll(it) }
+                }
+                item.isChecked = false
+            }
+        }
+        uncheckAll(menu)
+        menu.findItem(id)?.isChecked = true
+        updateDrawerItemSelection(id)
+        drawerSettingsButton.isSelected = id == R.id.nav_settings
+    }
+
+    private fun attachDrawerScrollFades(drawerRoot: View, topFadeId: Int, bottomFadeId: Int) {
+        val topFade = drawerRoot.findViewById<View>(topFadeId)
+        val bottomFade = drawerRoot.findViewById<View>(bottomFadeId)
+        val surface = getColorAttr(R.attr.colorSurface)
+        val transparentSurface = ColorUtils.setAlphaComponent(surface, 0)
+        topFade.background = GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(surface, transparentSurface),
+        )
+        bottomFade.background = GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(transparentSurface, surface),
+        )
+
+        fun updateFades() {
+            val scrollable = drawerMenuItems.height > drawerMenuScroll.height + 1
+            topFade.visibility = if (scrollable && drawerMenuScroll.canScrollVertically(-1)) View.VISIBLE else View.GONE
+            bottomFade.visibility = if (scrollable && drawerMenuScroll.canScrollVertically(1)) View.VISIBLE else View.GONE
+        }
+
+        drawerMenuScroll.viewTreeObserver.addOnScrollChangedListener { updateFades() }
+        drawerMenuItems.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> updateFades() }
+        drawerMenuScroll.post { updateFades() }
+    }
+
+    private fun rebuildDrawerItems() {
+        drawerMenuItems.removeAllViews()
+        val drawerFactor = UiScaleManager.drawerFactor()
+        val rowHeight = (dp(52) * drawerFactor).toInt().coerceIn(dp(36), dp(72))
+        val iconSize = (dp(24) * drawerFactor).toInt().coerceIn(dp(16), dp(34))
+        val groupGap = (dp(14) * drawerFactor).toInt().coerceAtLeast(dp(6))
+        val titleGap = (dp(16) * drawerFactor).toInt().coerceAtLeast(dp(10))
+        var previousGroup: Int? = null
+        val menu = navigation.menu
+        for (index in 0 until menu.size()) {
+            val item = menu.getItem(index)
+            if (!item.isVisible) continue
+
+            if (previousGroup != null && previousGroup != item.groupId) {
+                drawerMenuItems.addView(View(this), LinearLayout.LayoutParams(1, groupGap))
+            }
+            previousGroup = item.groupId
+
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(14), 0, dp(14), 0)
+                isClickable = true
+                isFocusable = true
+                tag = item.itemId
+                contentDescription = item.title
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+            }
+            val rowParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                rowHeight,
+            ).apply {
+                marginStart = dp(12)
+                marginEnd = dp(12)
+                bottomMargin = dp(3)
+            }
+            row.background = drawerRowBackground(selected = item.isChecked)
+
+            val icon = ImageView(this).apply {
+                scaleType = ImageView.ScaleType.CENTER_INSIDE
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                val iconDrawable = item.icon?.mutate()
+                iconDrawable?.setTint(getColorAttr(if (item.isChecked) R.attr.colorOnSurface else R.attr.colorOnSurfaceVariant))
+                setImageDrawable(iconDrawable)
+            }
+            row.addView(icon, LinearLayout.LayoutParams(iconSize, iconSize))
+
+            val title = TextView(this).apply {
+                text = item.title
+                textSize = 16f * drawerFactor
+                setTextColor(getColorAttr(if (item.isChecked) R.attr.colorOnSurface else R.attr.colorOnSurfaceVariant))
+                typeface = Typeface.create("sans-serif-medium", if (item.isChecked) Typeface.BOLD else Typeface.NORMAL)
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            }
+            row.addView(title, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginStart = titleGap
+            })
+            row.setOnClickListener { onNavigationItemSelected(item) }
+            drawerMenuItems.addView(row, rowParams)
+        }
+        drawerMenuItems.post { drawerMenuScroll.requestLayout() }
+    }
+
+    private fun updateDrawerItemSelection(selectedId: Int) {
+        for (index in 0 until drawerMenuItems.childCount) {
+            val row = drawerMenuItems.getChildAt(index) as? LinearLayout ?: continue
+            val itemId = row.tag as? Int ?: continue
+            val selected = itemId == selectedId
+            row.isSelected = selected
+            row.background = drawerRowBackground(selected)
+            (row.getChildAt(0) as? ImageView)?.drawable?.setTint(
+                getColorAttr(if (selected) R.attr.colorOnSurface else R.attr.colorOnSurfaceVariant)
+            )
+            val titleView = row.getChildAt(1) as? TextView
+            titleView?.setTextColor(
+                getColorAttr(if (selected) R.attr.colorOnSurface else R.attr.colorOnSurfaceVariant)
+            )
+            titleView?.typeface = Typeface.create("sans-serif-medium", if (selected) Typeface.BOLD else Typeface.NORMAL)
+        }
+    }
+
+    private fun drawerRowBackground(selected: Boolean): RippleDrawable {
+        val fill = GradientDrawable().apply {
+            cornerRadius = dp(24).toFloat()
+            setColor(if (selected) getColorAttr(R.attr.colorSurfaceVariant) else Color.TRANSPARENT)
+        }
+        val ripple = ColorUtils.setAlphaComponent(getColorAttr(R.attr.colorOnSurface), 20)
+        return RippleDrawable(ColorStateList.valueOf(ripple), fill, null)
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
+    override fun onNavigationItemSelected(item: MenuItem): Boolean {
+        if (isCurrentFragment(item.itemId)) {
+            binding.drawerLayout.closeDrawers()
+            return true
+        }
+        return displayFragmentWithId(item.itemId)
+    }
+
+
+    @SuppressLint("CommitTransaction")
+    fun displayFragment(fragment: ToolbarFragment) {
+        currentMainFragment = fragment
+        supportFragmentManager.beginTransaction()
+            .replace(R.id.fragment_holder, fragment)
+            .commitAllowingStateLoss()
+        binding.drawerLayout.closeDrawers()
+        syncMainControls(fragment, showWhenConnected = false, animate = true)
+    }
+
+    private fun syncMainControls(
+        fragment: Any? = currentMainFragment
+            ?: supportFragmentManager.findFragmentById(R.id.fragment_holder),
+        showWhenConnected: Boolean,
+        animate: Boolean,
+    ) {
+        val showControls = fragment is ConfigurationFragment || DataStore.showBottomBar
+        binding.stats.useExternalScrollDriver = fragment is ConfigurationFragment
+        binding.stats.syncMainControls(
+            showControls,
+            DataStore.serviceState,
+            showWhenConnected,
+            animate,
+        )
+        binding.fab.animate().cancel()
+        if (showControls) {
+            binding.fab.translationY = 0f
+            binding.fab.translationX = 0f
+            binding.fab.show()
+        } else {
+            binding.fab.hideProgress()
+            binding.fabProgress.hide()
+            binding.fabProgress.visibility = View.INVISIBLE
+            if (animate && binding.fab.isLaidOut) {
+                binding.fab.hide()
+            } else {
+                binding.fab.visibility = View.INVISIBLE
+            }
+        }
+    }
+
+    private fun refreshConfigurationProfileState() {
+        val fragment = currentMainFragment
+            ?: supportFragmentManager.findFragmentById(R.id.fragment_holder)
+        (fragment as? ConfigurationFragment)?.refreshProfileState()
+    }
+
+    fun driveBottomBar(scrollDy: Int) {
+        binding.stats.onListScrolled(scrollDy)
+    }
+
+    fun displayFragmentWithId(@IdRes id: Int): Boolean {
+        when (id) {
+            R.id.nav_configuration -> {
+                displayFragment(ConfigurationFragment())
+            }
+
+            R.id.nav_group -> displayFragment(GroupFragment())
+            R.id.nav_route -> displayFragment(RouteFragment())
+            R.id.nav_settings -> displayFragment(SettingsFragment())
+            R.id.nav_dashboard -> displayFragment(WebviewFragment())
+            R.id.nav_diagnostics -> displayFragment(DiagnosticsFragment())
+            R.id.nav_apps -> {
+                startActivity(Intent(this, AppManagerActivity::class.java))
+                binding.drawerLayout.closeDrawers()
+                return false
+            }
+            R.id.nav_tools -> displayFragment(ToolsFragment())
+            R.id.nav_logcat -> displayFragment(LogcatFragment())
+            R.id.nav_faq -> {
+                launchCustomTab("https://t.me/OwnBoxs")
+                return false
+            }
+
+            R.id.nav_docs -> displayFragment(DocsFragment())
+
+            R.id.nav_about -> displayFragment(AboutFragment())
+
+            else -> return false
+        }
+        setCheckedItem(id)
+        return true
+    }
+
+    private fun changeState(
+        state: BaseService.State,
+        msg: String? = null,
+        animate: Boolean = false,
+        animateControls: Boolean = animate,
+    ) {
+        DataStore.serviceState = state
+        refreshConfigurationProfileState()
+        io.nekohasekai.sagernet.widget.OwnBoxWidgetProvider.updateWidgets(this)
+
+        binding.fab.changeState(state, DataStore.serviceState, animate)
+        binding.stats.changeState(state)
+        syncMainControls(
+            showWhenConnected = state == BaseService.State.Connected,
+            animate = animateControls,
+        )
+        if (msg != null) snackbar(getString(R.string.vpn_error, msg)).show()
+    }
+
+    override fun snackbarInternal(text: CharSequence): Snackbar {
+        return Snackbar.make(binding.coordinator, text, Snackbar.LENGTH_LONG).apply {
+            if (binding.fab.isShown) {
+                anchorView = binding.fab
+            }
+            // TODO
+        }
+    }
+
+    override fun stateChanged(state: BaseService.State, profileName: String?, msg: String?) {
+        changeState(state, msg, true)
+    }
+
+    val connection = SagerConnection(SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_FOREGROUND, true)
+    override fun onServiceConnected(service: ISagerNetService) = changeState(
+        try {
+            BaseService.State.values()[service.state]
+        } catch (_: RemoteException) {
+            BaseService.State.Idle
+        }
+    )
+
+    override fun onServiceDisconnected() = changeState(BaseService.State.Idle)
+    override fun onBinderDied() {
+        connection.disconnect(this)
+        connection.connect(this, this)
+    }
+
+    private val connect = registerForActivityResult(VpnRequestActivity.StartService()) {
+        if (it) snackbar(R.string.vpn_permission_denied).show()
+    }
+
+    // may NOT called when app is in background
+    // ONLY do UI update here, write DB in bg process
+    override fun cbSpeedUpdate(stats: SpeedDisplayData) {
+        binding.stats.updateSpeed(stats.txRateProxy, stats.rxRateProxy)
+    }
+
+    override suspend fun cbTrafficUpdate(data: TrafficDataBatch) {
+        ProfileManager.postUpdate(data.items)
+    }
+
+    override fun cbSelectorUpdate(id: Long) {
+        val old = DataStore.selectedProxy
+        DataStore.selectedProxy = id
+        DataStore.currentProfile = id
+        refreshConfigurationProfileState()
+        runOnDefaultDispatcher {
+            ProfileManager.postUpdate(old, true)
+            ProfileManager.postUpdate(id, true)
+        }
+        if (DataStore.showLandingIp) {
+            binding.stats.refreshLandingIp(forceRefresh = true)
+        }
+        binding.stats.testConnection(silent = true)
+    }
+
+    override fun onPreferenceDataStoreChanged(store: PreferenceDataStore, key: String) {
+        runOnMainDispatcher {
+            if (isDestroyed || isFinishing) return@runOnMainDispatcher
+            when (key) {
+                Key.SERVICE_MODE -> onBinderDied()
+                Key.PROFILE_ID -> {
+                    LandingIpManager.clearCache()
+                    if (DataStore.serviceState.connected) {
+                        if (DataStore.showLandingIp) {
+                            binding.stats.refreshLandingIp(forceRefresh = true)
+                        }
+                        binding.stats.testConnection(silent = true)
+                    }
+                }
+                Key.SHOW_LANDING_IP -> {
+                    binding.stats.refreshDisplay()
+                }
+                Key.SHOW_BOTTOM_BAR -> {
+                    syncMainControls(
+                        showWhenConnected = DataStore.showBottomBar,
+                        animate = true,
+                    )
+                    when (val fragment = currentMainFragment
+                        ?: supportFragmentManager.findFragmentById(R.id.fragment_holder)
+                    ) {
+                        is GroupFragment -> fragment.updateBottomPadding()
+                        is RouteFragment -> fragment.updateBottomPadding()
+                    }
+                }
+                Key.PROXY_APPS, Key.BYPASS_MODE, Key.INDIVIDUAL -> {
+                    if (DataStore.serviceState.canStop) {
+                        snackbar(getString(R.string.need_reload)).setAction(R.string.apply) {
+                            SagerNet.reloadService()
+                        }.show()
+                    }
+                }
+            }
+        }
+    }
+
+    override fun onStart() {
+        connection.updateConnectionId(SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_FOREGROUND)
+        super.onStart()
+    }
+
+    override fun onStop() {
+        connection.updateConnectionId(SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_BACKGROUND)
+        super.onStop()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        GroupManager.userInterface = null
+        DataStore.configurationStore.unregisterChangeListener(this)
+        connection.disconnect(this)
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        when (keyCode) {
+            KeyEvent.KEYCODE_DPAD_LEFT -> {
+                if (super.onKeyDown(keyCode, event)) return true
+                binding.drawerLayout.open()
+                drawerMenuItems.getChildAt(0)?.requestFocus()
+            }
+
+            KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                if (binding.drawerLayout.isOpen) {
+                    binding.drawerLayout.close()
+                    return true
+                }
+            }
+        }
+
+        if (super.onKeyDown(keyCode, event)) return true
+        if (binding.drawerLayout.isOpen) return false
+
+        val fragment =
+            supportFragmentManager.findFragmentById(R.id.fragment_holder) as? ToolbarFragment
+        return fragment != null && fragment.onKeyDown(keyCode, event)
+    }
+
+    private var activeMenuToken: Any? = null
+
+    fun showMenuScrim(token: Any? = null, onScrimClick: (() -> Unit)? = null) {
+        val scrim = binding.menuScrimOverlay ?: return
+        activeMenuToken = token ?: Any()
+        scrim.visibility = View.VISIBLE
+        scrim.animate().cancel()
+        scrim.animate().alpha(1f).setDuration(200).start()
+        scrim.setOnClickListener {
+            onScrimClick?.invoke()
+            hideMenuScrim(token)
+        }
+    }
+
+    fun hideMenuScrim(token: Any? = null) {
+        if (token != null && activeMenuToken != null && token != activeMenuToken) {
+            return
+        }
+        activeMenuToken = null
+        val scrim = binding.menuScrimOverlay ?: return
+        scrim.animate().cancel()
+        scrim.animate().alpha(0f).setDuration(200).withEndAction {
+            if (activeMenuToken == null) {
+                scrim.visibility = View.GONE
+                scrim.setOnClickListener(null)
+            }
+        }.start()
+    }
+
+}

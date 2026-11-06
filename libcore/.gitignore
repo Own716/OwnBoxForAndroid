@@ -1,0 +1,10 @@
+binary*.go
+*.[a|j]ar
+.idea
+.vscode
+/debug.go
+build
+.build
+env_*.sh
+# 由 CI 构建时 go mod tidy 现场生成，不入库
+go.sum

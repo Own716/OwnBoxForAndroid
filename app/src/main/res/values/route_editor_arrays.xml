@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="rr_action_entries"><item>@string/rr_inherit</item><item>route</item><item>reject</item><item>sniff</item><item>resolve</item><item>hijack-dns</item><item>route-options</item></string-array>
+    <string-array name="rr_action_values"><item></item><item>route</item><item>reject</item><item>sniff</item><item>resolve</item><item>hijack-dns</item><item>route-options</item></string-array>
+    <string-array name="rr_method_entries"><item>@string/rr_default</item><item>default</item><item>drop</item><item>reply</item></string-array>
+    <string-array name="rr_method_values"><item></item><item>default</item><item>drop</item><item>reply</item></string-array>
+    <string-array name="rr_strategy_entries"><item>@string/rr_default</item><item>prefer_ipv4</item><item>prefer_ipv6</item><item>ipv4_only</item><item>ipv6_only</item></string-array>
+    <string-array name="rr_strategy_values"><item></item><item>prefer_ipv4</item><item>prefer_ipv6</item><item>ipv4_only</item><item>ipv6_only</item></string-array>
+    <string-array name="rr_ip_version_entries"><item>@string/rr_default</item><item>IPv4</item><item>IPv6</item></string-array>
+    <string-array name="rr_ip_version_values"><item></item><item>4</item><item>6</item></string-array>
+</resources>

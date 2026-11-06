@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="utf-8"?><!-- Based on: https://github.com/android/platform_frameworks_base/blob/505e3ab/core/res/res/layout/simple_list_item_2.xml -->
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/content"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="2dp"
+    android:clickable="true"
+    android:focusable="true"
+    app:cardCornerRadius="@dimen/profile_card_corner_radius">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <LinearLayout
+            android:id="@+id/content_lin"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:focusable="false"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:id="@+id/container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:layout_weight="1"
+                    android:gravity="center_vertical"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="8dp"
+                    android:paddingTop="6dp"
+                    android:paddingBottom="2dp">
+
+                    <TextView
+                        android:id="@+id/profile_name"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:maxLines="2"
+                        android:ellipsize="end"
+                        android:breakStrategy="simple"
+                        android:hyphenationFrequency="none"
+                        android:lineBreakStyle="loose"
+                        android:lineBreakWordStyle="phrase"
+                        android:textAppearance="?android:attr/textAppearanceSmall"
+                        android:textColor="?android:attr/textColorPrimary"
+                        android:textStyle="bold"
+                        tools:text="@string/profile_name" />
+                </LinearLayout>
+
+                <androidx.appcompat.widget.AppCompatImageView
+                    android:id="@+id/edit"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="top"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/edit"
+                    android:focusable="true"
+                    android:padding="12dp"
+                    android:visibility="gone"
+                    app:srcCompat="@drawable/ic_image_edit" />
+
+                <androidx.appcompat.widget.AppCompatImageView
+                    android:id="@+id/double_column_menu"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/more"
+                    android:focusable="true"
+                    android:padding="6dp"
+                    android:layout_marginEnd="6dp"
+                    android:visibility="gone"
+                    app:srcCompat="@drawable/ic_baseline_more_vert_24" />
+
+                <androidx.appcompat.widget.AppCompatImageView
+                    android:id="@+id/drag_handle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/reorder_mode_title"
+                    android:focusable="false"
+                    android:padding="6dp"
+                    android:layout_marginEnd="6dp"
+                    android:visibility="gone"
+                    app:srcCompat="@drawable/ic_baseline_drag_handle_24"
+                    app:tint="?android:attr/textColorSecondary" />
+
+                <LinearLayout
+                    android:id="@+id/share"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="top"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/more"
+                    android:focusable="true"
+                    android:visibility="gone"
+                    android:nextFocusLeft="@+id/container">
+
+                    <LinearLayout
+                        android:id="@+id/share_layer"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:padding="12dp">
+
+                        <androidx.appcompat.widget.AppCompatImageView
+                            android:id="@+id/shareIcon"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            app:srcCompat="@drawable/ic_baseline_more_vert_24" />
+                    </LinearLayout>
+
+                </LinearLayout>
+
+                <androidx.appcompat.widget.AppCompatImageView
+                    android:id="@+id/remove"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="top"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/delete"
+                    android:focusable="true"
+                    android:padding="12dp"
+                    android:visibility="gone"
+                    app:srcCompat="@drawable/ic_action_delete" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/profile_middle_row"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:paddingBottom="2dp"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <io.nekohasekai.sagernet.widget.MarqueeTextView
+                    android:id="@+id/profile_address"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:singleLine="true"
+                    android:ellipsize="marquee"
+                    android:marqueeRepeatLimit="marquee_forever"
+                    android:focusable="false"
+                    android:focusableInTouchMode="false"
+                    android:scrollHorizontally="true"
+                    tools:text="@string/server_address"
+                    android:textAppearance="?android:attr/textAppearanceSmall"
+                    android:textColor="?android:attr/textColorSecondary" />
+
+                <TextView
+                    android:id="@+id/traffic_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    tools:text="@string/traffic"
+                    android:textAppearance="?android:attr/textAppearanceSmall"
+                    android:textColor="?android:attr/textColorSecondary" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/profile_bottom_row"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:baselineAligned="true"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:paddingBottom="6dp">
+
+                <TextView
+                    android:id="@+id/profile_type"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:paddingTop="2dp"
+                    android:paddingBottom="2dp"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    tools:text="VMESS" />
+
+                <View
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:layout_weight="1" />
+
+                <TextView
+                    android:id="@+id/profile_status"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:gravity="end"
+                    android:singleLine="true"
+                    android:ellipsize="end"
+                    android:textAppearance="?android:attr/textAppearanceSmall"
+                    android:textColor="?android:textColorSecondary" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <View
+            android:id="@+id/selected_indicator"
+            android:layout_width="@dimen/profile_card_selected_bar_width"
+            android:layout_height="match_parent"
+            android:layout_gravity="start"
+            android:background="?attr/selectedColorPrimary"
+            android:visibility="gone"
+            tools:visibility="visible" />
+
+    </FrameLayout>
+
+</com.google.android.material.card.MaterialCardView>

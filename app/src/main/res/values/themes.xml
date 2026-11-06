@@ -1,0 +1,1062 @@
+<resources>
+    <!-- Base application theme. -->
+    <style name="Theme.SagerNet" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="actionBarStyle">@style/Widget.MaterialComponents.ActionBar.Solid</item>
+        <item name="actionModeCloseDrawable">@drawable/ic_navigation_close</item>
+        <item name="colorButtonNormal">?colorAccent</item>
+        <item name="android:navigationBarColor">?colorPrimaryDark</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="colorPrimary">@color/material_pink_500</item>
+        <item name="colorPrimaryDark">@color/material_pink_700</item>
+        <item name="colorAccent">@color/material_pink_accent_200</item>
+
+        <item name="colorMaterial100">@color/material_pink_100</item>
+        <item name="colorMaterial300">@color/material_pink_300</item>
+
+        <item name="android:colorBackground">@color/md3_background</item>
+        <item name="colorSurface">@color/md3_surface</item>
+        <item name="android:textColorPrimary">@color/md3_text_primary</item>
+        <item name="android:textColorSecondary">@color/md3_text_secondary</item>
+        <item name="colorOnSurface">?android:attr/textColorPrimary</item>
+        <item name="colorOnSurfaceVariant">?android:attr/textColorSecondary</item>
+        <item name="colorSurfaceVariant">@color/md3_background</item>
+        <item name="colorOutline">@color/card_stroke</item>
+
+        <!-- Switch, RadioButton, CheckBox 激活色严格收敛至自定义主题主色 -->
+        <item name="colorControlActivated">?colorPrimary</item>
+
+        <item name="textAppearanceHeadlineLarge">?attr/textAppearanceHeadline4</item>
+        <item name="textAppearanceHeadlineMedium">?attr/textAppearanceHeadline5</item>
+        <item name="textAppearanceHeadlineSmall">?attr/textAppearanceHeadline6</item>
+        <item name="textAppearanceTitleLarge">?attr/textAppearanceHeadline6</item>
+        <item name="textAppearanceTitleMedium">?attr/textAppearanceSubtitle1</item>
+        <item name="textAppearanceTitleSmall">?attr/textAppearanceSubtitle2</item>
+        <item name="textAppearanceBodyLarge">?attr/textAppearanceBody1</item>
+        <item name="textAppearanceBodyMedium">?attr/textAppearanceBody2</item>
+        <item name="textAppearanceBodySmall">?attr/textAppearanceCaption</item>
+        <item name="textAppearanceLabelLarge">?attr/textAppearanceButton</item>
+        <item name="textAppearanceLabelMedium">?attr/textAppearanceButton</item>
+        <item name="textAppearanceLabelSmall">?attr/textAppearanceCaption</item>
+
+        <!-- 立体卡片提升表面色，默认遵循 MD3 规范使用标准表面色 -->
+        <item name="cardElevatedSurfaceColor">@color/md3_surface</item>
+
+        <item name="accentOrTextSecondary">?colorAccent</item>
+        <item name="accentOrTextPrimary">?colorAccent</item>
+        <item name="primaryOrTextSecondary">?colorPrimary</item>
+        <item name="primaryOrTextPrimary">?colorPrimary</item>
+
+        <item name="fabColorBackground">?colorPrimary</item>
+        <item name="selectedColorPrimary">?colorPrimary</item>
+
+        <!-- 沉浸式 Top App Bar 主题与样式 -->
+        <item name="actionBarTheme">@style/ThemeOverlay.SagerNet.Toolbar</item>
+        <item name="actionBarPopupTheme">@style/ThemeOverlay.SagerNet.Toolbar.Popup</item>
+        <item name="appBarLayoutStyle">@style/Widget.SagerNet.AppBarLayout</item>
+        <item name="toolbarStyle">@style/Widget.SagerNet.Toolbar</item>
+        <item name="actionButtonStyle">@style/Widget.SagerNet.ActionButton</item>
+        <item name="actionOverflowButtonStyle">@style/Widget.SagerNet.ActionOverflowButton</item>
+        <item name="toolbarNavigationButtonStyle">@style/Widget.SagerNet.ToolbarNavigationButton</item>
+
+        <!-- MD3 Tab 默认样式（高对比、沉浸底色、首字母大写） -->
+        <item name="tabStyle">@style/Widget.SagerNet.TabLayout</item>
+        <item name="tabTextAppearance">@style/Widget.SagerNet.TabLayout.TextAppearance</item>
+        <item name="tabTextColor">?android:attr/textColorSecondary</item>
+        <item name="tabSelectedTextColor">?colorPrimary</item>
+        <item name="tabIndicatorColor">?colorPrimary</item>
+        <item name="tabRippleColor">?colorPrimary</item>
+        <item name="whiteOrTextPrimary">?android:attr/textColorPrimary</item>
+        <item name="colorOnPrimary">@color/white</item>
+
+        <item name="windowActionModeOverlay">true</item>
+
+        <!-- Remove ActionBar but keep styles and themes -->
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+
+        <item name="chipStyle">@style/Widget.MaterialComponents.Chip.Choice.SagerNet</item>
+
+        <item name="itemShapeAppearance">
+            @style/ShapeAppearance.MaterialComponents.MediumComponent
+        </item>
+
+        <item name="alertDialogTheme">
+            @style/ThemeOverlay.SagerNet.AlertDialog
+        </item>
+
+        <item name="materialAlertDialogTheme">
+            @style/ThemeOverlay.MaterialComponents.MaterialAlertDialog.SagerNet
+        </item>
+
+        <item name="materialCardViewStyle">@style/Widget.SagerNet.CardView</item>
+        <item name="textInputStyle">@style/Widget.SagerNet.TextInputLayout</item>
+        <item name="popupMenuStyle">@style/Widget.SagerNet.PopupMenu</item>
+        <item name="actionOverflowMenuStyle">@style/Widget.SagerNet.PopupMenu.Overflow</item>
+        <item name="bottomSheetDialogTheme">@style/ThemeOverlay.SagerNet.BottomSheetDialog</item>
+        <item name="materialButtonStyle">@style/Widget.SagerNet.Button</item>
+
+        <!-- Telegram Switch & Preference Styles -->
+        <item name="switchStyle">@style/Widget.Telegram.Switch</item>
+        <item name="switchPreferenceCompatStyle">@style/Widget.Telegram.Preference.Switch</item>
+        <item name="preferenceCategoryStyle">@style/Widget.Telegram.PreferenceCategory</item>
+
+    </style>
+
+    <style name="Theme.SagerNet.Dialog" parent="Theme.MaterialComponents.DayNight.Dialog.Alert">
+        <item name="actionBarStyle">@style/Widget.MaterialComponents.ActionBar.Solid</item>
+        <item name="actionModeCloseDrawable">@drawable/ic_navigation_close</item>
+        <item name="colorButtonNormal">?colorAccent</item>
+        <item name="android:navigationBarColor">?colorPrimaryDark</item>
+        <item name="colorPrimary">@color/material_pink_500</item>
+        <item name="colorPrimaryDark">@color/material_pink_700</item>
+        <item name="colorAccent">@color/material_pink_accent_200</item>
+
+        <item name="colorMaterial100">@color/material_pink_100</item>
+        <item name="colorMaterial300">@color/material_pink_300</item>
+
+        <item name="android:colorBackground">@color/md3_background</item>
+        <item name="colorSurface">@color/md3_surface</item>
+        <item name="android:textColorPrimary">@color/md3_text_primary</item>
+        <item name="android:textColorSecondary">@color/md3_text_secondary</item>
+        <item name="colorOnSurface">?android:attr/textColorPrimary</item>
+        <item name="colorOnSurfaceVariant">?android:attr/textColorSecondary</item>
+        <item name="colorSurfaceVariant">@color/md3_background</item>
+        <item name="colorControlActivated">?colorPrimary</item>
+        <item name="textAppearanceHeadlineLarge">?attr/textAppearanceHeadline4</item>
+        <item name="textAppearanceHeadlineMedium">?attr/textAppearanceHeadline5</item>
+        <item name="textAppearanceHeadlineSmall">?attr/textAppearanceHeadline6</item>
+        <item name="textAppearanceTitleLarge">?attr/textAppearanceHeadline6</item>
+        <item name="textAppearanceTitleMedium">?attr/textAppearanceSubtitle1</item>
+        <item name="textAppearanceTitleSmall">?attr/textAppearanceSubtitle2</item>
+        <item name="textAppearanceBodyLarge">?attr/textAppearanceBody1</item>
+        <item name="textAppearanceBodyMedium">?attr/textAppearanceBody2</item>
+        <item name="textAppearanceBodySmall">?attr/textAppearanceCaption</item>
+        <item name="textAppearanceLabelLarge">?attr/textAppearanceButton</item>
+        <item name="textAppearanceLabelMedium">?attr/textAppearanceButton</item>
+        <item name="textAppearanceLabelSmall">?attr/textAppearanceCaption</item>
+
+        <!-- 立体卡片提升表面色，默认遵循 MD3 规范使用标准表面色 -->
+        <item name="cardElevatedSurfaceColor">@color/md3_surface</item>
+
+        <item name="accentOrTextSecondary">?colorAccent</item>
+        <item name="accentOrTextPrimary">?colorAccent</item>
+        <item name="primaryOrTextSecondary">?colorPrimary</item>
+        <item name="primaryOrTextPrimary">?colorPrimary</item>
+
+        <item name="fabColorBackground">?colorPrimary</item>
+        <item name="selectedColorPrimary">?colorPrimary</item>
+        <item name="actionBarTheme">@style/ThemeOverlay.SagerNet.Toolbar</item>
+        <item name="appBarLayoutStyle">@style/Widget.SagerNet.AppBarLayout</item>
+        <item name="toolbarStyle">@style/Widget.SagerNet.Toolbar</item>
+        <item name="tabTextColor">?android:attr/textColorSecondary</item>
+        <item name="tabSelectedTextColor">?colorPrimary</item>
+        <item name="tabIndicatorColor">?colorPrimary</item>
+        <item name="tabRippleColor">?colorPrimary</item>
+        <item name="whiteOrTextPrimary">?android:attr/textColorPrimary</item>
+
+        <item name="windowActionModeOverlay">true</item>
+
+        <!-- Remove ActionBar but keep styles and themes -->
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+
+        <item name="chipStyle">@style/Widget.MaterialComponents.Chip.Choice.SagerNet</item>
+
+        <item name="itemShapeAppearance">
+            @style/ShapeAppearance.MaterialComponents.MediumComponent
+        </item>
+
+        <item name="alertDialogTheme">
+            @style/ThemeOverlay.SagerNet.AlertDialog
+        </item>
+
+        <item name="materialAlertDialogTheme">
+            @style/ThemeOverlay.MaterialComponents.MaterialAlertDialog.SagerNet
+        </item>
+
+        <item name="materialCardViewStyle">@style/Widget.SagerNet.CardView</item>
+        <item name="textInputStyle">@style/Widget.SagerNet.TextInputLayout</item>
+        <item name="popupMenuStyle">@style/Widget.SagerNet.PopupMenu</item>
+        <item name="actionOverflowMenuStyle">@style/Widget.SagerNet.PopupMenu.Overflow</item>
+        <item name="bottomSheetDialogTheme">@style/ThemeOverlay.SagerNet.BottomSheetDialog</item>
+        <item name="materialButtonStyle">@style/Widget.SagerNet.Button</item>
+
+        <!-- Telegram Switch & Preference Styles -->
+        <item name="switchStyle">@style/Widget.Telegram.Switch</item>
+        <item name="switchPreferenceCompatStyle">@style/Widget.Telegram.Preference.Switch</item>
+        <item name="preferenceCategoryStyle">@style/Widget.Telegram.PreferenceCategory</item>
+
+        <item name="android:dialogCornerRadius">@dimen/dialog_corner_radius</item>
+
+        <item name="windowFixedHeightMajor" type="dimen">95%</item>
+
+    </style>
+
+    <style name="AppearanceFoundation.Title" parent="TextAppearance.AppCompat.Title">
+        <item name="android:textColor">?attr/colorOnSurface</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="ThemeOverlay.MaterialComponents.MaterialAlertDialog.SagerNet">
+        <item name="shapeAppearanceOverlay">@style/ShapeAppearanceOverlay.SagerNet.Dialog</item>
+        <item name="buttonBarPositiveButtonStyle">
+            @style/Widget.MaterialComponents.Button.TextButton.Dialog.Primary
+        </item>
+        <item name="buttonBarNegativeButtonStyle">
+            @style/Widget.MaterialComponents.Button.TextButton.Dialog.Primary
+        </item>
+        <item name="buttonBarNeutralButtonStyle">
+            @style/Widget.MaterialComponents.Button.TextButton.Dialog.Flush.Primary
+        </item>
+    </style>
+
+    <style name="Widget.MaterialComponents.Button.TextButton.Dialog.Primary">
+        <item name="android:textColor">?primaryOrTextPrimary</item>
+    </style>
+
+    <style name="Widget.MaterialComponents.Button.TextButton.Dialog.Flush.Primary">
+        <item name="android:textColor">?primaryOrTextPrimary</item>
+    </style>
+
+    <style name="Widget.MaterialComponents.Chip.Choice.SagerNet">
+        <item name="textStartPadding">30dp</item>
+        <item name="textEndPadding">30dp</item>
+        <item name="chipBackgroundColor">@color/chip_background</item>
+        <item name="android:textColor">@color/chip_text_color</item>
+        <item name="checkedIconTint">?primaryOrTextPrimary</item>
+        <item name="rippleColor">@color/chip_ripple_color</item>
+    </style>
+
+    <style name="Widget.SagerNet.CardView" parent="Widget.MaterialComponents.CardView">
+        <item name="cardElevation">0dp</item>
+        <item name="cardCornerRadius">@dimen/profile_card_corner_radius</item>
+        <item name="strokeColor">@color/card_stroke</item>
+        <item name="strokeWidth">@dimen/card_stroke_width</item>
+        <item name="cardBackgroundColor">?attr/colorSurface</item>
+    </style>
+
+    <!-- MD3 Immersive AppBar & Toolbar styles -->
+    <!-- AppBarLayout is transparent: the window background (theme-specific) shows through
+         to the status bar padding area, eliminating the black-line artifact when using
+         colorful preset themes (mint, blue, etc.). Black/White/LightGray themes override
+         this below with their own opaque surface color. -->
+    <style name="Widget.SagerNet.AppBarLayout" parent="Widget.MaterialComponents.AppBarLayout.Surface">
+        <item name="android:background">@android:color/transparent</item>
+        <item name="elevation">0dp</item>
+    </style>
+
+    <!-- Neutral-theme AppBarLayout overrides: keep opaque surface so transparent window
+         background doesn't cause visual bleed on black/white/gray themes. -->
+    <style name="Widget.SagerNet.AppBarLayout.Black">
+        <item name="android:background">@color/black</item>
+    </style>
+    <style name="Widget.SagerNet.AppBarLayout.White">
+        <item name="android:background">@color/md3_surface</item>
+    </style>
+    <style name="Widget.SagerNet.AppBarLayout.LightGray">
+        <item name="android:background">@color/md3_surface</item>
+    </style>
+
+    <style name="Widget.SagerNet.Toolbar" parent="Widget.MaterialComponents.Toolbar.Surface">
+        <item name="android:background">@android:color/transparent</item>
+        <item name="titleTextColor">?android:attr/textColorPrimary</item>
+        <item name="subtitleTextColor">?android:attr/textColorSecondary</item>
+        <item name="navigationIconTint">?android:attr/textColorPrimary</item>
+        <item name="actionMenuTextColor">?android:attr/textColorPrimary</item>
+    </style>
+
+    <style name="ThemeOverlay.SagerNet.Toolbar" parent="ThemeOverlay.MaterialComponents.Toolbar.Surface">
+        <item name="colorControlNormal">?android:attr/textColorPrimary</item>
+        <item name="actionMenuTextColor">?android:attr/textColorPrimary</item>
+        <item name="colorSurface">@color/md3_surface</item>
+        <item name="android:colorBackground">@color/md3_surface</item>
+        <item name="actionBarPopupTheme">@style/ThemeOverlay.SagerNet.Toolbar.Popup</item>
+        <item name="actionButtonStyle">@style/Widget.SagerNet.ActionButton</item>
+        <item name="actionOverflowButtonStyle">@style/Widget.SagerNet.ActionOverflowButton</item>
+        <item name="toolbarNavigationButtonStyle">@style/Widget.SagerNet.ToolbarNavigationButton</item>
+    </style>
+
+    <style name="ThemeOverlay.SagerNet.Toolbar.Black" parent="ThemeOverlay.MaterialComponents.Toolbar.Surface">
+        <item name="colorControlNormal">@color/white</item>
+        <item name="actionMenuTextColor">@color/white</item>
+        <item name="colorSurface">@color/black</item>
+        <item name="android:colorBackground">@color/black</item>
+        <item name="actionBarPopupTheme">@style/ThemeOverlay.MaterialComponents.Dark</item>
+        <item name="actionButtonStyle">@style/Widget.SagerNet.ActionButton</item>
+        <item name="actionOverflowButtonStyle">@style/Widget.SagerNet.ActionOverflowButton</item>
+        <item name="toolbarNavigationButtonStyle">@style/Widget.SagerNet.ToolbarNavigationButton</item>
+    </style>
+
+    <style name="ThemeOverlay.SagerNet.Toolbar.Compact" parent="ThemeOverlay.MaterialComponents.Toolbar.Surface">
+        <item name="colorControlNormal">?android:attr/textColorPrimary</item>
+        <item name="actionMenuTextColor">?android:attr/textColorPrimary</item>
+        <item name="colorSurface">@color/md3_surface</item>
+        <item name="android:colorBackground">@color/md3_surface</item>
+        <item name="actionBarPopupTheme">@style/ThemeOverlay.SagerNet.Toolbar.Popup</item>
+        <item name="actionButtonStyle">@style/Widget.SagerNet.ActionButton.Compact</item>
+        <item name="actionOverflowButtonStyle">@style/Widget.SagerNet.ActionOverflowButton.Compact</item>
+        <item name="toolbarNavigationButtonStyle">@style/Widget.SagerNet.ToolbarNavigationButton</item>
+    </style>
+
+    <style name="Widget.SagerNet.ActionButton" parent="Widget.AppCompat.ActionButton">
+        <item name="android:minWidth">52dp</item>
+        <item name="android:paddingLeft">12dp</item>
+        <item name="android:paddingRight">12dp</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">12dp</item>
+    </style>
+
+    <style name="Widget.SagerNet.ActionOverflowButton" parent="Widget.AppCompat.ActionButton.Overflow">
+        <item name="android:minWidth">40dp</item>
+        <item name="android:paddingLeft">8dp</item>
+        <item name="android:paddingRight">8dp</item>
+        <item name="android:paddingStart">8dp</item>
+        <item name="android:paddingEnd">8dp</item>
+    </style>
+
+    <style name="Widget.SagerNet.ActionButton.Compact" parent="Widget.AppCompat.ActionButton">
+        <item name="android:minWidth">32dp</item>
+        <item name="android:paddingLeft">0dp</item>
+        <item name="android:paddingRight">0dp</item>
+        <item name="android:paddingStart">0dp</item>
+        <item name="android:paddingEnd">0dp</item>
+    </style>
+
+    <style name="Widget.SagerNet.ActionOverflowButton.Compact" parent="Widget.AppCompat.ActionButton.Overflow">
+        <item name="android:minWidth">32dp</item>
+        <item name="android:paddingLeft">0dp</item>
+        <item name="android:paddingRight">0dp</item>
+        <item name="android:paddingStart">0dp</item>
+        <item name="android:paddingEnd">0dp</item>
+    </style>
+
+    <style name="Widget.SagerNet.ToolbarNavigationButton" parent="Widget.AppCompat.Toolbar.Button.Navigation">
+        <item name="android:minWidth">36dp</item>
+        <item name="android:paddingStart">2dp</item>
+        <item name="android:paddingEnd">2dp</item>
+    </style>
+
+    <style name="TextAppearance.SagerNet.Toolbar.Title" parent="TextAppearance.MaterialComponents.Headline6">
+        <item name="android:textSize">16sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <style name="Widget.SagerNet.TabLayout" parent="Widget.MaterialComponents.TabLayout">
+        <item name="tabTextAppearance">@style/Widget.SagerNet.TabLayout.TextAppearance.Compact</item>
+        <item name="tabTextColor">?attr/tabTextColor</item>
+        <item name="tabSelectedTextColor">?attr/tabSelectedTextColor</item>
+        <item name="tabIndicatorColor">?attr/tabIndicatorColor</item>
+        <item name="tabRippleColor">?attr/tabRippleColor</item>
+        <item name="tabIndicatorHeight">2dp</item>
+        <item name="tabIndicatorFullWidth">false</item>
+    </style>
+
+    <style name="Widget.SagerNet.TabLayout.TextAppearance" parent="TextAppearance.MaterialComponents.Button">
+        <item name="android:textAllCaps">false</item>
+        <item name="textAllCaps">false</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <style name="Widget.SagerNet.TabLayout.TextAppearance.Compact" parent="TextAppearance.MaterialComponents.Button">
+        <item name="android:textAllCaps">false</item>
+        <item name="textAllCaps">false</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <style name="Widget.SagerNet.TabLayout.TextAppearance.Capsule" parent="TextAppearance.MaterialComponents.Body2">
+        <item name="android:textAllCaps">false</item>
+        <item name="textAllCaps">false</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textStyle">normal</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <style name="Widget.SagerNet.TabLayout.TextAppearance.Capsule.Selected" parent="Widget.SagerNet.TabLayout.TextAppearance.Capsule">
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <!-- ElevatedCard: shadow + tonal surface, no stroke. -->
+    <style name="Widget.SagerNet.CardView.Elevated">
+        <item name="cardElevation">@dimen/card_elevation</item>
+        <item name="strokeWidth">0dp</item>
+        <item name="cardBackgroundColor">?attr/cardElevatedSurfaceColor</item>
+    </style>
+
+    <style name="Widget.SagerNet.CardView.Tinted" parent="Widget.SagerNet.CardView">
+        <item name="cardBackgroundColor">?attr/cardElevatedSurfaceColor</item>
+    </style>
+
+    <!-- Telegram UI Components -->
+    <style name="Widget.Telegram.Switch" parent="Widget.AppCompat.CompoundButton.Switch">
+        <item name="track">@drawable/telegram_switch_track</item>
+        <item name="android:thumb">@drawable/telegram_switch_thumb</item>
+        <item name="thumbTint">@null</item>
+        <item name="trackTint">@null</item>
+        <item name="showText">false</item>
+        <item name="android:splitTrack">false</item>
+        <item name="splitTrack">false</item>
+        <item name="switchMinWidth">48dp</item>
+        <item name="switchPadding">6dp</item>
+    </style>
+
+    <style name="Widget.Telegram.Preference.Switch" parent="@style/Preference.SwitchPreferenceCompat.Material">
+        <item name="widgetLayout">@layout/layout_telegram_preference_switch</item>
+    </style>
+
+    <style name="Widget.Telegram.PreferenceCategory" parent="@style/Preference.Category">
+        <item name="android:layout">@layout/layout_telegram_preference_category</item>
+    </style>
+
+    <style name="ShapeAppearanceOverlay.SagerNet.Dialog" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">@dimen/dialog_corner_radius</item>
+    </style>
+
+    <style name="ShapeAppearanceOverlay.SagerNet.Input" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">@dimen/input_corner_radius</item>
+    </style>
+    <style name="Widget.SagerNet.TextInputLayout" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+        <item name="shapeAppearanceOverlay">@style/ShapeAppearanceOverlay.SagerNet.Input</item>
+    </style>
+
+    <style name="PopupMenuAnimation">
+        <item name="android:windowEnterAnimation">@anim/popup_enter</item>
+        <item name="android:windowExitAnimation">@anim/popup_exit</item>
+    </style>
+
+    <style name="TextAppearance.SagerNet.PopupMenu" parent="TextAppearance.AppCompat.Widget.PopupMenu.Large">
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <style name="Widget.SagerNet.PopupMenu" parent="Widget.MaterialComponents.PopupMenu">
+        <item name="android:popupBackground">@drawable/bg_popup_menu</item>
+        <item name="android:popupAnimationStyle">@style/PopupMenuAnimation</item>
+    </style>
+    <style name="Widget.SagerNet.PopupMenu.Overflow" parent="Widget.MaterialComponents.PopupMenu.Overflow">
+        <item name="android:popupBackground">@drawable/bg_popup_menu</item>
+        <item name="android:popupAnimationStyle">@style/PopupMenuAnimation</item>
+        <item name="android:dropDownHorizontalOffset">-6dp</item>
+        <item name="android:dropDownVerticalOffset">4dp</item>
+    </style>
+
+    <style name="ThemeOverlay.SagerNet.Toolbar.Popup" parent="ThemeOverlay.AppCompat.DayNight">
+        <item name="actionOverflowMenuStyle">@style/Widget.SagerNet.PopupMenu.Overflow</item>
+        <item name="popupMenuStyle">@style/Widget.SagerNet.PopupMenu</item>
+        <item name="dropdownListPreferredItemHeight">38dp</item>
+        <item name="listPreferredItemHeightSmall">38dp</item>
+        <item name="android:listPreferredItemHeightSmall">38dp</item>
+        <item name="textAppearanceLargePopupMenu">@style/TextAppearance.SagerNet.PopupMenu</item>
+    </style>
+
+    <style name="ShapeAppearanceOverlay.SagerNet.BottomSheet" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSizeTopLeft">@dimen/dialog_corner_radius</item>
+        <item name="cornerSizeTopRight">@dimen/dialog_corner_radius</item>
+        <item name="cornerSizeBottomLeft">0dp</item>
+        <item name="cornerSizeBottomRight">0dp</item>
+    </style>
+    <style name="Widget.SagerNet.BottomSheet" parent="Widget.MaterialComponents.BottomSheet.Modal">
+        <item name="shapeAppearanceOverlay">@style/ShapeAppearanceOverlay.SagerNet.BottomSheet</item>
+    </style>
+    <style name="ThemeOverlay.SagerNet.BottomSheetDialog" parent="ThemeOverlay.MaterialComponents.BottomSheetDialog">
+        <item name="bottomSheetStyle">@style/Widget.SagerNet.BottomSheet</item>
+    </style>
+
+    <style name="ShapeAppearanceOverlay.SagerNet.Button" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">@dimen/button_corner_radius</item>
+    </style>
+    <style name="Widget.SagerNet.Button" parent="Widget.MaterialComponents.Button">
+        <item name="shapeAppearanceOverlay">@style/ShapeAppearanceOverlay.SagerNet.Button</item>
+    </style>
+
+    <style name="ShapeAppearanceOverlay.SagerNet.DrawerButton" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">24dp</item>
+    </style>
+    <style name="Widget.SagerNet.DrawerSettingsButton" parent="Widget.MaterialComponents.Button">
+        <item name="shapeAppearanceOverlay">@style/ShapeAppearanceOverlay.SagerNet.DrawerButton</item>
+        <item name="android:textColor">?colorOnPrimary</item>
+        <item name="iconTint">?colorOnPrimary</item>
+        <item name="backgroundTint">?colorPrimary</item>
+        <item name="strokeWidth">0dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="android:elevation">0dp</item>
+        <item name="android:stateListAnimator">@null</item>
+    </style>
+
+    <style name="ShapeAppearance.SagerNet.NavItem" parent="ShapeAppearance.MaterialComponents.SmallComponent">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">@dimen/nav_item_corner_radius</item>
+    </style>
+
+    <style name="ThemeOverlay.SagerNet.AlertDialog" parent="ThemeOverlay.MaterialComponents.MaterialAlertDialog.SagerNet">
+        <item name="android:windowBackground">@drawable/bg_dialog</item>
+    </style>
+
+    <style name="Theme.SagerNet.Pink_SSR" parent="Theme.SagerNet">
+        <item name="colorPrimary">@color/color_pink_ssr</item>
+        <item name="colorPrimaryDark">@color/color_pink_ssr</item>
+        <item name="colorAccent">@color/material_pink_accent_200</item>
+        <item name="colorMaterial100">@color/material_pink_accent_100</item>
+        <item name="colorMaterial300">@color/color_pink_ssr</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_pink_ssr</item>
+    </style>
+
+    <style name="Theme.SagerNet.Amber" parent="Theme.SagerNet">
+        <item name="colorPrimary">@color/material_amber_500</item>
+        <item name="colorPrimaryDark">@color/material_amber_700</item>
+        <item name="colorAccent">@color/material_amber_accent_200</item>
+        <item name="colorMaterial100">@color/material_amber_100</item>
+        <item name="colorMaterial300">@color/material_amber_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_amber</item>
+    </style>
+
+    <style name="Theme.SagerNet.Blue" parent="Theme.SagerNet">
+        <item name="colorPrimary">@color/material_blue_500</item>
+        <item name="colorPrimaryDark">@color/material_blue_700</item>
+        <item name="colorAccent">@color/material_blue_accent_200</item>
+        <item name="colorMaterial100">@color/material_blue_100</item>
+        <item name="colorMaterial300">@color/material_blue_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_blue</item>
+    </style>
+
+    <style name="Theme.SagerNet.BlueGrey" parent="Theme.SagerNet">
+        <item name="colorPrimary">@color/material_blue_grey_500</item>
+        <item name="colorPrimaryDark">@color/material_blue_grey_700</item>
+        <item name="colorAccent">@color/material_blue_grey_200</item>
+        <item name="colorMaterial100">@color/material_blue_grey_100</item>
+        <item name="colorMaterial300">@color/material_blue_grey_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_blue_grey</item>
+    </style>
+
+    <style name="Theme.SagerNet.Brown" parent="Theme.SagerNet">
+        <item name="colorPrimary">@color/material_brown_500</item>
+        <item name="colorPrimaryDark">@color/material_brown_700</item>
+        <item name="colorAccent">@color/material_brown_200</item>
+        <item name="colorMaterial100">@color/material_brown_100</item>
+        <item name="colorMaterial300">@color/material_brown_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_brown</item>
+    </style>
+
+    <style name="Theme.SagerNet.Cyan" parent="Theme.SagerNet">
+        <item name="colorPrimary">@color/material_cyan_500</item>
+        <item name="colorPrimaryDark">@color/material_cyan_700</item>
+        <item name="colorAccent">@color/material_cyan_accent_200</item>
+        <item name="colorMaterial100">@color/material_cyan_100</item>
+        <item name="colorMaterial300">@color/material_cyan_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_cyan</item>
+    </style>
+
+    <style name="Theme.SagerNet.DeepOrange" parent="Theme.SagerNet">
+        <item name="colorPrimary">@color/material_deep_orange_500</item>
+        <item name="colorPrimaryDark">@color/material_deep_orange_700</item>
+        <item name="colorAccent">@color/material_deep_orange_accent_200</item>
+        <item name="colorMaterial100">@color/material_deep_orange_100</item>
+        <item name="colorMaterial300">@color/material_deep_orange_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_deep_orange</item>
+    </style>
+
+    <style name="Theme.SagerNet.DeepPurple" parent="Theme.SagerNet">
+        <item name="colorPrimary">@color/material_deep_purple_500</item>
+        <item name="colorPrimaryDark">@color/material_deep_purple_700</item>
+        <item name="colorAccent">@color/material_deep_purple_accent_200</item>
+        <item name="colorMaterial100">@color/material_deep_purple_100</item>
+        <item name="colorMaterial300">@color/material_deep_purple_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_deep_purple</item>
+    </style>
+
+    <style name="Theme.SagerNet.Green" parent="Theme.SagerNet">
+        <item name="colorPrimary">@color/material_green_500</item>
+        <item name="colorPrimaryDark">@color/material_green_700</item>
+        <item name="colorAccent">@color/material_green_accent_200</item>
+        <item name="colorMaterial100">@color/material_green_100</item>
+        <item name="colorMaterial300">@color/material_green_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_green</item>
+    </style>
+
+    <style name="Theme.SagerNet.Grey" parent="Theme.SagerNet">
+        <item name="colorPrimary">@color/material_grey_500</item>
+        <item name="colorPrimaryDark">@color/material_grey_700</item>
+        <item name="colorAccent">@color/material_grey_200</item>
+        <item name="colorMaterial100">@color/material_grey_100</item>
+        <item name="colorMaterial300">@color/material_grey_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_grey</item>
+    </style>
+
+    <style name="Theme.SagerNet.Indigo" parent="Theme.SagerNet">
+        <item name="colorPrimary">@color/material_indigo_500</item>
+        <item name="colorPrimaryDark">@color/material_indigo_700</item>
+        <item name="colorAccent">@color/material_indigo_accent_200</item>
+        <item name="colorMaterial100">@color/material_indigo_100</item>
+        <item name="colorMaterial300">@color/material_indigo_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_indigo</item>
+    </style>
+
+    <style name="Theme.SagerNet.LightBlue" parent="Theme.SagerNet">
+        <item name="colorPrimary">@color/material_light_blue_500</item>
+        <item name="colorPrimaryDark">@color/material_light_blue_700</item>
+        <item name="colorAccent">@color/material_light_blue_accent_200</item>
+        <item name="colorMaterial100">@color/material_light_blue_100</item>
+        <item name="colorMaterial300">@color/material_light_blue_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_light_blue</item>
+    </style>
+
+    <style name="Theme.SagerNet.LightGreen" parent="Theme.SagerNet">
+        <item name="colorPrimary">@color/material_light_green_500</item>
+        <item name="colorPrimaryDark">@color/material_light_green_700</item>
+        <item name="colorAccent">@color/material_light_green_accent_200</item>
+        <item name="colorMaterial100">@color/material_light_green_100</item>
+        <item name="colorMaterial300">@color/material_light_green_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_light_green</item>
+    </style>
+
+    <style name="Theme.SagerNet.Lime" parent="Theme.SagerNet">
+        <item name="colorPrimary">@color/material_lime_500</item>
+        <item name="colorPrimaryDark">@color/material_lime_700</item>
+        <item name="colorAccent">@color/material_lime_accent_200</item>
+        <item name="colorMaterial100">@color/material_lime_100</item>
+        <item name="colorMaterial300">@color/material_lime_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_lime</item>
+    </style>
+
+    <style name="Theme.SagerNet.Orange" parent="Theme.SagerNet">
+        <item name="colorPrimary">@color/material_orange_500</item>
+        <item name="colorPrimaryDark">@color/material_orange_700</item>
+        <item name="colorAccent">@color/material_orange_accent_200</item>
+        <item name="colorMaterial100">@color/material_orange_100</item>
+        <item name="colorMaterial300">@color/material_orange_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_orange</item>
+    </style>
+
+    <style name="Theme.SagerNet.Purple" parent="Theme.SagerNet">
+        <item name="colorPrimary">@color/material_purple_500</item>
+        <item name="colorPrimaryDark">@color/material_purple_700</item>
+        <item name="colorAccent">@color/material_purple_accent_200</item>
+        <item name="colorMaterial100">@color/material_purple_100</item>
+        <item name="colorMaterial300">@color/material_purple_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_purple</item>
+    </style>
+
+    <style name="Theme.SagerNet.Red" parent="Theme.SagerNet">
+        <item name="colorPrimary">@color/material_red_500</item>
+        <item name="colorPrimaryDark">@color/material_red_700</item>
+        <item name="colorAccent">@color/material_red_accent_200</item>
+        <item name="colorMaterial100">@color/material_red_100</item>
+        <item name="colorMaterial300">@color/material_red_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_red</item>
+    </style>
+
+    <style name="Theme.SagerNet.Teal" parent="Theme.SagerNet">
+        <item name="colorPrimary">@color/material_teal_500</item>
+        <item name="colorPrimaryDark">@color/material_teal_700</item>
+        <item name="colorAccent">@color/material_teal_accent_200</item>
+        <item name="colorMaterial100">@color/material_teal_100</item>
+        <item name="colorMaterial300">@color/material_teal_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_teal</item>
+    </style>
+
+    <style name="Theme.SagerNet.Yellow" parent="Theme.SagerNet">
+        <item name="colorPrimary">@color/material_yellow_500</item>
+        <item name="colorPrimaryDark">@color/material_yellow_700</item>
+        <item name="colorAccent">@color/material_yellow_accent_200</item>
+        <item name="colorMaterial100">@color/material_yellow_100</item>
+        <item name="colorMaterial300">@color/material_yellow_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_yellow</item>
+        <item name="colorOnPrimarySurface">@color/black</item>
+    </style>
+
+    <style name="Theme.SagerNet.Dialog.Amber" parent="Theme.SagerNet.Dialog">
+        <item name="colorPrimary">@color/material_amber_500</item>
+        <item name="colorPrimaryDark">@color/material_amber_700</item>
+        <item name="colorAccent">@color/material_amber_accent_200</item>
+        <item name="colorMaterial100">@color/material_amber_100</item>
+        <item name="colorMaterial300">@color/material_amber_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_amber</item>
+    </style>
+
+    <style name="Theme.SagerNet.Dialog.Blue" parent="Theme.SagerNet.Dialog">
+        <item name="colorPrimary">@color/material_blue_500</item>
+        <item name="colorPrimaryDark">@color/material_blue_700</item>
+        <item name="colorAccent">@color/material_blue_accent_200</item>
+        <item name="colorMaterial100">@color/material_blue_100</item>
+        <item name="colorMaterial300">@color/material_blue_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_blue</item>
+    </style>
+
+    <style name="Theme.SagerNet.Dialog.BlueGrey" parent="Theme.SagerNet.Dialog">
+        <item name="colorPrimary">@color/material_blue_grey_500</item>
+        <item name="colorPrimaryDark">@color/material_blue_grey_700</item>
+        <item name="colorAccent">@color/material_blue_grey_200</item>
+        <item name="colorMaterial100">@color/material_blue_grey_100</item>
+        <item name="colorMaterial300">@color/material_blue_grey_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_blue_grey</item>
+    </style>
+
+    <style name="Theme.SagerNet.Dialog.Brown" parent="Theme.SagerNet.Dialog">
+        <item name="colorPrimary">@color/material_brown_500</item>
+        <item name="colorPrimaryDark">@color/material_brown_700</item>
+        <item name="colorAccent">@color/material_brown_200</item>
+        <item name="colorMaterial100">@color/material_brown_100</item>
+        <item name="colorMaterial300">@color/material_brown_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_brown</item>
+    </style>
+
+    <style name="Theme.SagerNet.Dialog.Cyan" parent="Theme.SagerNet.Dialog">
+        <item name="colorPrimary">@color/material_cyan_500</item>
+        <item name="colorPrimaryDark">@color/material_cyan_700</item>
+        <item name="colorAccent">@color/material_cyan_accent_200</item>
+        <item name="colorMaterial100">@color/material_cyan_100</item>
+        <item name="colorMaterial300">@color/material_cyan_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_cyan</item>
+    </style>
+
+    <style name="Theme.SagerNet.Dialog.DeepOrange" parent="Theme.SagerNet.Dialog">
+        <item name="colorPrimary">@color/material_deep_orange_500</item>
+        <item name="colorPrimaryDark">@color/material_deep_orange_700</item>
+        <item name="colorAccent">@color/material_deep_orange_accent_200</item>
+        <item name="colorMaterial100">@color/material_deep_orange_100</item>
+        <item name="colorMaterial300">@color/material_deep_orange_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_deep_orange</item>
+    </style>
+
+    <style name="Theme.SagerNet.Dialog.DeepPurple" parent="Theme.SagerNet.Dialog">
+        <item name="colorPrimary">@color/material_deep_purple_500</item>
+        <item name="colorPrimaryDark">@color/material_deep_purple_700</item>
+        <item name="colorAccent">@color/material_deep_purple_accent_200</item>
+        <item name="colorMaterial100">@color/material_deep_purple_100</item>
+        <item name="colorMaterial300">@color/material_deep_purple_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_deep_purple</item>
+    </style>
+
+    <style name="Theme.SagerNet.Dialog.Green" parent="Theme.SagerNet.Dialog">
+        <item name="colorPrimary">@color/material_green_500</item>
+        <item name="colorPrimaryDark">@color/material_green_700</item>
+        <item name="colorAccent">@color/material_green_accent_200</item>
+        <item name="colorMaterial100">@color/material_green_100</item>
+        <item name="colorMaterial300">@color/material_green_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_green</item>
+    </style>
+
+    <style name="Theme.SagerNet.Dialog.Grey" parent="Theme.SagerNet.Dialog">
+        <item name="colorPrimary">@color/material_grey_500</item>
+        <item name="colorPrimaryDark">@color/material_grey_700</item>
+        <item name="colorAccent">@color/material_grey_200</item>
+        <item name="colorMaterial100">@color/material_grey_100</item>
+        <item name="colorMaterial300">@color/material_grey_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_grey</item>
+    </style>
+
+    <style name="Theme.SagerNet.Dialog.Indigo" parent="Theme.SagerNet.Dialog">
+        <item name="colorPrimary">@color/material_indigo_500</item>
+        <item name="colorPrimaryDark">@color/material_indigo_700</item>
+        <item name="colorAccent">@color/material_indigo_accent_200</item>
+        <item name="colorMaterial100">@color/material_indigo_100</item>
+        <item name="colorMaterial300">@color/material_indigo_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_indigo</item>
+    </style>
+
+    <style name="Theme.SagerNet.Dialog.LightBlue" parent="Theme.SagerNet.Dialog">
+        <item name="colorPrimary">@color/material_light_blue_500</item>
+        <item name="colorPrimaryDark">@color/material_light_blue_700</item>
+        <item name="colorAccent">@color/material_light_blue_accent_200</item>
+        <item name="colorMaterial100">@color/material_light_blue_100</item>
+        <item name="colorMaterial300">@color/material_light_blue_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_light_blue</item>
+    </style>
+
+    <style name="Theme.SagerNet.Dialog.LightGreen" parent="Theme.SagerNet.Dialog">
+        <item name="colorPrimary">@color/material_light_green_500</item>
+        <item name="colorPrimaryDark">@color/material_light_green_700</item>
+        <item name="colorAccent">@color/material_light_green_accent_200</item>
+        <item name="colorMaterial100">@color/material_light_green_100</item>
+        <item name="colorMaterial300">@color/material_light_green_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_light_green</item>
+    </style>
+
+    <style name="Theme.SagerNet.Dialog.Lime" parent="Theme.SagerNet.Dialog">
+        <item name="colorPrimary">@color/material_lime_500</item>
+        <item name="colorPrimaryDark">@color/material_lime_700</item>
+        <item name="colorAccent">@color/material_lime_accent_200</item>
+        <item name="colorMaterial100">@color/material_lime_100</item>
+        <item name="colorMaterial300">@color/material_lime_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_lime</item>
+    </style>
+
+    <style name="Theme.SagerNet.Dialog.Orange" parent="Theme.SagerNet.Dialog">
+        <item name="colorPrimary">@color/material_orange_500</item>
+        <item name="colorPrimaryDark">@color/material_orange_700</item>
+        <item name="colorAccent">@color/material_orange_accent_200</item>
+        <item name="colorMaterial100">@color/material_orange_100</item>
+        <item name="colorMaterial300">@color/material_orange_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_orange</item>
+    </style>
+
+    <style name="Theme.SagerNet.Dialog.Purple" parent="Theme.SagerNet.Dialog">
+        <item name="colorPrimary">@color/material_purple_500</item>
+        <item name="colorPrimaryDark">@color/material_purple_700</item>
+        <item name="colorAccent">@color/material_purple_accent_200</item>
+        <item name="colorMaterial100">@color/material_purple_100</item>
+        <item name="colorMaterial300">@color/material_purple_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_purple</item>
+    </style>
+
+    <style name="Theme.SagerNet.Dialog.Red" parent="Theme.SagerNet.Dialog">
+        <item name="colorPrimary">@color/material_red_500</item>
+        <item name="colorPrimaryDark">@color/material_red_700</item>
+        <item name="colorAccent">@color/material_red_accent_200</item>
+        <item name="colorMaterial100">@color/material_red_100</item>
+        <item name="colorMaterial300">@color/material_red_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_red</item>
+    </style>
+
+    <style name="Theme.SagerNet.Dialog.Pink_SSR" parent="Theme.SagerNet.Dialog">
+        <item name="colorPrimary">@color/color_pink_ssr</item>
+        <item name="colorPrimaryDark">@color/color_pink_ssr</item>
+        <item name="colorAccent">@color/material_pink_accent_200</item>
+        <item name="colorMaterial100">@color/material_pink_accent_100</item>
+        <item name="colorMaterial300">@color/color_pink_ssr</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_pink_ssr</item>
+    </style>
+
+    <style name="Theme.SagerNet.Dialog.Teal" parent="Theme.SagerNet.Dialog">
+        <item name="colorPrimary">@color/material_teal_500</item>
+        <item name="colorPrimaryDark">@color/material_teal_700</item>
+        <item name="colorAccent">@color/material_teal_accent_200</item>
+        <item name="colorMaterial100">@color/material_teal_100</item>
+        <item name="colorMaterial300">@color/material_teal_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_teal</item>
+    </style>
+
+    <style name="Theme.SagerNet.Dialog.Yellow" parent="Theme.SagerNet.Dialog">
+        <item name="colorPrimary">@color/material_yellow_500</item>
+        <item name="colorPrimaryDark">@color/material_yellow_700</item>
+        <item name="colorAccent">@color/material_yellow_accent_200</item>
+        <item name="colorMaterial100">@color/material_yellow_100</item>
+        <item name="colorMaterial300">@color/material_yellow_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_yellow</item>
+        <item name="colorOnPrimarySurface">@color/black</item>
+    </style>
+
+    <style name="Theme.SagerNet.Black" parent="Theme.SagerNet">
+        <item name="android:colorBackground">@color/black</item>
+        <item name="android:windowBackground">@color/black</item>
+        <item name="colorSurface">@color/black</item>
+        <item name="cardElevatedSurfaceColor">@color/color_black_theme_card_elevated</item>
+        <item name="android:textColorPrimary">@color/white</item>
+        <item name="android:textColorSecondary">@color/color_black_theme_text_secondary</item>
+        <item name="android:textColorTertiary">@color/color_black_theme_text_tertiary</item>
+        <item name="colorOnSurface">@color/white</item>
+        <item name="colorOnSurfaceVariant">@color/color_black_theme_text_secondary</item>
+        <item name="colorOnPrimary">@color/black</item>
+        <item name="colorPrimary">@color/white</item>
+        <item name="colorPrimaryDark">@color/color_black_theme_primary_dark</item>
+        <item name="colorAccent">@color/white</item>
+        <item name="colorMaterial100">@color/color_black_theme_material_100</item>
+        <item name="colorMaterial300">@color/color_black_theme_material_300</item>
+        <item name="selectedColorPrimary">@color/white</item>
+        <item name="fabColorBackground">@color/black</item>
+        <item name="itemShapeFillColor">@color/color_black_theme_item_shape</item>
+        <item name="tabTextColor">@color/color_black_theme_tab_unselected</item>
+        <item name="tabSelectedTextColor">@color/white</item>
+        <item name="tabIndicatorColor">@color/white</item>
+        <item name="tabRippleColor">@color/color_black_theme_tab_ripple</item>
+        <item name="primaryOrTextPrimary">@color/white</item>
+        <item name="primaryOrTextSecondary">@color/color_black_theme_text_secondary</item>
+        <item name="accentOrTextPrimary">@color/white</item>
+        <item name="accentOrTextSecondary">@color/color_black_theme_text_secondary</item>
+        <item name="whiteOrTextPrimary">@color/white</item>
+        <item name="actionBarTheme">@style/ThemeOverlay.SagerNet.Toolbar.Black</item>
+        <item name="actionBarPopupTheme">@style/ThemeOverlay.MaterialComponents.Dark</item>
+        <item name="appBarLayoutStyle">@style/Widget.SagerNet.AppBarLayout.Black</item>
+    </style>
+
+    <style name="Theme.SagerNet.VerdantMint" parent="Theme.SagerNet">
+        <item name="colorPrimary">@color/color_verdant_mint</item>
+        <item name="colorPrimaryDark">@color/color_verdant_mint_dark</item>
+        <item name="colorAccent">@color/color_verdant_mint_accent</item>
+        <item name="colorMaterial100">@color/color_verdant_mint_100</item>
+        <item name="colorMaterial300">@color/color_verdant_mint_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_verdant_mint</item>
+    </style>
+
+    <style name="Theme.SagerNet.White" parent="Theme.SagerNet">
+        <item name="colorPrimary">@color/color_white_theme_accent</item>
+        <item name="colorPrimaryDark">@color/color_white_theme_primary_dark</item>
+        <item name="colorAccent">@color/color_white_theme_accent</item>
+        <item name="colorControlActivated">@color/color_white_theme_accent</item>
+        <item name="colorMaterial100">@color/color_white_theme_material_100</item>
+        <item name="colorMaterial300">@color/color_white_theme_material_300</item>
+        <item name="cardElevatedSurfaceColor">@color/color_white_theme_surface</item>
+        <item name="colorSurface">@color/color_white_theme_surface</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorOnSurface">@color/color_white_theme_text_primary</item>
+        <item name="colorOnSurfaceVariant">@color/color_white_theme_text_secondary</item>
+        <item name="android:textColorPrimary">@color/color_white_theme_text_primary</item>
+        <item name="android:textColorSecondary">@color/color_white_theme_text_secondary</item>
+        <item name="android:colorBackground">@color/color_white_theme_bg</item>
+        <item name="android:windowBackground">@color/color_white_theme_bg</item>
+        <item name="actionBarTheme">@style/ThemeOverlay.SagerNet.Toolbar</item>
+        <item name="actionBarPopupTheme">@style/ThemeOverlay.MaterialComponents.Light</item>
+        <item name="tabTextColor">@color/color_white_theme_tab_unselected</item>
+        <item name="tabSelectedTextColor">@color/color_white_theme_tab_selected</item>
+        <item name="tabIndicatorColor">@color/color_white_theme_tab_selected</item>
+        <item name="tabRippleColor">@color/color_white_theme_ripple</item>
+        <item name="whiteOrTextPrimary">@color/color_white_theme_text_primary</item>
+        <item name="fabColorBackground">@color/color_white_theme_accent</item>
+        <item name="selectedColorPrimary">@color/color_white_theme_accent</item>
+        <item name="itemShapeFillColor">@color/color_white_theme_material_300</item>
+        <item name="accentOrTextSecondary">?android:textColorSecondary</item>
+        <item name="accentOrTextPrimary">?android:textColorPrimary</item>
+        <item name="primaryOrTextSecondary">?android:textColorSecondary</item>
+        <item name="primaryOrTextPrimary">?android:textColorPrimary</item>
+        <item name="appBarLayoutStyle">@style/Widget.SagerNet.AppBarLayout.White</item>
+    </style>
+    <style name="Theme.SagerNet.LightGray" parent="Theme.SagerNet">
+        <item name="colorPrimary">@color/color_light_gray_primary</item>
+        <item name="colorPrimaryDark">@color/color_light_gray_primary_dark</item>
+        <item name="colorAccent">@color/color_light_gray_accent</item>
+        <item name="colorControlActivated">@color/color_light_gray_primary</item>
+        <item name="colorMaterial100">@color/color_light_gray_material_100</item>
+        <item name="colorMaterial300">@color/color_light_gray_material_300</item>
+        <item name="cardElevatedSurfaceColor">@color/color_light_gray_surface</item>
+        <item name="colorSurface">@color/color_light_gray_surface</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorOnSurface">@color/color_light_gray_text_primary</item>
+        <item name="colorOnSurfaceVariant">@color/color_light_gray_text_secondary</item>
+        <item name="android:textColorPrimary">@color/color_light_gray_text_primary</item>
+        <item name="android:textColorSecondary">@color/color_light_gray_text_secondary</item>
+        <item name="android:colorBackground">@color/color_light_gray_bg</item>
+        <item name="android:windowBackground">@color/color_light_gray_bg</item>
+        <item name="actionBarTheme">@style/ThemeOverlay.SagerNet.Toolbar</item>
+        <item name="actionBarPopupTheme">@style/ThemeOverlay.MaterialComponents.Light</item>
+        <item name="tabTextColor">@color/color_light_gray_tab_unselected</item>
+        <item name="tabSelectedTextColor">@color/color_light_gray_tab_selected</item>
+        <item name="tabIndicatorColor">@color/color_light_gray_tab_selected</item>
+        <item name="tabRippleColor">@color/color_light_gray_ripple</item>
+        <item name="whiteOrTextPrimary">@color/color_light_gray_text_primary</item>
+        <item name="fabColorBackground">@color/color_light_gray_primary</item>
+        <item name="selectedColorPrimary">@color/color_light_gray_primary</item>
+        <item name="itemShapeFillColor">@color/color_light_gray_material_300</item>
+        <item name="accentOrTextSecondary">?android:textColorSecondary</item>
+        <item name="accentOrTextPrimary">?android:textColorPrimary</item>
+        <item name="primaryOrTextSecondary">?android:textColorSecondary</item>
+        <item name="primaryOrTextPrimary">?android:textColorPrimary</item>
+        <item name="appBarLayoutStyle">@style/Widget.SagerNet.AppBarLayout.LightGray</item>
+    </style>
+    <style name="Theme.SagerNet.Dialog.Black" parent="Theme.SagerNet.Dialog">
+        <item name="colorPrimary">@color/white</item>
+        <item name="colorPrimaryDark">@color/color_black_theme_primary_dark</item>
+        <item name="colorAccent">@color/white</item>
+        <item name="colorMaterial100">@color/color_black_theme_material_100</item>
+        <item name="colorMaterial300">@color/color_black_theme_material_300</item>
+        <item name="cardElevatedSurfaceColor">@color/color_black_theme_card_elevated</item>
+        <item name="selectedColorPrimary">@color/white</item>
+        <item name="fabColorBackground">@color/black</item>
+        <item name="itemShapeFillColor">@color/color_black_theme_item_shape</item>
+        <item name="accentOrTextSecondary">?android:textColorSecondary</item>
+        <item name="accentOrTextPrimary">?android:textColorPrimary</item>
+        <item name="primaryOrTextSecondary">?android:textColorSecondary</item>
+        <item name="primaryOrTextPrimary">?android:textColorPrimary</item>
+        <item name="colorOnPrimary">@color/black</item>
+        <item name="colorOnSurface">?android:textColorPrimary</item>
+        <item name="colorOnSurfaceVariant">?android:textColorSecondary</item>
+    </style>
+
+    <style name="Theme.SagerNet.Dialog.VerdantMint" parent="Theme.SagerNet.Dialog">
+        <item name="colorPrimary">@color/color_verdant_mint</item>
+        <item name="colorPrimaryDark">@color/color_verdant_mint_dark</item>
+        <item name="colorAccent">@color/color_verdant_mint_accent</item>
+        <item name="colorMaterial100">@color/color_verdant_mint_100</item>
+        <item name="colorMaterial300">@color/color_verdant_mint_300</item>
+        <item name="cardElevatedSurfaceColor">@color/card_elevated_verdant_mint</item>
+    </style>
+
+    <style name="Theme.SagerNet.Dialog.White" parent="Theme.SagerNet.Dialog">
+        <item name="colorPrimary">@color/color_white_theme_accent</item>
+        <item name="colorPrimaryDark">@color/color_white_theme_primary_dark</item>
+        <item name="colorAccent">@color/color_white_theme_accent</item>
+        <item name="colorControlActivated">@color/color_white_theme_accent</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorMaterial100">@color/color_white_theme_material_100</item>
+        <item name="colorMaterial300">@color/color_white_theme_material_300</item>
+        <item name="cardElevatedSurfaceColor">@color/color_white_theme_surface</item>
+        <item name="colorSurface">@color/color_white_theme_surface</item>
+        <item name="colorOnSurface">@color/color_white_theme_text_primary</item>
+        <item name="android:textColorPrimary">@color/color_white_theme_text_primary</item>
+        <item name="android:textColorSecondary">@color/color_white_theme_text_secondary</item>
+        <item name="fabColorBackground">@color/color_white_theme_accent</item>
+        <item name="selectedColorPrimary">@color/color_white_theme_accent</item>
+    </style>
+
+    <style name="Theme.SagerNet.Dialog.LightGray" parent="Theme.SagerNet.Dialog">
+        <item name="colorPrimary">@color/color_light_gray_primary</item>
+        <item name="colorPrimaryDark">@color/color_light_gray_primary_dark</item>
+        <item name="colorAccent">@color/color_light_gray_accent</item>
+        <item name="colorControlActivated">@color/color_light_gray_primary</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorMaterial100">@color/color_light_gray_material_100</item>
+        <item name="colorMaterial300">@color/color_light_gray_material_300</item>
+        <item name="cardElevatedSurfaceColor">@color/color_light_gray_surface</item>
+        <item name="colorSurface">@color/color_light_gray_surface</item>
+        <item name="colorOnSurface">@color/color_light_gray_text_primary</item>
+        <item name="android:textColorPrimary">@color/color_light_gray_text_primary</item>
+        <item name="android:textColorSecondary">@color/color_light_gray_text_secondary</item>
+        <item name="fabColorBackground">@color/color_light_gray_primary</item>
+        <item name="selectedColorPrimary">@color/color_light_gray_primary</item>
+    </style>
+
+    <style name="Theme.SagerNet.Monet" parent="Theme.SagerNet" />
+
+    <style name="Theme.SagerNet.Dialog.Monet" parent="Theme.SagerNet.Dialog" />
+
+    <style name="Theme.Start" parent="Theme.SagerNet">
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="colorPrimary">@android:color/transparent</item>
+        <item name="colorPrimaryDark">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+    </style>
+
+    <style name="Theme.SagerNet.Amoled" parent="Theme.SagerNet">
+        <item name="android:colorBackground">@color/black</item>
+        <item name="android:windowBackground">@color/black</item>
+        <item name="colorSurface">@color/black</item>
+        <item name="cardElevatedSurfaceColor">@color/color_amoled_card_elevated</item>
+        <item name="android:textColorPrimary">@color/white</item>
+        <item name="android:textColorSecondary">@color/color_amoled_text_secondary</item>
+        <item name="android:textColorTertiary">@color/color_amoled_text_tertiary</item>
+        <item name="colorOnSurface">@color/white</item>
+        <item name="colorOnSurfaceVariant">@color/color_amoled_text_secondary</item>
+        <item name="colorOnPrimary">@color/black</item>
+        <item name="colorPrimary">@color/white</item>
+        <item name="colorAccent">@color/white</item>
+        <item name="selectedColorPrimary">@color/white</item>
+        <item name="primaryOrTextPrimary">@color/white</item>
+        <item name="primaryOrTextSecondary">@color/color_amoled_text_secondary</item>
+        <item name="accentOrTextPrimary">@color/white</item>
+        <item name="accentOrTextSecondary">@color/color_amoled_text_secondary</item>
+    </style>
+
+
+    <style name="Theme.OwnBox.Dialog" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowAnimationStyle">@android:style/Animation.Dialog</item>
+        <item name="tabStyle">@style/Widget.SagerNet.TabLayout</item>
+        <item name="tabTextAppearance">@style/Widget.SagerNet.TabLayout.TextAppearance</item>
+    </style>
+</resources>

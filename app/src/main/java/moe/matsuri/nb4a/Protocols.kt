@@ -1,0 +1,125 @@
+package moe.matsuri.nb4a
+
+import android.content.Context
+import io.nekohasekai.sagernet.R
+import io.nekohasekai.sagernet.database.ProxyEntity
+import io.nekohasekai.sagernet.fmt.AbstractBean
+import io.nekohasekai.sagernet.ktx.app
+import io.nekohasekai.sagernet.ktx.getColorAttr
+import moe.matsuri.nb4a.proxy.config.ConfigBean
+
+// Settings for all protocols, built-in or plugin
+object Protocols {
+
+    // Deduplication
+
+    class Deduplication(
+        val bean: AbstractBean, val type: String
+    ) {
+
+        fun hash(): String {
+            if (bean is ConfigBean) {
+                return bean.config
+            }
+            val port = if (bean.finalPort != 0) {
+                bean.finalPort
+            } else if (bean is io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean) {
+                io.nekohasekai.sagernet.fmt.hysteria.getFirstPort(bean.serverPorts ?: "443")
+            } else {
+                bean.serverPort ?: 443
+            }
+            val extra = when (bean) {
+                is io.nekohasekai.sagernet.fmt.v2ray.StandardV2RayBean ->
+                    "${bean.uuid}/${bean.path}/${bean.sni}/${bean.realityPubKey}/${bean.security}"
+                is io.nekohasekai.sagernet.fmt.shadowsocks.ShadowsocksBean ->
+                    "${bean.password}/${bean.method}/${bean.plugin}"
+                is io.nekohasekai.sagernet.fmt.trojan.TrojanBean ->
+                    "${bean.password}/${bean.sni}"
+                is io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean ->
+                    "${bean.authPayload}/${bean.sni}/${bean.protocolVersion}"
+                is io.nekohasekai.sagernet.fmt.tuic.TuicBean ->
+                    "${bean.token}/${bean.uuid}/${bean.sni}"
+                is io.nekohasekai.sagernet.fmt.wireguard.WireGuardBean ->
+                    "${bean.privateKey}/${bean.peerPublicKey}/${bean.localAddress}"
+                is io.nekohasekai.sagernet.fmt.ssh.SSHBean ->
+                    "${bean.username}/${bean.password}/${bean.privateKey}"
+                is io.nekohasekai.sagernet.fmt.http.HttpBean ->
+                    "${bean.username}/${bean.password}"
+                is io.nekohasekai.sagernet.fmt.socks.SOCKSBean ->
+                    "${bean.username}/${bean.password}"
+                else -> "${bean.serverAddress}:$port"
+            }
+            return "${bean.serverAddress}:$port/$type/$extra"
+        }
+
+        override fun hashCode(): Int {
+            return hash().toByteArray().contentHashCode()
+        }
+
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (javaClass != other?.javaClass) return false
+
+            other as Deduplication
+
+            return hash() == other.hash()
+        }
+
+    }
+
+    // Display
+
+    fun Context.getProtocolColor(type: Int): Int {
+        return when (type) {
+            ProxyEntity.TYPE_BALANCER -> android.graphics.Color.parseColor("#FF6F00")
+            ProxyEntity.TYPE_CHAIN -> android.graphics.Color.parseColor("#7E57C2")
+            ProxyEntity.TYPE_NEKO -> getColorAttr(android.R.attr.textColorPrimary)
+            else -> getColorAttr(R.attr.accentOrTextSecondary)
+        }
+    }
+
+    // Test
+
+    fun genFriendlyMsg(msg: String): String {
+        val msgL = msg.lowercase()
+        return when {
+            msgL.contains("timeout") || msgL.contains("deadline") -> {
+                app.getString(R.string.connection_test_timeout_error)
+            }
+
+            msgL.contains("refused") || msgL.contains("closed pipe") -> {
+                app.getString(R.string.connection_test_refused)
+            }
+
+            msgL.contains("plugin") && (msgL.contains("not found") || msgL.contains("unknown")) -> {
+                val pluginName = msg.substringAfter("Plugin", "").substringBefore("not found").trim()
+                if (pluginName.isNotBlank()) "缺少插件: $pluginName" else "缺少必要插件"
+            }
+
+            msgL.contains("no such host") || msgL.contains("dns") || msgL.contains("nxdomain") || msgL.contains("name resolution") -> {
+                "DNS 解析失败"
+            }
+
+            msgL.contains("certificate") || msgL.contains("handshake") || msgL.contains("tls:") || msgL.contains("x509") -> {
+                "TLS 握手失败"
+            }
+
+            msgL.contains("cipher") || msgL.contains("unknown method") -> {
+                "加密方式不支持"
+            }
+
+            msgL.contains("reset by peer") || msgL.contains("connection reset") -> {
+                "连接被重置"
+            }
+
+            msgL.contains("network is unreachable") || msgL.contains("route to host") -> {
+                "网络不可达"
+            }
+
+            msg.isNotBlank() && msg.length <= 40 -> msg
+
+            else -> app.getString(R.string.unavailable)
+        }
+    }
+
+}

@@ -1,0 +1,463 @@
+package io.nekohasekai.sagernet.ui
+
+import android.content.Intent
+import android.os.Bundle
+import android.view.MenuItem
+import android.view.View
+import android.view.ViewGroup
+import androidx.appcompat.widget.Toolbar
+import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.updatePadding
+import androidx.recyclerview.widget.ItemTouchHelper
+import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import kotlinx.coroutines.*
+import io.nekohasekai.sagernet.R
+import io.nekohasekai.sagernet.SagerNet
+import io.nekohasekai.sagernet.database.DataStore
+import io.nekohasekai.sagernet.database.ProfileManager
+import io.nekohasekai.sagernet.database.RuleEntity
+import io.nekohasekai.sagernet.database.SagerDatabase
+import io.nekohasekai.sagernet.databinding.LayoutEmptyRouteBinding
+import io.nekohasekai.sagernet.databinding.LayoutRouteItemBinding
+import io.nekohasekai.sagernet.ktx.*
+import io.nekohasekai.sagernet.widget.ListListener
+import io.nekohasekai.sagernet.widget.UndoSnackbarManager
+
+class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItemClickListener {
+
+    companion object {
+        val CN_APPS = setOf(
+            "com.tencent.mm",
+            "com.tencent.mobileqq",
+            "com.eg.android.AlipayGphone",
+            "com.taobao.taobao",
+            "com.jingdong.app.mall",
+            "tv.danmaku.bili",
+            "com.ss.android.ugc.aweme",
+            "com.netease.cloudmusic",
+            "com.autonavi.minimap",
+            "com.baidu.BaiduMap",
+            "com.xunmeng.pinduoduo",
+            "com.sankuai.meituan",
+            "com.zhihu.android",
+            "com.sina.weibo",
+            "com.coolapk.market",
+        )
+
+        val FOREIGN_APPS = setOf(
+            "org.telegram.messenger",
+            "org.thunderdog.challegram",
+            "com.google.android.youtube",
+            "com.twitter.android",
+            "com.android.chrome",
+            "com.google.android.gms",
+            "com.android.vending",
+            "com.discord",
+            "com.whatsapp",
+            "com.instagram.android",
+            "com.zhiliaoapp.musically",
+            "com.openai.chatgpt",
+            "com.netflix.mediaclient",
+            "com.spotify.music",
+        )
+    }
+
+    lateinit var activity: MainActivity
+    lateinit var ruleListView: RecyclerView
+    lateinit var ruleAdapter: RuleAdapter
+    lateinit var undoManager: UndoSnackbarManager<RuleEntity>
+
+    fun autoReloadServiceIfStarted() {
+        if (DataStore.serviceState.started) {
+            runOnDefaultDispatcher {
+                try {
+                    SagerNet.reloadService()
+                } catch (e: Exception) {
+                    Logs.w(e)
+                }
+            }
+        }
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        activity = requireActivity() as MainActivity
+
+        ViewCompat.setOnApplyWindowInsetsListener(view, ListListener)
+        toolbar.setTitle(R.string.menu_route)
+        toolbar.inflateMenu(R.menu.add_route_menu)
+        toolbar.setOnMenuItemClickListener(this)
+
+        ruleListView = view.findViewById(R.id.route_list)
+        updateBottomPadding()
+        ruleListView.layoutManager = FixedLinearLayoutManager(ruleListView)
+        ruleAdapter = RuleAdapter()
+        ProfileManager.addListener(ruleAdapter)
+        ruleListView.adapter = ruleAdapter
+        undoManager = UndoSnackbarManager(activity, ruleAdapter)
+
+        ItemTouchHelper(object : ItemTouchHelper.SimpleCallback(ItemTouchHelper.UP or ItemTouchHelper.DOWN, ItemTouchHelper.START) {
+
+            override fun getSwipeDirs(
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder,
+            ) = if (viewHolder is RuleAdapter.DocumentHolder) {
+                0
+            } else {
+                super.getSwipeDirs(recyclerView, viewHolder)
+            }
+
+            override fun getDragDirs(
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder,
+            ) = if (viewHolder is RuleAdapter.DocumentHolder) {
+                0
+            } else {
+                super.getDragDirs(recyclerView, viewHolder)
+            }
+
+            override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
+                val index = viewHolder.bindingAdapterPosition
+                ruleAdapter.remove(index)
+                undoManager.remove(index to (viewHolder as RuleAdapter.RuleHolder).rule)
+            }
+
+            override fun onMove(
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder, target: RecyclerView.ViewHolder,
+            ): Boolean {
+                return if (target is RuleAdapter.DocumentHolder) {
+                    false
+                } else {
+                    ruleAdapter.move(viewHolder.bindingAdapterPosition, target.bindingAdapterPosition)
+                    true
+                }
+            }
+
+            override fun clearView(
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder,
+            ) {
+                super.clearView(recyclerView, viewHolder)
+                ruleAdapter.commitMove()
+            }
+        }).attachToRecyclerView(ruleListView)
+    }
+
+    fun updateBottomPadding() {
+        if (!::ruleListView.isInitialized) return
+        ruleListView.clipToPadding = false
+        ruleListView.updatePadding(bottom = dp2px(if (DataStore.showBottomBar) 80 else 4))
+    }
+
+    override fun onDestroy() {
+        if (::ruleAdapter.isInitialized) {
+            ProfileManager.removeListener(ruleAdapter)
+        }
+        super.onDestroy()
+    }
+
+    override fun onMenuItemClick(item: MenuItem): Boolean {
+        when (item.itemId) {
+            R.id.action_new_route -> {
+                startActivity(Intent(context, RouteSettingsActivity::class.java))
+            }
+            R.id.action_update_rule_sets -> {
+                android.widget.Toast.makeText(
+                    requireContext(),
+                    R.string.route_rule_sets_running,
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+                runOnDefaultDispatcher {
+                    val catalogErr = io.nekohasekai.sagernet.route.RuleSetCatalog.refreshCatalog()
+                    val (updated, errors) = io.nekohasekai.sagernet.route.RuleSetCatalog.refreshUsedRuleSets()
+                    val catalogSize = io.nekohasekai.sagernet.route.RuleSetCatalog.current().size
+                    autoReloadServiceIfStarted()
+                    onMainDispatcher {
+                        if (!isAdded) return@onMainDispatcher
+                        if (errors.isEmpty() && catalogErr == null) {
+                            snackbar(getString(R.string.route_rule_sets_update_done, updated, catalogSize)).show()
+                        } else {
+                            val errText = (listOfNotNull(catalogErr) + errors).joinToString("\n")
+                            MaterialAlertDialogBuilder(requireContext())
+                                .setTitle(R.string.route_update_rule_sets)
+                                .setMessage(getString(R.string.route_rule_sets_update_partial, updated, catalogSize, errText))
+                                .setPositiveButton(android.R.string.ok, null)
+                                .show()
+                        }
+                    }
+                }
+            }
+            R.id.action_ruleset_auto_update -> {
+                io.nekohasekai.sagernet.ui.route.RuleSetAutoUpdateDialog.show(requireContext()) { interval ->
+                    val label = io.nekohasekai.sagernet.route.RuleSets.formatUpdateInterval(requireContext(), interval)
+                    snackbar(getString(R.string.rule_set_auto_update_saved, label)).show()
+                }
+            }
+            R.id.action_reset_route -> {
+                MaterialAlertDialogBuilder(activity).setTitle(R.string.confirm)
+                    .setMessage(R.string.clear_profiles_message)
+                    .setPositiveButton(R.string.yes) { _, _ ->
+                        runOnDefaultDispatcher {
+                            SagerDatabase.rulesDao.reset()
+                            DataStore.rulesFirstCreate = false
+                            ruleAdapter.reload()
+                            autoReloadServiceIfStarted()
+                        }
+                    }
+                    .setNegativeButton(R.string.no, null)
+                    .show()
+            }
+            R.id.action_manage_assets -> {
+                startActivity(Intent(requireContext(), AssetsActivity::class.java))
+            }
+            R.id.action_preset_routes -> {
+                val presets = arrayOf(
+                    getString(R.string.preset_bypass_cn_apps),
+                    getString(R.string.preset_proxy_foreign_apps),
+                    getString(R.string.route_opt_block_ads)
+                )
+                MaterialAlertDialogBuilder(activity)
+                    .setTitle(R.string.route_preset_title)
+                    .setItems(presets) { _, which ->
+                        runOnDefaultDispatcher {
+                            when (which) {
+                                0 -> {
+                                    val rule = RuleEntity(
+                                        name = getString(R.string.preset_bypass_cn_apps),
+                                        packages = CN_APPS,
+                                        outbound = -1L,
+                                        enabled = true
+                                    )
+                                    ProfileManager.createRule(rule)
+                                }
+                                1 -> {
+                                    val rule = RuleEntity(
+                                        name = getString(R.string.preset_proxy_foreign_apps),
+                                        packages = FOREIGN_APPS,
+                                        outbound = 0L,
+                                        enabled = true
+                                    )
+                                    ProfileManager.createRule(rule)
+                                }
+                                2 -> {
+                                    val rule = RuleEntity(
+                                        name = getString(R.string.route_opt_block_ads),
+                                        domains = "domain:adservice.google.com\ndomain:admob.com\ndomain:doubleclick.net\ndomain:pangolin-sdk-toutiao.com",
+                                        ruleset = "geosite-category-ads-all",
+                                        outbound = -2L,
+                                        enabled = true
+                                    )
+                                    ProfileManager.createRule(rule)
+                                }
+                            }
+                            autoReloadServiceIfStarted()
+                            onMainDispatcher {
+                                snackbar(R.string.preset_applied_toast).show()
+                                ruleAdapter.reload()
+                            }
+                        }
+                    }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
+            }
+        }
+        return true
+    }
+
+    inner class RuleAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>(), ProfileManager.RuleListener, UndoSnackbarManager.Interface<RuleEntity> {
+
+        val ruleList = ArrayList<RuleEntity>()
+        suspend fun reload() {
+            val rules = ProfileManager.getRules()
+            ruleListView.post {
+                ruleList.clear()
+                ruleList.addAll(rules)
+                ruleAdapter.notifyDataSetChanged()
+            }
+        }
+
+        init {
+            runOnDefaultDispatcher {
+                reload()
+            }
+        }
+
+        override fun onCreateViewHolder(
+            parent: ViewGroup,
+            viewType: Int,
+        ): RecyclerView.ViewHolder {
+            return if (viewType == 0) {
+                DocumentHolder(LayoutEmptyRouteBinding.inflate(layoutInflater, parent, false))
+            } else {
+                RuleHolder(LayoutRouteItemBinding.inflate(layoutInflater, parent, false))
+            }
+        }
+
+        override fun getItemViewType(position: Int): Int {
+            if (position == 0) return 0
+            return 1
+        }
+
+        override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+            if (holder is DocumentHolder) {
+                holder.bind()
+            } else if (holder is RuleHolder) {
+                holder.bind(ruleList[position - 1])
+            }
+        }
+
+        override fun getItemCount(): Int {
+            return ruleList.size + 1
+        }
+
+        override fun getItemId(position: Int): Long {
+            if (position == 0) return 0L
+            return ruleList[position - 1].id
+        }
+
+        private val updated = HashSet<RuleEntity>()
+        fun move(from: Int, to: Int) {
+            val first = ruleList[from - 1]
+            var previousOrder = first.userOrder
+            val (step, range) = if (from < to) Pair(1, from - 1 until to - 1) else Pair(-1, to downTo from - 1)
+            for (i in range) {
+                val next = ruleList[i + step]
+                val order = next.userOrder
+                next.userOrder = previousOrder
+                previousOrder = order
+                ruleList[i] = next
+                updated.add(next)
+            }
+            first.userOrder = previousOrder
+            ruleList[to - 1] = first
+            updated.add(first)
+            notifyItemMoved(from, to)
+        }
+
+        fun commitMove() = runOnDefaultDispatcher {
+            if (updated.isNotEmpty()) {
+                SagerDatabase.rulesDao.updateRules(updated.toList())
+                updated.clear()
+                autoReloadServiceIfStarted()
+            }
+        }
+
+        fun remove(index: Int) {
+            ruleList.removeAt(index - 1)
+            notifyItemRemoved(index)
+        }
+
+        override fun undo(actions: List<Pair<Int, RuleEntity>>) {
+            for ((index, item) in actions) {
+                ruleList.add(index - 1, item)
+                notifyItemInserted(index)
+            }
+        }
+
+        override fun commit(actions: List<Pair<Int, RuleEntity>>) {
+            val rules = actions.map { it.second }
+            runOnDefaultDispatcher {
+                ProfileManager.deleteRules(rules)
+                autoReloadServiceIfStarted()
+            }
+        }
+
+        override suspend fun onAdd(rule: RuleEntity) {
+            ruleListView.post {
+                ruleList.add(rule)
+                ruleAdapter.notifyItemInserted(ruleList.size)
+                autoReloadServiceIfStarted()
+            }
+        }
+
+        override suspend fun onUpdated(rule: RuleEntity) {
+            val index = ruleList.indexOfFirst { it.id == rule.id }
+            if (index == -1) return
+            ruleListView.post {
+                ruleList[index] = rule
+                ruleAdapter.notifyItemChanged(index + 1)
+                autoReloadServiceIfStarted()
+            }
+        }
+
+        override suspend fun onRemoved(ruleId: Long) {
+            val index = ruleList.indexOfFirst { it.id == ruleId }
+            if (index == -1) {
+                onMainDispatcher {
+                    autoReloadServiceIfStarted()
+                }
+            } else ruleListView.post {
+                ruleList.removeAt(index)
+                ruleAdapter.notifyItemRemoved(index + 1)
+                autoReloadServiceIfStarted()
+            }
+        }
+
+        override suspend fun onCleared() {
+            ruleListView.post {
+                ruleList.clear()
+                ruleAdapter.notifyDataSetChanged()
+                autoReloadServiceIfStarted()
+            }
+        }
+
+        inner class DocumentHolder(binding: LayoutEmptyRouteBinding) : RecyclerView.ViewHolder(binding.root) {
+            fun bind() {
+                itemView.setOnClickListener {
+                    it.context.launchCustomTab("https://t.me/OwnBoxs")
+                }
+            }
+        }
+
+        inner class RuleHolder(binding: LayoutRouteItemBinding) : RecyclerView.ViewHolder(binding.root) {
+
+            lateinit var rule: RuleEntity
+            val profileName = binding.profileName
+            val profileType = binding.profileType
+            val routeOutbound = binding.routeOutbound
+            val editButton = binding.edit
+            val shareLayout = binding.share
+            val enableSwitch = binding.enable
+
+            fun bind(ruleEntity: RuleEntity) {
+                rule = ruleEntity
+                profileName.text = rule.displayName()
+                profileType.text = rule.mkSummary()
+                routeOutbound.text = rule.displayOutbound()
+
+                // 根据路由类型设置文字颜色
+                val colorRes = when (rule.outbound) {
+                    -2L -> R.color.color_route_block   // 屏蔽：红色
+                    -1L -> R.color.color_route_direct  // 直连：绿色
+                    0L -> R.color.color_route_proxy    // 代理：蓝色
+                    else -> R.color.color_route_config // 配置：紫色
+                }
+                routeOutbound.setTextColor(ContextCompat.getColor(itemView.context, colorRes))
+
+                itemView.setOnClickListener(null)
+                itemView.isClickable = false
+                itemView.isFocusable = false
+                enableSwitch.setOnCheckedChangeListener(null)
+                enableSwitch.isChecked = rule.enabled
+                enableSwitch.setOnCheckedChangeListener { _, isChecked ->
+                    runOnDefaultDispatcher {
+                        rule.enabled = isChecked
+                        SagerDatabase.rulesDao.updateRule(rule)
+                        autoReloadServiceIfStarted()
+                    }
+                }
+                editButton.setOnClickListener {
+                    startActivity(Intent(it.context, RouteSettingsActivity::class.java).apply {
+                        putExtra(RouteSettingsActivity.EXTRA_ROUTE_ID, rule.id)
+                    })
+                }
+            }
+        }
+
+    }
+
+}

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Action Bar & Action Menu Button Compact Overrides for >= 360dp screens -->
+    <dimen name="abc_action_button_min_width_material">32dp</dimen>
+    <dimen name="abc_action_button_min_width_overflow_material">32dp</dimen>
+    <dimen name="abc_action_bar_content_inset_material">0dp</dimen>
+    <dimen name="abc_action_bar_content_inset_with_nav">0dp</dimen>
+    <dimen name="abc_action_bar_default_padding_start_material">0dp</dimen>
+    <dimen name="abc_action_bar_default_padding_end_material">0dp</dimen>
+</resources>

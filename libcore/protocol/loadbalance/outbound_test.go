@@ -1,0 +1,597 @@
+package loadbalance
+
+import (
+	"context"
+	"net/netip"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/sagernet/sing-box/adapter"
+	M "github.com/sagernet/sing/common/metadata"
+)
+
+func TestStrategies(t *testing.T) {
+	n := 3
+	lb := &LoadBalance{
+		tags:     []string{"n0", "n1", "n2"},
+		stats:    make([]*nodeStats, n),
+		strategy: "failover",
+	}
+	for i := 0; i < n; i++ {
+		lb.stats[i] = new(nodeStats)
+	}
+	lb.outbounds = make([]adapter.Outbound, n)
+
+	// Test 1: failover under normal conditions
+	indices := lb.candidateIndices(nil, M.Socksaddr{})
+	if len(indices) != 3 || indices[0] != 0 || indices[1] != 1 || indices[2] != 2 {
+		t.Fatalf("expected [0, 1, 2], got %v", indices)
+	}
+
+	// Test 2: failover when node 0 degrades (2 consecutive fails recently)
+	lb.stats[0].consecutiveFails.Store(2)
+	lb.stats[0].lastFailTime.Store(time.Now().UnixMilli())
+	indices = lb.candidateIndices(nil, M.Socksaddr{})
+	if len(indices) != 3 || indices[0] != 1 || indices[1] != 2 || indices[2] != 0 {
+		t.Fatalf("expected [1, 2, 0] after node 0 fails, got %v", indices)
+	}
+
+	// Test 3: failover recovery after cooldown
+	lb.stats[0].lastFailTime.Store(time.Now().Add(-35 * time.Second).UnixMilli())
+	indices = lb.candidateIndices(nil, M.Socksaddr{})
+	if len(indices) != 3 || indices[0] != 0 {
+		t.Fatalf("expected node 0 to recover after cooldown, got %v", indices)
+	}
+
+	// Test 4: stable strategy
+	lb.strategy = "stable"
+	// Node 1: high success, low latency
+	lb.stats[1].totalDials.Store(100)
+	lb.stats[1].successDials.Store(99)
+	lb.stats[1].latencyEmaMs.Store(20)
+
+	// Node 0: recent failures
+	lb.stats[0].consecutiveFails.Store(3)
+	lb.stats[0].lastFailTime.Store(time.Now().UnixMilli())
+	lb.stats[0].totalDials.Store(100)
+	lb.stats[0].successDials.Store(70)
+	lb.stats[0].latencyEmaMs.Store(150)
+
+	// Node 2: medium stats
+	lb.stats[2].totalDials.Store(50)
+	lb.stats[2].successDials.Store(45)
+	lb.stats[2].latencyEmaMs.Store(80)
+
+	indices = lb.candidateIndices(nil, M.Socksaddr{})
+	if len(indices) != 3 || indices[0] != 1 {
+		t.Fatalf("expected node 1 to be highest score, got %v", indices)
+	}
+	if indices[2] != 0 {
+		t.Fatalf("expected node 0 to be lowest score due to recent fails, got %v", indices)
+	}
+
+	// Test 5: round_robin strategy
+	lb.strategy = "round_robin"
+	lb.counter = 0
+	i1 := lb.candidateIndices(nil, M.Socksaddr{})
+	i2 := lb.candidateIndices(nil, M.Socksaddr{})
+	if i1[0] == i2[0] {
+		t.Fatalf("expected round robin rotation, got i1=%v, i2=%v", i1, i2)
+	}
+
+	// Test 6: leastLoad dead node isolation
+	lb.strategy = "leastLoad"
+	lb.activeConns = make([]*atomic.Int64, n)
+	for i := 0; i < n; i++ {
+		lb.activeConns[i] = new(atomic.Int64)
+	}
+	// Node 0 has 0 active conns, BUT is degraded (dead)
+	lb.activeConns[0].Store(0)
+	lb.stats[0].consecutiveFails.Store(3)
+	lb.stats[0].lastFailTime.Store(time.Now().UnixMilli())
+	// Node 1 has 2 active conns, and is healthy
+	lb.activeConns[1].Store(2)
+	lb.stats[1].consecutiveFails.Store(0)
+	// Node 2 has 5 active conns, and is healthy
+	lb.activeConns[2].Store(5)
+	lb.stats[2].consecutiveFails.Store(0)
+
+	llIndices := lb.candidateIndices(nil, M.Socksaddr{})
+	if llIndices[0] != 1 {
+		t.Fatalf("expected healthy node 1 with 2 conns to be chosen before degraded node 0 with 0 conns, got %v", llIndices)
+	}
+	if llIndices[2] != 0 {
+		t.Fatalf("expected degraded node 0 to be placed last, got %v", llIndices)
+	}
+
+	// Test 7: round_robin rotation across requests with same FQDN, and consistentHash destination stickiness
+	lb.strategy = "round_robin"
+	destA := M.Socksaddr{Fqdn: "video.youtube.com"}
+	destA1 := lb.candidateIndices(nil, destA)
+	destA2 := lb.candidateIndices(nil, destA)
+	if destA1[0] == destA2[0] {
+		t.Fatalf("expected round robin to rotate across calls with same FQDN, got %v and %v", destA1, destA2)
+	}
+
+	lb.strategy = "consistentHash"
+	ch1 := lb.candidateIndices(nil, destA)
+	ch2 := lb.candidateIndices(nil, destA)
+	if ch1[0] != ch2[0] {
+		t.Fatalf("expected consistentHash to keep destination stickiness for same FQDN, got %v and %v", ch1, ch2)
+	}
+
+	// Verify leastLoad does not get overridden by destination hash
+	lb.strategy = "leastLoad"
+	lb.activeConns[0].Store(5)
+	lb.activeConns[1].Store(0)
+	lb.activeConns[2].Store(3)
+	lb.stats[0].consecutiveFails.Store(0)
+	lb.stats[1].consecutiveFails.Store(0)
+	lb.stats[2].consecutiveFails.Store(0)
+	llDest := lb.candidateIndices(nil, destA)
+	if llDest[0] != 1 {
+		t.Fatalf("expected leastLoad with 0 conns to be chosen regardless of destination hash, got %v", llDest)
+	}
+
+	// Test 8: leastPing strategy
+	lb.strategy = "leastPing"
+	lb.stats[0].consecutiveFails.Store(0)
+	lb.stats[0].latencyEmaMs.Store(250)
+	lb.stats[1].consecutiveFails.Store(0)
+	lb.stats[1].latencyEmaMs.Store(35)
+	lb.stats[2].consecutiveFails.Store(0)
+	lb.stats[2].latencyEmaMs.Store(120)
+
+	lpIndices := lb.candidateIndices(nil, M.Socksaddr{})
+	if lpIndices[0] != 1 || lpIndices[1] != 2 || lpIndices[2] != 0 {
+		t.Fatalf("expected leastPing order [1, 2, 0], got %v", lpIndices)
+	}
+
+	// Degrade node 1 (lowest latency)
+	lb.stats[1].consecutiveFails.Store(2)
+	lb.stats[1].lastFailTime.Store(time.Now().UnixMilli())
+	lpAfterFail := lb.candidateIndices(nil, M.Socksaddr{})
+	if lpAfterFail[0] != 2 || lpAfterFail[len(lpAfterFail)-1] != 1 {
+		t.Fatalf("expected degraded node 1 to be put last and node 2 chosen, got %v", lpAfterFail)
+	}
+
+	// Test 9: leastPing prefers measured healthy nodes over untested nodes (9999 vs 100 bugfix)
+	lb.stats[0].consecutiveFails.Store(0)
+	lb.stats[0].latencyEmaMs.Store(200)
+	lb.stats[1].consecutiveFails.Store(0)
+	lb.stats[1].latencyEmaMs.Store(120)
+	lb.stats[2].consecutiveFails.Store(0)
+	lb.stats[2].latencyEmaMs.Store(0) // Untested node!
+	lpUntested := lb.candidateIndices(nil, M.Socksaddr{})
+	if lpUntested[0] != 1 || lpUntested[1] != 0 || lpUntested[2] != 2 {
+		t.Fatalf("expected tested nodes [1, 0] to be prioritized ahead of untested node 2, got %v", lpUntested)
+	}
+
+	// Test 10: inspection methods
+	if len(lb.All()) != 3 {
+		t.Fatalf("expected 3 outbounds in All(), got %d", len(lb.All()))
+	}
+	if lb.Now() != "n1" {
+		t.Fatalf("expected Now() to report top healthy candidate 'n1', got %s", lb.Now())
+	}
+}
+
+func TestConsistentHashRing(t *testing.T) {
+	tags := []string{"node-us-east", "node-us-west", "node-hk", "node-sg", "node-jp"}
+	n := len(tags)
+	lb := &LoadBalance{
+		tags:      tags,
+		stats:     make([]*nodeStats, n),
+		strategy:  "consistentHash",
+		outbounds: make([]adapter.Outbound, n),
+	}
+	for i := 0; i < n; i++ {
+		lb.stats[i] = new(nodeStats)
+	}
+
+	// 1. Determinism: Same destination maps to same primary candidate every time
+	dest1 := M.Socksaddr{Fqdn: "api.telegram.org"}
+	c1 := lb.candidateIndices(nil, dest1)
+	c2 := lb.candidateIndices(nil, dest1)
+	if len(c1) != n || len(c2) != n {
+		t.Fatalf("expected length %d, got c1=%d, c2=%d", n, len(c1), len(c2))
+	}
+	if c1[0] != c2[0] {
+		t.Fatalf("expected deterministic primary node for %s, got %d and %d", dest1.Fqdn, c1[0], c2[0])
+	}
+
+	// 2. Ensure candidate list contains all distinct nodes without duplicates
+	seen := make(map[int]bool)
+	for _, idx := range c1 {
+		if seen[idx] {
+			t.Fatalf("duplicate node index %d in candidate list: %v", idx, c1)
+		}
+		seen[idx] = true
+	}
+	if len(seen) != n {
+		t.Fatalf("expected all %d nodes in candidate list, got %d", n, len(seen))
+	}
+
+	// 3. Smooth Failover:
+	// Degrade the primary node chosen for dest1
+	primaryIdx := c1[0]
+	lb.stats[primaryIdx].consecutiveFails.Store(2)
+	lb.stats[primaryIdx].lastFailTime.Store(time.Now().UnixMilli())
+
+	cAfterFail := lb.candidateIndices(nil, dest1)
+	// The primary node should now be degraded and put at the very end
+	if cAfterFail[0] == primaryIdx {
+		t.Fatalf("degraded node %d should not be primary candidate, got %v", primaryIdx, cAfterFail)
+	}
+	if cAfterFail[n-1] != primaryIdx {
+		t.Fatalf("degraded node %d should be put last, got %v", primaryIdx, cAfterFail)
+	}
+	// The new primary candidate should be the second node from c1 (clockwise neighbor)
+	expectedNewPrimary := c1[1]
+	if cAfterFail[0] != expectedNewPrimary {
+		t.Fatalf("expected clockwise failover to node %d, got %d", expectedNewPrimary, cAfterFail[0])
+	}
+
+	// 4. Immunity for unaffected destinations:
+	var otherDest M.Socksaddr
+	var otherC1 []int
+	for _, fqdn := range []string{"google.com", "cloudflare.com", "apple.com", "netflix.com", "github.com", "microsoft.com"} {
+		cand := lb.candidateIndices(nil, M.Socksaddr{Fqdn: fqdn})
+		if cand[0] != primaryIdx && cand[0] != expectedNewPrimary {
+			otherDest = M.Socksaddr{Fqdn: fqdn}
+			otherC1 = cand
+			break
+		}
+	}
+	if otherDest.Fqdn != "" {
+		otherCAfter := lb.candidateIndices(nil, otherDest)
+		if otherCAfter[0] != otherC1[0] {
+			t.Fatalf("unaffected destination %s remapped unexpectedly from %d to %d (consistent hash property violated)",
+				otherDest.Fqdn, otherC1[0], otherCAfter[0])
+		}
+	}
+
+	// 5. Recovery after cooldown:
+	lb.stats[primaryIdx].lastFailTime.Store(time.Now().Add(-35 * time.Second).UnixMilli())
+	cRecovered := lb.candidateIndices(nil, dest1)
+	if cRecovered[0] != primaryIdx {
+		t.Fatalf("expected node %d to reclaim primary slot after cooldown, got %v", primaryIdx, cRecovered)
+	}
+
+	// 6. Test compatibility with "consistent_hash" alias
+	lb.strategy = "consistent_hash"
+	cAlias := lb.candidateIndices(nil, dest1)
+	if cAlias[0] != primaryIdx {
+		t.Fatalf("expected 'consistent_hash' alias to produce same primary node %d, got %v", primaryIdx, cAlias)
+	}
+
+	// 7. Node order independence:
+	reorderedTags := []string{tags[2], tags[4], tags[0], tags[1], tags[3]}
+	lbReordered := &LoadBalance{
+		tags:      reorderedTags,
+		stats:     make([]*nodeStats, n),
+		strategy:  "consistentHash",
+		outbounds: make([]adapter.Outbound, n),
+	}
+	for i := 0; i < n; i++ {
+		lbReordered.stats[i] = new(nodeStats)
+	}
+	reorderedCandidates := lbReordered.candidateIndices(nil, dest1)
+	originalChosenTag := tags[c1[0]]
+	reorderedChosenTag := reorderedTags[reorderedCandidates[0]]
+	if originalChosenTag != reorderedChosenTag {
+		t.Fatalf("node reordering changed mapped tag for %s: originally %s, but reordered got %s",
+			dest1.Fqdn, originalChosenTag, reorderedChosenTag)
+	}
+}
+
+func TestConsistentHashDomainNormalization(t *testing.T) {
+	tags := []string{"node-0", "node-1", "node-2", "node-3"}
+	n := len(tags)
+	lb := &LoadBalance{
+		tags:      tags,
+		stats:     make([]*nodeStats, n),
+		strategy:  "consistentHash",
+		outbounds: make([]adapter.Outbound, n),
+	}
+	for i := 0; i < n; i++ {
+		lb.stats[i] = new(nodeStats)
+	}
+
+	// Subdomains of youtube.com must all map to the same node
+	ytCandidates1 := lb.candidateIndices(nil, M.Socksaddr{Fqdn: "www.youtube.com"})
+	ytCandidates2 := lb.candidateIndices(nil, M.Socksaddr{Fqdn: "video.youtube.com"})
+	ytCandidates3 := lb.candidateIndices(nil, M.Socksaddr{Fqdn: "m.youtube.com"})
+	ytCandidates4 := lb.candidateIndices(nil, M.Socksaddr{Fqdn: "youtube.com"})
+
+	if ytCandidates1[0] != ytCandidates2[0] || ytCandidates1[0] != ytCandidates3[0] || ytCandidates1[0] != ytCandidates4[0] {
+		t.Fatalf("expected all youtube subdomains to map to identical primary node, got: %d, %d, %d, %d",
+			ytCandidates1[0], ytCandidates2[0], ytCandidates3[0], ytCandidates4[0])
+	}
+
+	// Multi-part ccTLD domains (.com.cn, .co.uk)
+	baidu1 := lb.candidateIndices(nil, M.Socksaddr{Fqdn: "tieba.baidu.com.cn"})
+	baidu2 := lb.candidateIndices(nil, M.Socksaddr{Fqdn: "www.baidu.com.cn"})
+	if baidu1[0] != baidu2[0] {
+		t.Fatalf("expected baidu.com.cn subdomains to map to identical node, got %d and %d", baidu1[0], baidu2[0])
+	}
+
+	bbc1 := lb.candidateIndices(nil, M.Socksaddr{Fqdn: "news.bbc.co.uk"})
+	bbc2 := lb.candidateIndices(nil, M.Socksaddr{Fqdn: "bbc.co.uk"})
+	if bbc1[0] != bbc2[0] {
+		t.Fatalf("expected bbc.co.uk subdomains to map to identical node, got %d and %d", bbc1[0], bbc2[0])
+	}
+
+	// Context with InboundContext Domain sniffing
+	inboundCtx := &adapter.InboundContext{
+		Domain: "music.youtube.com",
+	}
+	ctx := adapter.WithContext(context.Background(), inboundCtx)
+	ytFromCtx := lb.candidateIndices(ctx, M.Socksaddr{Addr: netip.MustParseAddr("1.2.3.4")})
+	if ytFromCtx[0] != ytCandidates1[0] {
+		t.Fatalf("expected sniffed domain music.youtube.com to map to youtube node %d, got %d",
+			ytCandidates1[0], ytFromCtx[0])
+	}
+}
+
+func TestConsistentHashDistributionAcrossDomains(t *testing.T) {
+	tags := []string{"node-hk", "node-jp", "node-us"}
+	n := len(tags)
+	lb := &LoadBalance{
+		tags:      tags,
+		stats:     make([]*nodeStats, n),
+		strategy:  "consistentHash",
+		outbounds: make([]adapter.Outbound, n),
+	}
+	for i := 0; i < n; i++ {
+		lb.stats[i] = new(nodeStats)
+	}
+
+	domains := []string{
+		"google.com",
+		"youtube.com",
+		"github.com",
+		"twitter.com",
+		"bilibili.com",
+		"wikipedia.org",
+		"reddit.com",
+		"facebook.com",
+		"amazon.com",
+		"netflix.com",
+		"apple.com",
+		"microsoft.com",
+		"openai.com",
+		"telegram.org",
+		"instagram.com",
+	}
+
+	nodeCounts := make(map[int]int)
+	for _, domain := range domains {
+		c := lb.candidateIndices(nil, M.Socksaddr{Fqdn: domain})
+		primary := c[0]
+		nodeCounts[primary]++
+	}
+
+	t.Logf("Consistent hash domain distribution across %d nodes: %v", n, nodeCounts)
+
+	// Every node in the group MUST receive at least one domain!
+	// This directly fixes the user's issue: "发现所有各种类型的网站全都走了同一个节点。不应该是每个节点固定一个类型网站吗？"
+	for i := 0; i < n; i++ {
+		if nodeCounts[i] == 0 {
+			t.Fatalf("node %d (%s) received 0 domains! Distribution failure: %v", i, tags[i], nodeCounts)
+		}
+	}
+}
+
+func TestConsistentHashSubnetMasking(t *testing.T) {
+	tags := []string{"node-0", "node-1", "node-2"}
+	n := len(tags)
+	lb := &LoadBalance{
+		tags:      tags,
+		stats:     make([]*nodeStats, n),
+		strategy:  "consistentHash",
+		outbounds: make([]adapter.Outbound, n),
+	}
+	for i := 0; i < n; i++ {
+		lb.stats[i] = new(nodeStats)
+	}
+
+	// IPv4 in same /24
+	ip1 := lb.candidateIndices(nil, M.Socksaddr{Addr: netip.MustParseAddr("142.250.72.206")})
+	ip2 := lb.candidateIndices(nil, M.Socksaddr{Addr: netip.MustParseAddr("142.250.72.100")})
+	if ip1[0] != ip2[0] {
+		t.Fatalf("expected IPs in same /24 to map to same node, got %d and %d", ip1[0], ip2[0])
+	}
+
+	// IPv6 in same /48
+	ipv6A := lb.candidateIndices(nil, M.Socksaddr{Addr: netip.MustParseAddr("2606:4700:3037:0000::1")})
+	ipv6B := lb.candidateIndices(nil, M.Socksaddr{Addr: netip.MustParseAddr("2606:4700:3037:ffff::99")})
+	if ipv6A[0] != ipv6B[0] {
+		t.Fatalf("expected IPv6 in same /48 to map to same node, got %d and %d", ipv6A[0], ipv6B[0])
+	}
+}
+
+func TestStickySession(t *testing.T) {
+	tags := []string{"node-0", "node-1", "node-2"}
+	n := len(tags)
+	lb := &LoadBalance{
+		tags:           tags,
+		stats:          make([]*nodeStats, n),
+		strategy:       "consistent_hash",
+		outbounds:      make([]adapter.Outbound, n),
+		stickySessions: make(map[string]stickyEntry),
+	}
+	lb.ring = newConsistentHashRing(lb.tags)
+	for i := 0; i < n; i++ {
+		lb.stats[i] = new(nodeStats)
+	}
+
+	// 1. Verify leastPing does NOT use sticky sessions (no pollution)
+	lbLeastPing := &LoadBalance{
+		tags:           tags,
+		stats:          make([]*nodeStats, n),
+		strategy:       "leastPing",
+		outbounds:      make([]adapter.Outbound, n),
+		stickySessions: make(map[string]stickyEntry),
+	}
+	for i := 0; i < n; i++ {
+		lbLeastPing.stats[i] = new(nodeStats)
+	}
+	lbLeastPing.stats[0].latencyEmaMs.Store(50)
+	lbLeastPing.stats[1].latencyEmaMs.Store(30)
+	lbLeastPing.stats[2].latencyEmaMs.Store(100)
+	lbLeastPing.setStickySession("youtube.com", 0)
+
+	lpCands := lbLeastPing.candidateIndices(nil, M.Socksaddr{Fqdn: "youtube.com"})
+	if lpCands[0] != 1 {
+		t.Fatalf("leastPing must NOT be polluted by sticky session, expected node 1, got %d", lpCands[0])
+	}
+
+	// 2. Under consistent_hash, set sticky session to node 0 for youtube.com
+	lb.setStickySession("youtube.com", 0)
+
+	// With sticky session active on consistent_hash, node 0 must be promoted to index 0
+	stickyCands := lb.candidateIndices(nil, M.Socksaddr{Fqdn: "youtube.com"})
+	if stickyCands[0] != 0 {
+		t.Fatalf("expected sticky node 0 to be promoted to first in consistent_hash, got %d", stickyCands[0])
+	}
+
+	// Subdomain of same root domain (video.youtube.com) should also stick to node 0
+	subCands := lb.candidateIndices(nil, M.Socksaddr{Fqdn: "video.youtube.com"})
+	if subCands[0] != 0 {
+		t.Fatalf("expected subdomain video.youtube.com to stick to node 0, got %d", subCands[0])
+	}
+
+	// If node 0 degrades, sticky session should yield to healthy node
+	lb.stats[0].consecutiveFails.Store(2)
+	lb.stats[0].lastFailTime.Store(time.Now().UnixMilli())
+
+	fallbackCands := lb.candidateIndices(nil, M.Socksaddr{Fqdn: "youtube.com"})
+	if fallbackCands[0] == 0 {
+		t.Fatalf("expected degraded sticky node 0 to yield when degraded, got %d", fallbackCands[0])
+	}
+}
+
+func TestTrackedConnZeroCopy(t *testing.T) {
+	tc := &trackedConn{}
+	if !tc.ReaderReplaceable() {
+		t.Fatal("trackedConn must be ReaderReplaceable for kernel zero-copy splice")
+	}
+	if !tc.WriterReplaceable() {
+		t.Fatal("trackedConn must be WriterReplaceable for kernel zero-copy splice")
+	}
+	if tc.Upstream() != nil {
+		// nil Conn returns nil
+	}
+
+	tpc := &trackedPacketConn{}
+	if !tpc.ReaderReplaceable() {
+		t.Fatal("trackedPacketConn must be ReaderReplaceable")
+	}
+	if !tpc.WriterReplaceable() {
+		t.Fatal("trackedPacketConn must be WriterReplaceable")
+	}
+}
+
+func TestPublicSuffixRootDomain(t *testing.T) {
+	testCases := []struct {
+		input    string
+		expected string
+	}{
+		{"example.com", "example.com"},
+		{"sub.example.com", "example.com"},
+		{"a.b.c.example.com", "example.com"},
+		{"news.bbc.co.uk", "bbc.co.uk"},
+		{"dept.sub.gov.cn", "sub.gov.cn"},
+		{"portal.pku.edu.cn", "pku.edu.cn"},
+		{"user.github.io", "user.github.io"},
+		{"sub.user.github.io", "user.github.io"},
+		{"localhost", "localhost"},
+		{"", ""},
+	}
+	for _, tc := range testCases {
+		actual := extractRootDomain(tc.input)
+		if actual != tc.expected {
+			t.Errorf("extractRootDomain(%q) = %q, expected %q", tc.input, actual, tc.expected)
+		}
+	}
+
+	// Test IP destinations
+	ip4 := M.ParseSocksaddr("192.168.1.50:443")
+	key4 := destinationKey(context.Background(), ip4)
+	if key4 != "192.168.1.0/24" {
+		t.Fatalf("expected IPv4 /24 subnet key, got %q", key4)
+	}
+
+	ip6 := M.ParseSocksaddr("[2001:db8:85a3:8d3:1319:8a2e:370:7348]:443")
+	key6 := destinationKey(context.Background(), ip6)
+	if key6 != "2001:db8:85a3::/48" {
+		t.Fatalf("expected IPv6 /48 subnet key, got %q", key6)
+	}
+}
+
+func TestLeastLoadConcurrentAccounting(t *testing.T) {
+	var count atomic.Int64
+	tc := &trackedConn{
+		onClose: func() {
+			val := count.Add(-1)
+			if val < 0 {
+				count.Store(0)
+			}
+		},
+	}
+
+	// 1. Initial count 1
+	count.Store(1)
+	// First close should decrement to 0
+	tc.Close()
+	if count.Load() != 0 {
+		t.Fatalf("expected count 0, got %d", count.Load())
+	}
+
+	// Repeated close should NOT decrement again (CAS guard)
+	tc.Close()
+	tc.Close()
+	if count.Load() != 0 {
+		t.Fatalf("expected count to remain 0 after multiple closes, got %d", count.Load())
+	}
+}
+
+func TestLeastPingToleranceHysteresis(t *testing.T) {
+	n := 2
+	lb := &LoadBalance{
+		tags:      []string{"n0", "n1"},
+		stats:     make([]*nodeStats, n),
+		strategy:  "leastPing",
+		tolerance: 50,
+	}
+	for i := 0; i < n; i++ {
+		lb.stats[i] = new(nodeStats)
+	}
+	lb.lastSelectedIdx.Store(-1)
+	lb.outbounds = make([]adapter.Outbound, n)
+
+	// Step 1: n0 = 100ms, n1 = 120ms -> n0 selected
+	lb.stats[0].latencyEmaMs.Store(100)
+	lb.stats[1].latencyEmaMs.Store(120)
+	indices := lb.candidateIndices(nil, M.Socksaddr{})
+	if indices[0] != 0 {
+		t.Fatalf("expected initial index 0, got %d", indices[0])
+	}
+
+	// Step 2: n1 fluctuates to 95ms (only 5ms faster, within 50ms tolerance) -> n0 should remain at index 0
+	lb.stats[1].latencyEmaMs.Store(95)
+	indices = lb.candidateIndices(nil, M.Socksaddr{})
+	if indices[0] != 0 {
+		t.Fatalf("expected index 0 to be preserved within tolerance (delta=5ms <= 50ms), got %d", indices[0])
+	}
+
+	// Step 3: n1 drops to 40ms (60ms faster, exceeds 50ms tolerance) -> n1 should switch to index 0
+	lb.stats[1].latencyEmaMs.Store(40)
+	indices = lb.candidateIndices(nil, M.Socksaddr{})
+	if indices[0] != 1 {
+		t.Fatalf("expected switch to index 1 when exceeding tolerance (delta=60ms > 50ms), got %d", indices[0])
+	}
+}
+

@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- 1. 基础体验 -->
+    <PreferenceCategory app:title="@string/settings_cat_basic">
+
+        <Preference
+            app:fragment="io.nekohasekai.sagernet.ui.AppearanceSettingsFragment"
+            app:icon="@drawable/ic_baseline_color_lens_24"
+            app:key="screenUI"
+            app:summary="@string/settings_ui_summary"
+            app:title="@string/ui_settings"
+            app:widgetLayout="@layout/preference_widget_chevron" />
+
+        <Preference
+            app:fragment="io.nekohasekai.sagernet.ui.settings.VpnSettingsFragment"
+            app:icon="@drawable/ic_baseline_security_24"
+            app:key="screenVPN"
+            app:summary="@string/settings_vpn_summary"
+            app:title="@string/vpn_settings"
+            app:widgetLayout="@layout/preference_widget_chevron" />
+
+        <Preference
+            app:fragment="io.nekohasekai.sagernet.ui.settings.ModeSettingsFragment"
+            app:icon="@drawable/ic_device_developer_mode"
+            app:key="screenMode"
+            app:summary="@string/settings_mode_summary"
+            app:title="@string/mode_and_inbound_settings"
+            app:widgetLayout="@layout/preference_widget_chevron" />
+
+    </PreferenceCategory>
+
+    <!-- 2. 核心引擎与网络 -->
+    <PreferenceCategory app:title="@string/settings_cat_core_network">
+
+        <Preference
+            app:fragment="io.nekohasekai.sagernet.ui.settings.CoreSettingsFragment"
+            app:icon="@drawable/ic_baseline_manage_search_24"
+            app:key="screenCore"
+            app:summary="@string/settings_core_summary"
+            app:title="@string/core_settings"
+            app:widgetLayout="@layout/preference_widget_chevron" />
+
+        <Preference
+            app:fragment="io.nekohasekai.sagernet.ui.settings.DnsSettingsFragment"
+            app:icon="@drawable/ic_action_dns"
+            app:key="screenDNS"
+            app:summary="@string/settings_dns_summary"
+            app:title="@string/dns_settings"
+            app:widgetLayout="@layout/preference_widget_chevron" />
+
+        <Preference
+            app:fragment="io.nekohasekai.sagernet.ui.settings.FragmentSettingsFragment"
+            app:icon="@drawable/baseline_wrap_text_24"
+            app:key="screenFragment"
+            app:summary="@string/settings_fragment_summary"
+            app:title="@string/fragment_settings"
+            app:widgetLayout="@layout/preference_widget_chevron" />
+
+    </PreferenceCategory>
+
+    <!-- 3. 进阶与诊断 -->
+    <PreferenceCategory app:title="@string/settings_cat_advanced">
+
+        <Preference
+            app:fragment="io.nekohasekai.sagernet.ui.settings.ObservatorySettingsFragment"
+            app:icon="@drawable/ic_baseline_cast_connected_24"
+            app:key="screenObservatory"
+            app:summary="@string/settings_observatory_summary"
+            app:title="@string/observatory_settings"
+            app:widgetLayout="@layout/preference_widget_chevron" />
+
+        <Preference
+            app:fragment="io.nekohasekai.sagernet.ui.settings.AdvancedSettingsFragment"
+            app:icon="@drawable/ic_baseline_tune_24"
+            app:key="screenAdvanced"
+            app:summary="@string/settings_advanced_summary"
+            app:title="@string/advanced_settings"
+            app:widgetLayout="@layout/preference_widget_chevron" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory app:title="@string/observatory_settings">
+
+        <moe.matsuri.nb4a.ui.UrlTestPreference
+            app:defaultValue="@string/default_connection_test_url"
+            app:icon="@drawable/ic_baseline_cast_connected_24"
+            app:key="connectionTestURL"
+            app:title="@string/connection_test_url"
+            app:useSimpleSummaryProvider="true" />
+
+        <SwitchPreferenceCompat
+            app:defaultValue="false"
+            app:icon="@drawable/ic_baseline_filter_list_24"
+            app:key="hideUnavailableProfiles"
+            app:summary="@string/hide_unavailable_profiles_sum"
+            app:title="@string/hide_unavailable_profiles" />
+
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:defaultValue="@string/default_speed_test_mode"
+            app:entries="@array/speed_test_modes"
+            app:entryValues="@array/speed_test_mode_values"
+            app:key="speedTestMode"
+            app:title="@string/speed_test_mode"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:defaultValue="@string/default_speed_test_timeout_ms"
+            app:key="speedTestTimeoutMs"
+            app:title="@string/speed_test_timeout_ms"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:defaultValue="@string/default_simple_download_url"
+            app:key="simpleDownloadURL"
+            app:title="@string/simple_download_url"
+            app:useSimpleSummaryProvider="true" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>

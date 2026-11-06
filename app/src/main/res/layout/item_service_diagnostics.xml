@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/card_service_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="16dp"
+    android:layout_marginEnd="16dp"
+    android:layout_marginTop="3dp"
+    android:layout_marginBottom="3dp"
+    android:clickable="true"
+    android:focusable="true"
+    android:foreground="?android:attr/selectableItemBackground"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="0dp"
+    app:strokeWidth="0.6dp"
+    app:strokeColor="@color/card_stroke"
+    app:cardBackgroundColor="?android:attr/colorBackground">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="12dp"
+        android:paddingEnd="10dp"
+        android:paddingTop="9dp"
+        android:paddingBottom="9dp">
+
+        <!-- Left: Circular Icon Container (36dp x 36dp) -->
+        <FrameLayout
+            android:id="@+id/layout_icon_container"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginEnd="12dp">
+
+            <View
+                android:id="@+id/view_icon_bg"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="@drawable/bg_circle_icon" />
+
+            <ImageView
+                android:id="@+id/service_icon"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                tools:src="@drawable/ic_platform_chatgpt" />
+
+        </FrameLayout>
+
+        <!-- Center: Title + Subtitle -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tv_service_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="14.5sp"
+                android:textStyle="bold"
+                android:textColor="?android:attr/textColorPrimary"
+                tools:text="OpenAI" />
+
+            <TextView
+                android:id="@+id/tv_service_sub"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textSize="11.5sp"
+                android:textColor="?android:attr/textColorSecondary"
+                tools:text="🇸🇬 SG 290ms" />
+
+        </LinearLayout>
+
+        <!-- Right: Status Badge (Pill Capsule with 6dp dot) -->
+        <LinearLayout
+            android:id="@+id/layout_status_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:layout_marginEnd="6dp">
+
+            <!-- Small 6dp status dot -->
+            <View
+                android:id="@+id/view_status_dot"
+                android:layout_width="6dp"
+                android:layout_height="6dp"
+                android:layout_marginEnd="5dp"
+                android:background="@drawable/bg_status_dot" />
+
+            <!-- Mini testing spinner -->
+            <ProgressBar
+                android:id="@+id/pb_badge_testing"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:layout_marginEnd="5dp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tv_service_badge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="11.5sp"
+                android:textStyle="bold"
+                tools:textColor="#10B981"
+                tools:text="已完成" />
+
+        </LinearLayout>
+
+        <!-- Rightmost: Refresh Action Button -->
+        <FrameLayout
+            android:id="@+id/btn_item_refresh"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true">
+
+            <ImageView
+                android:id="@+id/iv_refresh_icon"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_gravity="center"
+                android:contentDescription="@string/diagnostics_retest"
+                android:src="@drawable/ic_baseline_refresh_24"
+                app:tint="?android:attr/textColorSecondary" />
+
+        </FrameLayout>
+
+    </LinearLayout>
+
+</com.google.android.material.card.MaterialCardView>

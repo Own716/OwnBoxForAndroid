@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_checked="true">
+        <layer-list>
+            <item
+                android:bottom="2dp"
+                android:left="2dp"
+                android:right="2dp"
+                android:top="2dp">
+                <shape android:shape="oval">
+                    <solid android:color="?attr/colorOnPrimary" />
+                    <stroke android:width="0.5dp" android:color="#26000000" />
+                    <size android:width="22dp" android:height="22dp" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+    <item>
+        <layer-list>
+            <item
+                android:bottom="2dp"
+                android:left="2dp"
+                android:right="2dp"
+                android:top="2dp">
+                <shape android:shape="oval">
+                    <solid android:color="@color/telegram_switch_thumb_off" />
+                    <stroke android:width="0.5dp" android:color="#33000000" />
+                    <size android:width="22dp" android:height="22dp" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

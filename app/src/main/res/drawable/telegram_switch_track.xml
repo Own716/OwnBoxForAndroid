@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_checked="true">
+        <shape android:shape="rectangle">
+            <corners android:radius="100dp" />
+            <solid android:color="?attr/colorPrimary" />
+            <size android:width="48dp" android:height="26dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="100dp" />
+            <solid android:color="@color/telegram_switch_track_off" />
+            <size android:width="48dp" android:height="26dp" />
+        </shape>
+    </item>
+</selector>

@@ -1,0 +1,122 @@
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <EditTextPreference
+        app:icon="@drawable/ic_social_emoji_symbols"
+        app:key="name"
+        app:title="@string/profile_name"
+        app:useSimpleSummaryProvider="true" />
+
+    <PreferenceCategory app:title="@string/proxy_cat">
+        <EditTextPreference
+            app:icon="@drawable/ic_hardware_router"
+            app:key="serverAddress"
+            app:title="@string/server_address"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:icon="@drawable/ic_maps_directions_boat"
+            app:key="serverPort"
+            app:title="@string/server_port"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:icon="@drawable/ic_baseline_domain_24"
+            app:key="localAddress"
+            app:title="@string/wireguard_local_address"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:icon="@drawable/ic_baseline_vpn_key_24"
+            app:key="privateKey"
+            app:title="@string/ssh_private_key"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:icon="@drawable/ic_action_copyright"
+            app:key="peerPublicKey"
+            app:title="@string/wireguard_public_key"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:dialogLayout="@layout/layout_password_dialog"
+            app:icon="@drawable/ic_settings_password"
+            app:key="peerPreSharedKey"
+            app:title="@string/wireguard_psk" />
+        <EditTextPreference
+            app:defaultValue="1420"
+            app:icon="@drawable/baseline_public_24"
+            app:key="mtu"
+            app:title="@string/mtu"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:defaultValue="0"
+            app:icon="@drawable/ic_maps_directions_boat"
+            app:key="listenPort"
+            app:title="@string/wireguard_listen_port"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:defaultValue="0"
+            app:icon="@drawable/ic_action_lock_open"
+            app:key="persistentKeepaliveInterval"
+            app:title="@string/wireguard_persistent_keepalive"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:icon="@drawable/ic_baseline_fingerprint_24"
+            app:key="reserved"
+            app:title="Reserved"
+            app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="AmneziaWG (AWG)">
+        <EditTextPreference
+            app:defaultValue="0"
+            app:icon="@drawable/ic_action_lock_open"
+            app:key="jc"
+            app:title="Jc (Junk packet count)"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:defaultValue="0"
+            app:icon="@drawable/ic_action_lock_open"
+            app:key="jmin"
+            app:title="Jmin (Junk packet min size)"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:defaultValue="0"
+            app:icon="@drawable/ic_action_lock_open"
+            app:key="jmax"
+            app:title="Jmax (Junk packet max size)"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:defaultValue="0"
+            app:icon="@drawable/ic_action_lock_open"
+            app:key="s1"
+            app:title="S1 (Init packet magic header)"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:defaultValue="0"
+            app:icon="@drawable/ic_action_lock_open"
+            app:key="s2"
+            app:title="S2 (Response packet magic header)"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:defaultValue="0"
+            app:icon="@drawable/ic_baseline_fingerprint_24"
+            app:key="h1"
+            app:title="H1 (Handshake init header)"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:defaultValue="0"
+            app:icon="@drawable/ic_baseline_fingerprint_24"
+            app:key="h2"
+            app:title="H2 (Handshake resp header)"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:defaultValue="0"
+            app:icon="@drawable/ic_baseline_fingerprint_24"
+            app:key="h3"
+            app:title="H3 (Underload header)"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:defaultValue="0"
+            app:icon="@drawable/ic_baseline_fingerprint_24"
+            app:key="h4"
+            app:title="H4 (Transport header)"
+            app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+
+</PreferenceScreen>

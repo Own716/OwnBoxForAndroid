@@ -1,0 +1,289 @@
+package io.nekohasekai.sagernet.bg
+
+import android.Manifest
+import android.annotation.SuppressLint
+import android.app.Service
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.ProxyInfo
+import android.os.Build
+import android.os.ParcelFileDescriptor
+import android.os.PowerManager
+import io.nekohasekai.sagernet.*
+import io.nekohasekai.sagernet.database.DataStore
+import io.nekohasekai.sagernet.fmt.LOCALHOST
+import io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean
+import io.nekohasekai.sagernet.ktx.*
+import io.nekohasekai.sagernet.ui.VpnRequestActivity
+import io.nekohasekai.sagernet.utils.Subnet
+import android.net.VpnService as BaseVpnService
+
+class VpnService : BaseVpnService(),
+    BaseService.Interface {
+
+    companion object {
+
+        const val PRIVATE_VLAN4_CLIENT = "172.19.0.1"
+        const val PRIVATE_VLAN4_ROUTER = "172.19.0.2"
+        const val FAKEDNS_VLAN4_CLIENT = "198.18.0.0"
+        const val PRIVATE_VLAN6_CLIENT = "fdfe:dcba:9876::1"
+        const val PRIVATE_VLAN6_ROUTER = "fdfe:dcba:9876::2"
+
+    }
+
+    var conn: ParcelFileDescriptor? = null
+
+    private var metered = false
+
+    override var upstreamInterfaceName: String? = null
+
+    override suspend fun startProcesses() {
+        DataStore.vpnService = this
+        super.startProcesses() // launch proxy instance
+    }
+
+    override var wakeLock: PowerManager.WakeLock? = null
+    private var wifiLock: android.net.wifi.WifiManager.WifiLock? = null
+
+    @SuppressLint("WakelockTimeout")
+    override fun acquireWakeLock() {
+        if (wakeLock == null) {
+            wakeLock = SagerNet.power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "sagernet:vpn")
+                .apply { acquire() }
+        }
+        if (wifiLock == null) {
+            try {
+                val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as? android.net.wifi.WifiManager
+                @Suppress("DEPRECATION")
+                wifiLock = wifiManager?.createWifiLock(
+                    android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF,
+                    "sagernet:vpn_wifi"
+                )?.apply {
+                    setReferenceCounted(false)
+                    acquire()
+                }
+            } catch (_: Throwable) {
+            }
+        }
+    }
+
+    @Suppress("EXPERIMENTAL_API_USAGE")
+    override suspend fun killProcesses(): Throwable? {
+        try {
+            wifiLock?.let {
+                if (it.isHeld) it.release()
+            }
+        } catch (_: Throwable) {
+        } finally {
+            wifiLock = null
+        }
+
+        val currentConnection = conn
+        var cleanupError: Throwable? = null
+        Logs.i(
+            "VpnLifecycleTrace stage=tun-close begin " +
+                "hasConnection=${currentConnection != null}"
+        )
+        try {
+            currentConnection?.close()
+            Logs.i("VpnLifecycleTrace stage=tun-close success")
+        } catch (error: Throwable) {
+            Logs.w(
+                "VpnLifecycleTrace stage=tun-close failed " +
+                    "type=${error.javaClass.name} message=${error.message}"
+            )
+            cleanupError = error
+        } finally {
+            conn = null
+        }
+        super.killProcesses()?.let { error ->
+            if (cleanupError == null) {
+                cleanupError = error
+            } else if (cleanupError !== error) {
+                cleanupError?.addSuppressed(error)
+            }
+        }
+        Logs.i(
+            "VpnLifecycleTrace stage=kill done hasCleanupError=${cleanupError != null}"
+        )
+        return cleanupError
+    }
+
+    override fun onBind(intent: Intent) = when (intent.action) {
+        SERVICE_INTERFACE -> super<BaseVpnService>.onBind(intent)
+        else -> super<BaseService.Interface>.onBind(intent)
+    }
+
+    override val data = BaseService.Data(this)
+    override val tag = "SagerNetVpnService"
+    override fun createNotification(profileName: String) =
+        ServiceNotification(
+            this, profileName,
+            if (DataStore.liveUpdateEnabled) "service-live-update" else "service-vpn-v2",
+            true
+        )
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (DataStore.serviceMode == Key.MODE_VPN) {
+            if (prepare(this) != null) {
+                startActivity(
+                    Intent(
+                        this, VpnRequestActivity::class.java
+                    ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            } else return super<BaseService.Interface>.onStartCommand(intent, flags, startId)
+        }
+        stopRunner()
+        return Service.START_NOT_STICKY
+    }
+
+    inner class NullConnectionException : NullPointerException(),
+        BaseService.ExpectedException {
+        override fun getLocalizedMessage() = getString(R.string.reboot_required)
+    }
+
+    fun startVpn(tunOptionsJson: String, tunPlatformOptionsJson: String): Int {
+//        Logs.d(tunOptionsJson)
+//        Logs.d(tunPlatformOptionsJson)
+//        val tunOptions = JSONObject(tunOptionsJson)
+
+        val effectiveMtu = DataStore.mtu.coerceIn(1280, 9000)
+        val builder = Builder().setConfigureIntent(SagerNet.configureIntent(this))
+            .setSession(getString(R.string.app_name))
+            .setMtu(effectiveMtu)
+        val ipv6Mode = DataStore.ipv6Mode
+
+        // address: 当启用 IPv6 时才添加 IPv6 虚拟地址与路由；当禁用 IPv6 时绝不配置 IPv6 虚拟地址与路由，
+        // 避免 Android 系统向微信等双栈客户端通告虚假 IPv6 连通性导致 Mars 握手超时、发图片/文件卡死转圈
+        builder.addAddress(PRIVATE_VLAN4_CLIENT, 30)
+        if (ipv6Mode != io.nekohasekai.sagernet.IPv6Mode.DISABLE) {
+            builder.addAddress(PRIVATE_VLAN6_CLIENT, 126)
+        }
+        builder.addDnsServer(PRIVATE_VLAN4_ROUTER)
+        if (ipv6Mode != io.nekohasekai.sagernet.IPv6Mode.DISABLE) {
+            builder.addDnsServer(PRIVATE_VLAN6_ROUTER)
+        }
+
+        // route
+        if (DataStore.bypassLan) {
+            resources.getStringArray(R.array.bypass_private_route).forEach {
+                val subnet = Subnet.fromString(it)!!
+                builder.addRoute(subnet.address.hostAddress!!, subnet.prefixSize)
+            }
+            builder.addRoute(PRIVATE_VLAN4_ROUTER, 32)
+            builder.addRoute(FAKEDNS_VLAN4_CLIENT, 15)
+            // https://issuetracker.google.com/issues/149636790
+            if (ipv6Mode != io.nekohasekai.sagernet.IPv6Mode.DISABLE) {
+                builder.addRoute("2000::", 3)
+                builder.addRoute("fc00::", 7)
+            }
+        } else {
+            builder.addRoute("0.0.0.0", 0)
+            if (ipv6Mode != io.nekohasekai.sagernet.IPv6Mode.DISABLE) {
+                builder.addRoute("::", 0)
+            }
+        }
+
+        updateUnderlyingNetwork(builder)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) builder.setMetered(metered)
+
+        // app route
+        val packageName = packageName
+        val proxyApps = DataStore.proxyApps
+        var bypass = DataStore.bypass
+        val needBypassRootUid = data.proxy!!.config.trafficMap.values.any {
+            it[0].hysteriaBean?.protocol == HysteriaBean.PROTOCOL_FAKETCP
+        }
+
+        if (proxyApps || needBypassRootUid) {
+            val individual = mutableSetOf<String>()
+            val allApps by lazy {
+                packageManager.getInstalledPackages(PackageManager.GET_PERMISSIONS).filter {
+                    when (it.packageName) {
+                        packageName -> false
+                        "android" -> true
+                        else -> it.requestedPermissions?.contains(Manifest.permission.INTERNET) == true
+                    }
+                }.map {
+                    it.packageName
+                }
+            }
+            if (proxyApps) {
+                individual.addAll(DataStore.individual.split('\n').filter { it.isNotBlank() })
+                if (bypass && needBypassRootUid) {
+                    val individualNew = allApps.toMutableList()
+                    individualNew.removeAll(individual)
+                    individual.clear()
+                    individual.addAll(individualNew)
+                    bypass = false
+                }
+            } else {
+                individual.addAll(allApps)
+                bypass = false
+            }
+
+            // In whitelist mode (proxyApps enabled, !bypass), if Google Play Store is selected,
+            // automatically ensure DownloadManager, Xiaomi download provider, and Google services are allowed into VPN
+            // so download tasks never bypass the TUN or leak to direct cellular/wifi.
+            if (proxyApps && !bypass && individual.contains("com.android.vending")) {
+                individual.add("com.android.providers.downloads")
+                individual.add("com.android.providers.downloads.ui")
+                individual.add("com.xiaomi.providers.downloads")
+                individual.add("com.google.android.gsf")
+                individual.add("com.google.android.gms")
+            }
+
+            val added = mutableListOf<String>()
+
+            individual.apply {
+                // Allow Matsuri itself using VPN.
+                remove(packageName)
+                if (!bypass) add(packageName)
+            }.forEach {
+                try {
+                    if (bypass) {
+                        builder.addDisallowedApplication(it)
+                    } else {
+                        builder.addAllowedApplication(it)
+                    }
+                    added.add(it)
+                } catch (ex: PackageManager.NameNotFoundException) {
+                    Logs.w(ex)
+                }
+            }
+
+            if (bypass) {
+                Logs.d("Add bypass: ${added.joinToString(", ")}")
+            } else {
+                Logs.d("Add allow: ${added.joinToString(", ")}")
+            }
+        }
+
+        // 保持纯 TUN 接口模式：不向系统注册全局 HTTP 代理，消除环回套接字双重代理瓶颈，
+        // 彻底释放 Telegram 等应用在发送大文件/视频时走纯 TUN 的全速上传吞吐量。
+
+        metered = DataStore.meteredNetwork
+        if (Build.VERSION.SDK_INT >= 29) builder.setMetered(metered)
+        conn = builder.establish() ?: throw NullConnectionException()
+        updateUnderlyingNetwork()
+
+        return conn!!.fd
+    }
+
+    fun updateUnderlyingNetwork(builder: Builder? = null) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
+            val networks = SagerNet.underlyingNetwork?.let { arrayOf(it) }
+            builder?.setUnderlyingNetworks(networks) ?: setUnderlyingNetworks(networks)
+        }
+    }
+
+    override fun onRevoke() = stopRunner()
+
+    override fun onDestroy() {
+        DataStore.vpnService = null
+        super.onDestroy()
+        data.binder.close()
+        SagerNet.notification.cancel(ServiceNotification.notificationId)
+    }
+}

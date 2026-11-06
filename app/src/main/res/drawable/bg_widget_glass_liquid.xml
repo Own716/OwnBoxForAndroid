@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Pure Liquid Glass Base - Translucent 18%~28% Luminous Droplet -->
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="26dp" />
+            <gradient
+                android:angle="135"
+                android:startColor="#35FFFFFF"
+                android:centerColor="#28FFFFFF"
+                android:endColor="#1EFFFFFF"
+                android:type="linear" />
+        </shape>
+    </item>
+
+    <!-- Top-Left Caustic Highlight & Specular Gleam -->
+    <item
+        android:left="1dp"
+        android:top="1dp"
+        android:right="1dp"
+        android:bottom="2dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="25dp" />
+            <gradient
+                android:angle="270"
+                android:startColor="#60FFFFFF"
+                android:centerColor="#18FFFFFF"
+                android:endColor="#00FFFFFF"
+                android:type="linear" />
+        </shape>
+    </item>
+
+    <!-- Refraction Edge Rim Stroke -->
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="26dp" />
+            <stroke
+                android:width="1.5dp"
+                android:color="#80FFFFFF" />
+        </shape>
+    </item>
+</layer-list>

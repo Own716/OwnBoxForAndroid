@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory app:title="@string/fragment_settings">
+
+        <SwitchPreferenceCompat
+            app:key="enableTLSFragment"
+            app:title="@string/enable_tls_fragment" />
+
+        <EditTextPreference
+            app:defaultValue="100-200"
+            app:key="fragmentLength"
+            app:title="@string/fragment_length"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:defaultValue="10-20"
+            app:key="fragmentInterval"
+            app:title="@string/fragment_interval"
+            app:useSimpleSummaryProvider="true" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>

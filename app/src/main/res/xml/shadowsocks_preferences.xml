@@ -1,0 +1,119 @@
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <EditTextPreference
+        app:icon="@drawable/ic_social_emoji_symbols"
+        app:key="name"
+        app:title="@string/profile_name"
+        app:useSimpleSummaryProvider="true" />
+
+    <PreferenceCategory app:title="@string/proxy_cat">
+        <EditTextPreference
+            app:icon="@drawable/ic_hardware_router"
+            app:key="serverAddress"
+            app:title="@string/server_address"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:icon="@drawable/ic_maps_directions_boat"
+            app:key="serverPort"
+            app:title="@string/server_port"
+            app:useSimpleSummaryProvider="true" />
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:entries="@array/ss_enc_method_value"
+            app:entryValues="@array/ss_enc_method_value"
+            app:icon="@drawable/ic_notification_enhanced_encryption"
+            app:key="method"
+            app:title="@string/enc_method"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:dialogLayout="@layout/layout_password_dialog"
+            app:icon="@drawable/ic_settings_password"
+            app:key="password"
+            app:title="@string/password" />
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="@string/plugin">
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:defaultValue=""
+            app:entries="@array/box_shadowsocks_plugins"
+            app:entryValues="@array/box_shadowsocks_plugins"
+            app:icon="@drawable/baseline_construction_24"
+            app:key="pluginName"
+            app:title="@string/plugin"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:icon="@drawable/ic_action_settings"
+            app:key="pluginConfig"
+            app:title="@string/plugin_configure"
+            app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="sing-box server">
+        <SwitchPreferenceCompat
+            app:key="sUoT"
+            app:title="UDP over TCP" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:key="serverMuxCategory"
+        app:title="@string/mux_preference">
+        <SwitchPreferenceCompat
+            app:icon="@drawable/ic_baseline_compare_arrows_24"
+            app:key="enableMux"
+            app:summary="@string/mux_sum"
+            app:title="@string/enable_mux" />
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:defaultValue="0"
+            app:entries="@array/mux_type"
+            app:entryValues="@array/int_array_3"
+            app:key="muxType"
+            app:title="@string/mux_type"
+            app:useSimpleSummaryProvider="true" />
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:defaultValue="0"
+            app:entries="@array/mux_mode"
+            app:entryValues="@array/int_array_2"
+            app:icon="@drawable/ic_baseline_tune_24"
+            app:key="muxMode"
+            app:title="@string/mux_mode"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:defaultValue="8"
+            app:icon="@drawable/ic_baseline_low_priority_24"
+            app:key="muxConcurrency"
+            app:title="@string/mux_concurrency"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:defaultValue="4"
+            app:icon="@drawable/ic_baseline_low_priority_24"
+            app:key="muxMaxConnections"
+            app:title="@string/mux_max_connections"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:defaultValue="4"
+            app:icon="@drawable/ic_baseline_low_priority_24"
+            app:key="muxMinStreams"
+            app:title="@string/mux_min_streams"
+            app:useSimpleSummaryProvider="true" />
+        <SwitchPreferenceCompat
+            app:icon="@drawable/baseline_developer_board_24"
+            app:key="muxPadding"
+            app:title="@string/padding" />
+        <SwitchPreferenceCompat
+            app:icon="@drawable/ic_baseline_speed_24"
+            app:key="muxBrutal"
+            app:title="@string/mux_brutal" />
+        <EditTextPreference
+            app:defaultValue="100"
+            app:icon="@drawable/ic_baseline_upload_24"
+            app:key="muxBrutalUpMbps"
+            app:title="@string/mux_brutal_up_mbps"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:defaultValue="100"
+            app:icon="@drawable/ic_baseline_download_24"
+            app:key="muxBrutalDownMbps"
+            app:title="@string/mux_brutal_down_mbps"
+            app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+
+</PreferenceScreen>

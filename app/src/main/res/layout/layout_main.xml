@@ -1,0 +1,434 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.drawerlayout.widget.DrawerLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/drawer_layout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    app:statusBarBackground="@android:color/transparent"
+    tools:openDrawer="start">
+
+    <androidx.coordinatorlayout.widget.CoordinatorLayout
+        android:id="@+id/coordinator"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipChildren="false">
+
+        <androidx.coordinatorlayout.widget.CoordinatorLayout
+            android:id="@+id/fragment_holder"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <!-- We double trackThickness as half of it will be invisible -->
+        <com.google.android.material.progressindicator.CircularProgressIndicator
+            android:id="@+id/fabProgress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:max="1"
+            android:visibility="invisible"
+            app:indicatorColor="?primaryOrTextSecondary"
+            app:layout_anchor="@+id/fab"
+            app:layout_anchorGravity="center"
+            app:layout_behavior="io.nekohasekai.sagernet.widget.FabProgressBehavior"
+            app:trackCornerRadius="@dimen/mtrl_progress_track_thickness"
+            app:trackThickness="8dp" />
+
+        <io.nekohasekai.sagernet.widget.ServiceButton
+            android:id="@+id/fab"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:elevation="6dp"
+            android:nextFocusDown="@+id/stats"
+            app:backgroundTint="?attr/fabColorBackground"
+            app:layout_anchor="@id/stats"
+            app:layout_anchorGravity="top|center_horizontal"
+            app:maxImageSize="24dp"
+            app:pressedTranslationZ="6dp"
+            app:srcCompat="@drawable/ic_service_idle" />
+
+        <io.nekohasekai.sagernet.widget.StatsBar
+            android:id="@+id/stats"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:nextFocusUp="@+id/fab"
+            app:backgroundTint="?colorPrimary"
+            app:contentInsetStart="0dp"
+            app:hideOnScroll="true">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:id="@+id/stats_content_container"
+                android:background="?android:attr/selectableItemBackground"
+                android:orientation="vertical"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="10dp">
+
+                <!-- Row 1: 左侧 tx / rx (左肩垂直排布独享全宽)，中央 FAB 凹槽安全隔离，右侧 status 与 btn_ip_detail (右肩) -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <!-- 左肩：tx / rx 速率区域（纵向排列各自独享全宽，自适应缩放彻底杜绝大字体截断） -->
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="center_vertical|start"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/tx"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:textSize="12sp"
+                            app:autoSizeMaxTextSize="13sp"
+                            app:autoSizeMinTextSize="9sp"
+                            app:autoSizeStepGranularity="0.5sp"
+                            app:autoSizeTextType="uniform"
+                            tools:text="▲ 0 B/s" />
+
+                        <TextView
+                            android:id="@+id/rx"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:textSize="12sp"
+                            app:autoSizeMaxTextSize="13sp"
+                            app:autoSizeMinTextSize="9sp"
+                            app:autoSizeStepGranularity="0.5sp"
+                            app:autoSizeTextType="uniform"
+                            tools:text="▼ 0 B/s" />
+
+                    </LinearLayout>
+
+                    <!-- 中央：FAB 悬浮球凹槽物理安全隔离空间 -->
+                    <Space
+                        android:layout_width="48dp"
+                        android:layout_height="1dp" />
+
+                    <!-- 右肩：status 延迟与重测刷新按钮（规整靠右对齐，上下两行排版防大字体截断） -->
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="center_vertical|end"
+                        android:orientation="horizontal">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:gravity="end|center_vertical"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/status_title"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:ellipsize="end"
+                                android:gravity="end"
+                                android:maxLines="1"
+                                android:textSize="11sp"
+                                android:visibility="gone"
+                                app:autoSizeMaxTextSize="11sp"
+                                app:autoSizeMinTextSize="8sp"
+                                app:autoSizeStepGranularity="0.5sp"
+                                app:autoSizeTextType="uniform"
+                                tools:text="HTTPS 握手延迟"
+                                tools:visibility="visible" />
+
+                            <TextView
+                                android:id="@+id/status"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:ellipsize="end"
+                                android:gravity="end"
+                                android:maxLines="1"
+                                android:textSize="13sp"
+                                android:textStyle="bold"
+                                app:autoSizeMaxTextSize="13sp"
+                                app:autoSizeMinTextSize="9sp"
+                                app:autoSizeStepGranularity="0.5sp"
+                                app:autoSizeTextType="uniform"
+                                tools:text="202ms" />
+
+                        </LinearLayout>
+
+                        <ImageView
+                            android:id="@+id/btn_ip_detail"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_marginStart="6dp"
+                            android:background="?android:attr/selectableItemBackgroundBorderless"
+                            android:contentDescription="@string/retest"
+                            android:padding="2dp"
+                            android:src="@drawable/ic_baseline_refresh_24"
+                            android:visibility="gone"
+                            tools:visibility="visible" />
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+                <!-- Row 2: 出站落地 IP 独占整行展示，支持大字体自适应与双行弹性折行 -->
+                <TextView
+                    android:id="@+id/status_ip"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:ellipsize="end"
+                    android:maxLines="2"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:visibility="gone"
+                    app:autoSizeMaxTextSize="14sp"
+                    app:autoSizeMinTextSize="10sp"
+                    app:autoSizeStepGranularity="0.5sp"
+                    app:autoSizeTextType="uniform"
+                    tools:text="🇰🇷 KR 118.218.10.157"
+                    tools:visibility="visible" />
+
+            </LinearLayout>
+
+        </io.nekohasekai.sagernet.widget.StatsBar>
+
+        <View
+            android:id="@+id/menu_scrim_overlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#80000000"
+            android:visibility="gone"
+            android:alpha="0"
+            android:elevation="20dp" />
+
+    </androidx.coordinatorlayout.widget.CoordinatorLayout>
+
+    <LinearLayout
+        android:id="@+id/nav_view"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:layout_gravity="start"
+        android:background="@drawable/bg_drawer_panel"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/drawer_brand"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:gravity="center_vertical"
+            android:paddingStart="22dp"
+            android:paddingEnd="22dp"
+            android:text="OwnBox"
+            android:textColor="?android:attr/textColorPrimary"
+            android:textSize="21sp"
+            android:textStyle="bold" />
+
+        <FrameLayout
+            android:id="@+id/drawer_menu_frame"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <com.google.android.material.navigation.NavigationView
+                android:id="@+id/nav_menu_view"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone"
+                app:menu="@menu/main_drawer_menu" />
+
+            <ScrollView
+                android:id="@+id/drawer_menu_scroll"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:fillViewport="true"
+                android:overScrollMode="never"
+                android:scrollbars="none">
+
+                <LinearLayout
+                    android:id="@+id/drawer_menu_items"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingTop="6dp"
+                    android:paddingBottom="12dp" />
+            </ScrollView>
+
+            <View
+                android:id="@+id/drawer_top_fade"
+                android:layout_width="match_parent"
+                android:layout_height="18dp"
+                android:layout_gravity="top"
+                android:clickable="false"
+                android:focusable="false"
+                android:visibility="gone" />
+
+            <View
+                android:id="@+id/drawer_bottom_fade"
+                android:layout_width="match_parent"
+                android:layout_height="28dp"
+                android:layout_gravity="bottom"
+                android:clickable="false"
+                android:focusable="false"
+                android:visibility="gone" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:id="@+id/drawer_quick_actions"
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/drawer_settings_button"
+                style="@style/Widget.SagerNet.DrawerSettingsButton"
+                android:layout_width="wrap_content"
+                android:layout_height="48dp"
+                android:minWidth="116dp"
+                android:contentDescription="@string/settings"
+                android:text="@string/settings"
+                app:icon="@drawable/ic_action_settings"
+                app:iconGravity="textStart"
+                app:iconPadding="8dp" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/drawer_about_button"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@drawable/bg_drawer_about_button"
+                android:contentDescription="@string/menu_about"
+                android:padding="12dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_baseline_info_24"
+                android:tooltipText="@string/menu_about"
+                app:tint="?android:attr/textColorPrimary" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/nav_view_black"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:layout_gravity="start"
+        android:background="@drawable/bg_drawer_panel"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/drawer_brand_black"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:gravity="center_vertical"
+            android:paddingStart="22dp"
+            android:paddingEnd="22dp"
+            android:text="OwnBox"
+            android:textColor="?android:attr/textColorPrimary"
+            android:textSize="21sp"
+            android:textStyle="bold" />
+
+        <FrameLayout
+            android:id="@+id/drawer_menu_frame_black"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <com.google.android.material.navigation.NavigationView
+                android:id="@+id/nav_menu_view_black"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone"
+                app:menu="@menu/main_drawer_menu" />
+
+            <ScrollView
+                android:id="@+id/drawer_menu_scroll_black"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:fillViewport="true"
+                android:overScrollMode="never"
+                android:scrollbars="none">
+
+                <LinearLayout
+                    android:id="@+id/drawer_menu_items_black"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingTop="6dp"
+                    android:paddingBottom="12dp" />
+            </ScrollView>
+
+            <View
+                android:id="@+id/drawer_top_fade_black"
+                android:layout_width="match_parent"
+                android:layout_height="18dp"
+                android:layout_gravity="top"
+                android:clickable="false"
+                android:focusable="false"
+                android:visibility="gone" />
+
+            <View
+                android:id="@+id/drawer_bottom_fade_black"
+                android:layout_width="match_parent"
+                android:layout_height="28dp"
+                android:layout_gravity="bottom"
+                android:clickable="false"
+                android:focusable="false"
+                android:visibility="gone" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:id="@+id/drawer_quick_actions_black"
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/drawer_settings_button_black"
+                style="@style/Widget.SagerNet.DrawerSettingsButton"
+                android:layout_width="wrap_content"
+                android:layout_height="48dp"
+                android:minWidth="116dp"
+                android:contentDescription="@string/settings"
+                android:text="@string/settings"
+                app:icon="@drawable/ic_action_settings"
+                app:iconGravity="textStart"
+                app:iconPadding="8dp" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/drawer_about_button_black"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@drawable/bg_drawer_about_button"
+                android:contentDescription="@string/menu_about"
+                android:padding="12dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_baseline_info_24"
+                android:tooltipText="@string/menu_about"
+                app:tint="?android:attr/textColorPrimary" />
+        </LinearLayout>
+    </LinearLayout>
+
+</androidx.drawerlayout.widget.DrawerLayout>

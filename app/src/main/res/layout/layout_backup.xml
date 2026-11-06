@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- 本地备份部分 -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="8dp"
+            android:clickable="true"
+            android:focusable="true">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/backup_local"
+                        android:textAppearance="?attr/textAppearanceHeadline6" />
+
+                    <CheckBox
+                        android:id="@+id/backup_configurations"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:checked="true"
+                        android:text="@string/backup_groups_and_configurations" />
+
+                    <CheckBox
+                        android:id="@+id/backup_rules"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:text="@string/backup_rules" />
+
+                    <CheckBox
+                        android:id="@+id/backup_settings"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:text="@string/backup_settings" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/backup_summary"
+                        android:textAppearance="?attr/textAppearanceBody2"
+                        android:textColor="?android:attr/textColorSecondary" />
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="20dp"
+                    android:layout_marginVertical="8dp"
+                    android:orientation="vertical">
+
+                    <!-- 本地备份部分的按钮 -->
+                    <Button
+                        android:id="@+id/action_share"
+                        style="@style/Widget.SagerNet.Button"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        app:cornerRadius="24dp"
+                        android:text="@string/share"
+                        android:textColor="?attr/colorOnPrimary" />
+
+                    <Button
+                        android:id="@+id/action_export"
+                        style="@style/Widget.SagerNet.Button"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        app:cornerRadius="24dp"
+                        android:text="@string/action_export_file"
+                        android:textColor="?attr/colorOnPrimary" />
+
+                    <Button
+                        android:id="@+id/action_import_file"
+                        style="@style/Widget.SagerNet.Button"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        app:cornerRadius="24dp"
+                        android:text="@string/action_import_file"
+                        android:textColor="?attr/colorOnPrimary" />
+
+                    <Button
+                        android:id="@+id/action_import_throne_desktop"
+                        style="@style/Widget.SagerNet.Button"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        app:cornerRadius="24dp"
+                        android:text="@string/action_import_throne_desktop"
+                        android:textColor="?attr/colorOnPrimary" />
+
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- WebDAV 备份部分 -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="8dp"
+            android:clickable="true"
+            android:focusable="true">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/backup_webdav"
+                        android:textAppearance="?attr/textAppearanceHeadline6" />
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="20dp"
+                    android:layout_marginVertical="8dp"
+                    android:orientation="vertical">
+
+                    <!-- WebDAV 备份部分的按钮 -->
+                    <Button
+                        android:id="@+id/webdav_settings"
+                        style="@style/Widget.SagerNet.Button"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        app:cornerRadius="24dp"
+                        android:text="@string/webdav_settings"
+                        android:textColor="?attr/colorOnPrimary" />
+
+                    <Button
+                        android:id="@+id/backup_to_webdav"
+                        style="@style/Widget.SagerNet.Button"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        app:cornerRadius="24dp"
+                        android:text="@string/backup_to_webdav"
+                        android:textColor="?attr/colorOnPrimary" />
+
+                    <Button
+                        android:id="@+id/restore_from_webdav"
+                        style="@style/Widget.SagerNet.Button"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        app:cornerRadius="24dp"
+                        android:text="@string/restore_from_webdav"
+                        android:textColor="?attr/colorOnPrimary" />
+
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+    </LinearLayout>
+</ScrollView>

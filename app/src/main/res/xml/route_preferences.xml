@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <PreferenceCategory app:title="@string/rr_basic">
+        <EditTextPreference
+            app:icon="@drawable/ic_social_emoji_symbols"
+            app:key="routeName"
+            app:title="@string/route_name"
+            app:useSimpleSummaryProvider="true" />
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:icon="@drawable/ic_baseline_legend_toggle_24"
+            app:key="rr_action"
+            app:title="@string/rr_action"
+            app:entries="@array/rr_action_entries"
+            app:entryValues="@array/rr_action_values"
+            app:useSimpleSummaryProvider="true" />
+        <io.nekohasekai.sagernet.widget.OutboundPreference
+            app:icon="@drawable/ic_hardware_router"
+            app:key="routeOutbound"
+            app:title="@string/rr_outbound"
+            app:useSimpleSummaryProvider="true" />
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:icon="@drawable/ic_baseline_block_24"
+            app:key="rr_method"
+            app:title="@string/rr_method"
+            app:entries="@array/rr_method_entries"
+            app:entryValues="@array/rr_method_values"
+            app:useSimpleSummaryProvider="true" />
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:icon="@drawable/baseline_wrap_text_24"
+            app:key="rr_strategy"
+            app:title="@string/rr_strategy"
+            app:entries="@array/rr_strategy_entries"
+            app:entryValues="@array/rr_strategy_values"
+            app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="@string/rr_common">
+        <EditTextPreference
+            app:icon="@drawable/ic_baseline_domain_24"
+            app:key="rr_domain_suffix"
+            app:title="@string/rr_domain_suffix"
+            app:dialogMessage="@string/rr_lines"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:icon="@drawable/baseline_public_24"
+            app:key="routeDomain"
+            app:title="@string/rr_domain"
+            app:dialogMessage="@string/rr_lines"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:icon="@drawable/ic_baseline_grid_3x3_24"
+            app:key="routeIP"
+            app:title="@string/rr_ip_cidr"
+            app:dialogMessage="@string/rr_lines"
+            app:useSimpleSummaryProvider="true" />
+        <Preference
+            app:icon="@drawable/ic_baseline_rule_folder_24"
+            app:key="routeRuleset"
+            app:title="@string/rr_rule_set"
+            app:persistent="false" />
+        <io.nekohasekai.sagernet.widget.AppListPreference
+            app:icon="@drawable/ic_navigation_apps"
+            app:key="routePackages"
+            app:title="@string/apps"
+            app:summary="@string/rr_apps_modes" />
+        <Preference
+            app:icon="@drawable/ic_hardware_router"
+            app:key="rr_network_type"
+            app:title="@string/route_rule_network_type"
+            app:persistent="false" />
+    </PreferenceCategory>
+
+    <Preference
+        app:icon="@drawable/ic_baseline_expand_more_24"
+        app:key="rr_toggle"
+        app:title="@string/rr_advanced"
+        app:summary="@string/rr_show_advanced"
+        app:persistent="false" />
+
+    <PreferenceCategory
+        app:key="rr_advanced"
+        app:title="@string/rr_advanced"
+        app:isPreferenceVisible="false">
+        <Preference
+            app:icon="@drawable/ic_baseline_update_24"
+            app:key="rr_ruleset_auto_update"
+            app:title="@string/rule_set_auto_update_title"
+            app:persistent="false" />
+        <EditTextPreference
+            app:key="rr_domain_keyword"
+            app:title="@string/rr_domain_keyword"
+            app:dialogMessage="@string/rr_lines"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:key="rr_domain_regex"
+            app:title="@string/rr_domain_regex"
+            app:dialogMessage="@string/rr_lines"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:key="rr_domain"
+            app:title="@string/rr_legacy_domain"
+            app:dialogMessage="@string/rr_lines"
+            app:useSimpleSummaryProvider="true" />
+        <SwitchPreferenceCompat
+            app:key="rr_ip_is_private"
+            app:title="@string/rr_ip_is_private" />
+        <EditTextPreference
+            app:icon="@drawable/ic_baseline_local_bar_24"
+            app:key="routeSource"
+            app:title="@string/rr_source_ip_cidr"
+            app:dialogMessage="@string/rr_lines"
+            app:useSimpleSummaryProvider="true" />
+        <SwitchPreferenceCompat
+            app:key="rr_source_ip_is_private"
+            app:title="@string/rr_source_ip_is_private" />
+        <EditTextPreference
+            app:icon="@drawable/ic_maps_directions_boat"
+            app:key="routePort"
+            app:title="@string/rr_port"
+            app:dialogMessage="@string/rr_lines"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:icon="@drawable/ic_baseline_home_24"
+            app:key="routeSourcePort"
+            app:title="@string/rr_source_port"
+            app:dialogMessage="@string/rr_lines"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:icon="@drawable/ic_baseline_compare_arrows_24"
+            app:key="routeNetwork"
+            app:title="@string/rr_network"
+            app:dialogMessage="@string/rr_lines"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:icon="@drawable/ic_baseline_layers_24"
+            app:key="routeProtocol"
+            app:title="@string/rr_protocol"
+            app:dialogMessage="@string/rr_lines"
+            app:useSimpleSummaryProvider="true" />
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:key="rr_ip_version"
+            app:title="@string/rr_ip_version"
+            app:entries="@array/rr_ip_version_entries"
+            app:entryValues="@array/rr_ip_version_values"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:key="rr_inbound"
+            app:title="@string/rr_inbound"
+            app:useSimpleSummaryProvider="true" />
+        <SwitchPreferenceCompat
+            app:key="rr_invert"
+            app:title="@string/rr_invert" />
+        <EditTextPreference
+            app:key="rr_override_address"
+            app:title="@string/rr_override_address"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:key="rr_override_port"
+            app:title="@string/rr_override_port"
+            app:useSimpleSummaryProvider="true" />
+        <SwitchPreferenceCompat
+            app:key="rr_no_drop"
+            app:title="@string/rr_no_drop" />
+        <SwitchPreferenceCompat
+            app:key="rr_network_is_expensive"
+            app:title="@string/route_rule_network_is_expensive" />
+        <EditTextPreference
+            app:key="rr_sniffer"
+            app:title="@string/rr_sniffer"
+            app:useSimpleSummaryProvider="true" />
+        <Preference
+            app:key="rr_limits"
+            app:title="@string/rr_advanced"
+            app:summary="@string/rr_limits"
+            app:selectable="false" />
+        <moe.matsuri.nb4a.ui.EditConfigPreference
+            app:icon="@drawable/ic_baseline_layers_24"
+            app:key="serverConfig"
+            app:title="@string/custom_config"
+            app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+</PreferenceScreen>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ImageView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/widget_chevron"
+    android:layout_width="20dp"
+    android:layout_height="20dp"
+    android:layout_gravity="center_vertical"
+    android:src="@drawable/ic_chevron_right_24"
+    app:tint="?android:attr/textColorSecondary"
+    android:alpha="0.45"
+    android:contentDescription="@null" />

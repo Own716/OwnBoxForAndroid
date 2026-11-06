@@ -1,0 +1,463 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="28dp">
+
+        <!-- Drag Handle -->
+        <View
+            android:layout_width="36dp"
+            android:layout_height="4dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="12dp"
+            android:background="@drawable/bg_sheet_handle" />
+
+        <!-- Top Header: Close, Title + Disclaimer, Refresh -->
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp">
+
+            <ImageView
+                android:id="@+id/btn_close"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_alignParentStart="true"
+                android:layout_centerVertical="true"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true"
+                android:padding="6dp"
+                android:contentDescription="@string/close"
+                android:src="@drawable/ic_dialog_close"
+                app:tint="?android:attr/textColorPrimary" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_toEndOf="@id/btn_close"
+                android:layout_toStartOf="@id/btn_refresh"
+                android:layout_marginStart="12dp"
+                android:layout_marginEnd="12dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tv_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/landing_ip_details_title"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="?android:attr/textColorPrimary" />
+
+                <TextView
+                    android:id="@+id/tv_disclaimer"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/landing_ip_disclaimer"
+                    android:textSize="12sp"
+                    android:textColor="?android:attr/textColorSecondary" />
+
+            </LinearLayout>
+
+            <ImageView
+                android:id="@+id/btn_refresh"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true"
+                android:padding="6dp"
+                android:contentDescription="@string/action_refresh"
+                android:src="@drawable/ic_baseline_refresh_24"
+                app:tint="?android:attr/textColorPrimary" />
+
+        </RelativeLayout>
+
+        <!-- Card 1: 基础信息 -->
+        <TextView
+            android:id="@+id/tv_header_basic"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_marginBottom="6dp"
+            android:text="@string/landing_ip_section_basic"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:textColor="?android:attr/textColorSecondary" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/card_basic_info"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:cardCornerRadius="@dimen/card_corner_radius"
+            app:cardElevation="0dp"
+            app:strokeWidth="1dp"
+            app:strokeColor="@color/card_stroke"
+            app:cardBackgroundColor="?android:attr/colorBackground">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp">
+
+                <!-- Row 1: IP 地址 -->
+                <LinearLayout
+                    android:id="@+id/layout_row_ip"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:background="?android:attr/selectableItemBackground"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tv_label_ip_address"
+                        android:layout_width="100dp"
+                        android:layout_height="wrap_content"
+                        android:text="@string/landing_ip_address"
+                        android:textSize="14sp"
+                        android:textColor="?android:attr/textColorSecondary" />
+
+                    <TextView
+                        android:id="@+id/tv_ip_address"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="end"
+                        android:fontFamily="monospace"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="?android:attr/textColorPrimary"
+                        tools:text="54.249.187.104" />
+
+                </LinearLayout>
+
+                <View
+                    android:id="@+id/divider_basic_1"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginBottom="8dp"
+                    android:background="@color/card_stroke" />
+
+                <!-- Row 2: 等级 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tv_label_level"
+                        android:layout_width="100dp"
+                        android:layout_height="wrap_content"
+                        android:text="@string/landing_ip_label_level"
+                        android:textSize="14sp"
+                        android:textColor="?android:attr/textColorSecondary" />
+
+                    <TextView
+                        android:id="@+id/tv_level"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="end"
+                        android:textSize="14sp"
+                        android:textColor="?android:attr/textColorPrimary"
+                        tools:text="普通" />
+
+                </LinearLayout>
+
+                <View
+                    android:id="@+id/divider_basic_2"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginBottom="8dp"
+                    android:background="@color/card_stroke" />
+
+                <!-- Row 3: 类型 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tv_label_type"
+                        android:layout_width="100dp"
+                        android:layout_height="wrap_content"
+                        android:text="@string/landing_ip_label_type"
+                        android:textSize="14sp"
+                        android:textColor="?android:attr/textColorSecondary" />
+
+                    <TextView
+                        android:id="@+id/tv_type"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="end"
+                        android:textSize="14sp"
+                        android:textColor="?android:attr/textColorPrimary"
+                        tools:text="机房" />
+
+                </LinearLayout>
+
+                <View
+                    android:id="@+id/divider_basic_3"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginBottom="8dp"
+                    android:background="@color/card_stroke" />
+
+                <!-- Row 4: 命中标记 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tv_label_hit_tag"
+                        android:layout_width="100dp"
+                        android:layout_height="wrap_content"
+                        android:text="@string/landing_ip_label_hit_tag"
+                        android:textSize="14sp"
+                        android:textColor="?android:attr/textColorSecondary" />
+
+                    <TextView
+                        android:id="@+id/tv_hit_tag"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="end"
+                        android:textSize="14sp"
+                        android:textColor="?android:attr/textColorPrimary"
+                        tools:text="无" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Card 2: 网络 -->
+        <TextView
+            android:id="@+id/tv_header_network"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_marginBottom="6dp"
+            android:text="@string/landing_ip_section_network"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:textColor="?android:attr/textColorSecondary" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/card_network"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:cardCornerRadius="@dimen/card_corner_radius"
+            app:cardElevation="0dp"
+            app:strokeWidth="1dp"
+            app:strokeColor="@color/card_stroke"
+            app:cardBackgroundColor="?android:attr/colorBackground">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp">
+
+                <!-- Row 1: 组织 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tv_label_org"
+                        android:layout_width="100dp"
+                        android:layout_height="wrap_content"
+                        android:text="@string/landing_ip_label_org"
+                        android:textSize="14sp"
+                        android:textColor="?android:attr/textColorSecondary" />
+
+                    <TextView
+                        android:id="@+id/tv_org"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="end"
+                        android:textSize="14sp"
+                        android:textColor="?android:attr/textColorPrimary"
+                        tools:text="Amazon.com, Inc." />
+
+                </LinearLayout>
+
+                <View
+                    android:id="@+id/divider_network_1"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginBottom="8dp"
+                    android:background="@color/card_stroke" />
+
+                <!-- Row 2: ASN -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tv_label_asn"
+                        android:layout_width="100dp"
+                        android:layout_height="wrap_content"
+                        android:text="@string/landing_ip_label_asn"
+                        android:textSize="14sp"
+                        android:textColor="?android:attr/textColorSecondary" />
+
+                    <TextView
+                        android:id="@+id/tv_asn"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="end"
+                        android:textSize="14sp"
+                        android:textColor="?android:attr/textColorPrimary"
+                        tools:text="AS16509" />
+
+                </LinearLayout>
+
+                <View
+                    android:id="@+id/divider_network_2"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginBottom="8dp"
+                    android:background="@color/card_stroke" />
+
+                <!-- Row 3: 采用来源 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tv_label_source"
+                        android:layout_width="100dp"
+                        android:layout_height="wrap_content"
+                        android:text="@string/landing_ip_label_source"
+                        android:textSize="14sp"
+                        android:textColor="?android:attr/textColorSecondary" />
+
+                    <TextView
+                        android:id="@+id/tv_source"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="end"
+                        android:textSize="14sp"
+                        android:textColor="?android:attr/textColorPrimary"
+                        tools:text="ipquery.io" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Card 3: 其他 -->
+        <TextView
+            android:id="@+id/tv_header_other"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_marginBottom="6dp"
+            android:text="@string/landing_ip_section_other"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:textColor="?android:attr/textColorSecondary" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/card_other"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardCornerRadius="@dimen/card_corner_radius"
+            app:cardElevation="0dp"
+            app:strokeWidth="1dp"
+            app:strokeColor="@color/card_stroke"
+            app:cardBackgroundColor="?android:attr/colorBackground">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp">
+
+                <TextView
+                    android:id="@+id/tv_label_hide_ip"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/landing_ip_label_hide_ip"
+                    android:textSize="14sp"
+                    android:textColor="?android:attr/textColorPrimary" />
+
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/switch_hide_ip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+
+            </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
+    </LinearLayout>
+
+</androidx.core.widget.NestedScrollView>

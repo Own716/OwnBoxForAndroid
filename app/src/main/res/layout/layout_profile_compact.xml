@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Single-line compact row for profile items (compactProfileRows) -->
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/content"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginHorizontal="2dp"
+    android:layout_marginVertical="1dp"
+    android:clickable="true"
+    android:focusable="true"
+    app:cardCornerRadius="@dimen/profile_card_corner_radius">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <LinearLayout
+            android:id="@+id/container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="38dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/profile_name"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:paddingStart="12dp"
+                android:paddingEnd="6dp"
+                android:paddingVertical="6dp"
+                android:singleLine="true"
+                android:textAppearance="?android:attr/textAppearanceSmall"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textStyle="bold"
+                tools:text="@string/profile_name" />
+
+            <TextView
+                android:id="@+id/profile_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:ellipsize="end"
+                android:maxWidth="160dp"
+                android:paddingStart="4dp"
+                android:paddingEnd="12dp"
+                android:singleLine="true"
+                android:textAppearance="?android:attr/textAppearanceSmall"
+                android:textColor="?android:attr/textColorSecondary"
+                tools:text="286 ms" />
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/double_column_menu"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:contentDescription="@string/more"
+                android:focusable="false"
+                android:visibility="gone"
+                app:srcCompat="@drawable/ic_baseline_more_vert_24" />
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/drag_handle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/reorder_mode_title"
+                android:focusable="false"
+                android:padding="6dp"
+                android:layout_marginEnd="6dp"
+                android:visibility="gone"
+                app:srcCompat="@drawable/ic_baseline_drag_handle_24"
+                app:tint="?android:attr/textColorSecondary" />
+
+            <!-- Hidden dummy views for compatibility with ConfigurationHolder -->
+            <TextView
+                android:id="@+id/profile_type"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:id="@+id/profile_middle_row"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:visibility="gone">
+
+                <io.nekohasekai.sagernet.widget.MarqueeTextView
+                    android:id="@+id/profile_address"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/traffic_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:visibility="gone" />
+
+            </LinearLayout>
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/edit"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                app:srcCompat="@drawable/ic_image_edit" />
+
+            <LinearLayout
+                android:id="@+id/share"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:id="@+id/share_layer"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content">
+
+                    <androidx.appcompat.widget.AppCompatImageView
+                        android:id="@+id/shareIcon"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        app:srcCompat="@drawable/ic_baseline_more_vert_24" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/remove"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                app:srcCompat="@drawable/ic_action_delete" />
+
+        </LinearLayout>
+
+        <View
+            android:id="@+id/selected_indicator"
+            android:layout_width="@dimen/profile_card_selected_bar_width"
+            android:layout_height="match_parent"
+            android:background="?attr/selectedColorPrimary"
+            android:visibility="gone"
+            tools:visibility="visible" />
+
+    </FrameLayout>
+
+</com.google.android.material.card.MaterialCardView>

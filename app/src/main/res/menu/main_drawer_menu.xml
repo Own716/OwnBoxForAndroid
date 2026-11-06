@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <group android:checkableBehavior="single">
+        <item
+            android:id="@+id/nav_configuration"
+            android:icon="@drawable/ic_nav_configuration_selector"
+            android:title="@string/menu_configuration" />
+
+        <item
+            android:id="@+id/nav_group"
+            android:icon="@drawable/ic_baseline_view_list_24"
+            android:title="@string/menu_group" />
+
+        <item
+            android:id="@+id/nav_route"
+            android:icon="@drawable/ic_maps_directions"
+            android:title="@string/menu_route" />
+
+    </group>
+
+    <group
+        android:id="@+id/misc"
+        android:checkableBehavior="single">
+        <item
+            android:id="@+id/nav_diagnostics"
+            android:icon="@drawable/ic_baseline_health_and_safety_24"
+            android:title="@string/menu_diagnostics" />
+        <item
+            android:id="@+id/nav_apps"
+            android:icon="@drawable/ic_navigation_apps"
+            android:title="@string/proxied_apps" />
+        <item
+            android:id="@+id/nav_tools"
+            android:icon="@drawable/baseline_construction_24"
+            android:title="@string/menu_tools" />
+        <item
+            android:id="@+id/nav_logcat"
+            android:icon="@drawable/ic_baseline_bug_report_24"
+            android:title="@string/menu_log" />
+        <item
+            android:id="@+id/nav_dashboard"
+            android:icon="@drawable/ic_dashboard"
+            android:title="@string/menu_dashboard" />
+    </group>
+
+    <group
+        android:id="@+id/about"
+        android:checkableBehavior="single">
+        <item
+            android:id="@+id/nav_faq"
+            android:icon="@drawable/baseline_send_24"
+            android:title="@string/menu_community" />
+        <item
+            android:id="@+id/nav_docs"
+            android:icon="@drawable/ic_baseline_import_contacts_24"
+            android:title="@string/menu_documentation" />
+    </group>
+
+</menu>
