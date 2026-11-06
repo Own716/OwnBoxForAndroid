@@ -65,7 +65,7 @@ class SagerConnection(
 
         override fun stateChanged(state: Int, profileName: String?, msg: String?) {
             if (state < 0) return // skip private
-            val s = BaseService.State.values()[state]
+            val s = BaseService.State.fromInt(state)
             DataStore.serviceState = s
             val callback = callback ?: return
             runOnMainDispatcher {

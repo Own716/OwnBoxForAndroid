@@ -214,32 +214,47 @@ data class ProxyEntity(
     }
 
     fun displayType(): String = when (type) {
-        TYPE_SOCKS -> socksBean!!.protocolName()
-        TYPE_HTTP -> if (httpBean!!.isTLS()) "HTTPS" else "HTTP"
+        TYPE_SOCKS -> socksBean?.protocolName() ?: "SOCKS"
+        TYPE_HTTP -> if (httpBean?.isTLS() == true) "HTTPS" else "HTTP"
         TYPE_SS -> "Shadowsocks"
         TYPE_SSR -> "ShadowsocksR"
-        TYPE_VMESS -> if (vmessBean!!.isVLESS) "VLESS" else "VMess"
+        TYPE_VMESS -> if (vmessBean?.isVLESS == true) "VLESS" else "VMess"
         TYPE_TROJAN -> "Trojan"
         TYPE_TROJAN_GO -> "Trojan-Go"
         TYPE_MIERU -> "Mieru"
         TYPE_NAIVE -> "Naïve"
-        TYPE_HYSTERIA -> "Hysteria" + hysteriaBean!!.protocolVersion
+        TYPE_HYSTERIA -> "Hysteria" + (hysteriaBean?.protocolVersion ?: "")
         TYPE_SSH -> "SSH"
         TYPE_WG -> if (wgBean?.isAwg == true) "AmneziaWG" else "WireGuard"
         TYPE_TUIC -> "TUIC"
         TYPE_JUICITY -> "Juicity"
         TYPE_SHADOWTLS -> "ShadowTLS"
         TYPE_ANYTLS -> "AnyTLS"
-        TYPE_CHAIN -> chainName
-        TYPE_BALANCER -> balancerName
-        TYPE_NEKO -> nekoBean!!.displayType()
-        TYPE_CONFIG -> configBean!!.displayType()
+        TYPE_CHAIN -> chainName ?: "Chain"
+        TYPE_BALANCER -> balancerName ?: "Balancer"
+        TYPE_NEKO -> nekoBean?.displayType() ?: "Neko"
+        TYPE_CONFIG -> configBean?.displayType() ?: "Config"
         TYPE_SNELL -> "Snell"
         else -> "Undefined type $type"
     }
 
-    fun displayName() = requireBean().displayName()
-    fun displayAddress() = requireBean().displayAddress()
+    fun displayName(): String = runCatching { requireBean().displayName() }.getOrElse {
+        displayType()
+    }
+    fun displayAddress(): String = runCatching { requireBean().displayAddress() }.getOrElse {
+        ""
+    }
+
+    class DummyBean(defaultName: String = "Unknown Profile") : AbstractBean() {
+        init {
+            name = defaultName
+            serverAddress = ""
+            serverPort = 0
+        }
+        override fun clone(): AbstractBean = DummyBean(name)
+        override fun displayName(): String = name ?: "Unknown Profile"
+        override fun displayAddress(): String = ""
+    }
 
     fun requireBean(): AbstractBean {
         return when (type) {
@@ -264,8 +279,8 @@ data class ProxyEntity(
             TYPE_NEKO -> nekoBean
             TYPE_CONFIG -> configBean
             TYPE_SNELL -> snellBean
-            else -> error("Undefined type $type")
-        } ?: error("Null ${displayType()} profile")
+            else -> null
+        } ?: (socksBean ?: httpBean ?: ssBean ?: vmessBean ?: trojanBean ?: DummyBean(displayType()))
     }
 
     fun haveLink(): Boolean {

@@ -31,7 +31,7 @@ class TileService : BaseTileService(), SagerConnection.Callback {
         updateTile(state, profileName)
 
     override fun onServiceConnected(service: ISagerNetService) {
-        updateTile(BaseService.State.values()[service.state], service.profileName)
+        updateTile(BaseService.State.fromInt(service.state), service.profileName)
         if (tapPending) {
             tapPending = false
             onClick()
@@ -108,7 +108,7 @@ class TileService : BaseTileService(), SagerConnection.Callback {
         if (service == null) {
             SagerNet.startService()
         } else {
-            BaseService.State.values()[service.state].let { state ->
+            BaseService.State.fromInt(service.state).let { state ->
                 when {
                     state.canStop -> SagerNet.stopService()
                     state == BaseService.State.Stopped || state == BaseService.State.Idle -> SagerNet.startService()

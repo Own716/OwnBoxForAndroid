@@ -1437,11 +1437,13 @@ fun buildConfig(
                 }
                 val uidList = effectivePackages.mapNotNull {
                     if (!isVPN) {
-                        Toast.makeText(
-                            SagerNet.application,
-                            SagerNet.application.getString(R.string.route_need_vpn, rule.displayName()),
-                            Toast.LENGTH_SHORT
-                        ).show()
+                        runOnMainDispatcher {
+                            Toast.makeText(
+                                SagerNet.application,
+                                SagerNet.application.getString(R.string.route_need_vpn, rule.displayName()),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
                     }
                     (PackageCache[it] ?: runCatching {
                         SagerNet.application.packageManager.getApplicationInfo(it, 0).uid
@@ -1703,11 +1705,13 @@ fun buildConfig(
                 }
                 for (subRule in generatedSubRules) {
                     if (subRule.action !in setOf("reject", "sniff", "resolve", "hijack-dns", "route-options") && subRule.outbound.isNullOrBlank()) {
-                        Toast.makeText(
-                            SagerNet.application,
-                            "Warning: " + rule.displayName() + ": A non-existent outbound was specified.",
-                            Toast.LENGTH_LONG
-                        ).show()
+                        runOnMainDispatcher {
+                            Toast.makeText(
+                                SagerNet.application,
+                                "Warning: " + rule.displayName() + ": A non-existent outbound was specified.",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
                     } else {
                         route.rules.add(subRule)
                         route.rule_set.addAll(ruleSets)
@@ -1905,6 +1909,40 @@ fun buildConfig(
                 })
             }
 
+            // Google Play 商店与核心海外服务防误杀 DNS 专线规则（置于 domesticCoreDomainSuffixes 之前）：
+            // 确保 googleapis.cn / gvt1-cn.com 不被国内 .cn 规则误判为直连，由海外远程安全 DNS 解析
+            val googlePlayDomains = listOf(
+                "googleapis.cn",
+                "google.cn",
+                "play.googleapis.com",
+                "market.android.com",
+                "android.clients.google.com",
+                "playstoregatewayadapter-pa.googleapis.com",
+                "firebaselogging-pa.googleapis.com",
+                "xn--ngstr-lra8j.com",
+                "xn--ngstr-cn-8za9o.com"
+            )
+            val googlePlayDomainSuffixes = listOf(
+                "gvt1.com", "gvt2.com", "gvt3.com", "gvt5.com", "gvt6.com", "gvt7.com", "gvt9.com",
+                "gvt1-cn.com", "gvt2-cn.com",
+                "googleusercontent.com",
+                "ggpht.com"
+            )
+            val googlePlayPackages = listOf(
+                "com.android.vending",
+                "com.google.android.gms",
+                "com.google.android.gsf"
+            )
+
+            dns.rules.add(DNSRule_DefaultOptions().apply {
+                domain = googlePlayDomains
+                server = "dns-remote"
+            })
+            dns.rules.add(DNSRule_DefaultOptions().apply {
+                domain_suffix = googlePlayDomainSuffixes
+                server = "dns-remote"
+            })
+
             // 中国大陆核心应用与常用域名后缀静态直连保底名单
             val domesticCoreDomainSuffixes = listOf(
                 "cn",
@@ -1945,6 +1983,23 @@ fun buildConfig(
                 network = listOf("udp")
                 port = listOf(443)
                 action = "reject"
+            })
+
+            // Google Play 商店与全套下载 CDN 专线路由（必须置于 domesticCoreDomainSuffixes 直连规则之前）：
+            // 解决 Google Play 下载卡在“等待中...”的核心问题：
+            // 确保 Google Play APK 下载（*.gvt1.com 等 CDN）以及应用商店 API (googleapis.cn) 强制走代理，
+            // 绝不被国内 .cn 后缀直连规则误伤导致连接超时断流。
+            topRouteRules.add(Rule_DefaultOptions().apply {
+                domain = googlePlayDomains
+                outbound = mainProxyTag
+            })
+            topRouteRules.add(Rule_DefaultOptions().apply {
+                domain_suffix = googlePlayDomainSuffixes
+                outbound = mainProxyTag
+            })
+            topRouteRules.add(Rule_DefaultOptions().apply {
+                package_name = googlePlayPackages
+                outbound = mainProxyTag
             })
 
             // 国内主流服务直连保底规则（抖音、微信、淘宝、支付宝、高德等），保障国内应用绝不误入海外代理
