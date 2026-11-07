@@ -975,27 +975,16 @@ class ConfigurationFragment @JvmOverloads constructor(
     private fun resolveTopBarIconTint(ctx: Context): Int {
         val isBlack = Theme.isBlackTheme(ctx)
         val isNight = Theme.usingNightMode(ctx)
-        val isWhite = Theme.isWhiteTheme(ctx)
-        val isLightGray = Theme.isLightGrayTheme(ctx)
-        val themeColor = Theme.getPrimaryColor(ctx)
         return when {
             isBlack -> Color.WHITE
-            isWhite -> Color.parseColor("#212121")
-            isLightGray -> Color.parseColor("#1F2937")
-            isNight -> ColorUtils.blendARGB(themeColor, Color.WHITE, 0.42f)
-            else -> {
-                val lum = ColorUtils.calculateLuminance(themeColor)
-                if (lum > 0.42) {
-                    ColorUtils.blendARGB(themeColor, Color.BLACK, 0.45f)
-                } else {
-                    ColorUtils.blendARGB(themeColor, Color.BLACK, 0.12f)
-                }
-            }
+            isNight -> Color.parseColor("#94A3B8")
+            else -> Color.parseColor("#475569")
         }
     }
 
     private fun applyTopBarIconTint(iconColor: Int) {
         if (!isToolbarInitialized) return
+        (toolbar as? com.google.android.material.appbar.MaterialToolbar)?.setNavigationIconTint(iconColor)
         toolbar.navigationIcon?.let {
             val tinted = it.mutate()
             DrawableCompat.setTint(tinted, iconColor)
@@ -1172,8 +1161,9 @@ class ConfigurationFragment @JvmOverloads constructor(
             showSoftKeyboard(editText)
         }
 
+        val iconColor = resolveTopBarIconTint(ctx)
         val closeBtn = searchView.findViewById<ImageView>(androidx.appcompat.R.id.search_close_btn)
-        closeBtn?.setColorFilter(textColor)
+        closeBtn?.setColorFilter(iconColor)
 
         // Ensure close button stays visible while search is active
         editText?.addTextChangedListener {
@@ -1219,7 +1209,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
         val searchBtn = searchView.findViewById<ImageView>(androidx.appcompat.R.id.search_button)
         searchBtn?.setImageResource(R.drawable.ic_baseline_search_24)
-        searchBtn?.setColorFilter(textColor)
+        searchBtn?.setColorFilter(iconColor)
         searchBtn?.minimumWidth = btnW
         searchBtn?.maxWidth = btnW
         searchBtn?.setPadding(0, 0, 0, 0)
@@ -1234,7 +1224,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
         val magBtn = searchView.findViewById<ImageView>(androidx.appcompat.R.id.search_mag_icon)
         magBtn?.setImageResource(R.drawable.ic_baseline_search_24)
-        magBtn?.setColorFilter(textColor)
+        magBtn?.setColorFilter(iconColor)
     }
 
     @SuppressLint("DetachAndAttachSameFragment")
@@ -1386,9 +1376,10 @@ class ConfigurationFragment @JvmOverloads constructor(
 
                 // Show back navigation arrow on the toolbar for clear exit path
                 if (!select) {
-                    toolbar.setNavigationIcon(R.drawable.baseline_arrow_back_24)
                     val searchContext = requireContext()
                     val iconTint = resolveTopBarIconTint(searchContext)
+                    (toolbar as? com.google.android.material.appbar.MaterialToolbar)?.setNavigationIconTint(iconTint)
+                    toolbar.setNavigationIcon(R.drawable.baseline_arrow_back_24)
                     toolbar.navigationIcon?.let {
                         val tinted = it.mutate()
                         DrawableCompat.setTint(tinted, iconTint)
