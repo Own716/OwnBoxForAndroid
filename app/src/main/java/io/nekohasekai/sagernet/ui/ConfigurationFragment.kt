@@ -836,6 +836,136 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
     }
 
+    private var topBarCapsulesDrawable: DualFloatingCapsulesDrawable? = null
+    private var topBarPreDrawListener: android.view.ViewTreeObserver.OnPreDrawListener? = null
+    private var topBarPreDrawTarget: View? = null
+
+    private fun setupTopBarFloatingCapsules(fillColor: Int, strokeColor: Int, isDark: Boolean) {
+        val rootView = view ?: return
+        val toolbarContainer = rootView.findViewById<View>(R.id.toolbar_container) ?: return
+        val capsulesBgView = rootView.findViewById<View>(R.id.toolbar_capsules_bg) ?: return
+        val density = resources.displayMetrics.density
+
+        val drawable = topBarCapsulesDrawable?.apply {
+            this.fillColor = fillColor
+            this.strokeColor = strokeColor
+            this.strokeWidthPx = 0.9f * density
+            this.isDark = isDark
+            invalidateSelf()
+        } ?: DualFloatingCapsulesDrawable(
+            fillColor = fillColor,
+            strokeColor = strokeColor,
+            strokeWidthPx = 0.9f * density,
+            isDark = isDark,
+            density = density,
+        ).also { topBarCapsulesDrawable = it }
+
+        if (capsulesBgView.background !== drawable) {
+            capsulesBgView.background = drawable
+        }
+
+        if (topBarPreDrawTarget !== toolbarContainer || topBarPreDrawListener == null) {
+            topBarPreDrawTarget?.viewTreeObserver?.let { vto ->
+                if (vto.isAlive && topBarPreDrawListener != null) {
+                    vto.removeOnPreDrawListener(topBarPreDrawListener)
+                }
+            }
+            val listener = android.view.ViewTreeObserver.OnPreDrawListener {
+                updateTopBarCapsulesBounds()
+                true
+            }
+            topBarPreDrawListener = listener
+            topBarPreDrawTarget = toolbarContainer
+            toolbarContainer.viewTreeObserver.addOnPreDrawListener(listener)
+        }
+        updateTopBarCapsulesBounds()
+    }
+
+    private fun updateTopBarCapsulesBounds() {
+        val rootView = view ?: return
+        val toolbarContainer = rootView.findViewById<View>(R.id.toolbar_container) ?: return
+        val drawable = topBarCapsulesDrawable ?: return
+        if (!isToolbarInitialized) return
+
+        val cw = toolbarContainer.width
+        val ch = toolbarContainer.height
+        if (cw <= 0 || ch <= 0) return
+
+        val density = resources.displayMetrics.density
+        val iconFactor = UiScaleManager.toolbarIconFactor()
+        val capsuleH = (29f * density * iconFactor).coerceIn(
+            24f * density,
+            (ch - 10f * density).coerceAtLeast(24f * density)
+        )
+        val cy = ch * 0.5f
+        val capTop = cy - capsuleH * 0.5f
+        val capBottom = cy + capsuleH * 0.5f
+        val capRadius = capsuleH * 0.5f
+
+        var rightL = 0f
+        var rightR = 0f
+        var menuView: ActionMenuView? = null
+        var navBtn: View? = null
+        for (i in 0 until toolbar.childCount) {
+            val child = toolbar.getChildAt(i)
+            if (child is ActionMenuView && child.visibility == View.VISIBLE) {
+                menuView = child
+            } else if (child is android.widget.ImageButton && child.visibility == View.VISIBLE) {
+                navBtn = child
+            }
+        }
+
+        if (menuView != null && menuView.width > 0) {
+            var minChildL = Int.MAX_VALUE
+            var maxChildR = Int.MIN_VALUE
+            for (j in 0 until menuView.childCount) {
+                val item = menuView.getChildAt(j)
+                if (item.visibility == View.VISIBLE && item.width > 0) {
+                    if (item.left < minChildL) minChildL = item.left
+                    if (item.right > maxChildR) maxChildR = item.right
+                }
+            }
+            if (minChildL < maxChildR) {
+                val baseOffset = (toolbar.left + menuView.left).toFloat()
+                val rawL = baseOffset + minChildL
+                val rawR = baseOffset + maxChildR
+                rightL = (rawL - 2.5f * density).coerceAtLeast(5.5f * density)
+                rightR = (rawR - 1.5f * density).coerceAtMost(cw - 5.5f * density)
+                if (rightR - rightL < capsuleH) {
+                    val mid = (rightL + rightR) * 0.5f
+                    rightL = mid - capsuleH * 0.5f
+                    rightR = mid + capsuleH * 0.5f
+                }
+            }
+        }
+
+        val titleView = rootView.findViewById<TextView>(R.id.toolbar_title_view)
+        val leftL = 5.5f * density
+        var leftR = if (titleView != null && titleView.visibility == View.VISIBLE && titleView.width > 0) {
+            titleView.right.toFloat() + 10.5f * density
+        } else if (navBtn != null && navBtn.width > 0) {
+            leftL + capsuleH
+        } else {
+            0f
+        }
+
+        if (leftR > leftL && rightR > rightL) {
+            leftR = leftR.coerceAtMost(rightL - 6f * density)
+        }
+
+        drawable.updateCapsules(
+            leftL = if (leftR > leftL) leftL else 0f,
+            leftT = if (leftR > leftL) capTop else 0f,
+            leftR = if (leftR > leftL) leftR else 0f,
+            leftB = if (leftR > leftL) capBottom else 0f,
+            rightL = if (rightR > rightL) rightL else 0f,
+            rightT = if (rightR > rightL) capTop else 0f,
+            rightR = if (rightR > rightL) rightR else 0f,
+            rightB = if (rightR > rightL) capBottom else 0f,
+            radius = capRadius,
+        )
+    }
+
     private fun styleCapsuleTabLayout() {
         if (!::tabLayout.isInitialized) return
         val ctx = context ?: return
@@ -845,21 +975,21 @@ class ConfigurationFragment @JvmOverloads constructor(
         val isLightGray = Theme.isLightGrayTheme(ctx)
         val themeColor = Theme.getPrimaryColor(ctx)
 
-        // 1. Style Outer Big Capsule Track (groupTabContainer)
+        // 1. Style Outer Big Capsule Track (groupTabContainer) & Top Bar Dual Floating Capsules
         val containerRadius = dp2px(19).toFloat()
         val containerBgColor: Int
         val containerStrokeColor: Int
         when {
             isBlack -> {
-                containerBgColor = Color.parseColor("#121214")
+                containerBgColor = Color.parseColor("#141417")
                 containerStrokeColor = Color.parseColor("#27272A")
             }
             isWhite -> {
                 containerBgColor = Color.WHITE
-                containerStrokeColor = Color.parseColor("#E2E8F0")
+                containerStrokeColor = Color.parseColor("#E4E8F0")
             }
             isLightGray -> {
-                containerBgColor = Color.parseColor("#F5F5F7")
+                containerBgColor = Color.WHITE
                 containerStrokeColor = Color.parseColor("#E2E8F0")
             }
             isNight -> {
@@ -868,17 +998,38 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
             else -> {
                 containerBgColor = Color.WHITE
-                containerStrokeColor = Color.parseColor("#E2E8F0")
+                containerStrokeColor = Color.parseColor("#E4E8F0")
             }
         }
-        val outerDrawable = android.graphics.drawable.GradientDrawable().apply {
-            shape = android.graphics.drawable.GradientDrawable.RECTANGLE
-            cornerRadius = containerRadius
-            setColor(containerBgColor)
-            setStroke(dp2px(1), containerStrokeColor)
+        val density = resources.displayMetrics.density
+        val padH = dp2px(8)
+        val padV = dp2px(5)
+        groupTabContainer?.setPadding(padH, padV, padH, padV)
+        groupTabContainer?.clipToOutline = false
+        (groupTabContainer as? ViewGroup)?.apply {
+            clipChildren = false
+            clipToPadding = false
         }
-        groupTabContainer?.background = outerDrawable
-        groupTabContainer?.clipToOutline = true
+        groupTabContainer?.background = SingleFloatingCapsuleDrawable(
+            fillColor = containerBgColor,
+            strokeColor = containerStrokeColor,
+            strokeWidthPx = 0.9f * density,
+            cornerRadiusPx = containerRadius,
+            insetLeft = padH,
+            insetTop = padV,
+            insetRight = padH,
+            insetBottom = padV,
+            isDark = isBlack || isNight,
+            density = density,
+        )
+        tabLayout.outlineProvider = object : android.view.ViewOutlineProvider() {
+            override fun getOutline(view: View, outline: android.graphics.Outline) {
+                val r = (view.height * 0.5f).coerceAtLeast(containerRadius)
+                outline.setRoundRect(0, 0, view.width, view.height, r)
+            }
+        }
+        tabLayout.clipToOutline = true
+        setupTopBarFloatingCapsules(containerBgColor, containerStrokeColor, isBlack || isNight)
 
         // 2. Style Inner Active Sliding Pill & Text colors
         val capsuleBg: Int
@@ -1227,7 +1378,7 @@ class ConfigurationFragment @JvmOverloads constructor(
 
         val tabFactor = UiScaleManager.tabBarFactor()
         if (tabFactor != 1.0f) {
-            val scaledTabHeight = (dp2px(38) * tabFactor).toInt().coerceIn(dp2px(26), dp2px(54))
+            val scaledTabHeight = (dp2px(38) * tabFactor).toInt().coerceIn(dp2px(26), dp2px(54)) + dp2px(10)
             groupTabContainer?.layoutParams = groupTabContainer?.layoutParams?.apply {
                 height = scaledTabHeight
             }
@@ -1415,6 +1566,18 @@ class ConfigurationFragment @JvmOverloads constructor(
                 refreshProfileState()
             }
         }
+    }
+
+    override fun onDestroyView() {
+        topBarPreDrawTarget?.viewTreeObserver?.let { vto ->
+            if (vto.isAlive && topBarPreDrawListener != null) {
+                vto.removeOnPreDrawListener(topBarPreDrawListener)
+            }
+        }
+        topBarPreDrawListener = null
+        topBarPreDrawTarget = null
+        topBarCapsulesDrawable = null
+        super.onDestroyView()
     }
 
     override fun onDestroy() {
