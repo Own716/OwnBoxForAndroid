@@ -876,6 +876,12 @@
     <string name="widget_2x2_desc">方形控制台，状态、延迟与流速监控</string>
     <string name="widget_4x2_name">OwnBox 仪表盘 (4×2)</string>
     <string name="widget_4x2_desc">大号全功能仪表盘，全方位网络诊断与流量看板</string>
+    <string name="proxy_mode_title">代 理 模 式</string>
+    <string name="mode_smart_routing">智能分流</string>
+    <string name="mode_global_proxy">全局模式</string>
+    <string name="custom_route">自定义路由</string>
+    <string name="status_enabled">已开启</string>
+    <string name="status_disabled">未开启</string>
     <string name="traffic_chart_title">实时流量图表</string>
     <string name="traffic_chart_summary">查看实时上下行速率动态图表与流量吞吐统计</string>
     <string name="traffic_current_up">实时上传</string>

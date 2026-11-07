@@ -171,6 +171,11 @@ class MainActivity : ThemedActivity(),
         }
         navigation.setNavigationItemSelectedListener(this)
         rebuildDrawerItems()
+        binding.drawerLayout.addDrawerListener(object : androidx.drawerlayout.widget.DrawerLayout.SimpleDrawerListener() {
+            override fun onDrawerOpened(drawerView: View) {
+                updateProxyModeCard()
+            }
+        })
         drawerSettingsButton.setOnClickListener {
             if (isCurrentFragment(R.id.nav_settings)) {
                 binding.drawerLayout.closeDrawers()
@@ -312,6 +317,7 @@ class MainActivity : ThemedActivity(),
         checkClipboardOnResume()
         binding.stats.refreshDisplay()
         refreshNavMenu(DataStore.enableClashAPI)
+        updateProxyModeCard()
     }
 
     private var lastPromptedClipboard: String = ""
@@ -664,6 +670,9 @@ class MainActivity : ThemedActivity(),
             if (!item.isVisible) continue
 
             if (previousGroup != null && previousGroup != item.groupId) {
+                if (previousGroup == 0) {
+                    addProxyModeCard()
+                }
                 drawerMenuItems.addView(View(this), LinearLayout.LayoutParams(1, groupGap))
             }
             previousGroup = item.groupId
@@ -730,6 +739,147 @@ class MainActivity : ThemedActivity(),
                 getColorAttr(if (selected) R.attr.colorOnSurface else R.attr.colorOnSurfaceVariant)
             )
             titleView?.typeface = Typeface.create("sans-serif-medium", if (selected) Typeface.BOLD else Typeface.NORMAL)
+        }
+        updateProxyModeCard()
+    }
+
+    private var proxyModeCardView: View? = null
+
+    private fun addProxyModeCard() {
+        val proxyModeView = layoutInflater.inflate(R.layout.layout_drawer_proxy_mode, drawerMenuItems, false)
+        proxyModeCardView = proxyModeView
+
+        val btnSmart = proxyModeView.findViewById<View>(R.id.btn_mode_smart)
+        val btnGlobal = proxyModeView.findViewById<View>(R.id.btn_mode_global)
+        val btnAppProxy = proxyModeView.findViewById<View>(R.id.btn_app_proxy)
+        val btnCustomRoute = proxyModeView.findViewById<View>(R.id.btn_custom_route)
+
+        btnSmart.setOnClickListener {
+            if (DataStore.globalMode) {
+                DataStore.globalMode = false
+                updateProxyModeCard(proxyModeView)
+                if (DataStore.serviceState.canStop) {
+                    runCatching { SagerNet.reloadService() }
+                }
+                it.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+            }
+        }
+
+        btnGlobal.setOnClickListener {
+            if (!DataStore.globalMode) {
+                DataStore.globalMode = true
+                updateProxyModeCard(proxyModeView)
+                if (DataStore.serviceState.canStop) {
+                    runCatching { SagerNet.reloadService() }
+                }
+                it.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+            }
+        }
+
+        btnAppProxy.setOnClickListener {
+            startActivity(Intent(this, AppManagerActivity::class.java))
+            binding.drawerLayout.closeDrawers()
+            it.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+        }
+
+        btnCustomRoute.setOnClickListener {
+            displayFragmentWithId(R.id.nav_route)
+            binding.drawerLayout.closeDrawers()
+            it.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+        }
+
+        updateProxyModeCard(proxyModeView)
+        drawerMenuItems.addView(proxyModeView)
+    }
+
+    private fun updateProxyModeCard(root: View? = proxyModeCardView) {
+        val view = root ?: return
+        val isGlobal = DataStore.globalMode
+        val btnSmart = view.findViewById<LinearLayout>(R.id.btn_mode_smart) ?: return
+        val btnGlobal = view.findViewById<LinearLayout>(R.id.btn_mode_global) ?: return
+        val iconSmart = view.findViewById<ImageView>(R.id.icon_mode_smart)
+        val iconGlobal = view.findViewById<ImageView>(R.id.icon_mode_global)
+        val textSmart = view.findViewById<TextView>(R.id.text_mode_smart)
+        val textGlobal = view.findViewById<TextView>(R.id.text_mode_global)
+
+        val primaryColor = getColorAttr(R.attr.colorPrimary)
+        val onSurfaceColor = getColorAttr(R.attr.colorOnSurface)
+        val onSurfaceVariantColor = getColorAttr(R.attr.colorOnSurfaceVariant)
+
+        if (!isGlobal) {
+            btnSmart.setBackgroundResource(R.drawable.bg_proxy_mode_btn_active)
+            btnGlobal.setBackgroundResource(R.drawable.bg_proxy_mode_btn_inactive)
+            iconSmart.drawable?.mutate()?.setTint(primaryColor)
+            textSmart.setTextColor(primaryColor)
+            iconGlobal.drawable?.mutate()?.setTint(onSurfaceVariantColor)
+            textGlobal.setTextColor(onSurfaceVariantColor)
+        } else {
+            btnSmart.setBackgroundResource(R.drawable.bg_proxy_mode_btn_inactive)
+            btnGlobal.setBackgroundResource(R.drawable.bg_proxy_mode_btn_active)
+            iconSmart.drawable?.mutate()?.setTint(onSurfaceVariantColor)
+            textSmart.setTextColor(onSurfaceVariantColor)
+            iconGlobal.drawable?.mutate()?.setTint(primaryColor)
+            textGlobal.setTextColor(primaryColor)
+        }
+
+        // App proxy status
+        val isAppProxyEnabled = DataStore.proxyApps
+        val chipAppProxy = view.findViewById<LinearLayout>(R.id.chip_app_proxy)
+        val textStatusAppProxy = view.findViewById<TextView>(R.id.status_text_app_proxy)
+        val dotStatusAppProxy = view.findViewById<View>(R.id.status_dot_app_proxy)
+
+        if (chipAppProxy != null && textStatusAppProxy != null && dotStatusAppProxy != null) {
+            if (isAppProxyEnabled) {
+                chipAppProxy.setBackgroundResource(R.drawable.bg_chip_status_connected)
+                textStatusAppProxy.text = getString(R.string.status_enabled)
+                textStatusAppProxy.setTextColor(Color.parseColor("#34D399"))
+                dotStatusAppProxy.background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(Color.parseColor("#10B981"))
+                }
+            } else {
+                chipAppProxy.setBackgroundResource(R.drawable.bg_chip_status_disconnected)
+                textStatusAppProxy.text = getString(R.string.status_disabled)
+                textStatusAppProxy.setTextColor(Color.parseColor("#94A3B8"))
+                dotStatusAppProxy.background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(Color.parseColor("#94A3B8"))
+                }
+            }
+        }
+
+        // Custom route status
+        val chipCustomRoute = view.findViewById<LinearLayout>(R.id.chip_custom_route)
+        val textStatusCustomRoute = view.findViewById<TextView>(R.id.status_text_custom_route)
+        val dotStatusCustomRoute = view.findViewById<View>(R.id.status_dot_custom_route)
+
+        if (chipCustomRoute != null && textStatusCustomRoute != null && dotStatusCustomRoute != null) {
+            runOnDefaultDispatcher {
+                val hasCustomRules = runCatching {
+                    io.nekohasekai.sagernet.database.SagerDatabase.rulesDao.allRules().any { it.enabled }
+                }.getOrDefault(false)
+
+                onMainDispatcher {
+                    if (isDestroyed || isFinishing) return@onMainDispatcher
+                    if (hasCustomRules) {
+                        chipCustomRoute.setBackgroundResource(R.drawable.bg_chip_status_connected)
+                        textStatusCustomRoute.text = getString(R.string.status_enabled)
+                        textStatusCustomRoute.setTextColor(Color.parseColor("#34D399"))
+                        dotStatusCustomRoute.background = GradientDrawable().apply {
+                            shape = GradientDrawable.OVAL
+                            setColor(Color.parseColor("#10B981"))
+                        }
+                    } else {
+                        chipCustomRoute.setBackgroundResource(R.drawable.bg_chip_status_disconnected)
+                        textStatusCustomRoute.text = getString(R.string.status_disabled)
+                        textStatusCustomRoute.setTextColor(Color.parseColor("#94A3B8"))
+                        dotStatusCustomRoute.background = GradientDrawable().apply {
+                            shape = GradientDrawable.OVAL
+                            setColor(Color.parseColor("#94A3B8"))
+                        }
+                    }
+                }
+            }
         }
     }
 

@@ -972,6 +972,12 @@
     <string name="widget_2x2_desc">Compact dashboard with latency and speed</string>
     <string name="widget_4x2_name">OwnBox Dashboard (4x2)</string>
     <string name="widget_4x2_desc">Full-featured network dashboard with live stats</string>
+    <string name="proxy_mode_title">Proxy Mode</string>
+    <string name="mode_smart_routing">Smart Routing</string>
+    <string name="mode_global_proxy">Global Mode</string>
+    <string name="custom_route">Custom Route</string>
+    <string name="status_enabled">Enabled</string>
+    <string name="status_disabled">Disabled</string>
     <string name="traffic_chart_title">Real-time Traffic Chart</string>
     <string name="traffic_chart_summary">View real-time speed chart and traffic throughput statistics</string>
     <string name="traffic_current_up">Upload Speed</string>
