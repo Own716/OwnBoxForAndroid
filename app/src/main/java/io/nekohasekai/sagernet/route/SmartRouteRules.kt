@@ -2,6 +2,7 @@ package io.nekohasekai.sagernet.route
 
 import io.nekohasekai.sagernet.BuildConfig
 import io.nekohasekai.sagernet.SagerNet
+import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.RuleEntity
 import io.nekohasekai.sagernet.utils.PackageCache
 import java.io.File
@@ -399,7 +400,16 @@ object SmartRouteRules {
             if (PackageCache.installedPackages.isEmpty()) PackageCache.awaitLoadSync()
             PackageCache.installedPackages.keys.toSet()
         }.getOrDefault(emptySet()),
-        bundledForeign: Set<String> = loadBundledForeignPackages()
+        bundledForeign: Set<String> = loadBundledForeignPackages(),
+        proxyAppsEnabled: Boolean = runCatching { DataStore.proxyApps }.getOrDefault(false),
+        bypassMode: Boolean = runCatching { DataStore.bypass }.getOrDefault(true),
+        individualPackages: Set<String> = runCatching {
+            DataStore.individual
+                .lineSequence()
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .toSet()
+        }.getOrDefault(emptySet()),
     ): Pair<Set<String>, Set<String>> {
         val normCountry = country.trim().lowercase().ifBlank { "cn" }
         val explicitDomestic = domesticExplicitPackages(normCountry)
@@ -446,6 +456,29 @@ object SmartRouteRules {
             if (pkg !in SYSTEM_EXCLUDED_PACKAGES && pkg !in BROWSER_AND_HYBRID_PACKAGES && pkg !in resolvedForeign) {
                 if (installedPackages.isEmpty() || pkg in installedPackages) {
                     resolvedDomestic.add(pkg)
+                }
+            }
+        }
+
+        // 尊重用户在「分应用代理」中的手动选择优先级，防止用户勾选的国内应用被智能分流强制直连
+        if (proxyAppsEnabled && individualPackages.isNotEmpty()) {
+            if (!bypassMode) {
+                // 仅代理选中应用模式：用户显式勾选的应用优先走代理，从本国直连名单中移除
+                for (pkg in individualPackages) {
+                    if (pkg in SYSTEM_EXCLUDED_PACKAGES) continue
+                    resolvedDomestic.remove(pkg)
+                    if (pkg !in BROWSER_AND_HYBRID_PACKAGES) {
+                        resolvedForeign.add(pkg)
+                    }
+                }
+            } else {
+                // 绕过选中应用模式：用户显式勾选绕过的应用从海外代理名单中移除并归入直连
+                for (pkg in individualPackages) {
+                    if (pkg in SYSTEM_EXCLUDED_PACKAGES) continue
+                    resolvedForeign.remove(pkg)
+                    if (pkg !in BROWSER_AND_HYBRID_PACKAGES) {
+                        resolvedDomestic.add(pkg)
+                    }
                 }
             }
         }

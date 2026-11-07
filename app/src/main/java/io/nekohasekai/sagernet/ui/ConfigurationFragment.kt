@@ -840,7 +840,12 @@ class ConfigurationFragment @JvmOverloads constructor(
     private var topBarPreDrawListener: android.view.ViewTreeObserver.OnPreDrawListener? = null
     private var topBarPreDrawTarget: View? = null
 
-    private fun setupTopBarFloatingCapsules(fillColor: Int, strokeColor: Int, isDark: Boolean) {
+    private fun setupTopBarFloatingCapsules(
+        fillColor: Int,
+        strokeColor: Int,
+        shadowBaseColor: Int,
+        isDark: Boolean,
+    ) {
         val rootView = view ?: return
         val toolbarContainer = rootView.findViewById<View>(R.id.toolbar_container) ?: return
         val capsulesBgView = rootView.findViewById<View>(R.id.toolbar_capsules_bg) ?: return
@@ -850,6 +855,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             this.fillColor = fillColor
             this.strokeColor = strokeColor
             this.strokeWidthPx = 0.9f * density
+            this.shadowBaseColor = shadowBaseColor
             this.isDark = isDark
             invalidateSelf()
         } ?: DualFloatingCapsulesDrawable(
@@ -858,6 +864,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             strokeWidthPx = 0.9f * density,
             isDark = isDark,
             density = density,
+            shadowBaseColor = shadowBaseColor,
         ).also { topBarCapsulesDrawable = it }
 
         if (capsulesBgView.background !== drawable) {
@@ -939,11 +946,10 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
         }
 
-        val titleView = rootView.findViewById<TextView>(R.id.toolbar_title_view)
+        // Scheme 1: Left independent circular floating button around navigation icon [|],
+        // leaving the "OwnBox" title cleanly outside the capsule.
         val leftL = 5.5f * density
-        var leftR = if (titleView != null && titleView.visibility == View.VISIBLE && titleView.width > 0) {
-            titleView.right.toFloat() + 10.5f * density
-        } else if (navBtn != null && navBtn.width > 0) {
+        var leftR = if (navBtn != null && navBtn.width > 0) {
             leftL + capsuleH
         } else {
             0f
@@ -966,6 +972,48 @@ class ConfigurationFragment @JvmOverloads constructor(
         )
     }
 
+    private fun resolveTopBarIconTint(ctx: Context): Int {
+        val isBlack = Theme.isBlackTheme(ctx)
+        val isNight = Theme.usingNightMode(ctx)
+        val isWhite = Theme.isWhiteTheme(ctx)
+        val isLightGray = Theme.isLightGrayTheme(ctx)
+        val themeColor = Theme.getPrimaryColor(ctx)
+        return when {
+            isBlack -> Color.WHITE
+            isWhite -> Color.parseColor("#212121")
+            isLightGray -> Color.parseColor("#1F2937")
+            isNight -> ColorUtils.blendARGB(themeColor, Color.WHITE, 0.42f)
+            else -> {
+                val lum = ColorUtils.calculateLuminance(themeColor)
+                if (lum > 0.42) {
+                    ColorUtils.blendARGB(themeColor, Color.BLACK, 0.45f)
+                } else {
+                    ColorUtils.blendARGB(themeColor, Color.BLACK, 0.12f)
+                }
+            }
+        }
+    }
+
+    private fun applyTopBarIconTint(iconColor: Int) {
+        if (!isToolbarInitialized) return
+        toolbar.navigationIcon?.let {
+            val tinted = it.mutate()
+            DrawableCompat.setTint(tinted, iconColor)
+            toolbar.navigationIcon = tinted
+        }
+        toolbar.overflowIcon?.let {
+            val tinted = it.mutate()
+            DrawableCompat.setTint(tinted, iconColor)
+            toolbar.overflowIcon = tinted
+        }
+        tintMenuIcons(toolbar.menu, iconColor)
+        val searchItem = toolbar.menu.findItem(R.id.action_search)
+        val sv = (searchItem?.actionView as? SearchView) ?: toolbar.findViewById<SearchView>(R.id.action_search)
+        sv?.findViewById<ImageView>(androidx.appcompat.R.id.search_button)?.setColorFilter(iconColor)
+        sv?.findViewById<ImageView>(androidx.appcompat.R.id.search_mag_icon)?.setColorFilter(iconColor)
+        sv?.findViewById<ImageView>(androidx.appcompat.R.id.search_close_btn)?.setColorFilter(iconColor)
+    }
+
     private fun styleCapsuleTabLayout() {
         if (!::tabLayout.isInitialized) return
         val ctx = context ?: return
@@ -975,30 +1023,36 @@ class ConfigurationFragment @JvmOverloads constructor(
         val isLightGray = Theme.isLightGrayTheme(ctx)
         val themeColor = Theme.getPrimaryColor(ctx)
 
-        // 1. Style Outer Big Capsule Track (groupTabContainer) & Top Bar Dual Floating Capsules
+        // 1. Style Outer Big Capsule Track (groupTabContainer) & Top Bar Floating Capsules
         val containerRadius = dp2px(19).toFloat()
         val containerBgColor: Int
         val containerStrokeColor: Int
+        val shadowBaseColor: Int
         when {
             isBlack -> {
                 containerBgColor = Color.parseColor("#141417")
                 containerStrokeColor = Color.parseColor("#27272A")
+                shadowBaseColor = Color.BLACK
             }
             isWhite -> {
                 containerBgColor = Color.WHITE
                 containerStrokeColor = Color.parseColor("#E4E8F0")
+                shadowBaseColor = Color.BLACK
             }
             isLightGray -> {
                 containerBgColor = Color.WHITE
                 containerStrokeColor = Color.parseColor("#E2E8F0")
+                shadowBaseColor = Color.BLACK
             }
             isNight -> {
-                containerBgColor = Color.parseColor("#1E293B")
-                containerStrokeColor = Color.parseColor("#334155")
+                containerBgColor = ColorUtils.blendARGB(Color.parseColor("#18181B"), themeColor, 0.16f)
+                containerStrokeColor = ColorUtils.blendARGB(Color.parseColor("#27272A"), themeColor, 0.38f)
+                shadowBaseColor = Color.BLACK
             }
             else -> {
-                containerBgColor = Color.WHITE
-                containerStrokeColor = Color.parseColor("#E4E8F0")
+                containerBgColor = ColorUtils.blendARGB(Color.WHITE, themeColor, 0.09f)
+                containerStrokeColor = ColorUtils.blendARGB(Color.WHITE, themeColor, 0.28f)
+                shadowBaseColor = ColorUtils.blendARGB(Color.BLACK, themeColor, 0.35f)
             }
         }
         val density = resources.displayMetrics.density
@@ -1021,6 +1075,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             insetBottom = padV,
             isDark = isBlack || isNight,
             density = density,
+            shadowBaseColor = shadowBaseColor,
         )
         tabLayout.outlineProvider = object : android.view.ViewOutlineProvider() {
             override fun getOutline(view: View, outline: android.graphics.Outline) {
@@ -1029,7 +1084,13 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
         }
         tabLayout.clipToOutline = true
-        setupTopBarFloatingCapsules(containerBgColor, containerStrokeColor, isBlack || isNight)
+        setupTopBarFloatingCapsules(
+            fillColor = containerBgColor,
+            strokeColor = containerStrokeColor,
+            shadowBaseColor = shadowBaseColor,
+            isDark = isBlack || isNight,
+        )
+        applyTopBarIconTint(resolveTopBarIconTint(ctx))
 
         // 2. Style Inner Active Sliding Pill & Text colors
         val capsuleBg: Int
@@ -1327,15 +1388,10 @@ class ConfigurationFragment @JvmOverloads constructor(
                 if (!select) {
                     toolbar.setNavigationIcon(R.drawable.baseline_arrow_back_24)
                     val searchContext = requireContext()
-                    val primaryColor = when {
-                        Theme.isBlackTheme(searchContext) -> Color.WHITE
-                        Theme.isWhiteTheme(searchContext) -> Color.parseColor("#212121")
-                        Theme.isLightGrayTheme(searchContext) -> Color.parseColor("#1F2937")
-                        else -> searchContext.getColorAttr(android.R.attr.textColorPrimary)
-                    }
+                    val iconTint = resolveTopBarIconTint(searchContext)
                     toolbar.navigationIcon?.let {
                         val tinted = it.mutate()
-                        DrawableCompat.setTint(tinted, primaryColor)
+                        DrawableCompat.setTint(tinted, iconTint)
                         toolbar.navigationIcon = tinted
                     }
                     toolbar.setNavigationOnClickListener {
@@ -1775,10 +1831,10 @@ class ConfigurationFragment @JvmOverloads constructor(
         customTitle?.text = getString(R.string.reorder_mode_title)
 
         toolbar.setNavigationIcon(R.drawable.baseline_arrow_back_24)
-        val primaryColor = requireContext().getColorAttr(android.R.attr.textColorPrimary)
+        val iconColor = resolveTopBarIconTint(requireContext())
         toolbar.navigationIcon?.let {
             val tinted = it.mutate()
-            androidx.core.graphics.drawable.DrawableCompat.setTint(tinted, primaryColor)
+            androidx.core.graphics.drawable.DrawableCompat.setTint(tinted, iconColor)
             toolbar.navigationIcon = tinted
         }
         toolbar.setNavigationOnClickListener {
@@ -1795,7 +1851,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             it.isVisible = true
             it.icon?.let { icon ->
                 val tinted = icon.mutate()
-                androidx.core.graphics.drawable.DrawableCompat.setTint(tinted, primaryColor)
+                androidx.core.graphics.drawable.DrawableCompat.setTint(tinted, iconColor)
                 it.icon = tinted
             }
         }
@@ -1807,10 +1863,10 @@ class ConfigurationFragment @JvmOverloads constructor(
         customTitle?.text = getString(R.string.app_name)
 
         toolbar.setNavigationIcon(R.drawable.ic_navigation_menu)
-        val primaryColor = requireContext().getColorAttr(android.R.attr.textColorPrimary)
+        val iconColor = resolveTopBarIconTint(requireContext())
         toolbar.navigationIcon?.let {
             val tinted = it.mutate()
-            androidx.core.graphics.drawable.DrawableCompat.setTint(tinted, primaryColor)
+            androidx.core.graphics.drawable.DrawableCompat.setTint(tinted, iconColor)
             toolbar.navigationIcon = tinted
         }
         toolbar.setNavigationOnClickListener {
@@ -5449,17 +5505,12 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             if (!select) {
                 toolbar.setNavigationIcon(R.drawable.ic_navigation_menu)
-                toolbar.navigationIcon?.let {
-                    val tinted = it.mutate()
-                    DrawableCompat.setTint(tinted, primaryColor)
-                    toolbar.navigationIcon = tinted
-                }
                 toolbar.setNavigationOnClickListener {
                     (activity as? MainActivity)?.binding?.drawerLayout?.openDrawer(GravityCompat.START)
                 }
             }
 
-            tintMenuIcons(toolbar.menu, primaryColor)
+            applyTopBarIconTint(resolveTopBarIconTint(cancelContext))
             adjustToolbarActionButtons()
 
             val imm = requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager

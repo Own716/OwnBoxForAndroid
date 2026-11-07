@@ -65,4 +65,37 @@ class SmartRouteRulesTest {
         assertTrue(irRules.any { it.outbound == -1L && it.domains.contains("geosite:ir") && it.domains.contains("domain:ir") })
         assertTrue(irRules.any { it.outbound == -1L && it.ip.contains("geoip:ir") })
     }
+
+    @Test
+    fun classifyAppsRespectsPerAppProxySelection() {
+        val sampleInstalled = setOf(
+            "tv.danmaku.bili",
+            "com.tencent.mm",
+            "org.telegram.messenger"
+        )
+
+        // 当分应用代理开启且为「仅代理选中应用 (!bypassMode)」时，手动勾选的国内应用 tv.danmaku.bili 应走代理而非强制直连
+        val (domesticProxyMode, foreignProxyMode) = SmartRouteRules.classifyApps(
+            country = "cn",
+            installedPackages = sampleInstalled,
+            bundledForeign = emptySet(),
+            proxyAppsEnabled = true,
+            bypassMode = false,
+            individualPackages = setOf("tv.danmaku.bili")
+        )
+        assertFalse(domesticProxyMode.contains("tv.danmaku.bili"))
+        assertTrue(foreignProxyMode.contains("tv.danmaku.bili"))
+
+        // 当分应用代理开启且为「绕过选中应用 (bypassMode)」时，手动勾选绕过的应用应从代理名单移除并归入直连
+        val (domesticBypassMode, foreignBypassMode) = SmartRouteRules.classifyApps(
+            country = "cn",
+            installedPackages = sampleInstalled,
+            bundledForeign = emptySet(),
+            proxyAppsEnabled = true,
+            bypassMode = true,
+            individualPackages = setOf("org.telegram.messenger")
+        )
+        assertFalse(foreignBypassMode.contains("org.telegram.messenger"))
+        assertTrue(domesticBypassMode.contains("org.telegram.messenger"))
+    }
 }

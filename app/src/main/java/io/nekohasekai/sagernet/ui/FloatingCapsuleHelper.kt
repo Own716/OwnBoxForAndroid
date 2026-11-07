@@ -13,7 +13,7 @@ import kotlin.math.roundToInt
 
 /**
  * Renders 360-degree soft Gaussian floating shadows + crisp hairline border + capsule surface
- * matching the exact SDF profile of the v2rayNG / OwnBox 3D floating capsule design.
+ * matching the exact SDF profile of the OwnBox 3D floating capsule design.
  */
 object FloatingCapsuleRenderer {
 
@@ -26,7 +26,7 @@ object FloatingCapsuleRenderer {
         val ambAlphaDark: Int,
     )
 
-    // Precomputed 16-step Gaussian SDF iso-contour steps from outer (4.8dp) to inner (0.25dp)
+    // Precomputed 16-step Gaussian SDF iso-contour steps from outer (4.8dp) to inner (0.22dp)
     private val SHADOW_STEPS: Array<ShadowStep> by lazy {
         val count = 16
         val maxDp = 4.8f
@@ -34,8 +34,6 @@ object FloatingCapsuleRenderer {
         val radii = FloatArray(count + 1) { i ->
             maxDp - (maxDp - minDp) * (i.toFloat() / count.toFloat())
         }
-        // Evaluate cumulative Gaussian at each radius so incremental alphas sum to the exact Gaussian profile
-        // Spot: peakL = 19, sigma = 2.05dp; Ambient: peakL = 9, sigma = 1.40dp
         fun spotG(d: Float, peak: Float): Int {
             val v = peak * exp(-(d * d) / (2f * 2.05f * 2.05f))
             return v.roundToInt()
@@ -88,6 +86,7 @@ object FloatingCapsuleRenderer {
         fillColor: Int,
         strokeColor: Int,
         strokeWidthPx: Float,
+        shadowBaseColor: Int,
         isDark: Boolean,
         density: Float,
         shadowPaint: Paint,
@@ -96,6 +95,10 @@ object FloatingCapsuleRenderer {
         scratchRect: RectF,
     ) {
         if (right <= left || bottom <= top) return
+
+        val srColor = Color.red(shadowBaseColor)
+        val sgColor = Color.green(shadowBaseColor)
+        val sbColor = Color.blue(shadowBaseColor)
 
         // 1. Draw 360-degree soft Gaussian SDF shadow layers from outside in
         val dyAmbPx = 0.25f * density
@@ -106,7 +109,7 @@ object FloatingCapsuleRenderer {
             val spotA = if (isDark) step.spotAlphaDark else step.spotAlphaLight
             if (spotA > 0) {
                 val dySpotPx = step.dySpotFactor * density
-                shadowPaint.color = Color.argb(spotA, 0, 0, 0)
+                shadowPaint.color = Color.argb(spotA, srColor, sgColor, sbColor)
                 scratchRect.set(
                     left - expandPx,
                     top - expandPx + dySpotPx,
@@ -118,7 +121,7 @@ object FloatingCapsuleRenderer {
 
             val ambA = if (isDark) step.ambAlphaDark else step.ambAlphaLight
             if (ambA > 0) {
-                shadowPaint.color = Color.argb(ambA, 0, 0, 0)
+                shadowPaint.color = Color.argb(ambA, srColor, sgColor, sbColor)
                 scratchRect.set(
                     left - expandPx,
                     top - expandPx + dyAmbPx,
@@ -161,6 +164,7 @@ class SingleFloatingCapsuleDrawable(
     private val insetBottom: Int,
     private val isDark: Boolean,
     private val density: Float,
+    private val shadowBaseColor: Int = Color.BLACK,
 ) : Drawable() {
 
     private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
@@ -186,6 +190,7 @@ class SingleFloatingCapsuleDrawable(
             fillColor = fillColor,
             strokeColor = strokeColor,
             strokeWidthPx = strokeWidthPx,
+            shadowBaseColor = shadowBaseColor,
             isDark = isDark,
             density = density,
             shadowPaint = shadowPaint,
@@ -210,8 +215,8 @@ class SingleFloatingCapsuleDrawable(
 }
 
 /**
- * Drawable for the top toolbar dual floating capsules (Scheme 2: Left [|] OwnBox capsule
- * + Right 5-in-1 action buttons capsule).
+ * Drawable for the top toolbar floating capsules (Scheme 1: Left independent circular floating
+ * button [|] + Right 5-in-1 action buttons floating capsule).
  */
 class DualFloatingCapsulesDrawable(
     var fillColor: Int,
@@ -219,6 +224,7 @@ class DualFloatingCapsulesDrawable(
     var strokeWidthPx: Float,
     var isDark: Boolean,
     private val density: Float,
+    var shadowBaseColor: Int = Color.BLACK,
 ) : Drawable() {
 
     private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
@@ -280,6 +286,7 @@ class DualFloatingCapsulesDrawable(
                 fillColor = fillColor,
                 strokeColor = strokeColor,
                 strokeWidthPx = strokeWidthPx,
+                shadowBaseColor = shadowBaseColor,
                 isDark = isDark,
                 density = density,
                 shadowPaint = shadowPaint,
@@ -300,6 +307,7 @@ class DualFloatingCapsulesDrawable(
                 fillColor = fillColor,
                 strokeColor = strokeColor,
                 strokeWidthPx = strokeWidthPx,
+                shadowBaseColor = shadowBaseColor,
                 isDark = isDark,
                 density = density,
                 shadowPaint = shadowPaint,
