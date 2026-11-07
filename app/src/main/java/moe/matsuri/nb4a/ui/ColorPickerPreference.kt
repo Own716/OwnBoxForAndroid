@@ -96,27 +96,35 @@ class ColorPickerPreference @JvmOverloads constructor(
         }
 
         val factor = context.resources.displayMetrics.density
-        val size = (44 * factor).roundToInt()
+        val size = dp2px(26)
         val widgetIv = ImageView(context).apply {
-            layoutParams = ViewGroup.LayoutParams(size, size)
-            setImageDrawable(getColorBadgeDrawable(context.resources, displayColor, false))
+            layoutParams = LinearLayout.LayoutParams(size, size).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                marginEnd = dp2px(6)
+            }
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            adjustViewBounds = true
+            setImageDrawable(getColorBadgeDrawable(context.resources, displayColor, false, size))
         }
         widgetFrame.addView(widgetIv)
         widgetFrame.visibility = View.VISIBLE
     }
 
-    private fun getColorBadgeDrawable(res: Resources, color: Int, isSelected: Boolean): Drawable {
+    private fun getColorBadgeDrawable(res: Resources, color: Int, isSelected: Boolean, badgeSize: Int = 0): Drawable {
         val factor = res.displayMetrics.density
         val strokeColor = when (color) {
-            Color.WHITE -> Color.parseColor("#CCCCCC")
+            Color.WHITE -> Color.parseColor("#CBD5E1")
             Color.parseColor("#F5F5F7") -> Color.parseColor("#CBD5E1")
             Color.BLACK -> Color.parseColor("#444444")
-            else -> Color.parseColor("#33000000")
+            else -> Color.parseColor("#26000000")
         }
 
         val circle = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
             setColor(color)
+            if (badgeSize > 0) {
+                setSize(badgeSize, badgeSize)
+            }
             setStroke((1.5f * factor).roundToInt().coerceAtLeast(1), strokeColor)
         }
 

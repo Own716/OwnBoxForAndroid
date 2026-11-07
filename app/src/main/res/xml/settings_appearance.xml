@@ -11,7 +11,7 @@
             app:defaultValue="0"
             app:entries="@array/night_mode"
             app:entryValues="@array/int_array_4"
-            app:icon="@drawable/ic_baseline_wb_sunny_24"
+            app:icon="@drawable/solar_sun_2_linear"
             app:key="nightTheme"
             app:title="@string/night_mode"
             app:useSimpleSummaryProvider="true" />
@@ -19,7 +19,7 @@
             app:defaultValue="0"
             app:entries="@array/app_icon_mode_entries"
             app:entryValues="@array/int_array_3"
-            app:icon="@drawable/ic_baseline_app_shortcut_24"
+            app:icon="@drawable/solar_widget_2_linear"
             app:key="appIconMode"
             app:title="@string/app_icon_mode"
             app:useSimpleSummaryProvider="true" />
@@ -27,7 +27,7 @@
             app:defaultValue=""
             app:entries="@array/language_entries"
             app:entryValues="@array/language_values"
-            app:icon="@drawable/baseline_translate_24"
+            app:icon="@drawable/solar_global_linear"
             app:key="appLanguage"
             app:title="@string/language"
             app:useSimpleSummaryProvider="true" />
@@ -57,19 +57,19 @@
             app:title="@string/card_view_mode"
             app:useSimpleSummaryProvider="true" />
         <SwitchPreferenceCompat
-            app:icon="@drawable/ic_baseline_center_focus_weak_24"
+            app:icon="@drawable/solar_map_point_wave_linear"
             app:key="alwaysShowAddress"
             app:summary="@string/always_show_address_sum"
             app:title="@string/always_show_address" />
         <SwitchPreferenceCompat
             app:defaultValue="false"
-            app:icon="@drawable/ic_baseline_format_align_left_24"
+            app:icon="@drawable/solar_align_left_linear"
             app:key="compactProfileRows"
             app:summary="@string/compact_profile_rows_sum"
             app:title="@string/compact_profile_rows" />
         <SwitchPreferenceCompat
             app:defaultValue="true"
-            app:icon="@drawable/baseline_public_24"
+            app:icon="@drawable/solar_earth_linear"
             app:key="showLandingIp"
             app:summary="@string/show_landing_ip_sum"
             app:title="@string/show_landing_ip"
@@ -82,17 +82,19 @@
             app:title="@string/show_subscription_info_card" />
         <SwitchPreferenceCompat
             app:defaultValue="true"
-            app:icon="@drawable/ic_baseline_format_align_left_24"
+            app:icon="@drawable/solar_chart_2_linear"
             app:key="showBalancerSummary"
             app:summary="@string/show_balancer_summary_sum"
             app:title="@string/show_balancer_summary" />
         <SwitchPreferenceCompat
             app:defaultValue="false"
+            app:icon="@drawable/solar_widget_5_linear"
             app:key="showAllGroupsTab"
             app:title="@string/show_all_groups_tab"
             app:summary="@string/show_all_groups_tab_summary" />
         <SwitchPreferenceCompat
             app:defaultValue="true"
+            app:icon="@drawable/solar_trash_bin_trash_linear"
             app:key="confirmProfileDelete"
             app:title="@string/confirm_profile_delete" />
     </PreferenceCategory>
@@ -100,14 +102,14 @@
     <PreferenceCategory app:title="@string/cag_notification">
         <SwitchPreferenceCompat
             app:defaultValue="false"
-            app:icon="@drawable/ic_baseline_stream_24"
+            app:icon="@drawable/solar_bell_ring_linear"
             app:key="liveUpdateEnabled"
             app:summary="@string/live_update_sum"
             app:title="@string/live_update" />
         <SwitchPreferenceCompat
             app:defaultValue="true"
             app:dependency="liveUpdateEnabled"
-            app:icon="@drawable/ic_baseline_fiber_manual_record_24"
+            app:icon="@drawable/solar_pill_linear"
             app:key="liveUpdateShowCapsule"
             app:summary="@string/live_update_show_capsule_sum"
             app:title="@string/live_update_show_capsule" />
@@ -122,28 +124,28 @@
             app:useSimpleSummaryProvider="true" />
         <EditTextPreference
             app:dependency="liveUpdateEnabled"
-            app:icon="@drawable/ic_baseline_center_focus_weak_24"
+            app:icon="@drawable/solar_text_square_linear"
             app:key="liveUpdateCollapsedFormat"
             app:summary="@string/live_update_collapsed_format_sum"
             app:title="@string/live_update_collapsed_format"
             app:useSimpleSummaryProvider="true" />
         <EditTextPreference
             app:dependency="liveUpdateEnabled"
-            app:icon="@drawable/ic_baseline_format_align_left_24"
+            app:icon="@drawable/solar_align_left_linear"
             app:key="liveUpdateTitleFormat"
             app:summary="@string/live_update_title_format_sum"
             app:title="@string/live_update_title_format"
             app:useSimpleSummaryProvider="true" />
         <EditTextPreference
             app:dependency="liveUpdateEnabled"
-            app:icon="@drawable/ic_baseline_timelapse_24"
+            app:icon="@drawable/solar_notes_linear"
             app:key="liveUpdateContentFormat"
             app:summary="@string/live_update_content_format_sum"
             app:title="@string/live_update_content_format"
             app:useSimpleSummaryProvider="true" />
         <EditTextPreference
             app:dependency="liveUpdateEnabled"
-            app:icon="@drawable/ic_baseline_chat_bubble_outline_24"
+            app:icon="@drawable/solar_chat_round_line_linear"
             app:key="liveUpdateSubtextFormat"
             app:summary="@string/live_update_subtext_format_sum"
             app:title="@string/live_update_subtext_format"
@@ -156,7 +158,7 @@
             app:title="@string/live_update_preview" />
         <SwitchPreferenceCompat
             app:defaultValue="true"
-            app:icon="@drawable/ic_baseline_speed_24"
+            app:icon="@drawable/solar_speedometer_middle_linear"
             app:key="showDirectSpeed"
             app:summary="@string/show_direct_speed_sum"
             app:title="@string/show_direct_speed" />
@@ -164,23 +166,25 @@
             app:defaultValue="1000"
             app:entries="@array/notification_entry"
             app:entryValues="@array/notification_value"
-            app:icon="@drawable/ic_baseline_shutter_speed_24"
+            app:icon="@drawable/solar_stopwatch_linear"
             app:key="speedInterval"
             app:title="@string/speed_interval"
             app:useSimpleSummaryProvider="true" />
         <SwitchPreferenceCompat
             app:defaultValue="true"
+            app:icon="@drawable/solar_database_linear"
             app:key="profileTrafficStatistics"
             app:summary="@string/profile_traffic_statistics_summary"
             app:title="@string/profile_traffic_statistics" />
         <SwitchPreferenceCompat
+            app:icon="@drawable/solar_tag_horizontal_linear"
             app:key="showGroupInNotification"
             app:title="@string/show_group_in_notification" />
         <MultiSelectListPreference
             app:defaultValue="@array/notification_action_defaults"
             app:entries="@array/notification_action_entries"
             app:entryValues="@array/notification_action_values"
-            app:icon="@drawable/ic_baseline_compare_arrows_24"
+            app:icon="@drawable/solar_square_transfer_horizontal_linear"
             app:key="notificationActions"
             app:title="@string/notification_actions" />
         <Preference
@@ -192,10 +196,12 @@
 
     <PreferenceCategory app:title="@string/cag_misc">
         <SwitchPreferenceCompat
+            app:icon="@drawable/solar_slider_minimalistic_horizontal_linear"
             app:key="showBottomBar"
             app:title="@string/show_bottom_bar" />
         <SwitchPreferenceCompat
             app:defaultValue="true"
+            app:icon="@drawable/solar_smartphone_vibration_linear"
             app:key="hapticFeedback"
             app:title="@string/haptic_feedback"
             app:summary="@string/haptic_feedback_summary" />
