@@ -659,10 +659,10 @@ class MainActivity : ThemedActivity(),
     private fun rebuildDrawerItems() {
         drawerMenuItems.removeAllViews()
         val drawerFactor = UiScaleManager.drawerFactor()
-        val rowHeight = (dp(52) * drawerFactor).toInt().coerceIn(dp(36), dp(72))
-        val iconSize = (dp(24) * drawerFactor).toInt().coerceIn(dp(16), dp(34))
-        val groupGap = (dp(14) * drawerFactor).toInt().coerceAtLeast(dp(6))
-        val titleGap = (dp(16) * drawerFactor).toInt().coerceAtLeast(dp(10))
+        val rowHeight = (dp(45) * drawerFactor).toInt().coerceIn(dp(36), dp(64))
+        val iconSize = (dp(22) * drawerFactor).toInt().coerceIn(dp(16), dp(30))
+        val groupGap = (dp(10) * drawerFactor).toInt().coerceAtLeast(dp(6))
+        val titleGap = (dp(14) * drawerFactor).toInt().coerceAtLeast(dp(10))
         var previousGroup: Int? = null
         val menu = navigation.menu
         for (index in 0 until menu.size()) {
@@ -693,7 +693,7 @@ class MainActivity : ThemedActivity(),
             ).apply {
                 marginStart = dp(12)
                 marginEnd = dp(12)
-                bottomMargin = dp(3)
+                bottomMargin = dp(5)
             }
             row.background = drawerRowBackground(selected = item.isChecked)
 
@@ -885,7 +885,7 @@ class MainActivity : ThemedActivity(),
 
     private fun drawerRowBackground(selected: Boolean): RippleDrawable {
         val fill = GradientDrawable().apply {
-            cornerRadius = dp(24).toFloat()
+            cornerRadius = dp(16).toFloat()
             setColor(if (selected) getColorAttr(R.attr.colorSurfaceVariant) else Color.TRANSPARENT)
         }
         val ripple = ColorUtils.setAlphaComponent(getColorAttr(R.attr.colorOnSurface), 20)

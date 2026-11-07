@@ -165,12 +165,6 @@
                     android:checked="false"
                     app:showAsAction="never" />
                 <item
-                    android:id="@+id/action_global_mode"
-                    android:title="@string/global_mode"
-                    android:checkable="true"
-                    android:checked="false"
-                    app:showAsAction="never" />
-                <item
                     android:id="@+id/action_order_layout"
                     android:title="@string/sort_and_layout">
                     <menu>
