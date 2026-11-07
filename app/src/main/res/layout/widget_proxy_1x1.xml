@@ -19,7 +19,7 @@
             android:layout_height="38dp"
             android:layout_gravity="center"
             android:contentDescription="@string/widget_toggle"
-            android:src="@drawable/ic_clover_disconnected" />
+            android:src="@drawable/ic_widget_plane_disconnected" />
 
         <ImageView
             android:id="@+id/widget_status_dot"

@@ -867,6 +867,15 @@
         <string name="app_icon_text">文本</string>
         <string name="app_icon_selected">已选择</string>
     <string name="switch_node">切换节点</string>
+    <string name="switch_node_short">换节点</string>
+    <string name="widget_1x1_name">OwnBox 快捷开关 (1×1)</string>
+    <string name="widget_1x1_desc">一键快速启停 VPN，极简小飞机水滴微件</string>
+    <string name="widget_4x1_name">OwnBox 状态胶囊 (4×1)</string>
+    <string name="widget_4x1_desc">单行状态条，实时节点显示与快速切换</string>
+    <string name="widget_2x2_name">OwnBox 控制台 (2×2)</string>
+    <string name="widget_2x2_desc">方形控制台，状态、延迟与流速监控</string>
+    <string name="widget_4x2_name">OwnBox 仪表盘 (4×2)</string>
+    <string name="widget_4x2_desc">大号全功能仪表盘，全方位网络诊断与流量看板</string>
     <string name="traffic_chart_title">实时流量图表</string>
     <string name="traffic_chart_summary">查看实时上下行速率动态图表与流量吞吐统计</string>
     <string name="traffic_current_up">实时上传</string>

@@ -258,9 +258,18 @@ class BaseService {
             }
         }
 
+        private var lastWidgetSpeedUpdate = 0L
+
         override fun postNotificationSpeed(speed: io.nekohasekai.sagernet.aidl.SpeedDisplayData) {
             launch {
                 data?.notification?.postNotificationSpeedUpdate(speed)
+                val now = System.currentTimeMillis()
+                if (now - lastWidgetSpeedUpdate > 3500) {
+                    lastWidgetSpeedUpdate = now
+                    runCatching {
+                        io.nekohasekai.sagernet.widget.OwnBoxWidgetHelper.updateAllWidgets(SagerNet.application, speed)
+                    }
+                }
             }
         }
 

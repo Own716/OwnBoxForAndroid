@@ -963,6 +963,15 @@
         <string name="app_icon_text">Text</string>
         <string name="app_icon_selected">Selected</string>
     <string name="switch_node">Switch Node</string>
+    <string name="switch_node_short">Switch</string>
+    <string name="widget_1x1_name">OwnBox Quick Toggle (1x1)</string>
+    <string name="widget_1x1_desc">One-tap VPN toggle with liquid glass droplet</string>
+    <string name="widget_4x1_name">OwnBox Status Capsule (4x1)</string>
+    <string name="widget_4x1_desc">Live node info and fast switching capsule</string>
+    <string name="widget_2x2_name">OwnBox Console (2x2)</string>
+    <string name="widget_2x2_desc">Compact dashboard with latency and speed</string>
+    <string name="widget_4x2_name">OwnBox Dashboard (4x2)</string>
+    <string name="widget_4x2_desc">Full-featured network dashboard with live stats</string>
     <string name="traffic_chart_title">Real-time Traffic Chart</string>
     <string name="traffic_chart_summary">View real-time speed chart and traffic throughput statistics</string>
     <string name="traffic_current_up">Upload Speed</string>

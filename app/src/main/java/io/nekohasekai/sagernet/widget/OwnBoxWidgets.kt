@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.text.format.Formatter
+import android.view.View
 import android.widget.RemoteViews
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.SagerNet
@@ -23,9 +24,18 @@ object OwnBoxWidgetHelper {
     const val ACTION_TOGGLE = "com.ownbox.app.widget.ACTION_TOGGLE"
 
     @Volatile
+    private var lastToggleTime = 0L
+
+    @Volatile
     var lastSpeedDisplayData: SpeedDisplayData? = null
 
     fun handleToggle(context: Context) {
+        val now = System.currentTimeMillis()
+        if (now - lastToggleTime < 800) {
+            return
+        }
+        lastToggleTime = now
+
         if (DataStore.serviceState.canStop) {
             SagerNet.stopService()
         } else {
@@ -91,10 +101,10 @@ object OwnBoxWidgetHelper {
             else -> context.getString(R.string.not_connected)
         }
 
-        val cloverIcon = if (isConnected) {
-            R.drawable.ic_clover_connected
+        val planeIcon = if (isConnected) {
+            R.drawable.ic_widget_plane_connected
         } else {
-            R.drawable.ic_clover_disconnected
+            R.drawable.ic_widget_plane_disconnected
         }
 
         val dotColor = when {
@@ -104,8 +114,10 @@ object OwnBoxWidgetHelper {
         }
 
         val latencyText = when {
-            currentProfile != null && currentProfile.status > 0 -> "🟢 ${currentProfile.status} ms"
-            currentProfile != null && currentProfile.status < 0 -> "🔴 失败"
+            currentProfile == null -> "-- ms"
+            currentProfile.status == 1 && currentProfile.ping > 0 -> "🟢 ${currentProfile.ping} ms"
+            currentProfile.status == 3 || currentProfile.status < 0 -> "🔴 失败"
+            currentProfile.status == 2 -> "⚠️ 插件缺失"
             else -> "-- ms"
         }
 
@@ -125,7 +137,16 @@ object OwnBoxWidgetHelper {
         }
 
         return WidgetCommonData(
-            profileTitle, profileType, statusText, cloverIcon, dotColor, latencyText, speedText, trafficTotalText
+            title = profileTitle,
+            type = profileType,
+            statusText = statusText,
+            planeIcon = planeIcon,
+            dotColor = dotColor,
+            latencyText = latencyText,
+            speedText = speedText,
+            trafficTotalText = trafficTotalText,
+            isConnected = isConnected,
+            isConnecting = isConnecting,
         )
     }
 
@@ -133,11 +154,13 @@ object OwnBoxWidgetHelper {
         val title: String,
         val type: String,
         val statusText: String,
-        val cloverIcon: Int,
+        val planeIcon: Int,
         val dotColor: Int,
         val latencyText: String,
         val speedText: String,
         val trafficTotalText: String,
+        val isConnected: Boolean,
+        val isConnecting: Boolean,
     )
 
     private fun update1x1(context: Context, manager: AppWidgetManager) {
@@ -149,7 +172,7 @@ object OwnBoxWidgetHelper {
 
             for (id in ids) {
                 val views = RemoteViews(context.packageName, R.layout.widget_proxy_1x1).apply {
-                    setImageViewResource(R.id.widget_icon, data.cloverIcon)
+                    setImageViewResource(R.id.widget_icon, data.planeIcon)
                     setInt(R.id.widget_status_dot, "setColorFilter", data.dotColor)
                     setOnClickPendingIntent(R.id.widget_toggle_btn, togglePending)
                 }
@@ -169,11 +192,13 @@ object OwnBoxWidgetHelper {
 
             for (id in ids) {
                 val views = RemoteViews(context.packageName, R.layout.widget_proxy_2x2).apply {
+                    setImageViewResource(R.id.widget_icon, R.drawable.ic_widget_brand_logo)
                     setTextViewText(R.id.widget_title, data.title)
                     setTextViewText(R.id.widget_status, data.statusText)
                     setTextViewText(R.id.widget_latency, data.latencyText)
                     setTextViewText(R.id.widget_speed, data.speedText)
-                    setImageViewResource(R.id.widget_toggle_btn, data.cloverIcon)
+                    setTextViewText(R.id.widget_switch_text, context.getString(R.string.switch_node_short))
+                    setImageViewResource(R.id.widget_toggle_btn, data.planeIcon)
                     setOnClickPendingIntent(R.id.widget_toggle_btn, togglePending)
                     setOnClickPendingIntent(R.id.widget_switch_btn, switchPending)
                     setOnClickPendingIntent(R.id.widget_info_area, launchPending)
@@ -195,10 +220,11 @@ object OwnBoxWidgetHelper {
 
             for (id in ids) {
                 val views = RemoteViews(context.packageName, R.layout.widget_proxy_4x1).apply {
+                    setImageViewResource(R.id.widget_icon, R.drawable.ic_widget_brand_logo)
                     setTextViewText(R.id.widget_title, data.title)
                     setTextViewText(R.id.widget_status, data.statusText)
                     setInt(R.id.widget_status_dot, "setColorFilter", data.dotColor)
-                    setImageViewResource(R.id.widget_toggle_btn, data.cloverIcon)
+                    setImageViewResource(R.id.widget_toggle_btn, data.planeIcon)
                     setOnClickPendingIntent(R.id.widget_toggle_btn, togglePending)
                     setOnClickPendingIntent(R.id.widget_switch_btn, switchPending)
                     setOnClickPendingIntent(R.id.widget_info_area, launchPending)
@@ -218,15 +244,27 @@ object OwnBoxWidgetHelper {
             val (togglePending, switchPending, launchPending) = getPendingIntents(context)
             val data = getCommonData(context)
 
+            val (statusBg, statusTextColor) = when {
+                data.isConnected -> Pair(R.drawable.bg_chip_status_connected, Color.parseColor("#34D399"))
+                data.isConnecting -> Pair(R.drawable.bg_chip_status_connecting, Color.parseColor("#FBBF24"))
+                else -> Pair(R.drawable.bg_chip_status_disconnected, Color.parseColor("#94A3B8"))
+            }
+
             for (id in ids) {
                 val views = RemoteViews(context.packageName, R.layout.widget_proxy_4x2).apply {
+                    setImageViewResource(R.id.widget_icon, R.drawable.ic_widget_brand_logo)
                     setTextViewText(R.id.widget_title, data.title)
                     setTextViewText(R.id.widget_status, data.statusText)
+                    setInt(R.id.widget_status, "setBackgroundResource", statusBg)
+                    setTextColor(R.id.widget_status, statusTextColor)
+
                     setTextViewText(R.id.widget_type, data.type)
+                    setViewVisibility(R.id.widget_type, if (data.type.isNotEmpty()) View.VISIBLE else View.GONE)
+
                     setTextViewText(R.id.widget_latency, data.latencyText)
                     setTextViewText(R.id.widget_speed, data.speedText)
                     setTextViewText(R.id.widget_traffic_total, data.trafficTotalText)
-                    setImageViewResource(R.id.widget_toggle_btn, data.cloverIcon)
+                    setImageViewResource(R.id.widget_toggle_btn, data.planeIcon)
                     setOnClickPendingIntent(R.id.widget_toggle_btn, togglePending)
                     setOnClickPendingIntent(R.id.widget_switch_btn, switchPending)
                     setOnClickPendingIntent(R.id.widget_info_area, launchPending)
@@ -248,10 +286,10 @@ object OwnBoxWidgetHelper {
 
             for (id in ids) {
                 val views = RemoteViews(context.packageName, R.layout.layout_widget_ownbox).apply {
-                    setImageViewResource(R.id.widget_icon, R.drawable.ic_widget_klee)
+                    setImageViewResource(R.id.widget_icon, R.drawable.ic_widget_brand_logo)
                     setTextViewText(R.id.widget_title, data.title)
                     setTextViewText(R.id.widget_status, data.statusText)
-                    setImageViewResource(R.id.widget_toggle_btn, data.cloverIcon)
+                    setImageViewResource(R.id.widget_toggle_btn, data.planeIcon)
                     setOnClickPendingIntent(R.id.widget_toggle_btn, togglePending)
                     setOnClickPendingIntent(R.id.widget_switch_btn, switchPending)
                     setOnClickPendingIntent(R.id.widget_info_area, launchPending)

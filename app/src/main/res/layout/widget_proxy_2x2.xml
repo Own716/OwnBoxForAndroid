@@ -20,7 +20,7 @@
             android:layout_width="28dp"
             android:layout_height="28dp"
             android:contentDescription="@string/app_name"
-            android:src="@drawable/ic_widget_klee" />
+            android:src="@drawable/ic_widget_brand_logo" />
 
         <TextView
             android:id="@+id/widget_status"
@@ -111,8 +111,8 @@
             android:background="@drawable/bg_widget_capsule_liquid"
             android:gravity="center"
             android:orientation="horizontal"
-            android:paddingStart="8dp"
-            android:paddingEnd="8dp">
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp">
 
             <ImageView
                 android:layout_width="14dp"
@@ -125,11 +125,13 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="4dp"
+                android:ellipsize="end"
+                android:singleLine="true"
                 android:shadowColor="#80000000"
                 android:shadowDx="0"
                 android:shadowDy="1"
                 android:shadowRadius="2"
-                android:text="@string/switch_node"
+                android:text="@string/switch_node_short"
                 android:textColor="#FFFFFFFF"
                 android:textSize="11sp"
                 android:textStyle="bold" />
@@ -141,7 +143,7 @@
             android:layout_height="36dp"
             android:layout_marginStart="8dp"
             android:contentDescription="@string/widget_toggle"
-            android:src="@drawable/ic_clover_disconnected" />
+            android:src="@drawable/ic_widget_plane_disconnected" />
     </LinearLayout>
 
 </LinearLayout>

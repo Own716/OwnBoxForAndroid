@@ -11,13 +11,13 @@
     android:paddingTop="8dp"
     android:paddingBottom="8dp">
 
-    <!-- 1号位：官方可莉（红帽子小女孩） -->
+    <!-- 1号位：官方品牌Logo -->
     <ImageView
         android:id="@+id/widget_icon"
         android:layout_width="40dp"
         android:layout_height="40dp"
         android:contentDescription="@string/app_name"
-        android:src="@drawable/ic_widget_klee" />
+        android:src="@drawable/ic_widget_brand_logo" />
 
     <!-- 节点名称与连接状态 -->
     <LinearLayout
@@ -83,7 +83,7 @@
 
     </LinearLayout>
 
-    <!-- 3号位：四叶草状态指示与开关 (未连接冷灰 / 已连接通透翡翠绿) -->
+    <!-- 3号位：小飞机状态指示与开关 (未连接冷灰磨砂 / 已连接翡翠绿渐变) -->
     <ImageView
         android:id="@+id/widget_toggle_btn"
         android:layout_width="38dp"
@@ -91,6 +91,6 @@
         android:background="?android:attr/selectableItemBackgroundBorderless"
         android:contentDescription="@string/widget_toggle"
         android:padding="3dp"
-        android:src="@drawable/ic_clover_disconnected" />
+        android:src="@drawable/ic_widget_plane_disconnected" />
 
 </LinearLayout>

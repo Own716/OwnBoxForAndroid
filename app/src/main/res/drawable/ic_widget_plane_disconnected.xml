@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Circular Frosted Glass Standby Background -->
+    <item>
+        <shape android:shape="oval">
+            <gradient
+                android:angle="135"
+                android:startColor="#33FFFFFF"
+                android:endColor="#1AFFFFFF"
+                android:type="linear" />
+            <stroke
+                android:width="1dp"
+                android:color="#4DFFFFFF" />
+        </shape>
+    </item>
+    <!-- Standby Paper Airplane Icon from ic_service_idle -->
+    <item
+        android:drawable="@drawable/ic_service_idle"
+        android:bottom="6dp"
+        android:left="6dp"
+        android:right="6dp"
+        android:top="6dp" />
+</layer-list>

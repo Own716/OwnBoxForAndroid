@@ -11,13 +11,13 @@
     android:paddingEnd="14dp"
     android:paddingBottom="8dp">
 
-    <!-- 1号位：可莉图标 -->
+    <!-- 1号位：品牌Logo -->
     <ImageView
         android:id="@+id/widget_icon"
         android:layout_width="38dp"
         android:layout_height="38dp"
         android:contentDescription="@string/app_name"
-        android:src="@drawable/ic_widget_klee" />
+        android:src="@drawable/ic_widget_brand_logo" />
 
     <!-- 节点名称与连接状态 -->
     <LinearLayout
@@ -109,12 +109,12 @@
             android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- 3号位：四叶草开关按钮 -->
+    <!-- 3号位：小飞机开关按钮 -->
     <ImageView
         android:id="@+id/widget_toggle_btn"
         android:layout_width="38dp"
         android:layout_height="38dp"
         android:contentDescription="@string/widget_toggle"
-        android:src="@drawable/ic_clover_disconnected" />
+        android:src="@drawable/ic_widget_plane_disconnected" />
 
 </LinearLayout>

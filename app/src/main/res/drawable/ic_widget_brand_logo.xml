@@ -3,16 +3,16 @@
     <!-- Liquid Glass Squircle Base -->
     <item>
         <shape android:shape="rectangle">
-            <corners android:radius="12dp" />
-            <solid android:color="#1AFFFFFF" />
+            <corners android:radius="10dp" />
+            <solid android:color="#20FFFFFF" />
             <stroke
                 android:width="1dp"
-                android:color="#33FFFFFF" />
+                android:color="#4DFFFFFF" />
         </shape>
     </item>
-    <!-- Official Chibi Klee Avatar -->
+    <!-- Official OwnBox Brand Logo -->
     <item
-        android:drawable="@mipmap/ic_widget_klee"
+        android:drawable="@mipmap/ic_launcher"
         android:bottom="2dp"
         android:left="2dp"
         android:right="2dp"
