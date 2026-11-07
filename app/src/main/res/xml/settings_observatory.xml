@@ -13,7 +13,7 @@
 
         <SwitchPreferenceCompat
             app:defaultValue="false"
-            app:icon="@drawable/ic_baseline_filter_list_24"
+            app:icon="@drawable/solar_eye_closed_linear"
             app:key="hideUnavailableProfiles"
             app:summary="@string/hide_unavailable_profiles_sum"
             app:title="@string/hide_unavailable_profiles" />
@@ -22,18 +22,21 @@
             app:defaultValue="@string/default_speed_test_mode"
             app:entries="@array/speed_test_modes"
             app:entryValues="@array/speed_test_mode_values"
+            app:icon="@drawable/solar_speedometer_middle_linear"
             app:key="speedTestMode"
             app:title="@string/speed_test_mode"
             app:useSimpleSummaryProvider="true" />
 
         <EditTextPreference
             app:defaultValue="@string/default_speed_test_timeout_ms"
+            app:icon="@drawable/solar_hourglass_line_linear"
             app:key="speedTestTimeoutMs"
             app:title="@string/speed_test_timeout_ms"
             app:useSimpleSummaryProvider="true" />
 
         <EditTextPreference
             app:defaultValue="@string/default_simple_download_url"
+            app:icon="@drawable/solar_cloud_download_linear"
             app:key="simpleDownloadURL"
             app:title="@string/simple_download_url"
             app:useSimpleSummaryProvider="true" />
