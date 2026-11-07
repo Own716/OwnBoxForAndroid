@@ -8,7 +8,7 @@
             app:defaultValue="cn"
             app:entries="@array/smart_route_country_entries"
             app:entryValues="@array/smart_route_country_values"
-            app:icon="@drawable/baseline_public_24"
+            app:icon="@drawable/solar_global_linear"
             app:key="smartRouteCountry"
             app:title="@string/smart_route_country"
             app:useSimpleSummaryProvider="true" />
@@ -32,19 +32,19 @@
             app:defaultValue="0"
             app:entries="@array/ipv6_mode"
             app:entryValues="@array/int_array_4"
-            app:icon="@drawable/ic_image_looks_6"
+            app:icon="@drawable/solar_server_square_linear"
             app:key="ipv6Mode"
             app:title="@string/ipv6"
             app:useSimpleSummaryProvider="true" />
 
         <SwitchPreferenceCompat
-            app:icon="@drawable/ic_baseline_compare_arrows_24"
+            app:icon="@drawable/solar_bolt_circle_linear"
             app:key="dualNetworkAcceleration"
             app:summary="@string/dual_network_acceleration_summary"
             app:title="@string/dual_network_acceleration" />
 
         <SwitchPreferenceCompat
-            app:icon="@drawable/ic_baseline_speed_24"
+            app:icon="@drawable/solar_transmission_linear"
             app:key="concurrentDial"
             app:summary="@string/concurrent_dial_summary"
             app:title="@string/concurrent_dial" />
@@ -53,7 +53,7 @@
             app:defaultValue="0"
             app:entries="@array/rules_dat_provider"
             app:entryValues="@array/int_array_5"
-            app:icon="@drawable/ic_baseline_rule_folder_24"
+            app:icon="@drawable/solar_cloud_storage_linear"
             app:key="rulesProvider"
             app:title="@string/route_rules_provider"
             app:useSimpleSummaryProvider="true" />
@@ -71,7 +71,7 @@
             app:useSimpleSummaryProvider="true" />
 
         <Preference
-            app:icon="@drawable/ic_baseline_shutter_speed_24"
+            app:icon="@drawable/solar_stopwatch_linear"
             app:key="rulesUpdateInterval"
             app:persistent="false"
             app:summary="@string/ruleset_update_interval_summary"

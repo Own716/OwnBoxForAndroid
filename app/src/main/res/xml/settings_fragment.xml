@@ -5,17 +5,20 @@
     <PreferenceCategory app:title="@string/fragment_settings">
 
         <SwitchPreferenceCompat
+            app:icon="@drawable/solar_scissors_square_linear"
             app:key="enableTLSFragment"
             app:title="@string/enable_tls_fragment" />
 
         <EditTextPreference
             app:defaultValue="100-200"
+            app:icon="@drawable/solar_ruler_angular_linear"
             app:key="fragmentLength"
             app:title="@string/fragment_length"
             app:useSimpleSummaryProvider="true" />
 
         <EditTextPreference
             app:defaultValue="10-20"
+            app:icon="@drawable/solar_stopwatch_linear"
             app:key="fragmentInterval"
             app:title="@string/fragment_interval"
             app:useSimpleSummaryProvider="true" />
