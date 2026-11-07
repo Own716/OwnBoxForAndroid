@@ -57,8 +57,12 @@ open class ToolbarFragment : Fragment {
                     }
                 }
             } else {
-                toolbar.contentInsetStartWithNavigation = dp2px(48)
-                toolbar.setContentInsetsRelative(dp2px(48), dp2px(4))
+                val cardMarginH = runCatching {
+                    requireContext().resources.getDimensionPixelSize(R.dimen.telegram_card_margin_horizontal)
+                }.getOrDefault(dp2px(12))
+                toolbar.setPaddingRelative(cardMarginH, toolbar.paddingTop, cardMarginH, toolbar.paddingBottom)
+                toolbar.contentInsetStartWithNavigation = dp2px(40)
+                toolbar.setContentInsetsRelative(dp2px(40), dp2px(4))
             }
             val primaryTextColor = requireContext().getColorAttr(android.R.attr.textColorPrimary)
             toolbar.setTitleTextColor(primaryTextColor)

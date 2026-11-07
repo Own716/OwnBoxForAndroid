@@ -533,8 +533,19 @@ class ConfigurationFragment @JvmOverloads constructor(
 
         val titleFactor = UiScaleManager.toolbarTitleFactor()
         val iconFactor = UiScaleManager.toolbarIconFactor()
+        val tabFactor = UiScaleManager.tabBarFactor()
+        val effectiveFactor = maxOf(tabFactor, iconFactor)
+
+        val toolbarContainer = view?.findViewById<View>(R.id.toolbar_container)
+        val scaledContainerHeight = (dp2px(38) * effectiveFactor).toInt().coerceIn(dp2px(26), dp2px(54)) + dp2px(10)
+        toolbarContainer?.layoutParams = toolbarContainer?.layoutParams?.apply {
+            if (height != scaledContainerHeight) {
+                height = scaledContainerHeight
+            }
+        }
+
         val navScale = 0.9f * iconFactor
-        val navMinW = (dp2px(40) * iconFactor).toInt().coerceAtLeast(dp2px(28))
+        val navSize = (dp2px(38) * effectiveFactor).toInt().coerceIn(dp2px(26), dp2px(54))
 
         val titleView = view?.findViewById<TextView>(R.id.toolbar_title_view)
         titleView?.let { tv ->
@@ -552,8 +563,10 @@ class ConfigurationFragment @JvmOverloads constructor(
         for (i in 0 until toolbar.childCount) {
             val child = toolbar.getChildAt(i)
             if (child is android.widget.ImageButton) {
-                child.minimumWidth = navMinW
-                child.setPadding(dp2px(8), 0, dp2px(8), 0)
+                child.minimumWidth = navSize
+                child.minimumHeight = navSize
+                child.setPadding(0, 0, 0, 0)
+                child.scaleType = ImageView.ScaleType.CENTER_INSIDE
                 child.scaleX = navScale
                 child.scaleY = navScale
             } else if (child is ActionMenuView) {
@@ -575,8 +588,10 @@ class ConfigurationFragment @JvmOverloads constructor(
             for (i in 0 until toolbar.childCount) {
                 val child = toolbar.getChildAt(i)
                 if (child is android.widget.ImageButton) {
-                    child.minimumWidth = navMinW
-                    child.setPadding(dp2px(8), 0, dp2px(8), 0)
+                    child.minimumWidth = navSize
+                    child.minimumHeight = navSize
+                    child.setPadding(0, 0, 0, 0)
+                    child.scaleType = ImageView.ScaleType.CENTER_INSIDE
                     child.scaleX = navScale
                     child.scaleY = navScale
                 } else if (child is ActionMenuView) {
@@ -597,9 +612,11 @@ class ConfigurationFragment @JvmOverloads constructor(
     private fun applyActionMenuSpacing(menuView: ActionMenuView) {
         if (isAdjustingMenuSpacing) return
         val iconFactor = UiScaleManager.toolbarIconFactor()
-        val minW = (dp2px(33) * iconFactor).toInt().coerceIn(dp2px(22), dp2px(46))
+        val minW = (dp2px(32) * iconFactor).toInt().coerceIn(dp2px(22), dp2px(44))
         val gap = dp2px(2)
-        val endMargin = dp2px(6)
+        val cardMargin = dp2px(8)
+        val padH = dp2px(6)
+        val endMargin = cardMargin + padH
         val iconScale = 0.88f * iconFactor
 
         menuView.clipChildren = false
@@ -647,7 +664,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                     minimumWidth = minW
                     maxWidth = minW
                     setPadding(0, 0, 0, 0)
-                    scaleType = ImageView.ScaleType.CENTER
+                    scaleType = ImageView.ScaleType.CENTER_INSIDE
                     scaleX = iconScale
                     scaleY = iconScale
                     (layoutParams as? ViewGroup.MarginLayoutParams)?.let { lp ->
@@ -900,14 +917,19 @@ class ConfigurationFragment @JvmOverloads constructor(
 
         val density = resources.displayMetrics.density
         val iconFactor = UiScaleManager.toolbarIconFactor()
-        val capsuleH = (29f * density * iconFactor).coerceIn(
-            24f * density,
-            (ch - 10f * density).coerceAtLeast(24f * density)
+        val tabFactor = UiScaleManager.tabBarFactor()
+        val effectiveFactor = maxOf(tabFactor, iconFactor)
+
+        val capsuleH = (38f * density * effectiveFactor).coerceIn(
+            26f * density,
+            (ch - 6f * density).coerceAtLeast(26f * density)
         )
         val cy = ch * 0.5f
         val capTop = cy - capsuleH * 0.5f
         val capBottom = cy + capsuleH * 0.5f
         val capRadius = capsuleH * 0.5f
+
+        val cardMargin = 8f * density
 
         var rightL = 0f
         var rightR = 0f
@@ -919,6 +941,31 @@ class ConfigurationFragment @JvmOverloads constructor(
                 menuView = child
             } else if (child is android.widget.ImageButton && child.visibility == View.VISIBLE) {
                 navBtn = child
+            }
+        }
+
+        // Scheme 1: Left independent circular floating button around navigation icon [|],
+        // perfectly centered in a circle of width capsuleH, anchored at cardMargin.
+        val leftL = cardMargin
+        var leftR = if (navBtn != null && navBtn.width > 0) {
+            leftL + capsuleH
+        } else {
+            0f
+        }
+
+        // Accurately center the navBtn icon at (leftL + capsuleH * 0.5, cy)
+        navBtn?.let { btn ->
+            val targetCenterX = leftL + capsuleH * 0.5f
+            val currentCenterX = toolbar.left + btn.left + btn.width * 0.5f
+            val dx = targetCenterX - currentCenterX
+            if (kotlin.math.abs(btn.translationX - dx) > 0.4f) {
+                btn.translationX = dx
+            }
+            val targetCenterY = cy
+            val currentCenterY = toolbar.top + btn.top + btn.height * 0.5f
+            val dy = targetCenterY - currentCenterY
+            if (kotlin.math.abs(btn.translationY - dy) > 0.4f) {
+                btn.translationY = dy
             }
         }
 
@@ -936,8 +983,9 @@ class ConfigurationFragment @JvmOverloads constructor(
                 val baseOffset = (toolbar.left + menuView.left).toFloat()
                 val rawL = baseOffset + minChildL
                 val rawR = baseOffset + maxChildR
-                rightL = (rawL - 2.5f * density).coerceAtLeast(5.5f * density)
-                rightR = (rawR - 1.5f * density).coerceAtMost(cw - 5.5f * density)
+                val padH = 6f * density
+                rightR = (rawR + padH).coerceAtMost(cw - cardMargin)
+                rightL = (rawL - padH).coerceAtLeast(leftR + 8f * density)
                 if (rightR - rightL < capsuleH) {
                     val mid = (rightL + rightR) * 0.5f
                     rightL = mid - capsuleH * 0.5f
@@ -946,17 +994,27 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
         }
 
-        // Scheme 1: Left independent circular floating button around navigation icon [|],
-        // leaving the "OwnBox" title cleanly outside the capsule.
-        val leftL = 5.5f * density
-        var leftR = if (navBtn != null && navBtn.width > 0) {
-            leftL + capsuleH
-        } else {
-            0f
+        if (leftR > leftL && rightR > rightL) {
+            leftR = leftR.coerceAtMost(rightL - 8f * density)
         }
 
-        if (leftR > leftL && rightR > rightL) {
-            leftR = leftR.coerceAtMost(rightL - 6f * density)
+        // Dynamic Title Positioning & Anti-Collision
+        val titleView = rootView.findViewById<TextView>(R.id.toolbar_title_view)
+        if (titleView != null && leftR > 0f) {
+            val titleStart = (leftR + 8f * density).toInt()
+            (titleView.layoutParams as? ViewGroup.MarginLayoutParams)?.let { lp ->
+                if (lp.leftMargin != titleStart) {
+                    lp.leftMargin = titleStart
+                    titleView.layoutParams = lp
+                }
+            }
+            val titleBoundR = if (rightL > leftR + 16f * density) rightL else cw - cardMargin
+            val maxTitleW = (titleBoundR - titleStart - 8f * density).toInt().coerceAtLeast((30f * density).toInt())
+            if (titleView.maxWidth != maxTitleW) {
+                titleView.maxWidth = maxTitleW
+            }
+            titleView.ellipsize = android.text.TextUtils.TruncateAt.END
+            titleView.isSingleLine = true
         }
 
         drawable.updateCapsules(
@@ -1013,7 +1071,9 @@ class ConfigurationFragment @JvmOverloads constructor(
         val themeColor = Theme.getPrimaryColor(ctx)
 
         // 1. Style Outer Big Capsule Track (groupTabContainer) & Top Bar Floating Capsules
-        val containerRadius = dp2px(19).toFloat()
+        val tabFactor = UiScaleManager.tabBarFactor()
+        val scaledCapsuleH = (dp2px(38) * tabFactor).toFloat().coerceIn(dp2px(26).toFloat(), dp2px(54).toFloat())
+        val containerRadius = scaledCapsuleH * 0.5f
         val containerBgColor: Int
         val containerStrokeColor: Int
         val shadowBaseColor: Int
@@ -1428,9 +1488,9 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
 
         val tabFactor = UiScaleManager.tabBarFactor()
-        if (tabFactor != 1.0f) {
-            val scaledTabHeight = (dp2px(38) * tabFactor).toInt().coerceIn(dp2px(26), dp2px(54)) + dp2px(10)
-            groupTabContainer?.layoutParams = groupTabContainer?.layoutParams?.apply {
+        val scaledTabHeight = (dp2px(38) * tabFactor).toInt().coerceIn(dp2px(26), dp2px(54)) + dp2px(10)
+        groupTabContainer?.layoutParams = groupTabContainer?.layoutParams?.apply {
+            if (height != scaledTabHeight) {
                 height = scaledTabHeight
             }
         }
