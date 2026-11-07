@@ -1,5 +1,18 @@
 # OwnBox for Android 更新日志 (Changelog)
 
+# OwnBox for Android v26.11.3.83 预览版
+
+* 路由设置页面图标全面规范重构与补齐（全量 27 处设置项）：
+  - 规则基本信息：路由名称替换为规则标签（`tag`），动作替换为正圆执行播放（`play-circle`），出站目标替换为网络路由（`routing`）；
+  - 常用匹配规则：彻底清除历史遗留的“写字楼”办公大厦，域名后缀替换为截断链接（`link-broken`）；域名替换为经典经纬线地球仪（`global`）；IP CIDR 替换为网络服务器方块（`server-square`）；规则集替换为极简规则清单（`checklist-minimalistic`）；网络类型替换为多路信号发射塔（`transmission`）；
+  - 高级匹配规则：
+    * 彻底清除荒唐错位的鸡尾酒吧台杯（🍸）、客运轮船（🚢）以及小房屋（🏠）等历史遗留图标；
+    * 源 IP CIDR 替换为起点定位波纹（`map-point-wave`），端口/端口范围替换为服务接口插座（`socket`），源端口范围替换为起点数据进入（`login-3`）；
+    * 远程规则集自动更新间隔替换为正圆循环刷新（`refresh-circle`），网络协议替换为双向传输交换（`transfer-horizontal`），协议替换为官方线性分层（`layers`），自定义配置替换为方块代码片段（`code-square` </>）；
+    * 全量补齐 12 处长期缺失图标：域名关键字（`magnifer` 放大镜）、域名正则（`code-file` 代码文件）、精确域名（`target` 精确靶心）、私有 IP（`shield-keyhole` 钥匙孔盾）、私有源 IP（`shield` 线性盾牌）、IP 版本（`tuning-square-2` 版本调音器）、入站标签（`tag-horizontal` 横向标签）、反转匹配结果（`restart-square` 逻辑逆转）、复写目标地址（`pen-new-square` 编辑笔）、复写目标端口（`tuning` 调音滑块）、计费网络（`card-2` 流量卡片）、高级（`settings-minimalistic` 极简齿轮）。
+* 所有新增与替换图标统一采用 480 Design Solar Linear 官方设计体系与原生深石墨灰配色（`#212121`），严格限定范围，“应用”等未指定项及业务图标 100% 保持不动。
+
+
 # OwnBox for Android v26.11.3.82 预览版
 
 * 连接观测设置页面图标规范重构与补齐：
