@@ -413,7 +413,12 @@ fun buildConfig(
         return list
     }
 
-    val extraRules = if (forTest) listOf() else SagerDatabase.rulesDao.enabledRules()
+    val isSmartRouting = !forTest && DataStore.smartMode && !DataStore.globalMode
+    val extraRules = when {
+        forTest -> listOf()
+        isSmartRouting -> io.nekohasekai.sagernet.route.SmartRouteRules.buildSmartRules(DataStore.smartRouteCountry)
+        else -> SagerDatabase.rulesDao.enabledRules()
+    }
     val extraProxies =
         if (forTest) mapOf() else SagerDatabase.proxyDao.getEntities(extraRules.mapNotNull { rule ->
             rule.outbound.takeIf { it > 0 && it != proxy.id }
@@ -1943,19 +1948,14 @@ fun buildConfig(
                 server = "dns-remote"
             })
 
-            // 中国大陆核心应用与常用域名后缀静态直连保底名单
-            val domesticCoreDomainSuffixes = listOf(
-                "cn",
-                "douyin.com", "iesdouyin.com", "bytedance.com", "snssdk.com", "pstatp.com", "bytecdn.cn",
-                "qq.com", "tencent.com", "weixin.com", "qpic.cn", "gtimg.cn",
-                "taobao.com", "alipay.com", "alicdn.com", "tmall.com", "alibaba.com", "aliyun.com",
-                "baidu.com", "bdstatic.com", "bilibili.com", "bilivideo.com", "jd.com", "meituan.com",
-                "amap.com", "sina.com.cn", "weibo.com", "zhihu.com", "163.com", "sohu.com"
-            )
-            dns.rules.add(DNSRule_DefaultOptions().apply {
-                domain_suffix = domesticCoreDomainSuffixes
-                server = "dns-direct"
-            })
+            // 所属国家/地区核心应用与常用域名后缀静态直连保底名单
+            val domesticCoreDomainSuffixes = io.nekohasekai.sagernet.route.SmartRouteRules.domesticCoreDomainSuffixes(DataStore.smartRouteCountry)
+            if (!DataStore.globalMode) {
+                dns.rules.add(DNSRule_DefaultOptions().apply {
+                    domain_suffix = domesticCoreDomainSuffixes
+                    server = "dns-direct"
+                })
+            }
 
             // 提取 directDNS 与 remoteDns 的域名及 IP/CIDR 目标
             val (rawDirectDomains, directIps) = extractDnsTargets(directDNS, false)
@@ -2002,11 +2002,13 @@ fun buildConfig(
                 outbound = mainProxyTag
             })
 
-            // 国内主流服务直连保底规则（抖音、微信、淘宝、支付宝、高德等），保障国内应用绝不误入海外代理
-            topRouteRules.add(Rule_DefaultOptions().apply {
-                domain_suffix = domesticCoreDomainSuffixes
-                outbound = TAG_DIRECT
-            })
+            // 本国主流服务直连保底规则（非全局模式下保障本国核心服务绝不误入海外代理）
+            if (!DataStore.globalMode) {
+                topRouteRules.add(Rule_DefaultOptions().apply {
+                    domain_suffix = domesticCoreDomainSuffixes
+                    outbound = TAG_DIRECT
+                })
+            }
 
             // Telegram 官方数据中心（DC 1~5）及核心媒体 CDN 纯 IP 段
             val telegramDcIps = listOf(

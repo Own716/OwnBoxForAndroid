@@ -1343,7 +1343,7 @@
     <string name="settings_ui_summary">Appearance, card style, language and haptics</string>
     <string name="settings_vpn_summary">Auto-connect, per-app proxy, bypass LAN, strict route, MTU</string>
     <string name="settings_mode_summary">Service mode, mixed inbound, proxy port, LAN sharing</string>
-    <string name="settings_core_summary">Traffic sniffing, IPv6, route rules provider and update</string>
+    <string name="settings_core_summary">Smart routing region, traffic sniffing, IPv6, route rules provider and update</string>
     <string name="settings_dns_summary">Remote/Direct DNS, FakeDNS, DNS strategy and Hosts</string>
     <string name="settings_fragment_summary">TLS fragment toggle, length and interval control</string>
     <string name="settings_observatory_summary">Connection test URL, speed test mode and timeouts</string>
@@ -1368,4 +1368,16 @@
     <string name="reset_order_confirm_message">Reset all nodes in this group to their initial subscription/default order?</string>
     <string name="reset_order_done_toast">Restored to default order</string>
     <string name="reorder_all_groups_not_supported">Please switch to a specific group tab to adjust node order</string>
+    <string name="smart_route_country">Smart Routing Country / Region</string>
+    <string name="smart_country_cn">China Mainland (CN)</string>
+    <string name="smart_country_ir">Iran (IR)</string>
+    <string name="smart_country_ru">Russia (RU)</string>
+    <string name="smart_country_tr">Turkey (TR)</string>
+    <string name="smart_country_id">Indonesia (ID)</string>
+    <string name="smart_country_in">India (IN)</string>
+    <string name="smart_country_vn">Vietnam (VN)</string>
+    <string name="smart_country_br">Brazil (BR)</string>
+    <string name="status_smart_routing">Smart Routing</string>
+    <string name="status_global_active">Global Active</string>
+    <string name="status_rule_active">By Rules</string>
 </resources>

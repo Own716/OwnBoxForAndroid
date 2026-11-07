@@ -841,4 +841,25 @@
         <item>@string/route_network_type_other</item>
     </string-array>
 
+    <string-array name="smart_route_country_entries">
+        <item>@string/smart_country_cn</item>
+        <item>@string/smart_country_ir</item>
+        <item>@string/smart_country_ru</item>
+        <item>@string/smart_country_tr</item>
+        <item>@string/smart_country_id</item>
+        <item>@string/smart_country_in</item>
+        <item>@string/smart_country_vn</item>
+        <item>@string/smart_country_br</item>
+    </string-array>
+    <string-array name="smart_route_country_values" translatable="false">
+        <item>cn</item>
+        <item>ir</item>
+        <item>ru</item>
+        <item>tr</item>
+        <item>id</item>
+        <item>in</item>
+        <item>vn</item>
+        <item>br</item>
+    </string-array>
+
 </resources>

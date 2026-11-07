@@ -59,7 +59,12 @@ object ActiveOutboundTracker {
             if (runCatching { DataStore.isGroupLoadBalance(group.id) }.getOrDefault(false)) return "负载均衡"
         }
         val isGlobal = runCatching { DataStore.globalMode }.getOrDefault(false)
-        return if (isGlobal) "全局模式" else "规则分流"
+        val isSmart = runCatching { DataStore.smartMode }.getOrDefault(false)
+        return when {
+            isGlobal -> "全局模式"
+            isSmart -> "智能分流"
+            else -> "规则分流"
+        }
     }
 
     fun onProfileSwitched(newProfile: ProxyEntity) {

@@ -238,6 +238,8 @@ object Key {
     const val WEBDAV_PATH = "webdavPath"
 
     const val GLOBAL_MODE = "globalMode"
+    const val SMART_MODE = "smartMode"
+    const val SMART_ROUTE_COUNTRY = "smartRouteCountry"
 }
 
 object TunImplementation {

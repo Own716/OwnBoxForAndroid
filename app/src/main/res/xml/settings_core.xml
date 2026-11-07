@@ -5,6 +5,15 @@
     <PreferenceCategory app:title="@string/core_settings">
 
         <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:defaultValue="cn"
+            app:entries="@array/smart_route_country_entries"
+            app:entryValues="@array/smart_route_country_values"
+            app:icon="@drawable/baseline_public_24"
+            app:key="smartRouteCountry"
+            app:title="@string/smart_route_country"
+            app:useSimpleSummaryProvider="true" />
+
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference
             app:defaultValue="1"
             app:entries="@array/traffic_sniffing_values"
             app:entryValues="@array/int_array_2"

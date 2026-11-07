@@ -755,25 +755,31 @@ class MainActivity : ThemedActivity(),
         val btnCustomRoute = proxyModeView.findViewById<View>(R.id.btn_custom_route)
 
         btnSmart.setOnClickListener {
-            if (DataStore.globalMode) {
+            if (DataStore.smartMode && !DataStore.globalMode) {
+                DataStore.smartMode = false
+            } else {
+                DataStore.smartMode = true
                 DataStore.globalMode = false
-                updateProxyModeCard(proxyModeView)
-                if (DataStore.serviceState.canStop) {
-                    runCatching { SagerNet.reloadService() }
-                }
-                it.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
             }
+            updateProxyModeCard(proxyModeView)
+            if (DataStore.serviceState.canStop) {
+                runCatching { SagerNet.reloadService() }
+            }
+            it.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
         }
 
         btnGlobal.setOnClickListener {
-            if (!DataStore.globalMode) {
+            if (DataStore.globalMode) {
+                DataStore.globalMode = false
+            } else {
                 DataStore.globalMode = true
-                updateProxyModeCard(proxyModeView)
-                if (DataStore.serviceState.canStop) {
-                    runCatching { SagerNet.reloadService() }
-                }
-                it.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+                DataStore.smartMode = false
             }
+            updateProxyModeCard(proxyModeView)
+            if (DataStore.serviceState.canStop) {
+                runCatching { SagerNet.reloadService() }
+            }
+            it.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
         }
 
         btnAppProxy.setOnClickListener {
@@ -795,6 +801,7 @@ class MainActivity : ThemedActivity(),
     private fun updateProxyModeCard(root: View? = proxyModeCardView) {
         val view = root ?: return
         val isGlobal = DataStore.globalMode
+        val isSmart = DataStore.smartMode && !isGlobal
         val btnSmart = view.findViewById<LinearLayout>(R.id.btn_mode_smart) ?: return
         val btnGlobal = view.findViewById<LinearLayout>(R.id.btn_mode_global) ?: return
         val iconSmart = view.findViewById<ImageView>(R.id.icon_mode_smart)
@@ -806,20 +813,24 @@ class MainActivity : ThemedActivity(),
         val onSurfaceColor = getColorAttr(R.attr.colorOnSurface)
         val onSurfaceVariantColor = getColorAttr(R.attr.colorOnSurfaceVariant)
 
-        if (!isGlobal) {
+        if (isSmart) {
             btnSmart.setBackgroundResource(R.drawable.bg_proxy_mode_btn_active)
-            btnGlobal.setBackgroundResource(R.drawable.bg_proxy_mode_btn_inactive)
             iconSmart.drawable?.mutate()?.setTint(primaryColor)
             textSmart.setTextColor(primaryColor)
-            iconGlobal.drawable?.mutate()?.setTint(onSurfaceVariantColor)
-            textGlobal.setTextColor(onSurfaceVariantColor)
         } else {
             btnSmart.setBackgroundResource(R.drawable.bg_proxy_mode_btn_inactive)
-            btnGlobal.setBackgroundResource(R.drawable.bg_proxy_mode_btn_active)
             iconSmart.drawable?.mutate()?.setTint(onSurfaceVariantColor)
             textSmart.setTextColor(onSurfaceVariantColor)
+        }
+
+        if (isGlobal) {
+            btnGlobal.setBackgroundResource(R.drawable.bg_proxy_mode_btn_active)
             iconGlobal.drawable?.mutate()?.setTint(primaryColor)
             textGlobal.setTextColor(primaryColor)
+        } else {
+            btnGlobal.setBackgroundResource(R.drawable.bg_proxy_mode_btn_inactive)
+            iconGlobal.drawable?.mutate()?.setTint(onSurfaceVariantColor)
+            textGlobal.setTextColor(onSurfaceVariantColor)
         }
 
         // App proxy status
@@ -848,35 +859,61 @@ class MainActivity : ThemedActivity(),
             }
         }
 
-        // Custom route status
+        // Custom route three-state indicator: 走智能分流 / 全局生效中 / 按规则运行
+        val btnCustomRoute = view.findViewById<LinearLayout>(R.id.btn_custom_route)
+        val iconCustomRoute = view.findViewById<ImageView>(R.id.icon_custom_route)
         val chipCustomRoute = view.findViewById<LinearLayout>(R.id.chip_custom_route)
         val textStatusCustomRoute = view.findViewById<TextView>(R.id.status_text_custom_route)
         val dotStatusCustomRoute = view.findViewById<View>(R.id.status_dot_custom_route)
 
         if (chipCustomRoute != null && textStatusCustomRoute != null && dotStatusCustomRoute != null) {
-            runOnDefaultDispatcher {
-                val hasCustomRules = runCatching {
-                    io.nekohasekai.sagernet.database.SagerDatabase.rulesDao.allRules().any { it.enabled }
-                }.getOrDefault(false)
-
-                onMainDispatcher {
-                    if (isDestroyed || isFinishing) return@onMainDispatcher
-                    if (hasCustomRules) {
-                        chipCustomRoute.setBackgroundResource(R.drawable.bg_chip_status_connected)
-                        textStatusCustomRoute.text = getString(R.string.status_enabled)
-                        textStatusCustomRoute.setTextColor(Color.parseColor("#34D399"))
-                        dotStatusCustomRoute.background = GradientDrawable().apply {
-                            shape = GradientDrawable.OVAL
-                            setColor(Color.parseColor("#10B981"))
-                        }
-                    } else {
-                        chipCustomRoute.setBackgroundResource(R.drawable.bg_chip_status_disconnected)
-                        textStatusCustomRoute.text = getString(R.string.status_disabled)
-                        textStatusCustomRoute.setTextColor(Color.parseColor("#94A3B8"))
-                        dotStatusCustomRoute.background = GradientDrawable().apply {
-                            shape = GradientDrawable.OVAL
-                            setColor(Color.parseColor("#94A3B8"))
-                        }
+            when {
+                isSmart -> {
+                    btnCustomRoute?.setBackgroundResource(R.drawable.bg_proxy_mode_row)
+                    iconCustomRoute?.drawable?.mutate()?.setTint(onSurfaceColor)
+                    chipCustomRoute.background = GradientDrawable().apply {
+                        shape = GradientDrawable.RECTANGLE
+                        cornerRadius = dp(999).toFloat()
+                        setColor(Color.parseColor("#243B82F6"))
+                        setStroke(dp(1), Color.parseColor("#663B82F6"))
+                    }
+                    textStatusCustomRoute.text = getString(R.string.status_smart_routing)
+                    textStatusCustomRoute.setTextColor(Color.parseColor("#3B82F6"))
+                    dotStatusCustomRoute.background = GradientDrawable().apply {
+                        shape = GradientDrawable.OVAL
+                        setColor(Color.parseColor("#3B82F6"))
+                    }
+                }
+                isGlobal -> {
+                    btnCustomRoute?.setBackgroundResource(R.drawable.bg_proxy_mode_row)
+                    iconCustomRoute?.drawable?.mutate()?.setTint(onSurfaceColor)
+                    chipCustomRoute.background = GradientDrawable().apply {
+                        shape = GradientDrawable.RECTANGLE
+                        cornerRadius = dp(999).toFloat()
+                        setColor(Color.parseColor("#2694A3B8"))
+                        setStroke(dp(1), Color.parseColor("#4D94A3B8"))
+                    }
+                    textStatusCustomRoute.text = getString(R.string.status_global_active)
+                    textStatusCustomRoute.setTextColor(Color.parseColor("#94A3B8"))
+                    dotStatusCustomRoute.background = GradientDrawable().apply {
+                        shape = GradientDrawable.OVAL
+                        setColor(Color.parseColor("#94A3B8"))
+                    }
+                }
+                else -> {
+                    btnCustomRoute?.background = GradientDrawable().apply {
+                        shape = GradientDrawable.RECTANGLE
+                        cornerRadius = dp(14).toFloat()
+                        setColor(Color.parseColor("#1410B981"))
+                        setStroke(dp(1), Color.parseColor("#5910B981"))
+                    }
+                    iconCustomRoute?.drawable?.mutate()?.setTint(Color.parseColor("#10B981"))
+                    chipCustomRoute.setBackgroundResource(R.drawable.bg_chip_status_connected)
+                    textStatusCustomRoute.text = getString(R.string.status_rule_active)
+                    textStatusCustomRoute.setTextColor(Color.parseColor("#10B981"))
+                    dotStatusCustomRoute.background = GradientDrawable().apply {
+                        shape = GradientDrawable.OVAL
+                        setColor(Color.parseColor("#10B981"))
                     }
                 }
             }

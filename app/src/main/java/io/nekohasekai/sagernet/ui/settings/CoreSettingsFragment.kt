@@ -17,6 +17,7 @@ class CoreSettingsFragment : BaseSettingsPreferenceFragment() {
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         super.onCreatePreferences(savedInstanceState, rootKey)
 
+        findPreference<Preference>(Key.SMART_ROUTE_COUNTRY)?.onPreferenceChangeListener = reloadListener
         findPreference<Preference>(Key.TRAFFIC_SNIFFING)?.onPreferenceChangeListener = reloadListener
         findPreference<Preference>(Key.RESOLVE_DESTINATION)?.onPreferenceChangeListener = reloadListener
         findPreference<Preference>(Key.IPV6_MODE)?.onPreferenceChangeListener = reloadListener

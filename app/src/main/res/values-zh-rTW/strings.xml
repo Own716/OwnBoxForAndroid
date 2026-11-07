@@ -891,7 +891,7 @@
     <string name="settings_ui_summary">外觀、主題、卡片樣式、語言與觸覺回饋</string>
     <string name="settings_vpn_summary">自動連線、分應用代理、繞過 LAN、嚴格路由、MTU</string>
     <string name="settings_mode_summary">運作模式、混合入站、代理埠、認證、區域網路共用</string>
-    <string name="settings_core_summary">流量探測、IPv6 策略、路由規則提供者與自動更新</string>
+    <string name="settings_core_summary">智慧分流地區、流量探測、IPv6 策略、路由規則提供者與自動更新</string>
     <string name="settings_dns_summary">遠端/直連 DNS、FakeDNS、DNS 策略與 Hosts</string>
     <string name="settings_fragment_summary">TLS 分片開啟、分片長度與發包間隔控制</string>
     <string name="settings_observatory_summary">連通性測試 URL、測速模式與逾時配置</string>
@@ -910,4 +910,16 @@
     <string name="reset_order_confirm_message">是否將當前分組的所有節點恢復為訂閱/匯入時的初始預設順序？</string>
     <string name="reset_order_done_toast">已恢復預設順序</string>
     <string name="reorder_all_groups_not_supported">請在具體分組內調整節點順序</string>
+    <string name="smart_route_country">智慧分流國家/地區</string>
+    <string name="smart_country_cn">中國大陸 (CN)</string>
+    <string name="smart_country_ir">伊朗 (IR)</string>
+    <string name="smart_country_ru">俄羅斯 (RU)</string>
+    <string name="smart_country_tr">土耳其 (TR)</string>
+    <string name="smart_country_id">印尼 (ID)</string>
+    <string name="smart_country_in">印度 (IN)</string>
+    <string name="smart_country_vn">越南 (VN)</string>
+    <string name="smart_country_br">巴西 (BR)</string>
+    <string name="status_smart_routing">走智慧分流</string>
+    <string name="status_global_active">全域生效中</string>
+    <string name="status_rule_active">按規則運作</string>
 </resources>
