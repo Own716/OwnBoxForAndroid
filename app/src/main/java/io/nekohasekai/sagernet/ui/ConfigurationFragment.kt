@@ -3905,12 +3905,6 @@ class ConfigurationFragment @JvmOverloads constructor(
             var isReorderMode: Boolean = false
             var snapshotIds: List<Long> = emptyList()
             var snapshotOrders: Map<Long, Long> = emptyMap()
-            private var reloadJob: kotlinx.coroutines.Job? = null
-
-            override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
-                super.onDetachedFromRecyclerView(recyclerView)
-                reloadJob?.cancel()
-            }
 
             fun cancelMove() {
                 if (snapshotIds.isNotEmpty()) {
@@ -4433,103 +4427,100 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
 
             fun reloadProfiles() {
-                reloadJob?.cancel()
-                reloadJob = runOnDefaultDispatcher {
-                    var newProfiles = if (isAllGroupsTab) {
-                        // All-groups tab: fetch every profile from non-disabled groups
-                        SagerDatabase.proxyDao.getAll().filter { !DataStore.isGroupDisabled(it.groupId) }
+                var newProfiles = if (isAllGroupsTab) {
+                    // All-groups tab: fetch every profile from non-disabled groups
+                    SagerDatabase.proxyDao.getAll().filter { !DataStore.isGroupDisabled(it.groupId) }
+                } else {
+                    if (!proxyGroup.ungrouped && DataStore.isGroupDisabled(proxyGroup.id)) {
+                        emptyList()
                     } else {
-                        if (!proxyGroup.ungrouped && DataStore.isGroupDisabled(proxyGroup.id)) {
-                            emptyList()
+                        SagerDatabase.proxyDao.getByGroup(proxyGroup.id)
+                    }
+                }
+                val pf = parentFragment as? ConfigurationFragment
+                if (pf?.excludedIds != null && pf.excludedIds.isNotEmpty()) {
+                    val excludeSet = pf.excludedIds.toSet()
+                    newProfiles = newProfiles.filter { it.id !in excludeSet }
+                }
+                val currentOrder = if (isAllGroupsTab) DataStore.allGroupsOrder else proxyGroup.order
+                when (currentOrder) {
+                    GroupOrder.ORIGIN -> {
+                        if (isAllGroupsTab) {
+                            newProfiles = newProfiles.sortedBy { it.id }
                         } else {
-                            SagerDatabase.proxyDao.getByGroup(proxyGroup.id)
+                            newProfiles = newProfiles.sortedBy { it.userOrder }
                         }
                     }
-                    val pf = parentFragment as? ConfigurationFragment
-                    if (pf?.excludedIds != null && pf.excludedIds.isNotEmpty()) {
-                        val excludeSet = pf.excludedIds.toSet()
-                        newProfiles = newProfiles.filter { it.id !in excludeSet }
+
+                    GroupOrder.BY_NAME -> {
+                        newProfiles = newProfiles.sortedBy { it.displayName() }
                     }
-                    val currentOrder = if (isAllGroupsTab) DataStore.allGroupsOrder else proxyGroup.order
-                    when (currentOrder) {
-                        GroupOrder.ORIGIN -> {
-                            if (isAllGroupsTab) {
-                                newProfiles = newProfiles.sortedBy { it.id }
-                            } else {
-                                newProfiles = newProfiles.sortedBy { it.userOrder }
-                            }
-                        }
 
-                        GroupOrder.BY_NAME -> {
-                            newProfiles = newProfiles.sortedBy { it.displayName() }
-                        }
-
-                        GroupOrder.BY_DELAY -> {
-                            newProfiles = newProfiles.sortedWith(
-                                compareBy(
-                                    { if (it.status == 1 && it.ping > 0) 0 else 1 },
-                                    { if (it.status == 1 && it.ping > 0) it.ping else Int.MAX_VALUE },
-                                    { it.displayName() }
-                                )
+                    GroupOrder.BY_DELAY -> {
+                        newProfiles = newProfiles.sortedWith(
+                            compareBy(
+                                { if (it.status == 1 && it.ping > 0) 0 else 1 },
+                                { if (it.status == 1 && it.ping > 0) it.ping else Int.MAX_VALUE },
+                                { it.displayName() }
                             )
-                        }
+                        )
                     }
+                }
 
-                    if (DataStore.hideUnavailableProfiles) {
+                if (DataStore.hideUnavailableProfiles) {
+                    val selectedProxy = selectedItem?.id ?: DataStore.selectedProxy
+                    val available = newProfiles.filter { it.status == 0 || it.status == 1 || it.id == selectedProxy }
+                    // 兜底策略：若某个分组内所有节点均测试不通，需有合理的空状态或全部展示兜底逻辑，避免列表直接变成空白界面。
+                    if (available.isNotEmpty()) {
+                        newProfiles = available
+                    }
+                }
+
+
+                val newProfileMap = newProfiles.associateBy { it.id }
+                val newProfileIds = newProfiles.map { it.id }.distinct()
+
+                var selectedProfileIndex = -1
+
+                if (selected) {
+                    if (pf?.multiSelect == true) {
+                        val firstSelected = pf.multiSelectedIds.firstOrNull()
+                        if (firstSelected != null) {
+                            selectedProfileIndex = newProfileIds.indexOf(firstSelected)
+                        }
+                    } else {
                         val selectedProxy = selectedItem?.id ?: DataStore.selectedProxy
-                        val available = newProfiles.filter { it.status == 0 || it.status == 1 || it.id == selectedProxy }
-                        // 兜底策略：若某个分组内所有节点均测试不通，需有合理的空状态或全部展示兜底逻辑，避免列表直接变成空白界面。
-                        if (available.isNotEmpty()) {
-                            newProfiles = available
-                        }
+                        selectedProfileIndex = newProfileIds.indexOf(selectedProxy)
                     }
+                }
 
+                configurationListView.post {
+                    configurationList.clear()
+                    configurationList.putAll(newProfileMap)
+                    allConfigurationIdList.clear()
+                    allConfigurationIdList.addAll(newProfileIds)
+                    configurationIdList.clear()
+                    configurationIdList.addAll(newProfileIds)
+                    notifyDataSetChanged()
 
-                    val newProfileMap = newProfiles.associateBy { it.id }
-                    val newProfileIds = newProfiles.map { it.id }.distinct()
-
-                    var selectedProfileIndex = -1
-
-                    if (selected) {
-                        if (pf?.multiSelect == true) {
-                            val firstSelected = pf.multiSelectedIds.firstOrNull()
-                            if (firstSelected != null) {
-                                selectedProfileIndex = newProfileIds.indexOf(firstSelected)
-                            }
-                        } else {
-                            val selectedProxy = selectedItem?.id ?: DataStore.selectedProxy
-                            selectedProfileIndex = newProfileIds.indexOf(selectedProxy)
-                        }
-                    }
-
-                    configurationListView.post {
-                        configurationList.clear()
-                        configurationList.putAll(newProfileMap)
-                        allConfigurationIdList.clear()
-                        allConfigurationIdList.addAll(newProfileIds)
-                        configurationIdList.clear()
-                        configurationIdList.addAll(newProfileIds)
-                        notifyDataSetChanged()
-
-                        val pendingId = pendingLocateProfileId
-                        if (pendingId != null && pendingId > 0L) {
-                            val pendingIndex = configurationIdList.indexOf(pendingId)
-                            if (pendingIndex != -1) {
-                                pendingLocateProfileId = null
-                                scrollToAndHighlight(pendingIndex, true)
-                            } else if (selectedProfileIndex != -1) {
-                                configurationListView.scrollTo(selectedProfileIndex, true)
-                            } else if (newProfiles.isNotEmpty()) {
-                                configurationListView.scrollTo(0, true)
-                            }
+                    val pendingId = pendingLocateProfileId
+                    if (pendingId != null && pendingId > 0L) {
+                        val pendingIndex = configurationIdList.indexOf(pendingId)
+                        if (pendingIndex != -1) {
+                            pendingLocateProfileId = null
+                            scrollToAndHighlight(pendingIndex, true)
                         } else if (selectedProfileIndex != -1) {
                             configurationListView.scrollTo(selectedProfileIndex, true)
                         } else if (newProfiles.isNotEmpty()) {
                             configurationListView.scrollTo(0, true)
                         }
-                        updateSubscriptionInfoCard()
-
+                    } else if (selectedProfileIndex != -1) {
+                        configurationListView.scrollTo(selectedProfileIndex, true)
+                    } else if (newProfiles.isNotEmpty()) {
+                        configurationListView.scrollTo(0, true)
                     }
+                    updateSubscriptionInfoCard()
+
                 }
             }
 

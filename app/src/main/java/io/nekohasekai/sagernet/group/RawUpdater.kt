@@ -41,7 +41,6 @@ import org.json.JSONObject
 import org.json.JSONTokener
 import org.yaml.snakeyaml.TypeDescription
 import org.yaml.snakeyaml.Yaml
-import org.yaml.snakeyaml.constructor.SafeConstructor
 import androidx.core.net.toUri
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
@@ -457,7 +456,7 @@ object RawUpdater : GroupUpdater() {
 
             try {
 
-                val yaml = Yaml(SafeConstructor()).apply {
+                val yaml = Yaml().apply {
                     addTypeDescription(TypeDescription(String::class.java, "str"))
                 }.loadAs(text, Map::class.java)
 

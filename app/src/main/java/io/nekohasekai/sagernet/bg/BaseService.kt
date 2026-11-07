@@ -41,12 +41,7 @@ class BaseService {
         /**
          * Idle state is only used by UI and will never be returned by BaseService.
          */
-        Idle, Connecting(true, true, false), Connected(true, true, true), Stopping, Stopped;
-
-        companion object {
-            @JvmStatic
-            fun fromInt(value: Int): State = values().getOrElse(value) { Idle }
-        }
+        Idle, Connecting(true, true, false), Connected(true, true, true), Stopping, Stopped,
     }
 
     interface ExpectedException

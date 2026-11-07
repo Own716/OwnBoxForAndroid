@@ -30,8 +30,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.supervisorScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import moe.matsuri.nb4a.utils.Util
 import moe.matsuri.nb4a.utils.toBytesString
 import java.lang.NumberFormatException
@@ -212,26 +210,23 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
         val groupList = ArrayList<ProxyGroup>()
 
         suspend fun reload() {
-            val groups = withContext(Dispatchers.IO) {
-                // 自动清理历史遗留的多余空未分组（老版本升级容错）
-                val allInDb = SagerDatabase.groupDao.allGroups()
-                val ungroupedInDb = allInDb.filter { it.ungrouped }
-                if (ungroupedInDb.size > 1) {
-                    for (ug in ungroupedInDb) {
-                        if (SagerDatabase.proxyDao.countByGroup(ug.id) == 0L && SagerDatabase.groupDao.allGroups().filter { it.ungrouped }.size > 1) {
-                            SagerDatabase.groupDao.deleteById(ug.id)
-                        }
+            // 自动清理历史遗留的多余空未分组（老版本升级容错）
+            val allInDb = SagerDatabase.groupDao.allGroups()
+            val ungroupedInDb = allInDb.filter { it.ungrouped }
+            if (ungroupedInDb.size > 1) {
+                for (ug in ungroupedInDb) {
+                    if (SagerDatabase.proxyDao.countByGroup(ug.id) == 0L && SagerDatabase.groupDao.allGroups().filter { it.ungrouped }.size > 1) {
+                        SagerDatabase.groupDao.deleteById(ug.id)
                     }
                 }
-                val list = SagerDatabase.groupDao.allGroups().toMutableList()
-                if (list.size > 1) {
-                    list.removeAll { it.ungrouped && SagerDatabase.proxyDao.countByGroup(it.id) == 0L }
-                }
-                list
             }
+            val groups = SagerDatabase.groupDao.allGroups().toMutableList()
+            if (groups.size > 1) {
+                groups.removeAll { it.ungrouped && SagerDatabase.proxyDao.countByGroup(it.id) == 0L }
+            }
+            groupList.clear()
+            groupList.addAll(groups)
             groupListView.post {
-                groupList.clear()
-                groupList.addAll(groups)
                 notifyDataSetChanged()
             }
         }
