@@ -6,7 +6,7 @@
 
         <SwitchPreferenceCompat
             app:defaultValue="false"
-            app:icon="@drawable/ic_communication_phonelink_ring"
+            app:icon="@drawable/solar_restart_circle_linear"
             app:key="isAutoConnect"
             app:summary="@string/auto_connect_summary"
             app:title="@string/auto_connect" />
@@ -18,11 +18,12 @@
             app:title="@string/proxied_apps" />
 
         <SwitchPreferenceCompat
-            app:icon="@drawable/ic_baseline_legend_toggle_24"
+            app:icon="@drawable/solar_routing_2_linear"
             app:key="bypassLan"
             app:title="@string/route_opt_bypass_lan" />
 
         <SwitchPreferenceCompat
+            app:icon="@drawable/solar_cpu_linear"
             app:key="bypassLanInCore"
             app:title="@string/bypass_lan_in_core" />
 
@@ -34,7 +35,7 @@
             app:title="@string/strict_route" />
 
         <SwitchPreferenceCompat
-            app:icon="@drawable/ic_device_data_usage"
+            app:icon="@drawable/solar_pie_chart_2_linear"
             app:key="meteredNetwork"
             app:summary="@string/metered_summary"
             app:title="@string/metered" />
@@ -43,7 +44,7 @@
             app:defaultValue="3"
             app:entries="@array/tun_implementation"
             app:entryValues="@array/int_array_4"
-            app:icon="@drawable/ic_baseline_flip_camera_android_24"
+            app:icon="@drawable/solar_tuning_square_2_linear"
             app:key="tunImplementation"
             app:title="@string/tun_implementation" />
 
@@ -51,7 +52,7 @@
             app:defaultValue="1400"
             app:entries="@array/mtu_select"
             app:entryValues="@array/mtu_select"
-            app:icon="@drawable/baseline_public_24"
+            app:icon="@drawable/solar_ruler_angular_linear"
             app:key="mtu"
             app:title="@string/mtu" />
 

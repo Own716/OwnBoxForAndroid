@@ -15,32 +15,32 @@
 
         <SwitchPreferenceCompat
             app:defaultValue="false"
-            app:icon="@drawable/ic_baseline_block_24"
+            app:icon="@drawable/solar_forbidden_circle_linear"
             app:key="disableMixedInbound"
             app:summary="@string/disable_mixed_inbound_sum"
             app:title="@string/disable_mixed_inbound" />
 
         <EditTextPreference
-            app:icon="@drawable/ic_maps_directions_boat"
+            app:icon="@drawable/solar_hashtag_circle_linear"
             app:key="mixedPort"
             app:title="@string/port_proxy"
             app:useSimpleSummaryProvider="true" />
 
         <Preference
-            app:icon="@drawable/ic_baseline_lock_24"
+            app:icon="@drawable/solar_lock_keyhole_linear"
             app:key="mixedAuthConfig"
             app:title="@string/mixed_auth_config" />
 
         <EditTextPreference
             app:defaultValue=""
             app:dialogMessage="@string/http_proxy_bypass_dialog_message"
-            app:icon="@drawable/ic_baseline_domain_24"
+            app:icon="@drawable/solar_checklist_minimalistic_linear"
             app:key="httpProxyBypass"
             app:title="@string/http_proxy_bypass"
             app:useSimpleSummaryProvider="true" />
 
         <Preference
-            app:icon="@drawable/ic_social_share"
+            app:icon="@drawable/solar_wi_fi_router_linear"
             app:key="lanSharing"
             app:title="@string/lan_sharing" />
 
