@@ -101,16 +101,16 @@
 
 建议优先打开 [**GitHub Releases 最新发布页**](https://github.com/Own716/OwnBoxForAndroid/releases/latest)，查看当前版本的说明、安装包与校验文件。
 
-### 当前稳定版 v26.11.3 安装包
+### 当前稳定版 v26.11.8 安装包
 
-> **版本号说明**：版本号采用「年.月.日」命名规范，`v26.11.3` 为最新发布的正式版（全面整合了 v26.11.2 及 v26.11.2.1 ~ v26.11.2.5 预览版的全部功能增强与稳定性修复）。
+> **版本号说明**：版本号采用「年.月.日」命名规范，`v26.11.8` 为最新发布的正式版（全面整合了包括三维智能分流、代理模式控制面板、网络诊断重构、全规格桌面小组件及 Solar 图标规范在内的全部功能增强与稳定性修复）。
 
 | 架构 | 适用设备 | 下载 | 校验 |
 |:--|:--|:--:|:--:|
-| **ARM64 (v8a)** · 推荐 | 大多数现代 Android 手机与平板 | [下载 APK](https://github.com/Own716/OwnBoxForAndroid/releases/download/v26.11.3/OwnBox-26.11.3-arm64-v8a-release.apk) | [SHA-256](https://github.com/Own716/OwnBoxForAndroid/releases/download/v26.11.3/sha256sums.txt) |
-| **armeabi-v7a** | 较旧的 32 位 Android 设备 | [下载 APK](https://github.com/Own716/OwnBoxForAndroid/releases/download/v26.11.3/OwnBox-26.11.3-armeabi-v7a-release.apk) | [SHA-256](https://github.com/Own716/OwnBoxForAndroid/releases/download/v26.11.3/sha256sums.txt) |
-| **x86_64** | 64 位 Android 模拟器 | [下载 APK](https://github.com/Own716/OwnBoxForAndroid/releases/download/v26.11.3/OwnBox-26.11.3-x86_64-release.apk) | [SHA-256](https://github.com/Own716/OwnBoxForAndroid/releases/download/v26.11.3/sha256sums.txt) |
-| **x86** | 32 位 Android 模拟器 | [下载 APK](https://github.com/Own716/OwnBoxForAndroid/releases/download/v26.11.3/OwnBox-26.11.3-x86-release.apk) | [SHA-256](https://github.com/Own716/OwnBoxForAndroid/releases/download/v26.11.3/sha256sums.txt) |
+| **ARM64 (v8a)** · 推荐 | 大多数现代 Android 手机与平板 | [下载 APK](https://github.com/Own716/OwnBoxForAndroid/releases/download/v26.11.8/OwnBox-26.11.8-arm64-v8a-release.apk) | [SHA-256](https://github.com/Own716/OwnBoxForAndroid/releases/download/v26.11.8/sha256sums.txt) |
+| **armeabi-v7a** | 较旧的 32 位 Android 设备 | [下载 APK](https://github.com/Own716/OwnBoxForAndroid/releases/download/v26.11.8/OwnBox-26.11.8-armeabi-v7a-release.apk) | [SHA-256](https://github.com/Own716/OwnBoxForAndroid/releases/download/v26.11.8/sha256sums.txt) |
+| **x86_64** | 64 位 Android 模拟器 | [下载 APK](https://github.com/Own716/OwnBoxForAndroid/releases/download/v26.11.8/OwnBox-26.11.8-x86_64-release.apk) | [SHA-256](https://github.com/Own716/OwnBoxForAndroid/releases/download/v26.11.8/sha256sums.txt) |
+| **x86** | 32 位 Android 模拟器 | [下载 APK](https://github.com/Own716/OwnBoxForAndroid/releases/download/v26.11.8/OwnBox-26.11.8-x86-release.apk) | [SHA-256](https://github.com/Own716/OwnBoxForAndroid/releases/download/v26.11.8/sha256sums.txt) |
 
 > **如何选择？** 一般手机请选择 `ARM64 (v8a)`。如果不确定设备架构，请先查看设备信息；不要仅凭 Android 版本号判断 CPU 架构。
 
