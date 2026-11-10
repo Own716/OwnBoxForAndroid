@@ -56,20 +56,6 @@
             app:key="mtu"
             app:title="@string/mtu" />
 
-        <SwitchPreferenceCompat
-            app:defaultValue="true"
-            app:icon="@drawable/solar_shield_warning_linear"
-            app:key="block_quic"
-            app:summary="拦截走代理的 UDP 443 (QUIC) 强制回退至 TCP，放行国内直连"
-            app:title="拦截代理 QUIC (UDP 443)" />
-
-        <SwitchPreferenceCompat
-            app:defaultValue="false"
-            app:icon="@drawable/solar_wi_fi_router_linear"
-            app:key="trusted_network_smart_enabled"
-            app:summary="连入家庭/公司等受信任 Wi-Fi 或内网时自动暂停代理，离开后自动恢复"
-            app:title="受信任网络智能启停" />
-
     </PreferenceCategory>
 
 </PreferenceScreen>

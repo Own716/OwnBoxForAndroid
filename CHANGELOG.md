@@ -1,5 +1,8 @@
 # OwnBox for Android 更新日志 (Changelog)
 
+# OwnBox for Android v26.11.8.2 预览版
+
+
 # OwnBox for Android v26.11.8.1 预览版
 
 ### 【体验优化】

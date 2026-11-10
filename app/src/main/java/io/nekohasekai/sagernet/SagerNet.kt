@@ -127,7 +127,6 @@ class SagerNet : Application(),
             runOnDefaultDispatcher {
                 DefaultNetworkListener.start(this) {
                     underlyingNetwork = it
-                    io.nekohasekai.sagernet.utils.TrustedNetworkManager.checkAndApply(it)
                 }
 
                 updateNotificationChannels()

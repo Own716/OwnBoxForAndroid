@@ -148,11 +148,6 @@ object DataStore : OnPreferenceDataStoreChangeListener {
 
     var bypassLan by configurationStore.boolean(Key.BYPASS_LAN)
     var bypassLanInCore by configurationStore.boolean(Key.BYPASS_LAN_IN_CORE)
-    var blockQuic by configurationStore.boolean("block_quic") { true }
-    var trustedNetworkSmartEnabled by configurationStore.boolean("trusted_network_smart_enabled") { false }
-    var trustedWifiSsids by configurationStore.stringSet("trusted_wifi_ssids") { emptySet() }
-    var trustedLanIps by configurationStore.stringSet("trusted_lan_ips") { emptySet() }
-    var trustedWanIps by configurationStore.stringSet("trusted_wan_ips") { emptySet() }
     var concurrentDial by configurationStore.boolean(Key.CONCURRENT_DIAL)
     var dualNetworkAcceleration by configurationStore.boolean(Key.DUAL_NETWORK_ACCELERATION)
     var autoSelectLowestLatency by configurationStore.boolean(Key.AUTO_SELECT_LOWEST_LATENCY)

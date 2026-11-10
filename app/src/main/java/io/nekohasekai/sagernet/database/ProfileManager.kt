@@ -249,7 +249,9 @@ object ProfileManager {
                         packages = setOf(
                             "com.android.vending",
                             "com.google.android.gms",
-                            "com.google.android.gsf"
+                            "com.google.android.gsf",
+                            "com.android.providers.downloads",
+                            "com.android.providers.downloads.ui"
                         )
                     ), true
                 )
