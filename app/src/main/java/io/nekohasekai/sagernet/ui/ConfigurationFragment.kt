@@ -192,6 +192,7 @@ class ConfigurationFragment @JvmOverloads constructor(
     companion object {
         /** Synthetic ProxyGroup ID used for the "All Groups" tab. Must be negative to avoid DB collision. */
         const val ALL_GROUPS_SENTINEL_ID = -1L
+        val recentlyUpdatedGroupIds = java.util.Collections.synchronizedSet(mutableSetOf<Long>())
     }
 
     lateinit var adapter: GroupPagerAdapter
@@ -3916,8 +3917,57 @@ class ConfigurationFragment @JvmOverloads constructor(
             val sub = currentGroup.subscription!!
             tvTitle?.text = currentGroup.displayName()
 
+            val isUpdating = GroupUpdater.updating.contains(currentGroup.id)
+            val cardScaleFactor = UiScaleManager.profileCardFactor()
+            val scaledIconSize = (dp2px(14) * cardScaleFactor).toInt().coerceAtLeast(dp2px(10))
+            btnUpdate?.iconSize = scaledIconSize
+            btnUpdate?.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, dp2px(11) * cardScaleFactor)
+
+            val normalColor = root.context.getColorAttr(android.R.attr.textColorSecondary)
+            val emeraldColor = 0xFF10B981.toInt()
+
+            if (isUpdating) {
+                btnUpdate?.text = ""
+                btnUpdate?.isEnabled = false
+                val avd = androidx.core.content.ContextCompat.getDrawable(root.context, R.drawable.avd_solar_cloud_download)
+                btnUpdate?.icon = avd
+                (avd as? android.graphics.drawable.Animatable)?.start()
+            } else if (recentlyUpdatedGroupIds.remove(currentGroup.id)) {
+                btnUpdate?.isEnabled = false
+                if (DataStore.hapticFeedback) {
+                    btnUpdate?.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                }
+                btnUpdate?.setIconResource(R.drawable.solar_checklist_minimalistic_linear)
+                btnUpdate?.iconTint = android.content.res.ColorStateList.valueOf(emeraldColor)
+                btnUpdate?.setTextColor(emeraldColor)
+                btnUpdate?.text = "更新完毕"
+
+                btnUpdate?.postDelayed({
+                    btnUpdate?.setIconResource(R.drawable.solar_cloud_download_linear)
+                    btnUpdate?.iconTint = android.content.res.ColorStateList.valueOf(normalColor)
+                    btnUpdate?.setTextColor(normalColor)
+                    btnUpdate?.text = root.context.getString(R.string.group_update)
+                    btnUpdate?.isEnabled = true
+                }, 1800)
+            } else {
+                btnUpdate?.setIconResource(R.drawable.solar_cloud_download_linear)
+                btnUpdate?.iconTint = android.content.res.ColorStateList.valueOf(normalColor)
+                btnUpdate?.setTextColor(normalColor)
+                btnUpdate?.text = root.context.getString(R.string.group_update)
+                btnUpdate?.isEnabled = true
+            }
+
             btnUpdate?.isVisible = true
             btnUpdate?.setOnClickListener {
+                if (DataStore.hapticFeedback) {
+                    it.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                }
+                recentlyUpdatedGroupIds.add(currentGroup.id)
+                btnUpdate.text = ""
+                btnUpdate.isEnabled = false
+                val avd = androidx.core.content.ContextCompat.getDrawable(it.context, R.drawable.avd_solar_cloud_download)
+                btnUpdate.icon = avd
+                (avd as? android.graphics.drawable.Animatable)?.start()
                 GroupUpdater.startUpdate(currentGroup, true)
             }
 

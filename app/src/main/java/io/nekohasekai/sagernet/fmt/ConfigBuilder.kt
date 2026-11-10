@@ -1976,37 +1976,11 @@ fun buildConfig(
                 action = "hijack-dns"
             })
 
-            // 顶层秒级硬拦截 QUIC (UDP 443)：在网络层 0ms 瞬间拒绝 UDP 443 握手包（返回 ICMP 端口不可达），
-            // 无需等待 100ms 嗅探超时，迫使 TikTok / YouTube / Instagram 等海外客户端无缝秒级回退至
-            // 高速稳定、无丢包的 TCP TLS HTTP/2 链路，彻底根治 TikTok 评论区加载慢、视频转圈问题。
-            topRouteRules.add(Rule_DefaultOptions().apply {
-                network = listOf("udp")
-                port = listOf(443)
-                action = "reject"
-            })
-
-            // Google Play 商店与全套下载 CDN 专线路由（必须置于 domesticCoreDomainSuffixes 直连规则之前）：
-            // 解决 Google Play 下载卡在“等待中...”的核心问题：
-            // 确保 Google Play APK 下载（*.gvt1.com 等 CDN）以及应用商店 API (googleapis.cn) 强制走代理，
-            // 绝不被国内 .cn 后缀直连规则误伤导致连接超时断流。
-            topRouteRules.add(Rule_DefaultOptions().apply {
-                domain = googlePlayDomains
-                outbound = mainProxyTag
-            })
-            topRouteRules.add(Rule_DefaultOptions().apply {
-                domain_suffix = googlePlayDomainSuffixes
-                outbound = mainProxyTag
-            })
-            topRouteRules.add(Rule_DefaultOptions().apply {
-                package_name = googlePlayPackages
-                outbound = mainProxyTag
-            })
-
-            // 本国主流服务直连保底规则（非全局模式下保障本国核心服务绝不误入海外代理）
-            if (!DataStore.globalMode) {
+            // 2. 局域网绕过前置保护：置于用户规则与代理规则之前，防止误吞私网 IP (192.168.x.x 等)
+            if (DataStore.bypassLanInCore) {
                 topRouteRules.add(Rule_DefaultOptions().apply {
-                    domain_suffix = domesticCoreDomainSuffixes
-                    outbound = TAG_DIRECT
+                    outbound = TAG_BYPASS
+                    ip_is_private = true
                 })
             }
 
@@ -2023,9 +1997,7 @@ fun buildConfig(
                 "2001:67c:4e8::/48"
             )
 
-            // 2. sing-box 1.13：sniff（嗅探域名以供后续分流规则匹配）
-            // 显式指定 timeout = "100ms" 与 sniffer = ["tls", "http", "quic"]，并通过 ip_cidr + invert 跳过 Telegram 纯 IP MTProto 流量嗅探，
-            // 既杜绝 100ms~300ms 首包等待与断流，又不拦截用户自定义的 Telegram 应用/节点分流规则
+            // 3. sing-box 1.13：sniff 嗅探时机前置于所有域名规则之前，确保未开 FakeDNS 时网络包进站瞬间能嗅探出真实域名
             if (needSniff) {
                 topRouteRules.add(Rule_DefaultOptions().apply {
                     ip_cidr = telegramDcIps
@@ -2036,11 +2008,42 @@ fun buildConfig(
                 })
             }
 
-            // 3. resolve 动作：仅当用户显式开启“解析目标地址”时执行，绝不对全局连接强插解析，杜绝 Telegram 等直连 IP 发生解析超时断流
+            // 4. resolve 动作：仅当用户显式开启“解析目标地址”时执行
             if (DataStore.resolveDestination) {
                 topRouteRules.add(Rule_DefaultOptions().apply {
                     action = "resolve"
                     strategy = genDomainStrategy(true)
+                })
+            }
+
+            // 5. Google Play 商店与全套下载 CDN 专线路由
+            topRouteRules.add(Rule_DefaultOptions().apply {
+                domain = googlePlayDomains
+                outbound = mainProxyTag
+            })
+            topRouteRules.add(Rule_DefaultOptions().apply {
+                domain_suffix = googlePlayDomainSuffixes
+                outbound = mainProxyTag
+            })
+            topRouteRules.add(Rule_DefaultOptions().apply {
+                package_name = googlePlayPackages
+                outbound = mainProxyTag
+            })
+
+            // 6. 本国主流服务直连保底规则（优先于 QUIC 阻断规则，放行国内应用 HTTP/3 直连）
+            if (!DataStore.globalMode) {
+                topRouteRules.add(Rule_DefaultOptions().apply {
+                    domain_suffix = domesticCoreDomainSuffixes
+                    outbound = TAG_DIRECT
+                })
+            }
+
+            // 7. 细化拦截 QUIC (UDP 443)：置于国内直连之后，仅阻断走代理流量，迫使海外 TikTok / YouTube 回退至稳定 TCP
+            if (DataStore.blockQuic) {
+                topRouteRules.add(Rule_DefaultOptions().apply {
+                    network = listOf("udp")
+                    port = listOf(443)
+                    action = "reject"
                 })
             }
 
@@ -2085,16 +2088,6 @@ fun buildConfig(
                 })
             }
 
-            // 7. 未拦截远程 DNS 兜底保护（port 53 / protocol dns 流量强制走代理）
-            topRouteRules.add(Rule_DefaultOptions().apply {
-                port = listOf(53)
-                outbound = mainProxyTag
-            })
-            topRouteRules.add(Rule_DefaultOptions().apply {
-                protocol = listOf("dns")
-                outbound = mainProxyTag
-            })
-
             route.rules.addAll(0, topRouteRules)
 
             // Telegram 官方数据中心（DC 1~5）兜底规则：置于所有用户自定义分流规则之后，
@@ -2104,16 +2097,9 @@ fun buildConfig(
                 outbound = mainProxyTag
             })
 
-            if (DataStore.bypassLanInCore) {
-                route.rules.add(Rule_DefaultOptions().apply {
-                    outbound = TAG_BYPASS
-                    ip_is_private = true
-                })
-            }
-            // block mcast
+            // block mcast: 终端单播发送组播请求，仅匹配目标 IP，移除导致逻辑永远不命中的 source_ip_cidr
             route.rules.add(Rule_DefaultOptions().apply {
                 ip_cidr = listOf("224.0.0.0/3", "ff00::/8")
-                source_ip_cidr = listOf("224.0.0.0/3", "ff00::/8")
                 action = "reject"
             })
             // FakeDNS obj (sing-box 1.14: fakeip configured as a server in dns.servers)
