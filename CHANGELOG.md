@@ -1,5 +1,11 @@
 # OwnBox for Android 更新日志 (Changelog)
 
+# OwnBox for Android v26.11.8.3 预览版
+
+### 【问题修复】
+1. 修复主页落地 IP 与网络诊断页面归属地可能误显为美国的问题，优先采用边缘网络真实探测结果，确保与节点实际所在国家一致。
+
+
 # OwnBox for Android v26.11.8.2 预览版
 
 

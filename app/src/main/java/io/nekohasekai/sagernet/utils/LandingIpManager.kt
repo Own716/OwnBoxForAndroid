@@ -169,12 +169,7 @@ object LandingIpManager {
     private fun createHttpClient(): libcore.HTTPClient {
         return Libcore.newHttpClient().apply {
             modernTLS()
-            val mixedPort = DataStore.mixedPort
-            if (mixedPort > 0) {
-                trySocks5(mixedPort.toInt(), "", "")
-            } else {
-                tryProxyOutbound()
-            }
+            tryProxyOutbound()
         }
     }
 
@@ -302,12 +297,18 @@ object LandingIpManager {
             if (isProxy) hitTags.add("代理")
             val hitTagLabel = if (hitTags.isEmpty()) "无" else hitTags.joinToString(" / ")
 
-            val countryCode = json.optString("country_code", fallbackCc).uppercase()
-            val rawCountry = json.optString("country").ifBlank { countryCode }
+            val dbCc = json.optString("country_code").uppercase()
+            val countryCode = if (fallbackCc.isNotBlank() && fallbackCc.length == 2 && fallbackCc != "XX") {
+                fallbackCc
+            } else {
+                dbCc.ifBlank { fallbackCc }
+            }
+            val isCountryMatched = dbCc.equals(countryCode, ignoreCase = true)
+            val rawCountry = if (isCountryMatched) json.optString("country").ifBlank { countryCode } else countryCode
             val country = localizeCountry(countryCode, rawCountry)
             val flag = countryCodeToFlagEmoji(countryCode)
-            val city = json.optString("city").orEmpty()
-            val state = json.optString("subdivision").orEmpty()
+            val city = if (isCountryMatched) json.optString("city").orEmpty() else ""
+            val state = if (isCountryMatched) json.optString("subdivision").orEmpty() else ""
 
             val cost = System.currentTimeMillis() - startTime
 
@@ -378,12 +379,18 @@ object LandingIpManager {
                 val asRaw = json.optString("as").trim()
                 val asn = if (asRaw.startsWith("AS")) asRaw.split(" ").firstOrNull() ?: asRaw else asRaw
 
-                val countryCode = json.optString("countryCode", fallbackCc).uppercase()
-                val rawCountry = json.optString("country").ifBlank { countryCode }
+                val dbCc = json.optString("countryCode").uppercase()
+                val countryCode = if (fallbackCc.isNotBlank() && fallbackCc.length == 2 && fallbackCc != "XX") {
+                    fallbackCc
+                } else {
+                    dbCc.ifBlank { fallbackCc }
+                }
+                val isCountryMatched = dbCc.equals(countryCode, ignoreCase = true)
+                val rawCountry = if (isCountryMatched) json.optString("country").ifBlank { countryCode } else countryCode
                 val country = localizeCountry(countryCode, rawCountry)
                 val flag = countryCodeToFlagEmoji(countryCode)
-                val city = json.optString("city").orEmpty()
-                val state = json.optString("regionName").orEmpty()
+                val city = if (isCountryMatched) json.optString("city").orEmpty() else ""
+                val state = if (isCountryMatched) json.optString("regionName").orEmpty() else ""
 
                 val cost = System.currentTimeMillis() - startTime
 
@@ -439,12 +446,18 @@ object LandingIpManager {
             val org = ispObj?.optString("org", ispObj.optString("isp")).orEmpty().ifBlank { "未知" }
 
             val locObj = json.optJSONObject("location")
-            val countryCode = locObj?.optString("country_code", fallbackCc).orEmpty().uppercase()
-            val rawCountry = locObj?.optString("country").orEmpty()
+            val dbCc = locObj?.optString("country_code").orEmpty().uppercase()
+            val countryCode = if (fallbackCc.isNotBlank() && fallbackCc.length == 2 && fallbackCc != "XX") {
+                fallbackCc
+            } else {
+                dbCc.ifBlank { fallbackCc }
+            }
+            val isCountryMatched = dbCc.equals(countryCode, ignoreCase = true)
+            val rawCountry = if (isCountryMatched) locObj?.optString("country").orEmpty() else countryCode
             val country = localizeCountry(countryCode, rawCountry)
             val flag = countryCodeToFlagEmoji(countryCode)
-            val city = locObj?.optString("city").orEmpty()
-            val state = locObj?.optString("state").orEmpty()
+            val city = if (isCountryMatched) locObj?.optString("city").orEmpty() else ""
+            val state = if (isCountryMatched) locObj?.optString("state").orEmpty() else ""
 
             val riskObj = json.optJSONObject("risk")
             val isDatacenter = riskObj?.optBoolean("is_datacenter", false) ?: false
@@ -535,7 +548,7 @@ object LandingIpManager {
 
         try {
             // 第一步：先快速拿到真实出口 IP 字符串与国家（优先 Anycast 毫秒响应）
-            val ipPair = withTimeoutOrNull(2000L) { fetchRawEgressIp(ua) }
+            val ipPair = withTimeoutOrNull(3500L) { fetchRawEgressIp(ua) }
             val rawIp = ipPair?.first.orEmpty()
             val rawCc = ipPair?.second.orEmpty()
 
@@ -544,16 +557,16 @@ object LandingIpManager {
             }
 
             // 第二步：使用真实 IP 执行多梯队质量查询（优先 iplocate.io 对齐 FlClash，超时快速切入 ip-api.com）
-            var info = withTimeoutOrNull(1200L) { fetchFromIpLocate(rawIp, rawCc, ua, startTime) }
+            var info = withTimeoutOrNull(2000L) { fetchFromIpLocate(rawIp, rawCc, ua, startTime) }
 
             // 备用第二梯队：ip-api.com（毫秒级极速通道）
             if (info == null) {
-                info = withTimeoutOrNull(1500L) { fetchFromIpApiCom(rawIp, rawCc, ua, startTime) }
+                info = withTimeoutOrNull(2000L) { fetchFromIpApiCom(rawIp, rawCc, ua, startTime) }
             }
 
             // 备用第三梯队：api.ipquery.io
             if (info == null) {
-                info = withTimeoutOrNull(1500L) { fetchFromIpQueryIo(rawIp, rawCc, ua, startTime) }
+                info = withTimeoutOrNull(2000L) { fetchFromIpQueryIo(rawIp, rawCc, ua, startTime) }
             }
 
             // 终极保护：如果所有第三方智库均因网络受阻，绝不硬编码假数据（如 Cloudflare, Inc.），仅返回已知真实 IP
