@@ -43,7 +43,7 @@ jobs:
           unzip -l /tmp/libcore-classes.jar | grep -q 'libcore/Libcore.class'
           unzip -l /tmp/libcore-classes.jar | grep -q 'go/Seq.class'
       - name: Upload LibCore AAR
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: libcore-aar
           path: app/libs/libcore.aar
@@ -135,7 +135,7 @@ jobs:
           rm -f release.keystore
 
           echo "APK=$APK_DIR" >> $GITHUB_ENV
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: APKs
           path: ${{ env.APK }}
