@@ -36,10 +36,10 @@ object OwnBoxWidgetHelper {
         }
         lastToggleTime = now
 
-        if (DataStore.serviceState.canStop) {
-            SagerNet.stopService()
-        } else {
-            SagerNet.startService()
+        when {
+            DataStore.serviceState == BaseService.State.Suspended -> SagerNet.smartResume()
+            DataStore.serviceState.canStop -> SagerNet.stopService()
+            else -> SagerNet.startService()
         }
         updateAllWidgets(context)
     }
@@ -89,6 +89,7 @@ object OwnBoxWidgetHelper {
         val state = DataStore.serviceState
         val isConnected = state == BaseService.State.Connected
         val isConnecting = state == BaseService.State.Connecting
+        val isSuspended = state == BaseService.State.Suspended
 
         val currentProfile = ProfileManager.getProfile(DataStore.selectedProxy)
         val profileTitle = currentProfile?.displayName() ?: context.getString(R.string.app_name)
@@ -97,6 +98,7 @@ object OwnBoxWidgetHelper {
         val statusText = when {
             isConnected -> context.getString(R.string.vpn_connected)
             isConnecting -> context.getString(R.string.connecting)
+            isSuspended -> context.getString(R.string.service_suspended_short)
             state.canStop -> context.getString(R.string.stopping)
             else -> context.getString(R.string.not_connected)
         }
@@ -109,7 +111,7 @@ object OwnBoxWidgetHelper {
 
         val dotColor = when {
             isConnected -> Color.parseColor("#10B981")
-            isConnecting -> Color.parseColor("#F59E0B")
+            isConnecting || isSuspended -> Color.parseColor("#F59E0B")
             else -> Color.parseColor("#94A3B8")
         }
 

@@ -23,6 +23,13 @@
             app:useSimpleSummaryProvider="true" />
 
         <SwitchPreferenceCompat
+            app:defaultValue="true"
+            app:icon="@drawable/solar_shield_warning_linear"
+            app:key="blockQuic"
+            app:summary="@string/block_quic_summary"
+            app:title="@string/block_quic" />
+
+        <SwitchPreferenceCompat
             app:icon="@drawable/baseline_wrap_text_24"
             app:key="resolveDestination"
             app:summary="@string/resolve_destination_summary"

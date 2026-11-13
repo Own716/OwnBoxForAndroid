@@ -34,6 +34,20 @@
             app:summary="@string/acquire_wake_lock_summary"
             app:title="@string/acquire_wake_lock" />
 
+        <SwitchPreferenceCompat
+            app:defaultValue="false"
+            app:icon="@drawable/solar_routing_2_linear"
+            app:key="smartAutoStop"
+            app:summary="@string/smart_auto_stop_summary"
+            app:title="@string/smart_auto_stop" />
+
+        <Preference
+            app:dependency="smartAutoStop"
+            app:icon="@drawable/solar_server_square_linear"
+            app:key="smartAutoStopNetworks"
+            app:persistent="false"
+            app:title="@string/smart_auto_stop_networks" />
+
     </PreferenceCategory>
 
     <PreferenceCategory app:title="@string/cag_advanced_security">

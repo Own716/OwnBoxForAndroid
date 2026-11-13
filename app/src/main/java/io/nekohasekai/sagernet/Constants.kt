@@ -240,6 +240,9 @@ object Key {
     const val GLOBAL_MODE = "globalMode"
     const val SMART_MODE = "smartMode"
     const val SMART_ROUTE_COUNTRY = "smartRouteCountry"
+    const val BLOCK_QUIC = "blockQuic"
+    const val SMART_AUTO_STOP = "smartAutoStop"
+    const val SMART_AUTO_STOP_NETWORKS = "smartAutoStopNetworks"
 }
 
 object TunImplementation {
@@ -286,5 +289,7 @@ object Action {
     const val SWITCH_PREVIOUS = "io.nekohasekai.sagernet.SWITCH_PREVIOUS"
     const val SWITCH_PROFILE = "io.nekohasekai.sagernet.SWITCH_PROFILE"
     const val REFRESH_NOTIFICATION = "io.nekohasekai.sagernet.REFRESH_NOTIFICATION"
+    const val REFRESH_SMART_AUTO_STOP = "com.ownbox.app.REFRESH_SMART_AUTO_STOP"
+    const val SMART_RESUME = "com.ownbox.app.SMART_RESUME"
     const val EXTRA_PROFILE_ID = "profile_id"
 }

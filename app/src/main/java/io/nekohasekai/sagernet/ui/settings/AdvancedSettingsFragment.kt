@@ -10,6 +10,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.SagerNet
+import io.nekohasekai.sagernet.bg.SmartAutoStopMatcher
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.ktx.triggerFullRestart
 import io.nekohasekai.sagernet.ui.MainActivity
@@ -44,6 +45,85 @@ class AdvancedSettingsFragment : BaseSettingsPreferenceFragment() {
         }
 
         findPreference<Preference>(Key.ACQUIRE_WAKE_LOCK)?.onPreferenceChangeListener = reloadListener
+
+        val smartAutoStopPref = findPreference<SwitchPreferenceCompat>(Key.SMART_AUTO_STOP)
+        val smartAutoStopNetworksPref = findPreference<Preference>(Key.SMART_AUTO_STOP_NETWORKS)
+        fun updateSmartAutoStopSummary() {
+            val rules = DataStore.smartAutoStopNetworks.trim()
+            smartAutoStopNetworksPref?.summary = if (rules.isEmpty()) {
+                getString(R.string.smart_auto_stop_networks_summary_empty)
+            } else {
+                rules
+            }
+        }
+        updateSmartAutoStopSummary()
+
+        smartAutoStopPref?.setOnPreferenceChangeListener { _, newValue ->
+            val enabled = newValue as Boolean
+            DataStore.smartAutoStop = enabled
+            if (DataStore.serviceState != io.nekohasekai.sagernet.bg.BaseService.State.Stopped &&
+                DataStore.serviceState != io.nekohasekai.sagernet.bg.BaseService.State.Idle
+            ) {
+                SagerNet.refreshSmartAutoStop()
+            }
+            true
+        }
+
+        smartAutoStopNetworksPref?.setOnPreferenceClickListener {
+            val ctx = context ?: return@setOnPreferenceClickListener true
+            val input = EditText(ctx).apply {
+                setText(DataStore.smartAutoStopNetworks)
+                hint = "192.168.1.0/24, gateway:192.168.10.1"
+                setSingleLine(false)
+                maxLines = 4
+            }
+            val container = android.widget.FrameLayout(ctx).apply {
+                val padH = (24 * resources.displayMetrics.density).toInt()
+                val padV = (8 * resources.displayMetrics.density).toInt()
+                setPadding(padH, padV, padH, 0)
+                addView(input)
+            }
+            val dialog = MaterialAlertDialogBuilder(ctx)
+                .setTitle(R.string.smart_auto_stop_networks)
+                .setMessage(R.string.smart_auto_stop_networks_hint)
+                .setView(container)
+                .setPositiveButton(android.R.string.ok, null)
+                .setNegativeButton(android.R.string.cancel, null)
+                .create()
+            dialog.setOnShowListener {
+                dialog.getButton(android.content.DialogInterface.BUTTON_POSITIVE).setOnClickListener {
+                    val raw = input.text?.toString().orEmpty()
+                    when (val result = SmartAutoStopMatcher.validateRules(raw)) {
+                        is SmartAutoStopMatcher.ValidationResult.Valid -> {
+                            DataStore.smartAutoStopNetworks = result.rules.joinToString(",")
+                            updateSmartAutoStopSummary()
+                            if (DataStore.serviceState != io.nekohasekai.sagernet.bg.BaseService.State.Stopped &&
+                                DataStore.serviceState != io.nekohasekai.sagernet.bg.BaseService.State.Idle
+                            ) {
+                                SagerNet.refreshSmartAutoStop()
+                            }
+                            dialog.dismiss()
+                        }
+                        is SmartAutoStopMatcher.ValidationResult.TooManyRules -> {
+                            Toast.makeText(
+                                ctx,
+                                getString(R.string.smart_auto_stop_too_many, result.max),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                        is SmartAutoStopMatcher.ValidationResult.InvalidRule -> {
+                            Toast.makeText(
+                                ctx,
+                                getString(R.string.smart_auto_stop_invalid_rule, result.rule),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                }
+            }
+            dialog.show()
+            true
+        }
 
         findPreference<SwitchPreferenceCompat>(Key.HIDE_FROM_RECENT_APPS)?.setOnPreferenceChangeListener { _, newValue ->
             (activity as? MainActivity)?.applyHideFromRecentApps(newValue as Boolean)

@@ -25,6 +25,7 @@
         <SwitchPreferenceCompat
             app:icon="@drawable/solar_cpu_linear"
             app:key="bypassLanInCore"
+            app:summary="@string/bypass_lan_in_core_summary"
             app:title="@string/bypass_lan_in_core" />
 
         <SwitchPreferenceCompat

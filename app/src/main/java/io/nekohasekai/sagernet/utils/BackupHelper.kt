@@ -33,8 +33,9 @@ object BackupHelper {
         setting: Boolean = true
     ): ByteArray {
         val out = JSONObject().apply {
+            put("version", 1)
             if (profile) {
-                put("proxies", JSONArray().apply {
+                put("profiles", JSONArray().apply {
                     SagerDatabase.proxyDao.getAll().forEach {
                         put(it.toBase64Str())
                     }
@@ -49,13 +50,13 @@ object BackupHelper {
             if (rule) {
                 put("rules", JSONArray().apply {
                     SagerDatabase.rulesDao.allRules().forEach {
-                        put(it.toBase64Str())
+                        put(BackupCodec.ruleToJson(it))
                     }
                 })
             }
             if (setting) {
                 put("settings", JSONArray().apply {
-                    PublicDatabase.kvPairDao.all().forEach {
+                    BackupCodec.exportSettingsWithDefaults(PublicDatabase.kvPairDao.all()).forEach {
                         put(it.toBase64Str())
                     }
                 })

@@ -41,7 +41,7 @@ class BaseService {
         /**
          * Idle state is only used by UI and will never be returned by BaseService.
          */
-        Idle, Connecting(true, true, false), Connected(true, true, true), Stopping, Stopped,
+        Idle, Connecting(true, true, false), Connected(true, true, true), Stopping, Stopped, Suspended(true, false, false),
     }
 
     interface ExpectedException
@@ -52,6 +52,9 @@ class BaseService {
         var notification: ServiceNotification? = null
         var cacheRecoveryAttempts = 0
         var networkSwitchRetryAttempts = 0
+        @Volatile var isSmartStopped = false
+        @Volatile var smartStopReason: String? = null
+        var smartAutoStopController: SmartAutoStopController? = null
 
         var lastScreenOffTime = 0L
 
@@ -70,6 +73,12 @@ class BaseService {
                     runOnDefaultDispatcher {
                         notification?.refreshLiveUpdate()
                     }
+                }
+                Action.REFRESH_SMART_AUTO_STOP -> {
+                    smartAutoStopController?.refreshConfig(initialStart = false)
+                }
+                Action.SMART_RESUME -> {
+                    service.smartResume(manual = true)
                 }
                 // Action.SWITCH_WAKE_LOCK -> runOnDefaultDispatcher { service.switchWakeLock() }
                 PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED -> {
@@ -164,7 +173,7 @@ class BaseService {
                     NotificationManagerCompat.from(SagerNet.application).cancel(ServiceNotification.notificationId)
                     SagerNet.notification.cancel(ServiceNotification.notificationId)
                 }
-            } else {
+            } else if (s != State.Suspended) {
                 runOnDefaultDispatcher {
                     notification?.postStateUpdate(s)
                 }
@@ -348,6 +357,9 @@ class BaseService {
             }
             val s = data.state
             when {
+                s == State.Suspended -> {
+                    Logs.d("BaseService: ignore reload while suspended by Smart Auto-Stop")
+                }
                 s == State.Stopped -> startRunner()
                 s.canStop -> stopRunner(true)
                 else -> {
@@ -478,6 +490,10 @@ class BaseService {
             if (!restart) {
                 data.cacheRecoveryAttempts = 0
                 data.networkSwitchRetryAttempts = 0
+                data.isSmartStopped = false
+                data.smartStopReason = null
+                runCatching { data.smartAutoStopController?.stop() }
+                data.smartAutoStopController = null
             }
 
             val serviceId = Integer.toHexString(System.identityHashCode(data))
@@ -592,6 +608,65 @@ class BaseService {
             // TODO NEW save app stats?
         }
 
+        fun smartSuspend(matchedLabel: String) {
+            if (data.state != State.Connecting && data.state != State.Connected) return
+            this as Service
+            data.isSmartStopped = true
+            data.smartStopReason = matchedLabel
+            val fallbackTitle = (data.proxy?.profile ?: SagerDatabase.proxyDao.getById(DataStore.selectedProxy))
+                ?.let { ActiveOutboundTracker.formatNotificationTitle(it) }
+                ?: getString(R.string.app_name)
+            runOnMainDispatcher {
+                try {
+                    data.connectingJob?.cancelAndJoin()
+                } catch (e: Throwable) {
+                    Logs.w("SmartAutoStop: connectingJob cancel error", e)
+                } finally {
+                    data.connectingJob = null
+                }
+                ActiveOutboundTracker.reset()
+                if (data.notification == null) {
+                    data.notification = createNotification(fallbackTitle)
+                }
+                data.notification?.listenPostSpeed = false
+                try {
+                    killProcesses()
+                } catch (e: Throwable) {
+                    Logs.w("SmartAutoStop: killProcesses error", e)
+                } finally {
+                    data.proxy = null
+                }
+                data.changeState(State.Suspended)
+                data.notification?.postSuspendedState(matchedLabel)
+            }
+        }
+
+        fun smartResume(manual: Boolean) {
+            if (data.state != State.Suspended && !data.isSmartStopped) return
+            this as Context
+            if (manual) {
+                data.smartAutoStopController?.onManualOverride()
+            }
+            data.isSmartStopped = false
+            data.smartStopReason = null
+            if (this is VpnService && android.net.VpnService.prepare(this) != null) {
+                if (manual) {
+                    startActivity(
+                        Intent(this, io.nekohasekai.sagernet.ui.VpnRequestActivity::class.java)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
+                    stopRunner(false, null)
+                } else {
+                    stopRunner(false, getString(R.string.vpn_permission_denied))
+                }
+                return
+            }
+            runCatching { data.notification?.detachWithoutCancel() }
+            data.notification = null
+            data.state = State.Stopped
+            startRunner()
+        }
+
         // networks
         var upstreamInterfaceName: String?
 
@@ -702,6 +777,8 @@ class BaseService {
                     addAction(Action.SWITCH_PREVIOUS)
                     addAction(Action.SWITCH_PROFILE)
                     addAction(Action.REFRESH_NOTIFICATION)
+                    addAction(Action.REFRESH_SMART_AUTO_STOP)
+                    addAction(Action.SMART_RESUME)
                     // addAction(Action.SWITCH_WAKE_LOCK)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                         addAction(PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED)
@@ -731,8 +808,13 @@ class BaseService {
                 data.closeReceiverRegistered = true
             }
 
+            if (data.smartAutoStopController == null) {
+                data.smartAutoStopController = SmartAutoStopController(this)
+            }
+            data.smartAutoStopController?.start()
+
             data.changeState(State.Connecting)
-            runOnMainDispatcher {
+            data.connectingJob = runOnMainDispatcher {
                 try {
                     data.notification = createNotification(ActiveOutboundTracker.formatNotificationTitle(profile))
 
@@ -747,6 +829,11 @@ class BaseService {
                     }
 
                     startProcesses()
+                    if (data.isSmartStopped) {
+                        killProcesses()
+                        data.proxy = null
+                        return@runOnMainDispatcher
+                    }
                     data.changeState(State.Connected)
                     data.cacheRecoveryAttempts = 0
                     data.networkSwitchRetryAttempts = 0

@@ -86,12 +86,18 @@ class TileService : BaseTileService(), SagerConnection.Callback {
                     state = Tile.STATE_UNAVAILABLE
                     label = getString(R.string.stopping)
                 }
+
+                BaseService.State.Suspended -> {
+                    state = Tile.STATE_INACTIVE
+                    label = getString(R.string.service_suspended_short)
+                }
             }
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
                 setSubtitle(when (serviceState) {
                     // Subtitle = connection status text (secondary row, shown on double-line devices)
                     BaseService.State.Connected -> getString(R.string.tile_connected)
                     BaseService.State.Connecting -> validProfileName
+                    BaseService.State.Suspended -> validProfileName ?: getString(R.string.service_suspended)
                     BaseService.State.Stopping -> null
                     BaseService.State.Stopped, BaseService.State.Idle -> getString(R.string.not_connected)
                     else -> null
@@ -110,6 +116,7 @@ class TileService : BaseTileService(), SagerConnection.Callback {
         } else {
             BaseService.State.values()[service.state].let { state ->
                 when {
+                    state == BaseService.State.Suspended -> SagerNet.smartResume()
                     state.canStop -> SagerNet.stopService()
                     state == BaseService.State.Stopped || state == BaseService.State.Idle -> SagerNet.startService()
                 }

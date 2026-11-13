@@ -19,6 +19,7 @@ class CoreSettingsFragment : BaseSettingsPreferenceFragment() {
 
         findPreference<Preference>(Key.SMART_ROUTE_COUNTRY)?.onPreferenceChangeListener = reloadListener
         findPreference<Preference>(Key.TRAFFIC_SNIFFING)?.onPreferenceChangeListener = reloadListener
+        findPreference<Preference>(Key.BLOCK_QUIC)?.onPreferenceChangeListener = reloadListener
         findPreference<Preference>(Key.RESOLVE_DESTINATION)?.onPreferenceChangeListener = reloadListener
         findPreference<Preference>(Key.IPV6_MODE)?.onPreferenceChangeListener = reloadListener
         findPreference<Preference>(Key.DUAL_NETWORK_ACCELERATION)?.onPreferenceChangeListener = reloadListener

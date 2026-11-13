@@ -262,6 +262,12 @@ class SagerNet : Application(),
         fun stopService() =
             application.sendBroadcast(Intent(Action.CLOSE).setPackage(application.packageName))
 
+        fun smartResume() =
+            application.sendBroadcast(Intent(Action.SMART_RESUME).setPackage(application.packageName))
+
+        fun refreshSmartAutoStop() =
+            application.sendBroadcast(Intent(Action.REFRESH_SMART_AUTO_STOP).setPackage(application.packageName))
+
         fun updatePerformancePriorityMode(enabled: Boolean) {
             DataStore.performancePriorityMode = enabled
             runCatching {

@@ -207,7 +207,7 @@ object ProfileManager {
             createRule(
                 RuleEntity(
                     name = app.getString(R.string.route_opt_block_ads),
-                    domains = "geosite:category-ads-all",
+                    ruleset = "geosite-category-ads-all",
                     outbound = -2
                 )
             )
@@ -250,8 +250,6 @@ object ProfileManager {
                             "com.android.vending",
                             "com.google.android.gms",
                             "com.google.android.gsf",
-                            "com.android.providers.downloads",
-                            "com.android.providers.downloads.ui"
                         )
                     ), true
                 )
@@ -278,7 +276,7 @@ object ProfileManager {
                 val isPlayStoreRule = rule.domains.contains("googleapis.cn") || rule.packages.contains("com.android.vending")
                 if (isPlayStoreRule) {
                     var changed = false
-                    if (!rule.packages.contains("com.android.providers.downloads") || !rule.domains.contains("playstoregatewayadapter-pa.googleapis.com")) {
+                    if (!rule.domains.contains("playstoregatewayadapter-pa.googleapis.com") || !rule.packages.contains("com.google.android.gsf")) {
                         val currentDomains = rule.domains.split("\n").map { it.trim() }.filter { it.isNotBlank() }
                         val newDomains = listOf(
                             "geosite:google-play",
@@ -307,13 +305,17 @@ object ProfileManager {
                             "com.android.vending",
                             "com.google.android.gms",
                             "com.google.android.gsf",
-                            "com.android.providers.downloads",
-                            "com.android.providers.downloads.ui"
                         )
                         changed = true
                     }
-                    if (!rule.enabled) {
-                        rule.enabled = true
+                    // Strip legacy injected system download manager packages so domestic DownloadManager downloads are not hijacked
+                    if (rule.domains.contains("googleapis.cn") &&
+                        (rule.packages.contains("com.android.providers.downloads") || rule.packages.contains("com.android.providers.downloads.ui"))
+                    ) {
+                        rule.packages = rule.packages - setOf(
+                            "com.android.providers.downloads",
+                            "com.android.providers.downloads.ui",
+                        )
                         changed = true
                     }
                     if (changed) {

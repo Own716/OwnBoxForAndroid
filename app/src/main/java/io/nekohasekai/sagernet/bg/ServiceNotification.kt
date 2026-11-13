@@ -139,6 +139,7 @@ class ServiceNotification(
     }
 
     suspend fun postStateUpdate(state: BaseService.State) {
+        if (state == BaseService.State.Suspended || service.data.isSmartStopped) return
         if (DataStore.liveUpdateEnabled) {
             postNotificationSpeedUpdate(lastStats)
             if (state == BaseService.State.Connected) {
@@ -147,7 +148,46 @@ class ServiceNotification(
         }
     }
 
+    suspend fun postSuspendedState(matchedDetail: String) {
+        listenPostSpeed = false
+        val ctx = service as Context
+        val content = if (matchedDetail.isNotBlank()) {
+            ctx.getString(R.string.service_suspended_detail, matchedDetail)
+        } else {
+            ctx.getString(R.string.service_suspended)
+        }
+        useBuilder {
+            it.setContentTitle(ctx.getString(R.string.app_name))
+            it.setContentText(content)
+            it.setSubText(null)
+            it.setStyle(null)
+            it.priority = NotificationCompat.PRIORITY_LOW
+            it.clearActions()
+            it.addAction(
+                broadcastAction(
+                    R.drawable.ic_notification_next,
+                    ctx.getText(R.string.smart_auto_stop_resume),
+                    Action.SMART_RESUME,
+                    6,
+                )
+            )
+            it.addAction(
+                broadcastAction(
+                    R.drawable.ic_notification_stop,
+                    ctx.getText(R.string.stop),
+                    Action.CLOSE,
+                    1,
+                )
+            )
+            it.extras.remove("capsule_text")
+            it.extras.remove("android.shortCriticalText")
+            it.extras.remove("miui.focus.param")
+        }
+        update()
+    }
+
     suspend fun postNotificationSpeedUpdate(stats: SpeedDisplayData) {
+        if (service.data.state == BaseService.State.Suspended || service.data.isSmartStopped) return
         lastStats = stats
         useBuilder {
             if (DataStore.liveUpdateEnabled) {
@@ -554,6 +594,14 @@ class ServiceNotification(
 
     private suspend fun update() = useBuilder {
         NotificationManagerCompat.from(service as Service).notify(notificationId, it.build())
+    }
+
+    fun detachWithoutCancel() {
+        listenPostSpeed = false
+        try {
+            (service as Context).unregisterReceiver(this)
+        } catch (_: Throwable) {
+        }
     }
 
     fun destroy() {

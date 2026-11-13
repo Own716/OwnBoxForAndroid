@@ -1298,4 +1298,20 @@
     <string name="status_smart_routing">走智能分流</string>
     <string name="status_global_active">全局生效中</string>
     <string name="status_rule_active">按规则运行</string>
+    <string name="block_quic">拦截 QUIC (UDP 443)</string>
+    <string name="block_quic_summary">在路由入口拦截 UDP 443 以无缝回退 TCP/HTTP2（改善 TikTok/YouTube 稳定性）；如需使用 HTTP/3 请关闭</string>
+    <string name="bypass_lan_in_core_summary">在核心路由中直连私有/局域网目标 IP（位于自定义路由规则之后生效）</string>
+    <string name="route_outbound_missing">节点不存在（已失效）</string>
+    <string name="route_invalid_outbound_toast">规则“%s”指向的节点已失效或被删除，已安全处理</string>
+    <string name="smart_auto_stop">智能启停代理服务</string>
+    <string name="smart_auto_stop_summary">连接受信任的内网 Wi-Fi/有线网络时自动暂停代理，离开后自动恢复连接</string>
+    <string name="smart_auto_stop_networks">受信任内网规则</string>
+    <string name="smart_auto_stop_networks_summary_empty">未配置（支持 IP、CIDR 或 gateway:网关，逗号分隔，最多 5 条）</string>
+    <string name="smart_auto_stop_networks_hint">示例：192.168.1.0/24, gateway:192.168.10.1, 10.0.0.0/8\n逗号分隔，最多 5 条规则（基于底层网卡 IP 匹配，无需位置权限）。</string>
+    <string name="smart_auto_stop_too_many">最多支持配置 %d 条内网规则</string>
+    <string name="smart_auto_stop_invalid_rule">无效的 IP / CIDR / gateway 规则：%s</string>
+    <string name="service_suspended">已暂停 · 命中受信任内网</string>
+    <string name="service_suspended_detail">已暂停 · 命中内网 %s</string>
+    <string name="service_suspended_short">已暂停（内网）</string>
+    <string name="smart_auto_stop_resume">立即恢复</string>
 </resources>

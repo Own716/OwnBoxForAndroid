@@ -34,9 +34,11 @@ class GoogleRouteRuleTest {
     fun testProfileManagerGooglePlayRuleEnrichment() {
         val profileManagerSource = sourceFile("src/main/java/io/nekohasekai/sagernet/database/ProfileManager.kt").readText()
 
-        // Verify Play Store rule includes DownloadManager and related packages
-        assertTrue(profileManagerSource.contains("\"com.android.providers.downloads\""))
-        assertTrue(profileManagerSource.contains("\"com.android.providers.downloads.ui\""))
+        // Verify Play Store rule keeps Play/GMS/GSF packages without hijacking system DownloadManager
+        assertFalse(
+            "Default Play Store routing rule must not force-add com.android.providers.downloads",
+            profileManagerSource.contains("rule.packages = rule.packages + setOf(\n                            \"com.android.vending\",\n                            \"com.google.android.gms\",\n                            \"com.google.android.gsf\",\n                            \"com.android.providers.downloads\"")
+        )
         assertTrue(profileManagerSource.contains("\"com.google.android.gsf\""))
         assertTrue(profileManagerSource.contains("\"com.android.vending\""))
         assertTrue(profileManagerSource.contains("\"com.google.android.gms\""))

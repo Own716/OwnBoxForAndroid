@@ -282,6 +282,8 @@ class VpnService : BaseVpnService(),
 
     override fun onDestroy() {
         DataStore.vpnService = null
+        runCatching { data.smartAutoStopController?.stop() }
+        data.smartAutoStopController = null
         super.onDestroy()
         data.binder.close()
         SagerNet.notification.cancel(ServiceNotification.notificationId)

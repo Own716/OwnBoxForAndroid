@@ -1404,6 +1404,9 @@ fun buildConfig(
             }
         }
 
+        val earlyRejectUserRules = mutableListOf<SingBoxOptions.Rule>()
+        val invalidRuleNames = linkedSetOf<String>()
+
         // 在应用用户规则之前检查全局模式
         if (!forTest && DataStore.globalMode) {
             // 全局模式下的规则处理
@@ -1426,12 +1429,6 @@ fun buildConfig(
                     PackageCache.awaitLoadSync()
                 }
                 val effectivePackages = rule.packages.toMutableSet()
-                if (effectivePackages.contains("com.android.vending")) {
-                    effectivePackages.add("com.android.providers.downloads")
-                    effectivePackages.add("com.android.providers.downloads.ui")
-                    effectivePackages.add("com.xiaomi.providers.downloads")
-                    effectivePackages.add("com.google.android.gms")
-                }
                 val officialTelegramPackages = setOf(
                     "org.telegram.messenger",
                     "org.telegram.messenger.web",
@@ -1484,6 +1481,17 @@ fun buildConfig(
                         rule.source.isBlank() &&
                         rule.protocol.isBlank()
                 val routingAction = RouteRuleEditor.action(rule.config, rule.outbound)
+                val targetOutbound = when (val outId = rule.outbound) {
+                    0L -> mainProxyTag
+                    -1L -> TAG_BYPASS
+                    -2L -> TAG_BLOCK
+                    else -> if (outId == proxy.id) mainProxyTag else tagMap[outId] ?: ""
+                }
+                if (RouteRuleEditor.needsOutbound(rule.config, rule.outbound) && targetOutbound.isBlank()) {
+                    invalidRuleNames += rule.displayName()
+                    Logs.w("ConfigBuilder: route rule '${rule.displayName()}' skipped because outbound profile ${rule.outbound} does not exist")
+                    continue
+                }
                 val extendedMatch = RouteRuleEditor.json(rule.config)
                 val scopedMatch = setOf("domain", "domain_suffix", "domain_keyword", "domain_regex", "inbound",
                     "ip_version", "ip_is_private", "source_ip_is_private", "invert", "port", "port_range",
@@ -1595,13 +1603,6 @@ fun buildConfig(
                     }
                 }
 
-                val targetOutbound = when (val outId = rule.outbound) {
-                    0L -> mainProxyTag
-                    -1L -> TAG_BYPASS
-                    -2L -> TAG_BLOCK
-                    else -> if (outId == proxy.id) mainProxyTag else tagMap[outId] ?: ""
-                }
-
                 fun applyCommonFilters(ruleObj: Rule_DefaultOptions) {
                     if (rule.port.isNotBlank()) {
                         ruleObj.port = mutableListOf<Int>()
@@ -1702,23 +1703,22 @@ fun buildConfig(
                     if (!fallbackRule.checkEmpty()) generatedSubRules.add(fallbackRule)
                 }
 
+                val targetRuleBucket: MutableList<SingBoxOptions.Rule> = if (!isSmartRouting && routingAction == "reject") {
+                    earlyRejectUserRules
+                } else {
+                    route.rules
+                }
                 val invertedGroup = RouteRuleEditor.invertedGroup(generatedSubRules)
                 if (invertedGroup != null) {
-                    route.rules.add(invertedGroup)
+                    targetRuleBucket.add(invertedGroup)
                     route.rule_set.addAll(ruleSets)
                     continue
                 }
                 for (subRule in generatedSubRules) {
                     if (subRule.action !in setOf("reject", "sniff", "resolve", "hijack-dns", "route-options") && subRule.outbound.isNullOrBlank()) {
-                        runOnMainDispatcher {
-                            Toast.makeText(
-                                SagerNet.application,
-                                "Warning: " + rule.displayName() + ": A non-existent outbound was specified.",
-                                Toast.LENGTH_LONG
-                            ).show()
-                        }
+                        invalidRuleNames += rule.displayName()
                     } else {
-                        route.rules.add(subRule)
+                        targetRuleBucket.add(subRule)
                         route.rule_set.addAll(ruleSets)
                         Logs.d("[ConfigBuilder] Route rule '${rule.displayName()}' condition added -> ${subRule.outbound ?: subRule.action}")
                     }
@@ -1964,7 +1964,7 @@ fun buildConfig(
             val remoteDomains = rawRemoteDomains
 
             // 构建最优先前置路由规则（须位于所有用户规则之前）
-            val topRouteRules = mutableListOf<Rule_DefaultOptions>()
+            val topRouteRules = mutableListOf<SingBoxOptions.Rule>()
 
             // 1. hijack-dns 拦截入站 DNS 流量进入内置 DNS 引擎（最高优先级，确保 DNS 解析不被后续嗅探/解析规则阻塞干扰）
             topRouteRules.add(Rule_DefaultOptions().apply {
@@ -1979,34 +1979,12 @@ fun buildConfig(
             // 顶层秒级硬拦截 QUIC (UDP 443)：在网络层 0ms 瞬间拒绝 UDP 443 握手包（返回 ICMP 端口不可达），
             // 无需等待 100ms 嗅探超时，迫使 TikTok / YouTube / Instagram 等海外客户端无缝秒级回退至
             // 高速稳定、无丢包的 TCP TLS HTTP/2 链路，彻底根治 TikTok 评论区加载慢、视频转圈问题。
-            topRouteRules.add(Rule_DefaultOptions().apply {
-                network = listOf("udp")
-                port = listOf(443)
-                action = "reject"
-            })
-
-            // Google Play 商店与全套下载 CDN 专线路由（必须置于 domesticCoreDomainSuffixes 直连规则之前）：
-            // 解决 Google Play 下载卡在“等待中...”的核心问题：
-            // 确保 Google Play APK 下载（*.gvt1.com 等 CDN）以及应用商店 API (googleapis.cn) 强制走代理，
-            // 绝不被国内 .cn 后缀直连规则误伤导致连接超时断流。
-            topRouteRules.add(Rule_DefaultOptions().apply {
-                domain = googlePlayDomains
-                outbound = mainProxyTag
-            })
-            topRouteRules.add(Rule_DefaultOptions().apply {
-                domain_suffix = googlePlayDomainSuffixes
-                outbound = mainProxyTag
-            })
-            topRouteRules.add(Rule_DefaultOptions().apply {
-                package_name = googlePlayPackages
-                outbound = mainProxyTag
-            })
-
-            // 本国主流服务直连保底规则（非全局模式下保障本国核心服务绝不误入海外代理）
-            if (!DataStore.globalMode) {
+            // 用户可在 核心设置 -> 拦截 QUIC (UDP 443) 自由开关（默认开启）。
+            if (DataStore.blockQuic) {
                 topRouteRules.add(Rule_DefaultOptions().apply {
-                    domain_suffix = domesticCoreDomainSuffixes
-                    outbound = TAG_DIRECT
+                    network = listOf("udp")
+                    port = listOf(443)
+                    action = "reject"
                 })
             }
 
@@ -2023,9 +2001,8 @@ fun buildConfig(
                 "2001:67c:4e8::/48"
             )
 
-            // 2. sing-box 1.13：sniff（嗅探域名以供后续分流规则匹配）
-            // 显式指定 timeout = "100ms" 与 sniffer = ["tls", "http", "quic"]，并通过 ip_cidr + invert 跳过 Telegram 纯 IP MTProto 流量嗅探，
-            // 既杜绝 100ms~300ms 首包等待与断流，又不拦截用户自定义的 Telegram 应用/节点分流规则
+            // 2. sing-box 1.13+：sniff（必须置于所有域名规则之前，否则直连/海外域名规则匹配时流量尚未完成域名嗅探）
+            // 显式指定 timeout = "100ms" 与 sniffer = ["tls", "http", "quic"]，并通过 ip_cidr + invert 跳过 Telegram 纯 IP MTProto 流量嗅探
             if (needSniff) {
                 topRouteRules.add(Rule_DefaultOptions().apply {
                     ip_cidr = telegramDcIps
@@ -2036,7 +2013,7 @@ fun buildConfig(
                 })
             }
 
-            // 3. resolve 动作：仅当用户显式开启“解析目标地址”时执行，绝不对全局连接强插解析，杜绝 Telegram 等直连 IP 发生解析超时断流
+            // 3. resolve 动作：仅当用户显式开启“解析目标地址”时执行
             if (DataStore.resolveDestination) {
                 topRouteRules.add(Rule_DefaultOptions().apply {
                     action = "resolve"
@@ -2085,15 +2062,32 @@ fun buildConfig(
                 })
             }
 
-            // 7. 未拦截远程 DNS 兜底保护（port 53 / protocol dns 流量强制走代理）
+            // 7. 用户自定义屏蔽 (reject) 规则优先于 domesticCoreDomainSuffixes（确保自定义屏蔽国内广告域名如 gdt.qq.com 生效）
+            if (earlyRejectUserRules.isNotEmpty()) {
+                topRouteRules.addAll(earlyRejectUserRules)
+            }
+
+            // 8. Google Play 商店与全套下载 CDN 专线路由（必须置于 domesticCoreDomainSuffixes 直连规则之前）：
             topRouteRules.add(Rule_DefaultOptions().apply {
-                port = listOf(53)
+                domain = googlePlayDomains
                 outbound = mainProxyTag
             })
             topRouteRules.add(Rule_DefaultOptions().apply {
-                protocol = listOf("dns")
+                domain_suffix = googlePlayDomainSuffixes
                 outbound = mainProxyTag
             })
+            topRouteRules.add(Rule_DefaultOptions().apply {
+                package_name = googlePlayPackages
+                outbound = mainProxyTag
+            })
+
+            // 9. 本国主流服务直连保底规则（非全局模式下保障本国核心服务绝不误入海外代理）
+            if (!DataStore.globalMode) {
+                topRouteRules.add(Rule_DefaultOptions().apply {
+                    domain_suffix = domesticCoreDomainSuffixes
+                    outbound = TAG_DIRECT
+                })
+            }
 
             route.rules.addAll(0, topRouteRules)
 
@@ -2110,10 +2104,9 @@ fun buildConfig(
                     ip_is_private = true
                 })
             }
-            // block mcast
+            // block mcast (dst only; IPv4 mDNS 224.0.0.251 has already been handled earlier)
             route.rules.add(Rule_DefaultOptions().apply {
                 ip_cidr = listOf("224.0.0.0/3", "ff00::/8")
-                source_ip_cidr = listOf("224.0.0.0/3", "ff00::/8")
                 action = "reject"
             })
             // FakeDNS obj (sing-box 1.14: fakeip configured as a server in dns.servers)
@@ -2195,7 +2188,20 @@ fun buildConfig(
                     r.outbound = groupTag
                 } else {
                     Logs.w("ConfigBuilder: rule outbound tag '$out' not found in outbounds, fallback to '$mainProxyTag'")
+                    invalidRuleNames += out
                     r.outbound = mainProxyTag
+                }
+            }
+        }
+        if (invalidRuleNames.isNotEmpty() && !forTest && !forExport) {
+            val joined = invalidRuleNames.joinToString(", ")
+            runOnMainDispatcher {
+                runCatching {
+                    Toast.makeText(
+                        SagerNet.application,
+                        SagerNet.application.getString(R.string.route_invalid_outbound_toast, joined),
+                        Toast.LENGTH_LONG
+                    ).show()
                 }
             }
         }

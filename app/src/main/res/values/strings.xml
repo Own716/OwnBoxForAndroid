@@ -1380,4 +1380,20 @@
     <string name="status_smart_routing">Smart Routing</string>
     <string name="status_global_active">Global Active</string>
     <string name="status_rule_active">By Rules</string>
+    <string name="block_quic">Block QUIC (UDP 443)</string>
+    <string name="block_quic_summary">Reject QUIC UDP/443 at route entry for instant TCP HTTP/2 fallback; disable to allow native HTTP/3</string>
+    <string name="bypass_lan_in_core_summary">Bypass private/LAN destination IPs in core routing (applied after custom routing rules)</string>
+    <string name="route_outbound_missing">Profile missing (invalid)</string>
+    <string name="route_invalid_outbound_toast">Rule \"%s\" references a missing node and was handled safely</string>
+    <string name="smart_auto_stop">Smart Auto-Stop Proxy</string>
+    <string name="smart_auto_stop_summary">Pause proxy on trusted intranet Wi-Fi/Ethernet and resume automatically when leaving</string>
+    <string name="smart_auto_stop_networks">Trusted Intranet Rules</string>
+    <string name="smart_auto_stop_networks_summary_empty">Not set (IP, CIDR, or gateway:IP; comma-separated, max 5)</string>
+    <string name="smart_auto_stop_networks_hint">Examples: 192.168.1.0/24, gateway:192.168.10.1, 10.0.0.0/8\nUp to 5 comma-separated rules. No location permission needed.</string>
+    <string name="smart_auto_stop_too_many">Up to %d intranet rules are supported</string>
+    <string name="smart_auto_stop_invalid_rule">Invalid IP/CIDR/gateway rule: %s</string>
+    <string name="service_suspended">Paused · Trusted Intranet</string>
+    <string name="service_suspended_detail">Paused · Matched %s</string>
+    <string name="service_suspended_short">Paused (Intranet)</string>
+    <string name="smart_auto_stop_resume">Resume</string>
 </resources>

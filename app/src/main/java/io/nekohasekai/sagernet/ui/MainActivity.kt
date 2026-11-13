@@ -250,9 +250,18 @@ class MainActivity : ThemedActivity(),
 
         binding.fab.setOnClickListener {
             if (DataStore.hapticFeedback) it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
-            if (DataStore.serviceState.canStop) SagerNet.stopService() else connect.launch(
-                null
-            )
+            when {
+                DataStore.serviceState == BaseService.State.Suspended -> {
+                    if (DataStore.serviceMode == Key.MODE_VPN && android.net.VpnService.prepare(this) != null) {
+                        SagerNet.stopService()
+                        connect.launch(null)
+                    } else {
+                        SagerNet.smartResume()
+                    }
+                }
+                DataStore.serviceState.canStop -> SagerNet.stopService()
+                else -> connect.launch(null)
+            }
         }
         binding.stats.setOnClickListener {
             if (DataStore.hapticFeedback) it.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
@@ -1187,6 +1196,11 @@ class MainActivity : ThemedActivity(),
                         snackbar(getString(R.string.need_reload)).setAction(R.string.apply) {
                             SagerNet.reloadService()
                         }.show()
+                    }
+                }
+                Key.SMART_AUTO_STOP, Key.SMART_AUTO_STOP_NETWORKS -> {
+                    if (DataStore.serviceState != BaseService.State.Stopped && DataStore.serviceState != BaseService.State.Idle) {
+                        SagerNet.refreshSmartAutoStop()
                     }
                 }
             }

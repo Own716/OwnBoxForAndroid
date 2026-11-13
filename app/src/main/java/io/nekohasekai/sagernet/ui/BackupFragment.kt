@@ -559,13 +559,15 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
             if (rule) {
                 put("rules", JSONArray().apply {
                     SagerDatabase.rulesDao.allRules().forEach {
-                        put(it.toBase64Str())
+                        put(io.nekohasekai.sagernet.utils.BackupCodec.ruleToJson(it))
                     }
                 })
             }
             if (setting) {
                 put("settings", JSONArray().apply {
-                    PublicDatabase.kvPairDao.all().forEach {
+                    io.nekohasekai.sagernet.utils.BackupCodec.exportSettingsWithDefaults(
+                        PublicDatabase.kvPairDao.all()
+                    ).forEach {
                         put(it.toBase64Str())
                     }
                 })
@@ -735,7 +737,7 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
             val json = JSONObject(content)
             onMainDispatcher {
                 val import = LayoutImportBinding.inflate(layoutInflater)
-                if (!json.has("profiles")) {
+                if (io.nekohasekai.sagernet.utils.BackupCodec.resolveProfilesKey(json) == null) {
                     import.backupConfigurations.isVisible = false
                 }
                 if (!json.has("rules")) {
@@ -787,9 +789,10 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
     fun finishImport(
         content: JSONObject, profile: Boolean, rule: Boolean, setting: Boolean
     ) {
-        if (profile && content.has("profiles")) {
+        val profileKey = io.nekohasekai.sagernet.utils.BackupCodec.resolveProfilesKey(content)
+        if (profile && profileKey != null) {
             val profiles = mutableListOf<ProxyEntity>()
-            val jsonProfiles = content.getJSONArray("profiles")
+            val jsonProfiles = content.getJSONArray(profileKey)
             for (i in 0 until jsonProfiles.length()) {
                 val data = Util.b64Decode(jsonProfiles[i] as String)
                 val parcel = Parcel.obtain()
@@ -815,15 +818,17 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
             SagerDatabase.groupDao.insert(groups)
         }
         if (rule && content.has("rules")) {
-            val rules = mutableListOf<RuleEntity>()
             val jsonRules = content.getJSONArray("rules")
-            for (i in 0 until jsonRules.length()) {
-                val data = Util.b64Decode(jsonRules[i] as String)
+            val rules = io.nekohasekai.sagernet.utils.BackupCodec.decodeRules(jsonRules) { b64 ->
+                val data = Util.b64Decode(b64)
                 val parcel = Parcel.obtain()
-                parcel.unmarshall(data, 0, data.size)
-                parcel.setDataPosition(0)
-                rules.add(ParcelizeBridge.createRule(parcel))
-                parcel.recycle()
+                try {
+                    parcel.unmarshall(data, 0, data.size)
+                    parcel.setDataPosition(0)
+                    ParcelizeBridge.createRule(parcel)
+                } finally {
+                    parcel.recycle()
+                }
             }
             SagerDatabase.rulesDao.reset()
             SagerDatabase.rulesDao.insert(rules)

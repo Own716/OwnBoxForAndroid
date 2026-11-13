@@ -525,6 +525,7 @@ class StatsBar @JvmOverloads constructor(
                     when (currentState) {
                         BaseService.State.Connecting -> R.string.connecting
                         BaseService.State.Stopping -> R.string.stopping
+                        BaseService.State.Suspended -> R.string.service_suspended
                         else -> R.string.not_connected
                     }
                 )

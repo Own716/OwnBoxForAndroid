@@ -130,6 +130,8 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     }
     var networkChangeResetConnections by configurationStore.boolean(Key.NETWORK_CHANGE_RESET_CONNECTIONS) { false }
     var wakeResetConnections by configurationStore.boolean(Key.WAKE_RESET_CONNECTIONS)
+    var smartAutoStop by configurationStore.boolean(Key.SMART_AUTO_STOP) { false }
+    var smartAutoStopNetworks by configurationStore.string(Key.SMART_AUTO_STOP_NETWORKS) { "" }
 
     //
 
@@ -142,6 +144,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var serviceMode by configurationStore.string(Key.SERVICE_MODE) { Key.MODE_VPN }
 
     var trafficSniffing by configurationStore.stringToInt(Key.TRAFFIC_SNIFFING) { 1 }
+    var blockQuic by configurationStore.boolean(Key.BLOCK_QUIC) { true }
     var resolveDestination by configurationStore.boolean(Key.RESOLVE_DESTINATION)
 
     var mtu by configurationStore.stringToInt(Key.MTU) { 1360 }
@@ -513,19 +516,9 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var groupIsSelector by profileCacheStore.boolean(Key.GROUP_IS_SELECTOR)
     var groupIsUrlTest by profileCacheStore.boolean("groupIsUrlTest")
     var groupIsLoadBalance by profileCacheStore.boolean("groupIsLoadBalance")
-    private var rawGroupUrlTestUrl by profileCacheStore.string("groupUrlTestUrl") {
-        SagerNet.application.getString(R.string.default_connection_test_url)
-    }
+    private var rawGroupUrlTestUrl by profileCacheStore.string("groupUrlTestUrl") { "" }
     var groupUrlTestUrl: String
-        get() {
-            val url = rawGroupUrlTestUrl.trim()
-            if (url.isBlank()) {
-                val newUrl = SagerNet.application.getString(R.string.default_connection_test_url)
-                rawGroupUrlTestUrl = newUrl
-                return newUrl
-            }
-            return url
-        }
+        get() = rawGroupUrlTestUrl.trim()
         set(value) {
             rawGroupUrlTestUrl = value.trim()
         }
@@ -556,12 +549,20 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     fun groupIsLoadBalance(groupId: Long): Boolean = isGroupLoadBalance(groupId)
     fun setGroupIsLoadBalance(groupId: Long, value: Boolean) = setGroupLoadBalance(groupId, value)
 
+    fun rawGroupUrlTestUrl(groupId: Long): String =
+        configurationStore.getString("group_${groupId}_urlTestUrl", "")?.trim() ?: ""
+
     fun groupUrlTestUrl(groupId: Long): String {
-        val stored = configurationStore.getString("group_${groupId}_urlTestUrl", "")?.trim()?.takeIf { it.isNotBlank() }
-        return stored ?: connectionTestURL
+        val stored = rawGroupUrlTestUrl(groupId)
+        val defaultUrl = SagerNet.application.getString(R.string.default_connection_test_url)
+        return stored.takeIf { it.isNotBlank() && it != defaultUrl } ?: connectionTestURL
     }
+
     fun setGroupUrlTestUrl(groupId: Long, value: String) {
-        configurationStore.putString("group_${groupId}_urlTestUrl", value)
+        val trimmed = value.trim()
+        val defaultUrl = SagerNet.application.getString(R.string.default_connection_test_url)
+        val storedValue = if (trimmed.isBlank() || trimmed == defaultUrl || trimmed == connectionTestURL) "" else trimmed
+        configurationStore.putString("group_${groupId}_urlTestUrl", storedValue)
     }
 
     fun groupUrlTestInterval(groupId: Long): Long =
