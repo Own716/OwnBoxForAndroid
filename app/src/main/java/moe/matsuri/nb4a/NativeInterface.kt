@@ -21,6 +21,7 @@ import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.app
 import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
 import io.nekohasekai.sagernet.utils.DefaultNetworkListener
+import io.nekohasekai.sagernet.utils.LandingIpManager
 import io.nekohasekai.sagernet.utils.PackageCache
 import kotlinx.coroutines.runBlocking
 import libcore.BoxPlatformInterface
@@ -339,9 +340,10 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
                         ?: if (isGroupStrategy) runCatching { SagerDatabase.proxyDao.getByGroup(group!!.id).map { it.id } }.getOrNull() else null
                     if (memberMap != null && id in memberMap) {
                         ActiveOutboundTracker.updateActiveLeaf(id, ent.displayName())
+                        LandingIpManager.clearCache()
                         val newTitle = ActiveOutboundTracker.formatNotificationTitle(activeProfile!!)
                         data.proxy?.displayProfileName = newTitle
-                        data.notification?.postNotificationTitle(newTitle)
+                        data.notification?.refresh(newTitle)
                         ProfileManager.postUpdate(id, true)
                         activeProfile.let { ProfileManager.postUpdate(it.id, true) }
                         data.binder.broadcast { b ->
@@ -352,11 +354,12 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
                 }
 
                 // traffic & title
+                LandingIpManager.clearCache()
                 data.proxy?.apply {
                     profile = ent
                     looper?.selectMain(id)
                     displayProfileName = ActiveOutboundTracker.formatNotificationTitle(ent)
-                    data.notification?.postNotificationTitle(displayProfileName)
+                    data.notification?.refresh(displayProfileName)
                 }
                 DataStore.currentProfile = id
                 // post binder

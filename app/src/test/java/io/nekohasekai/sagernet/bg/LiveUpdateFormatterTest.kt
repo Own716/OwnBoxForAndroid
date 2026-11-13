@@ -1,5 +1,9 @@
 package io.nekohasekai.sagernet.bg
 
+import io.nekohasekai.sagernet.database.ProxyEntity
+import io.nekohasekai.sagernet.fmt.internal.BalancerBean
+import io.nekohasekai.sagernet.fmt.shadowsocks.ShadowsocksBean
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -98,5 +102,66 @@ class LiveUpdateFormatterTest {
         assertEquals("香港", LiveUpdateFormatter.inferCountryFromName("Hong Kong 01"))
         assertEquals("新加坡", LiveUpdateFormatter.inferCountryFromName("Singapore 01"))
         assertEquals("美国", LiveUpdateFormatter.inferCountryFromName("US Los Angeles"))
+    }
+
+    @After
+    fun tearDown() {
+        ActiveOutboundTracker.reset()
+    }
+
+    @Test
+    fun testRequiresEgressProbeOnlyWhenTemplatesReferenceEgressFields() {
+        val noEgress = LiveUpdateFormatter.Templates(
+            collapsed = "{profile}",
+            title = "[{group}] {profile}",
+            content = "↓ {down} ↑ {up}",
+            subText = "{protocol} | {duration}",
+        )
+        assertFalse(LiveUpdateFormatter.requiresEgressProbe(noEgress))
+
+        assertTrue(
+            LiveUpdateFormatter.requiresEgressProbe(
+                noEgress.copy(collapsed = "{country}")
+            )
+        )
+        assertTrue(
+            LiveUpdateFormatter.requiresEgressProbe(
+                noEgress.copy(collapsed = "｛ Location ｝")
+            )
+        )
+        assertTrue(
+            LiveUpdateFormatter.requiresEgressProbe(
+                noEgress.copy(subText = "{profile} | {ip}")
+            )
+        )
+        assertTrue(
+            LiveUpdateFormatter.requiresEgressProbe(
+                noEgress.copy(content = "{egress_ip} / {region}")
+            )
+        )
+    }
+
+    @Test
+    fun testResolveEffectiveProfileIdPrefersActiveLeafOnlyForStrategyProfiles() {
+        val singleNode = ProxyEntity().apply {
+            id = 101L
+            type = 0
+            putBean(ShadowsocksBean().apply { name = "日本 01" })
+        }
+        val balancer = ProxyEntity().apply {
+            id = 200L
+            type = ProxyEntity.TYPE_BALANCER
+            putBean(BalancerBean().apply { name = "自动选择" })
+        }
+
+        ActiveOutboundTracker.reset()
+        assertEquals(101L, LiveUpdateFormatter.resolveEffectiveProfileId(singleNode))
+        assertEquals(200L, LiveUpdateFormatter.resolveEffectiveProfileId(balancer))
+        assertEquals(55L, LiveUpdateFormatter.resolveEffectiveProfileId(null, fallbackProfileId = 55L))
+
+        ActiveOutboundTracker.updateActiveLeaf(305L, "新加坡 01")
+        // Single node ignores leaf ID; strategy balancer resolves active leaf ID.
+        assertEquals(101L, LiveUpdateFormatter.resolveEffectiveProfileId(singleNode))
+        assertEquals(305L, LiveUpdateFormatter.resolveEffectiveProfileId(balancer))
     }
 }

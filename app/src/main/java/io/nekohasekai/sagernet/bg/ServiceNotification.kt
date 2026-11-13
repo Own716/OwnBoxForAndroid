@@ -31,6 +31,7 @@ import io.nekohasekai.sagernet.utils.Theme
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * User can customize visibility of notification since Android 8.
@@ -41,6 +42,9 @@ class ServiceNotification(
     channel: String,
     visible: Boolean = false,
 ) : BroadcastReceiver() {
+
+    private val channelId = channel
+    private val isVisible = visible
 
     companion object {
         const val notificationId = 1
@@ -78,8 +82,17 @@ class ServiceNotification(
 
     private val connectStartTime = System.currentTimeMillis()
     private var lastStats: SpeedDisplayData = SpeedDisplayData()
+    @Volatile
+    private var currentTitle: String = title
+    @Volatile
     private var currentEgressIp: String? = null
+    @Volatile
     private var currentEgressCountry: String? = null
+    @Volatile
+    private var lastCollapsedText: String? = null
+    @Volatile
+    private var lastShowCapsule: Boolean? = null
+    private val egressProbeGeneration = AtomicLong(0L)
 
     private fun applyLiveUpdateProperties(
         builder: NotificationCompat.Builder,
@@ -186,172 +199,166 @@ class ServiceNotification(
         update()
     }
 
+    private fun buildLiveUpdateInfo(stats: SpeedDisplayData): LiveUpdateFormatter.LiveUpdateInfo {
+        val profileId = service.data.proxy?.profile?.id ?: DataStore.selectedProxy
+        val profile = service.data.proxy?.profile ?: SagerDatabase.proxyDao.getById(profileId)
+        return LiveUpdateFormatter.buildInfo(
+            service as Context,
+            profile,
+            stats,
+            connectStartTime,
+            currentEgressIp,
+            currentEgressCountry
+        )
+    }
+
+    private fun applyFormattedLiveUpdate(
+        target: NotificationCompat.Builder,
+        info: LiveUpdateFormatter.LiveUpdateInfo,
+        tpls: LiveUpdateFormatter.Templates,
+        showCapsule: Boolean,
+        formattedCollapsed: String,
+        fallbackTitle: String,
+    ) {
+        val formattedTitle = LiveUpdateFormatter.format(tpls.title, info).ifEmpty { fallbackTitle }
+        val formattedContent = LiveUpdateFormatter.format(tpls.content, info)
+        val formattedSubText = LiveUpdateFormatter.format(tpls.subText, info)
+
+        target.setContentTitle(formattedCollapsed)
+        target.setContentText(formattedContent.ifEmpty { null })
+        target.setSubText(formattedSubText.ifEmpty { null })
+
+        val bigTextStyle = NotificationCompat.BigTextStyle()
+        bigTextStyle.setBigContentTitle(formattedTitle)
+        bigTextStyle.bigText(formattedContent.ifEmpty { formattedTitle })
+        bigTextStyle.setSummaryText(formattedSubText.ifEmpty { null })
+        target.setStyle(bigTextStyle)
+
+        applyLiveUpdateProperties(
+            target,
+            showCapsule,
+            formattedCollapsed,
+            formattedTitle,
+            formattedContent,
+            formattedSubText
+        )
+        lastCollapsedText = formattedCollapsed
+        lastShowCapsule = showCapsule
+    }
+
+    private fun applyStandardSpeedContent(target: NotificationCompat.Builder, stats: SpeedDisplayData) {
+        if (showDirectSpeed) {
+            val speedDetail = (service as Context).getString(
+                R.string.speed_detail, service.getString(
+                    R.string.speed, Formatter.formatFileSize(service, stats.txRateProxy)
+                ), service.getString(
+                    R.string.speed, Formatter.formatFileSize(service, stats.rxRateProxy)
+                ), service.getString(
+                    R.string.speed,
+                    Formatter.formatFileSize(service, stats.txRateDirect)
+                ), service.getString(
+                    R.string.speed,
+                    Formatter.formatFileSize(service, stats.rxRateDirect)
+                )
+            )
+            target.setStyle(NotificationCompat.BigTextStyle().bigText(speedDetail))
+            target.setContentText(speedDetail)
+            target.setSubText(
+                service.getString(
+                    R.string.traffic,
+                    Formatter.formatFileSize(service, stats.txTotal),
+                    Formatter.formatFileSize(service, stats.rxTotal)
+                )
+            )
+        } else {
+            val speedSimple = (service as Context).getString(
+                R.string.traffic, service.getString(
+                    R.string.speed, Formatter.formatFileSize(service, stats.txRateProxy)
+                ), service.getString(
+                    R.string.speed, Formatter.formatFileSize(service, stats.rxRateProxy)
+                )
+            )
+            target.setStyle(null)
+            target.setContentText(speedSimple)
+            target.setSubText(
+                service.getString(
+                    R.string.traffic,
+                    Formatter.formatFileSize(service, stats.txTotal),
+                    Formatter.formatFileSize(service, stats.rxTotal)
+                )
+            )
+        }
+    }
+
     suspend fun postNotificationSpeedUpdate(stats: SpeedDisplayData) {
         if (service.data.state == BaseService.State.Suspended || service.data.isSmartStopped) return
         lastStats = stats
-        useBuilder {
+        buildLock.withLock {
             if (DataStore.liveUpdateEnabled) {
-                val profileId = service.data.proxy?.profile?.id ?: DataStore.selectedProxy
-                val profile = service.data.proxy?.profile ?: SagerDatabase.proxyDao.getById(profileId)
-                val info = LiveUpdateFormatter.buildInfo(
-                    service as Context,
-                    profile,
-                    stats,
-                    connectStartTime,
-                    currentEgressIp,
-                    currentEgressCountry
-                )
+                val showCapsule = DataStore.liveUpdateShowCapsule
+                val info = buildLiveUpdateInfo(stats)
                 val tpls = LiveUpdateFormatter.getTemplates()
-
-                val formattedCollapsed = LiveUpdateFormatter.format(tpls.collapsed, info).ifEmpty { title }
-                val formattedTitle = LiveUpdateFormatter.format(tpls.title, info).ifEmpty { title }
-                val formattedContent = LiveUpdateFormatter.format(tpls.content, info)
-                val formattedSubText = LiveUpdateFormatter.format(tpls.subText, info)
-
-                it.setContentTitle(formattedCollapsed)
-                it.setContentText(formattedContent.ifEmpty { null })
-                if (formattedSubText.isNotEmpty()) {
-                    it.setSubText(formattedSubText)
+                val formattedCollapsed = LiveUpdateFormatter.format(tpls.collapsed, info).ifEmpty { currentTitle }
+                val target = if (formattedCollapsed != lastCollapsedText || lastShowCapsule != showCapsule) {
+                    rebuildBuilderLocked(currentTitle)
                 } else {
-                    it.setSubText(null)
+                    builder
                 }
-
-                val bigTextStyle = NotificationCompat.BigTextStyle()
-                bigTextStyle.setBigContentTitle(formattedTitle)
-                bigTextStyle.bigText(formattedContent.ifEmpty { formattedTitle })
-                if (formattedSubText.isNotEmpty()) {
-                    bigTextStyle.setSummaryText(formattedSubText)
-                } else {
-                    bigTextStyle.setSummaryText(null)
-                }
-                it.setStyle(bigTextStyle)
-
-                applyLiveUpdateProperties(
-                    it,
-                    DataStore.liveUpdateShowCapsule,
-                    formattedCollapsed,
-                    formattedTitle,
-                    formattedContent,
-                    formattedSubText
-                )
-            } else if (showDirectSpeed) {
-                val speedDetail = (service as Context).getString(
-                    R.string.speed_detail, service.getString(
-                        R.string.speed, Formatter.formatFileSize(service, stats.txRateProxy)
-                    ), service.getString(
-                        R.string.speed, Formatter.formatFileSize(service, stats.rxRateProxy)
-                    ), service.getString(
-                        R.string.speed,
-                        Formatter.formatFileSize(service, stats.txRateDirect)
-                    ), service.getString(
-                        R.string.speed,
-                        Formatter.formatFileSize(service, stats.rxRateDirect)
-                    )
-                )
-                it.setStyle(NotificationCompat.BigTextStyle().bigText(speedDetail))
-                it.setContentText(speedDetail)
-                it.setSubText(
-                    service.getString(
-                        R.string.traffic,
-                        Formatter.formatFileSize(service, stats.txTotal),
-                        Formatter.formatFileSize(service, stats.rxTotal)
-                    )
-                )
+                applyFormattedLiveUpdate(target, info, tpls, showCapsule, formattedCollapsed, currentTitle)
             } else {
-                val speedSimple = (service as Context).getString(
-                    R.string.traffic, service.getString(
-                        R.string.speed, Formatter.formatFileSize(service, stats.txRateProxy)
-                    ), service.getString(
-                        R.string.speed, Formatter.formatFileSize(service, stats.rxRateProxy)
-                    )
-                )
-                it.setStyle(null)
-                it.setContentText(speedSimple)
-                it.setSubText(
-                    service.getString(
-                        R.string.traffic,
-                        Formatter.formatFileSize(service, stats.txTotal),
-                        Formatter.formatFileSize(service, stats.rxTotal)
-                    )
-                )
+                applyStandardSpeedContent(builder, stats)
             }
+            NotificationManagerCompat.from(service as Service).notify(notificationId, builder.build())
         }
-        update()
     }
 
     suspend fun postNotificationTitle(newTitle: String) {
-        useBuilder {
-            if (!DataStore.liveUpdateEnabled) {
-                it.setContentTitle(newTitle)
-            }
+        if (DataStore.liveUpdateEnabled) {
+            refresh(newTitle)
+            return
         }
-        update()
+        currentTitle = newTitle
+        buildLock.withLock {
+            builder.setContentTitle(newTitle)
+            NotificationManagerCompat.from(service as Service).notify(notificationId, builder.build())
+        }
     }
 
     suspend fun refresh(newTitle: String) {
+        currentTitle = newTitle
         currentEgressIp = null
         currentEgressCountry = null
-        updateActions()
-        useBuilder {
+        lastCollapsedText = null
+        lastShowCapsule = null
+        egressProbeGeneration.incrementAndGet()
+        LandingIpManager.clearCache()
+        buildLock.withLock {
+            val target = rebuildBuilderLocked(newTitle)
             if (DataStore.liveUpdateEnabled) {
-                val profileId = service.data.proxy?.profile?.id ?: DataStore.selectedProxy
-                val profile = service.data.proxy?.profile ?: SagerDatabase.proxyDao.getById(profileId)
-                val info = LiveUpdateFormatter.buildInfo(
-                    service as Context,
-                    profile,
-                    lastStats,
-                    connectStartTime,
-                    currentEgressIp,
-                    currentEgressCountry
-                )
+                val showCapsule = DataStore.liveUpdateShowCapsule
+                val info = buildLiveUpdateInfo(lastStats)
                 val tpls = LiveUpdateFormatter.getTemplates()
-
                 val formattedCollapsed = LiveUpdateFormatter.format(tpls.collapsed, info).ifEmpty { newTitle }
-                val formattedTitle = LiveUpdateFormatter.format(tpls.title, info).ifEmpty { newTitle }
-                val formattedContent = LiveUpdateFormatter.format(tpls.content, info)
-                val formattedSubText = LiveUpdateFormatter.format(tpls.subText, info)
-
-                it.setContentTitle(formattedCollapsed)
-                it.setContentText(formattedContent.ifEmpty { null })
-                if (formattedSubText.isNotEmpty()) {
-                    it.setSubText(formattedSubText)
-                } else {
-                    it.setSubText(null)
-                }
-
-                val bigTextStyle = NotificationCompat.BigTextStyle()
-                bigTextStyle.setBigContentTitle(formattedTitle)
-                bigTextStyle.bigText(formattedContent.ifEmpty { formattedTitle })
-                if (formattedSubText.isNotEmpty()) {
-                    bigTextStyle.setSummaryText(formattedSubText)
-                } else {
-                    bigTextStyle.setSummaryText(null)
-                }
-                it.setStyle(bigTextStyle)
-
-                applyLiveUpdateProperties(
-                    it,
-                    DataStore.liveUpdateShowCapsule,
-                    formattedCollapsed,
-                    formattedTitle,
-                    formattedContent,
-                    formattedSubText
-                )
+                applyFormattedLiveUpdate(target, info, tpls, showCapsule, formattedCollapsed, newTitle)
             } else {
-                it.setContentTitle(newTitle)
-                it.setContentText(null)
-                it.setSubText(null)
-                it.setStyle(null)
+                target.setContentTitle(newTitle)
+                target.setContentText(null)
+                target.setSubText(null)
+                target.setStyle(null)
             }
+            NotificationManagerCompat.from(service as Service).notify(notificationId, target.build())
         }
-        update()
         if (DataStore.liveUpdateEnabled) {
-            probeEgress()
+            probeEgress(forceRefresh = true)
         }
     }
 
     suspend fun refreshLiveUpdate() {
-        updateActions()
+        lastCollapsedText = null
+        lastShowCapsule = null
+        buildLock.withLock {
+            rebuildBuilderLocked(currentTitle)
+        }
         postNotificationSpeedUpdate(lastStats)
     }
 
@@ -373,19 +380,34 @@ class ServiceNotification(
         update()
     }
 
-    private fun probeEgress() {
-        if (!DataStore.liveUpdateEnabled) return
+    private fun probeEgress(forceRefresh: Boolean = false) {
+        if (!DataStore.liveUpdateEnabled || service.data.state == BaseService.State.Suspended || service.data.isSmartStopped) return
+        val templates = LiveUpdateFormatter.getTemplates()
+        if (!LiveUpdateFormatter.requiresEgressProbe(templates)) return
+        val generation = egressProbeGeneration.incrementAndGet()
         runOnDefaultDispatcher {
-            val profileId = service.data.proxy?.profile?.id ?: DataStore.selectedProxy
-            val cached = LandingIpManager.getCachedInfo()
+            if (egressProbeGeneration.get() != generation) return@runOnDefaultDispatcher
+            val profile = service.data.proxy?.profile
+                ?: runCatching { SagerDatabase.proxyDao.getById(DataStore.selectedProxy) }.getOrNull()
+            val effectiveProfileId = LiveUpdateFormatter.resolveEffectiveProfileId(profile, DataStore.selectedProxy)
+            if (effectiveProfileId <= 0L) return@runOnDefaultDispatcher
+
+            val cached = if (forceRefresh) null else LandingIpManager.getCachedInfo(expectedProfileId = effectiveProfileId)
             if (cached != null && cached.ip.isNotEmpty()) {
+                if (egressProbeGeneration.get() != generation) return@runOnDefaultDispatcher
                 currentEgressIp = cached.ip
                 if (cached.country.isNotEmpty()) {
                     currentEgressCountry = LiveUpdateFormatter.cleanCountryName(cached.country)
                 }
                 postNotificationSpeedUpdate(lastStats)
-            } else if (service.data.state == BaseService.State.Connected && profileId > 0L) {
-                LandingIpManager.queryLandingIp(profileId) { info ->
+            } else if (service.data.state == BaseService.State.Connected) {
+                LandingIpManager.queryLandingIp(effectiveProfileId, forceRefresh = forceRefresh) { info ->
+                    if (egressProbeGeneration.get() != generation) return@queryLandingIp
+                    val latestProfile = service.data.proxy?.profile
+                        ?: runCatching { SagerDatabase.proxyDao.getById(DataStore.selectedProxy) }.getOrNull()
+                    if (LiveUpdateFormatter.resolveEffectiveProfileId(latestProfile, DataStore.selectedProxy) != effectiveProfileId) {
+                        return@queryLandingIp
+                    }
                     var changed = false
                     if (info.ip.isNotEmpty() && info.ip != currentEgressIp) {
                         currentEgressIp = info.ip
@@ -398,7 +420,9 @@ class ServiceNotification(
                     }
                     if (changed) {
                         runOnDefaultDispatcher {
-                            postNotificationSpeedUpdate(lastStats)
+                            if (egressProbeGeneration.get() == generation) {
+                                postNotificationSpeedUpdate(lastStats)
+                            }
                         }
                     }
                 }
@@ -408,17 +432,28 @@ class ServiceNotification(
 
     private val showDirectSpeed get() = DataStore.showDirectSpeed
 
-    private val builder = NotificationCompat.Builder(service as Context, channel)
-        .setWhen(0)
-        .setTicker(service.getString(R.string.forward_success))
-        .setContentTitle(title)
-        .setOnlyAlertOnce(true)
-        .setContentIntent(SagerNet.configureIntent(service))
-        .setSmallIcon(R.drawable.ic_throne_tile)
-        .setCategory(NotificationCompat.CATEGORY_SERVICE)
-        .setPriority(if (visible) NotificationCompat.PRIORITY_LOW else NotificationCompat.PRIORITY_MIN)
-        .setOngoing(true)
-        .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+    private fun createBaseBuilder(baseTitle: String): NotificationCompat.Builder {
+        return NotificationCompat.Builder(service as Context, channelId)
+            .setWhen(0)
+            .setTicker(service.getString(R.string.forward_success))
+            .setContentTitle(baseTitle)
+            .setOnlyAlertOnce(true)
+            .setContentIntent(SagerNet.configureIntent(service))
+            .setSmallIcon(R.drawable.ic_throne_tile)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setPriority(if (isVisible) NotificationCompat.PRIORITY_LOW else NotificationCompat.PRIORITY_MIN)
+            .setOngoing(true)
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+    }
+
+    private fun rebuildBuilderLocked(baseTitle: String): NotificationCompat.Builder {
+        val fresh = createBaseBuilder(baseTitle)
+        applyActionsLocked(fresh)
+        builder = fresh
+        return fresh
+    }
+
+    private var builder = createBaseBuilder(title)
 
     private val buildLock = Mutex()
 
@@ -441,101 +476,69 @@ class ServiceNotification(
         })
 
         runOnMainDispatcher {
-            updateActions()
-            if (DataStore.liveUpdateEnabled) {
-                val profileId = service.data.proxy?.profile?.id ?: DataStore.selectedProxy
-                val profile = service.data.proxy?.profile ?: SagerDatabase.proxyDao.getById(profileId)
-                val info = LiveUpdateFormatter.buildInfo(
-                    service as Context,
-                    profile,
-                    lastStats,
-                    connectStartTime,
-                    currentEgressIp,
-                    currentEgressCountry
-                )
-                val tpls = LiveUpdateFormatter.getTemplates()
-
-                val formattedCollapsed = LiveUpdateFormatter.format(tpls.collapsed, info).ifEmpty { title }
-                val formattedTitle = LiveUpdateFormatter.format(tpls.title, info).ifEmpty { title }
-                val formattedContent = LiveUpdateFormatter.format(tpls.content, info)
-                val formattedSubText = LiveUpdateFormatter.format(tpls.subText, info)
-
-                builder.setContentTitle(formattedCollapsed)
-                builder.setContentText(formattedContent.ifEmpty { null })
-                if (formattedSubText.isNotEmpty()) {
-                    builder.setSubText(formattedSubText)
-                } else {
-                    builder.setSubText(null)
+            buildLock.withLock {
+                applyActionsLocked(builder)
+                if (DataStore.liveUpdateEnabled) {
+                    val showCapsule = DataStore.liveUpdateShowCapsule
+                    val info = buildLiveUpdateInfo(lastStats)
+                    val tpls = LiveUpdateFormatter.getTemplates()
+                    val formattedCollapsed = LiveUpdateFormatter.format(tpls.collapsed, info).ifEmpty { currentTitle }
+                    applyFormattedLiveUpdate(builder, info, tpls, showCapsule, formattedCollapsed, currentTitle)
                 }
-
-                val bigTextStyle = NotificationCompat.BigTextStyle()
-                bigTextStyle.setBigContentTitle(formattedTitle)
-                bigTextStyle.bigText(formattedContent.ifEmpty { formattedTitle })
-                if (formattedSubText.isNotEmpty()) {
-                    bigTextStyle.setSummaryText(formattedSubText)
-                } else {
-                    bigTextStyle.setSummaryText(null)
-                }
-                builder.setStyle(bigTextStyle)
-
-                applyLiveUpdateProperties(
-                    builder,
-                    DataStore.liveUpdateShowCapsule,
-                    formattedCollapsed,
-                    formattedTitle,
-                    formattedContent,
-                    formattedSubText
-                )
             }
             show()
         }
     }
 
     private suspend fun updateActions() {
+        useBuilder {
+            applyActionsLocked(it)
+        }
+    }
+
+    private fun applyActionsLocked(target: NotificationCompat.Builder) {
         service as Context
         val actions = notificationActions()
         val profileId = service.data.proxy?.profile?.id ?: DataStore.selectedProxy
         val canCycle = (ACTION_NEXT in actions || ACTION_PREVIOUS in actions) && ProfileOrder.canCycle(profileId)
 
-        useBuilder {
-            it.clearActions()
-            for (action in actions) when (action) {
-                ACTION_STOP -> it.addAction(
-                    broadcastAction(R.drawable.ic_notification_stop, service.getText(R.string.stop), Action.CLOSE, 1)
-                )
+        target.clearActions()
+        for (action in actions) when (action) {
+            ACTION_STOP -> target.addAction(
+                broadcastAction(R.drawable.ic_notification_stop, service.getText(R.string.stop), Action.CLOSE, 1)
+            )
 
-                ACTION_PREVIOUS -> if (canCycle) it.addAction(
-                    broadcastAction(
-                        R.drawable.ic_notification_previous, service.getText(R.string.notification_previous),
-                        Action.SWITCH_PREVIOUS, 2,
+            ACTION_PREVIOUS -> if (canCycle) target.addAction(
+                broadcastAction(
+                    R.drawable.ic_notification_previous, service.getText(R.string.notification_previous),
+                    Action.SWITCH_PREVIOUS, 2,
+                )
+            )
+
+            ACTION_NEXT -> if (canCycle) target.addAction(
+                broadcastAction(
+                    R.drawable.ic_notification_next, service.getText(R.string.notification_next),
+                    Action.SWITCH_NEXT, 3,
+                )
+            )
+
+            ACTION_SWITCH -> target.addAction(
+                NotificationCompat.Action.Builder(
+                    R.drawable.ic_notification_switch, service.getText(R.string.notification_switch),
+                    PendingIntent.getActivity(
+                        service, 4,
+                        Intent(service, SwitchActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                        flags,
                     )
-                )
+                ).setShowsUserInterface(true).build()
+            )
 
-                ACTION_NEXT -> if (canCycle) it.addAction(
-                    broadcastAction(
-                        R.drawable.ic_notification_next, service.getText(R.string.notification_next),
-                        Action.SWITCH_NEXT, 3,
-                    )
+            ACTION_RESET -> target.addAction(
+                broadcastAction(
+                    R.drawable.ic_notification_reset, service.getText(R.string.reset_connections),
+                    Action.RESET_UPSTREAM_CONNECTIONS, 5,
                 )
-
-                ACTION_SWITCH -> it.addAction(
-                    NotificationCompat.Action.Builder(
-                        R.drawable.ic_notification_switch, service.getText(R.string.notification_switch),
-                        PendingIntent.getActivity(
-                            service, 4,
-                            Intent(service, SwitchActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                            flags,
-                        )
-                    ).setShowsUserInterface(true).build()
-                )
-
-                ACTION_RESET -> it.addAction(
-                    broadcastAction(
-                        R.drawable.ic_notification_reset, service.getText(R.string.reset_connections),
-                        Action.RESET_UPSTREAM_CONNECTIONS, 5,
-                    )
-                )
-            }
+            )
         }
     }
 
@@ -550,7 +553,10 @@ class ServiceNotification(
         when (intent.action) {
             Intent.ACTION_SCREEN_ON -> {
                 listenPostSpeed = true
-                if (DataStore.liveUpdateEnabled && (currentEgressIp.isNullOrEmpty() || currentEgressCountry.isNullOrEmpty())) {
+                if (DataStore.liveUpdateEnabled &&
+                    LiveUpdateFormatter.requiresEgressProbe(LiveUpdateFormatter.getTemplates()) &&
+                    (currentEgressIp.isNullOrEmpty() || currentEgressCountry.isNullOrEmpty())
+                ) {
                     probeEgress()
                 }
             }
@@ -598,6 +604,7 @@ class ServiceNotification(
 
     fun detachWithoutCancel() {
         listenPostSpeed = false
+        egressProbeGeneration.incrementAndGet()
         try {
             (service as Context).unregisterReceiver(this)
         } catch (_: Throwable) {
@@ -606,6 +613,7 @@ class ServiceNotification(
 
     fun destroy() {
         listenPostSpeed = false
+        egressProbeGeneration.incrementAndGet()
         val s = service as? Service
         if (s != null) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {

@@ -70,6 +70,9 @@ object ActiveOutboundTracker {
     fun onProfileSwitched(newProfile: ProxyEntity) {
         val oldId = activeLeafProfileId
         reset()
+        if (!LiveUpdateFormatter.isStrategyProfile(newProfile)) {
+            updateActiveLeaf(newProfile.id, newProfile.displayName())
+        }
         if (oldId > 0L) {
             runOnDefaultDispatcher {
                 ProfileManager.postUpdate(oldId, true)

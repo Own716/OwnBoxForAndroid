@@ -73,7 +73,7 @@ data class LandingIpInfo(
 
 object LandingIpManager {
 
-    private const val CACHE_TTL_MS = 60_000L
+    const val CACHE_TTL_MS = 60_000L
 
     @Volatile
     private var currentCache: LandingIpInfo? = null
@@ -85,12 +85,34 @@ object LandingIpManager {
     @Volatile
     private var isQuerying: Boolean = false
 
+    @Volatile
+    private var activeQueryProfileId: Long = -1L
+
+    private val queryGeneration = java.util.concurrent.atomic.AtomicLong(0L)
+
     fun clearCache() {
+        queryGeneration.incrementAndGet()
         currentCache = null
         cachedProfileId = -1L
+        activeQueryProfileId = -1L
+        isQuerying = false
     }
 
     fun getCachedInfo(): LandingIpInfo? = currentCache
+
+    fun getCachedInfo(expectedProfileId: Long, maxAgeMs: Long = CACHE_TTL_MS): LandingIpInfo? {
+        val cache = currentCache ?: return null
+        if (expectedProfileId <= 0L || cachedProfileId != expectedProfileId) return null
+        if (maxAgeMs > 0L && System.currentTimeMillis() - cache.queryTimestamp >= maxAgeMs) return null
+        return cache
+    }
+
+    @androidx.annotation.VisibleForTesting
+    internal fun setCacheForTest(profileId: Long, info: LandingIpInfo) {
+        queryGeneration.incrementAndGet()
+        currentCache = info
+        cachedProfileId = profileId
+    }
 
     fun isCurrentlyQuerying(): Boolean = isQuerying
 
@@ -528,19 +550,21 @@ object LandingIpManager {
 
         val now = System.currentTimeMillis()
         if (forceRefresh) {
+            queryGeneration.incrementAndGet()
             currentCache = null
             cachedProfileId = -1L
         } else {
-            val cache = currentCache
-            if (cache != null && cachedProfileId == profileId && (now - cache.queryTimestamp < CACHE_TTL_MS)) {
+            val cache = getCachedInfo(expectedProfileId = profileId)
+            if (cache != null) {
                 return@withContext Result.success(cache)
+            }
+            if (isQuerying && activeQueryProfileId == profileId) {
+                return@withContext Result.failure(IllegalStateException("Landing IP query already in progress"))
             }
         }
 
-        if (isQuerying && !forceRefresh) {
-            currentCache?.let { return@withContext Result.success(it) }
-        }
-
+        val myGen = queryGeneration.incrementAndGet()
+        activeQueryProfileId = profileId
         isQuerying = true
         val startTime = System.currentTimeMillis()
         val ua = USER_AGENT.takeIf { it.isNotBlank() }
@@ -596,6 +620,9 @@ object LandingIpManager {
                 )
             }
 
+            if (queryGeneration.get() != myGen) {
+                return@withContext Result.failure(IllegalStateException("Landing IP query superseded"))
+            }
             currentCache = info
             cachedProfileId = profileId
             onUpdate?.invoke(info)
@@ -603,7 +630,10 @@ object LandingIpManager {
         } catch (e: Throwable) {
             Result.failure(e)
         } finally {
-            isQuerying = false
+            if (queryGeneration.get() == myGen) {
+                isQuerying = false
+                activeQueryProfileId = -1L
+            }
         }
     }
 }

@@ -339,11 +339,12 @@ class BaseService {
                             proxy.config.mainEntId = newProfileId
                             DataStore.currentProfile = newProfileId
                             ActiveOutboundTracker.onProfileSwitched(newProfile)
+                            LandingIpManager.clearCache()
                             val newTitle = ActiveOutboundTracker.formatNotificationTitle(newProfile)
                             proxy.displayProfileName = newTitle
                             runOnDefaultDispatcher {
                                 proxy.looper?.selectMain(newProfileId)
-                                data.notification?.postNotificationTitle(newTitle)
+                                data.notification?.refresh(newTitle)
                                 data.binder.broadcast { cb ->
                                     cb.cbSelectorUpdate(newProfileId)
                                 }
@@ -484,6 +485,7 @@ class BaseService {
         }
 
         fun stopRunner(restart: Boolean = false, msg: String? = null) {
+            LandingIpManager.clearCache()
             DataStore.baseService = null
             DataStore.vpnService = null
             DataStore.mixedInboundAuthed = false
