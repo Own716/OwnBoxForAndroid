@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96" role="img" aria-labelledby="title">
+<title id="title">Speed</title>
+<defs><linearGradient id="g" x1="15" y1="15" x2="82" y2="82" gradientUnits="userSpaceOnUse"><stop stop-color="#75F5E3"/><stop offset=".55" stop-color="#29C9DA"/><stop offset="1" stop-color="#7187FF"/></linearGradient></defs>
+<rect x="5" y="5" width="86" height="86" rx="25" fill="#0B1B30" stroke="#1C3B56" stroke-width="2"/>
+<g fill="none" stroke="url(#g)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><g><path d="M18 64a30 30 0 1 1 60 0"/><path d="M28 64a20 20 0 0 1 40 0" opacity=".42"/><path d="m48 64 16-22"/><circle cx="48" cy="64" r="4" fill="url(#g)" stroke="none"/><path d="M25 64h-7m60 0h-7M48 34v-7" opacity=".75"/><path d="M31 43 26 38m39 5 5-5" opacity=".5"/></g></g>
+</svg>

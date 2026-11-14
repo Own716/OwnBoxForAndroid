@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96" role="img" aria-labelledby="title">
+<title id="title">Diagnostics</title>
+<defs><linearGradient id="g" x1="15" y1="15" x2="82" y2="82" gradientUnits="userSpaceOnUse"><stop stop-color="#75F5E3"/><stop offset=".55" stop-color="#29C9DA"/><stop offset="1" stop-color="#7187FF"/></linearGradient></defs>
+<rect x="5" y="5" width="86" height="86" rx="25" fill="#0B1B30" stroke="#1C3B56" stroke-width="2"/>
+<g fill="none" stroke="url(#g)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><g><rect x="20" y="19" width="56" height="58" rx="12"/><path d="M32 37h31M32 49h19M32 61h14"/><circle cx="67" cy="65" r="12" fill="#0A1C30"/><path d="m62 65 4 4 7-9"/></g></g>
+</svg>
