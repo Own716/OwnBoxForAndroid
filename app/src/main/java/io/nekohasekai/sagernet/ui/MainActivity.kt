@@ -278,7 +278,7 @@ class MainActivity : ThemedActivity(),
         changeState(
             BaseService.State.Idle,
             animate = false,
-            animateControls = animateInitialControls,
+            animateControls = false,
         )
         connection.connect(this, this)
         DataStore.configurationStore.registerChangeListener(this)
@@ -1009,7 +1009,11 @@ class MainActivity : ThemedActivity(),
             .replace(R.id.fragment_holder, fragment)
             .commitAllowingStateLoss()
         binding.drawerLayout.closeDrawers()
-        syncMainControls(fragment, showWhenConnected = false, animate = true)
+        syncMainControls(
+            fragment,
+            showWhenConnected = DataStore.serviceState == BaseService.State.Connected,
+            animate = true,
+        )
     }
 
     private fun syncMainControls(
