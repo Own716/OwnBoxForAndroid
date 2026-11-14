@@ -78,6 +78,8 @@ import io.nekohasekai.sagernet.SpeedTestOutcome
 import io.nekohasekai.sagernet.aidl.TrafficData
 import io.nekohasekai.sagernet.bg.ActiveOutboundTracker
 import io.nekohasekai.sagernet.bg.BaseService
+import io.nekohasekai.sagernet.bg.StrategyGroupSnapshot
+import io.nekohasekai.sagernet.bg.StrategySnapshot
 import io.nekohasekai.sagernet.bg.proto.AndroidSpeedTestSession
 import io.nekohasekai.sagernet.bg.proto.SpeedTestQueueRunner
 import io.nekohasekai.sagernet.bg.proto.SpeedTestSnapshot
@@ -255,10 +257,20 @@ class ConfigurationFragment @JvmOverloads constructor(
     private var speedTestNotification: ConnectionTestNotification? = null
     private var speedTestHidden = false
 
+    private var cardStrategyStatus: MaterialCardView? = null
+    private var strategyStatusIcon: ImageView? = null
+    private var strategyStatusText: TextView? = null
+    private var strategyStatusDelay: TextView? = null
+    private var latestStrategySnapshot: StrategyGroupSnapshot? = null
+    private var strategyStatusJob: Job? = null
+    private var strategyTickerJob: Job? = null
+    private val strategyStatusGeneration = AtomicLong(0L)
+
     fun refreshProfileState() {
         lifecycleScope.launch(Dispatchers.Main.immediate) {
             val generation = profileStateGeneration.incrementAndGet()
             profileStateRequests.trySend(generation)
+            refreshStrategyStatus()
         }
     }
 
@@ -328,6 +340,9 @@ class ConfigurationFragment @JvmOverloads constructor(
         selectedProxySnapshot = selectedProxy
         currentProfileSnapshot = currentProfile
         serviceStartedSnapshot = serviceStarted
+        if (!serviceStarted) {
+            hideStrategyStatusBanner()
+        }
 
         if (changedIds.isEmpty() || !::adapter.isInitialized) return
         adapter.groupFragments.values.forEach { fragment ->
@@ -1310,6 +1325,25 @@ class ConfigurationFragment @JvmOverloads constructor(
         groupPager = view.findViewById(R.id.group_pager)
         groupTabContainer = view.findViewById(R.id.group_tab_container)
         tabLayout = view.findViewById(R.id.group_tab)
+        cardStrategyStatus = view.findViewById(R.id.card_strategy_status)
+        strategyStatusIcon = view.findViewById(R.id.strategy_status_icon)
+        strategyStatusText = view.findViewById(R.id.strategy_status_text)
+        strategyStatusDelay = view.findViewById(R.id.strategy_status_delay)
+        cardStrategyStatus?.setOnClickListener {
+            val snap = latestStrategySnapshot
+            startActivity(
+                Intent(requireContext(), StrategyStatsActivity::class.java).apply {
+                    if (snap != null) {
+                        if (snap.editProfileId > 0L) {
+                            putExtra(StrategyStatsActivity.EXTRA_PROFILE_ID, snap.editProfileId)
+                        }
+                        if (snap.editGroupId > 0L) {
+                            putExtra(StrategyStatsActivity.EXTRA_GROUP_ID, snap.editGroupId)
+                        }
+                    }
+                }
+            )
+        }
         adapter = GroupPagerAdapter()
         ProfileManager.addListener(adapter)
         GroupManager.addListener(adapter)
@@ -1681,6 +1715,14 @@ class ConfigurationFragment @JvmOverloads constructor(
     }
 
     override fun onDestroyView() {
+        stopStrategyTicker()
+        strategyStatusJob?.cancel()
+        strategyStatusJob = null
+        latestStrategySnapshot = null
+        cardStrategyStatus = null
+        strategyStatusIcon = null
+        strategyStatusText = null
+        strategyStatusDelay = null
         topBarPreDrawTarget?.viewTreeObserver?.let { vto ->
             if (vto.isAlive && topBarPreDrawListener != null) {
                 vto.removeOnPreDrawListener(topBarPreDrawListener)
@@ -1723,6 +1765,116 @@ class ConfigurationFragment @JvmOverloads constructor(
             speedTestNotification?.updateNotification(0, 0, true)
             speedTestNotification = null
             speedTestDialog?.show()
+        }
+        refreshStrategyStatus()
+        startStrategyTicker()
+    }
+
+    override fun onPause() {
+        stopStrategyTicker()
+        super.onPause()
+    }
+
+    private fun startStrategyTicker() {
+        if (select || !isAdded || view == null) return
+        strategyTickerJob?.cancel()
+        strategyTickerJob = viewLifecycleOwner.lifecycleScope.launch {
+            while (isActive) {
+                delay(3000L)
+                refreshStrategyStatus()
+            }
+        }
+    }
+
+    private fun stopStrategyTicker() {
+        strategyTickerJob?.cancel()
+        strategyTickerJob = null
+    }
+
+    private fun hideStrategyStatusBanner() {
+        latestStrategySnapshot = null
+        strategyStatusJob?.cancel()
+        strategyStatusJob = null
+        cardStrategyStatus?.visibility = View.GONE
+    }
+
+    private fun refreshStrategyStatus() {
+        if (select || !isAdded || view == null) return
+        if (!DataStore.serviceState.started) {
+            hideStrategyStatusBanner()
+            return
+        }
+        val service = (activity as? MainActivity)?.connection?.service
+        if (service == null) {
+            hideStrategyStatusBanner()
+            return
+        }
+        val gen = strategyStatusGeneration.incrementAndGet()
+        strategyStatusJob?.cancel()
+        strategyStatusJob = viewLifecycleOwner.lifecycleScope.launch {
+            val raw = withContext(Dispatchers.IO) {
+                runCatching { service.getActiveStrategySnapshotJson() }.getOrNull().orEmpty()
+            }
+            if (!isAdded || view == null || gen != strategyStatusGeneration.get()) {
+                return@launch
+            }
+            if (!DataStore.serviceState.started) {
+                hideStrategyStatusBanner()
+                return@launch
+            }
+            applyStrategyStatusSnapshot(StrategySnapshot.parse(raw))
+        }
+    }
+
+    private fun applyStrategyStatusSnapshot(snap: StrategyGroupSnapshot?) {
+        val card = cardStrategyStatus ?: return
+        val context = context ?: return
+        if (snap == null || !snap.active || select || !DataStore.serviceState.started) {
+            latestStrategySnapshot = null
+            card.visibility = View.GONE
+            return
+        }
+        latestStrategySnapshot = snap
+        card.visibility = View.VISIBLE
+
+        val primaryColor = context.getColorAttr(R.attr.colorPrimary)
+        strategyStatusIcon?.apply {
+            setImageResource(
+                if (snap.isPinned) R.drawable.ic_baseline_lock_24 else R.drawable.ic_baseline_speed_24
+            )
+            setColorFilter(primaryColor)
+        }
+
+        val modeLabel = StrategySnapshot.formatStrategyLabel(context, snap.strategyType)
+        val activeDisplay = snap.pinnedName.takeIf { snap.isPinned && it.isNotBlank() } ?: snap.activeName
+        strategyStatusText?.text = when {
+            snap.isPinned -> getString(R.string.strategy_status_pinned, activeDisplay.ifBlank { snap.pinnedTag })
+            activeDisplay.isNotBlank() -> getString(R.string.strategy_status_running, modeLabel, activeDisplay)
+            else -> getString(R.string.strategy_status_running_no_node, modeLabel)
+        }
+
+        val currentMember = snap.members.firstOrNull { it.pinned }
+            ?: snap.members.firstOrNull { it.active }
+        val delayMs = currentMember?.delay ?: snap.activeDelay
+        val unavailable = currentMember?.isUnavailable == true
+        strategyStatusDelay?.apply {
+            when {
+                unavailable -> {
+                    visibility = View.VISIBLE
+                    setText(R.string.unavailable)
+                    setTextColor(context.getColorAttr(android.R.attr.textColorSecondary))
+                }
+
+                delayMs > 0 -> {
+                    visibility = View.VISIBLE
+                    text = getString(R.string.strategy_latency_ms, delayMs)
+                    setTextColor(StrategySnapshot.resolveLatencyColor(context, delayMs))
+                }
+
+                else -> {
+                    visibility = View.GONE
+                }
+            }
         }
     }
 

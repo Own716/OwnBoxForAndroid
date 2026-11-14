@@ -282,6 +282,26 @@ class BaseService {
             }
         }
 
+        override fun getActiveStrategySnapshotJson(): String {
+            val currentData = data ?: return ""
+            if (currentData.state != State.Connected) return ""
+            val proxy = currentData.proxy ?: return ""
+            return StrategySnapshotHelper.getOrCheckSnapshotJson(proxy, forceCheck = false)
+        }
+
+        override fun checkActiveStrategyNowJson(): String {
+            val currentData = data ?: return ""
+            if (currentData.state != State.Connected) return ""
+            val proxy = currentData.proxy ?: return ""
+            return StrategySnapshotHelper.getOrCheckSnapshotJson(proxy, forceCheck = true)
+        }
+
+        override fun pinActiveStrategyMember(memberProfileId: Long): String {
+            val currentData = data ?: return ""
+            if (currentData.state != State.Connected) return ""
+            return StrategySnapshotHelper.pinMemberAndSnapshotJson(currentData, memberProfileId)
+        }
+
         fun stateChanged(s: State, msg: String?) = launch {
             val profileName = profileName
             broadcast { it.stateChanged(s.ordinal, profileName, msg) }
@@ -338,6 +358,7 @@ class BaseService {
                             proxy.profile = newProfile
                             proxy.config.mainEntId = newProfileId
                             DataStore.currentProfile = newProfileId
+                            runCatching { StrategySnapshotHelper.applyPersistedPin(proxy) }
                             ActiveOutboundTracker.onProfileSwitched(newProfile)
                             LandingIpManager.clearCache()
                             val newTitle = ActiveOutboundTracker.formatNotificationTitle(newProfile)

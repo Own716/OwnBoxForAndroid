@@ -28,6 +28,7 @@ import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.databinding.LayoutAddEntityBinding
 import io.nekohasekai.sagernet.databinding.LayoutProfileBinding
 import io.nekohasekai.sagernet.fmt.internal.BalancerBean
+import io.nekohasekai.sagernet.fmt.internal.BalancerMemberResolver
 import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.ui.ProfileSelectActivity
 import io.nekohasekai.sagernet.widget.OutboundPreference
@@ -38,6 +39,7 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
 
     private lateinit var frontProxyPreference: OutboundPreference
     private lateinit var landingProxyPreference: OutboundPreference
+    private var refreshMatchSummaryFn: ((String?, String?) -> Unit)? = null
 
     val selectProfileForAddFront = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -50,6 +52,7 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
                 if (::frontProxyPreference.isInitialized) {
                     frontProxyPreference.value = OutboundPreference.VALUE_SELECT_PROFILE
                 }
+                refreshMatchSummaryFn?.invoke(null, null)
             }
         }
     }
@@ -65,6 +68,7 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
                 if (::landingProxyPreference.isInitialized) {
                     landingProxyPreference.value = OutboundPreference.VALUE_SELECT_PROFILE
                 }
+                refreshMatchSummaryFn?.invoke(null, null)
             }
         }
     }
@@ -165,6 +169,7 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
                     )
                     false
                 } else {
+                    runOnMainDispatcher { refreshMatchSummaryFn?.invoke(null, null) }
                     true
                 }
             }
@@ -188,6 +193,7 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
                     )
                     false
                 } else {
+                    runOnMainDispatcher { refreshMatchSummaryFn?.invoke(null, null) }
                     true
                 }
             }
@@ -234,6 +240,7 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
                     DataStore.balancerTargetGroups = newGids.joinToString(",")
                     DataStore.balancerTargetGroup = newGids.firstOrNull() ?: 0L
                     updateGroupSummary()
+                    refreshMatchSummaryFn?.invoke(null, null)
                 }
                 .setNegativeButton(android.R.string.cancel, null)
                 .show()
@@ -244,20 +251,87 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         val useLandingProxyPref = findPreference<Preference>("balancerUseLandingProxy")
         val nameExcludePref = findPreference<EditTextPreference>("balancerNameExclude")
         val nameIncludePref = findPreference<EditTextPreference>("balancerNameInclude")
+        val matchSummaryPref = findPreference<Preference>("balancerMatchSummary")
+
+        fun refreshMatchSummary(excludeOverride: String? = null, includeOverride: String? = null) {
+            val type = DataStore.balancerType
+            val gids = DataStore.balancerTargetGroups.split(",")
+                .mapNotNull { it.trim().toLongOrNull() }
+                .filter { it > 0L }
+                .ifEmpty {
+                    if (DataStore.balancerTargetGroup > 0L) listOf(DataStore.balancerTargetGroup) else emptyList()
+                }
+            val extraIds = proxyList.map { it.id }
+            val excludePattern = excludeOverride ?: DataStore.balancerNameExclude
+            val includePattern = includeOverride ?: DataStore.balancerNameInclude
+            val selfId = DataStore.editingId
+            val frontId = if (DataStore.balancerFrontProxyTmp == OutboundPreference.VALUE_SELECT_PROFILE.toInt()) {
+                DataStore.balancerFrontProxy
+            } else 0L
+            val landingId = if (DataStore.balancerLandingProxyTmp == OutboundPreference.VALUE_SELECT_PROFILE.toInt()) {
+                DataStore.balancerLandingProxy
+            } else 0L
+
+            runOnDefaultDispatcher {
+                val res = BalancerMemberResolver.resolve(
+                    BalancerMemberResolver.FilterSpec(
+                        balancerType = type,
+                        targetGroupIds = gids,
+                        explicitProxyIds = extraIds,
+                        nameExclude = excludePattern,
+                        nameInclude = includePattern,
+                        selfId = selfId,
+                        frontProxyId = frontId,
+                        landingProxyId = landingId,
+                    )
+                )
+                val summaryText = when {
+                    res.hasRegexError -> {
+                        val base = when {
+                            res.totalCount <= 0 -> getString(R.string.balancer_match_summary_empty)
+                            type == BalancerBean.TYPE_MIXED -> getString(
+                                R.string.balancer_match_summary_mixed,
+                                res.totalCount,
+                                res.groupMatchedCount,
+                                res.extraAddedCount,
+                            )
+                            type == BalancerBean.TYPE_GROUP -> getString(R.string.balancer_match_summary_group, res.totalCount)
+                            else -> getString(R.string.balancer_match_summary_list, res.totalCount)
+                        }
+                        getString(R.string.balancer_match_summary_regex_error, base)
+                    }
+                    res.totalCount <= 0 -> getString(R.string.balancer_match_summary_empty)
+                    type == BalancerBean.TYPE_MIXED -> getString(
+                        R.string.balancer_match_summary_mixed,
+                        res.totalCount,
+                        res.groupMatchedCount,
+                        res.extraAddedCount,
+                    )
+                    type == BalancerBean.TYPE_GROUP -> getString(R.string.balancer_match_summary_group, res.totalCount)
+                    else -> getString(R.string.balancer_match_summary_list, res.totalCount)
+                }
+                onMainDispatcher {
+                    matchSummaryPref?.summary = summaryText
+                }
+            }
+        }
+        refreshMatchSummaryFn = { ex, inc -> refreshMatchSummary(ex, inc) }
 
         fun updateTypeVisibility(type: Int) {
-            val isGroup = type == BalancerBean.TYPE_GROUP
-            groupPref?.isVisible = isGroup
-            useFrontProxyPref?.isVisible = isGroup
-            useLandingProxyPref?.isVisible = isGroup
-            nameExcludePref?.isVisible = isGroup
-            nameIncludePref?.isVisible = isGroup
+            val hasGroup = type == BalancerBean.TYPE_GROUP || type == BalancerBean.TYPE_MIXED
+            val hasList = type == BalancerBean.TYPE_LIST || type == BalancerBean.TYPE_MIXED
+            groupPref?.isVisible = hasGroup
+            useFrontProxyPref?.isVisible = hasGroup
+            useLandingProxyPref?.isVisible = hasGroup
+            nameExcludePref?.isVisible = hasGroup
+            nameIncludePref?.isVisible = hasGroup
             if (::configurationList.isInitialized) {
-                configurationList.isVisible = !isGroup
+                configurationList.isVisible = hasList
             }
             if (::listCell.isInitialized) {
-                listCell.isVisible = !isGroup
+                listCell.isVisible = hasList
             }
+            refreshMatchSummary()
         }
 
         val typePref = findPreference<SimpleMenuPreference>("balancerType")
@@ -307,7 +381,7 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
             tolerancePref?.summary = when {
                 value != null && value >= 0 -> "$value $unit"
                 unit == "s" -> "1 s"
-                else -> "300 ms"
+                else -> "50 ms"
             }
         }
         updateToleranceSummary()
@@ -347,6 +421,14 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         nameIncludePref?.summaryProvider = Preference.SummaryProvider<EditTextPreference> { pref ->
             if (pref.text.isNullOrBlank()) getString(androidx.preference.R.string.not_set) else pref.text
         }
+        nameExcludePref?.setOnPreferenceChangeListener { _, newValue ->
+            refreshMatchSummary(excludeOverride = newValue as? String)
+            true
+        }
+        nameIncludePref?.setOnPreferenceChangeListener { _, newValue ->
+            refreshMatchSummary(includeOverride = newValue as? String)
+            true
+        }
 
 
         updateTypeVisibility(DataStore.balancerType)
@@ -364,9 +446,9 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         supportActionBar?.setTitle(R.string.balancer_settings)
         configurationList = findViewById(R.id.configuration_list)
         listCell = findViewById(R.id.list_cell)
-        val isGroup = DataStore.balancerType == BalancerBean.TYPE_GROUP
-        configurationList.isVisible = !isGroup
-        listCell.isVisible = !isGroup
+        val hasList = DataStore.balancerType == BalancerBean.TYPE_LIST || DataStore.balancerType == BalancerBean.TYPE_MIXED
+        configurationList.isVisible = hasList
+        listCell.isVisible = hasList
         layoutManager = FixedLinearLayoutManager(configurationList)
         configurationList.layoutManager = layoutManager
         configurationAdapter = ProxiesAdapter()
@@ -458,6 +540,7 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
                 proxyList.clear()
                 proxyList.addAll(loaded)
                 notifyDataSetChanged()
+                refreshMatchSummaryFn?.invoke(null, null)
             }
         }
 
@@ -473,6 +556,7 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
             proxyList.removeAt(index - 1)
             notifyItemRemoved(index)
             DataStore.dirty = true
+            refreshMatchSummaryFn?.invoke(null, null)
         }
 
         override fun getItemId(position: Int): Long {
@@ -550,6 +634,7 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
                         proxyList.clear()
                         proxyList.addAll(newProxyList)
                         configurationAdapter.notifyDataSetChanged()
+                        refreshMatchSummaryFn?.invoke(null, null)
                     }
                 } else {
                     val singleId = data.getLongExtra(ProfileSelectActivity.EXTRA_PROFILE_ID, 0L)
@@ -575,6 +660,7 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
                                             configurationAdapter.notifyItemInserted(proxyList.size)
                                         }
                                     }
+                                    refreshMatchSummaryFn?.invoke(null, null)
                                 }
                             }
                         }
@@ -654,8 +740,7 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
             binding.remove.setOnClickListener {
                 val pos = bindingAdapterPosition
                 if (pos > 0 && pos <= proxyList.size) {
-                    proxyList.removeAt(pos - 1)
-                    configurationAdapter.notifyItemRemoved(pos)
+                    configurationAdapter.remove(pos)
                 }
             }
             binding.share.isVisible = false

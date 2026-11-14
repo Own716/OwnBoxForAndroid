@@ -766,10 +766,12 @@
     <string-array name="balancer_type_entries">
         <item>@string/balancer_type_list</item>
         <item>@string/balancer_type_group</item>
+        <item>@string/balancer_type_mixed</item>
     </string-array>
     <string-array name="balancer_type_values" translatable="false">
         <item>0</item>
         <item>1</item>
+        <item>2</item>
     </string-array>
 
     <string-array name="balancer_strategy_entries">

@@ -109,6 +109,80 @@
 
     </FrameLayout>
 
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/card_strategy_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="3dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:foreground="?attr/selectableItemBackground"
+        android:visibility="gone"
+        tools:visibility="visible"
+        app:cardBackgroundColor="?attr/colorSurface"
+        app:cardCornerRadius="@dimen/profile_card_corner_radius"
+        app:cardElevation="0dp"
+        app:strokeColor="@color/card_stroke"
+        app:strokeWidth="@dimen/card_stroke_width">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingTop="8dp"
+            android:paddingEnd="10dp"
+            android:paddingBottom="8dp">
+
+            <ImageView
+                android:id="@+id/strategy_status_icon"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_baseline_speed_24"
+                app:tint="?attr/colorPrimary" />
+
+            <TextView
+                android:id="@+id/strategy_status_text"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:fontFamily="sans-serif-medium"
+                android:singleLine="true"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textSize="13sp"
+                tools:text="策略运行中 (最低延迟) · 日本 01" />
+
+            <TextView
+                android:id="@+id/strategy_status_delay"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:fontFamily="sans-serif-medium"
+                android:singleLine="true"
+                android:textSize="12sp"
+                android:visibility="gone"
+                tools:text="86 毫秒"
+                tools:visibility="visible" />
+
+            <ImageView
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_marginStart="4dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_chevron_right_24"
+                app:tint="?android:attr/textColorSecondary" />
+
+        </LinearLayout>
+
+    </com.google.android.material.card.MaterialCardView>
+
     <androidx.viewpager2.widget.ViewPager2
         android:id="@+id/group_pager"
         android:layout_width="match_parent"

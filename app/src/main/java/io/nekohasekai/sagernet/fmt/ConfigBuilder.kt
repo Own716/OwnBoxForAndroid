@@ -13,6 +13,7 @@ import io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean
 import io.nekohasekai.sagernet.fmt.hysteria.buildSingBoxOutboundHysteriaBean
 import io.nekohasekai.sagernet.fmt.internal.ChainBean
 import io.nekohasekai.sagernet.fmt.internal.BalancerBean
+import io.nekohasekai.sagernet.fmt.internal.BalancerMemberResolver
 import io.nekohasekai.sagernet.fmt.shadowsocks.ShadowsocksBean
 import io.nekohasekai.sagernet.fmt.shadowsocks.buildSingBoxOutboundShadowsocksBean
 import io.nekohasekai.sagernet.fmt.socks.SOCKSBean
@@ -282,6 +283,13 @@ internal fun finalizeRootConfig(
     return configMap
 }
 
+private data class BalancerMemberChainKey(
+    val profileId: Long,
+    val useGroupFront: Boolean,
+    val useGroupLanding: Boolean,
+    val externalDetour: String?,
+)
+
 class ConfigBuildResult(
     var config: String,
     var externalIndex: List<IndexEntity>,
@@ -290,6 +298,11 @@ class ConfigBuildResult(
     var profileTagMap: Map<Long, String>,
     val selectorGroupId: Long,
     val balancerMemberMap: Map<Long, List<Long>> = emptyMap(),
+    val balancerTagMap: Map<Long, String> = emptyMap(),
+    val outboundTagProfileMap: Map<String, Long> = emptyMap(),
+    val activeStrategyTag: String = "",
+    val activeStrategyKind: String = "",
+    val activeStrategyId: Long = 0L,
 ) {
     data class IndexEntity(var chain: LinkedHashMap<Int, ProxyEntity>)
 }
@@ -367,7 +380,11 @@ fun buildConfig(
 
     val trafficMap = HashMap<String, List<ProxyEntity>>()
     val tagMap = HashMap<Long, String>()
+    val customChainTagMap = HashMap<BalancerMemberChainKey, String>()
+    var nextCustomChainId = -1L
     val balancerMemberMap = HashMap<Long, List<Long>>()
+    val balancerTagMap = HashMap<Long, String>()
+    val outboundTagProfileMap = HashMap<String, Long>()
     val globalOutbounds = HashMap<Long, String>()
     val readableNames = mutableSetOf(TAG_DIRECT, TAG_BYPASS, TAG_BLOCK, TAG_FRAGMENT, TAG_MIXED, TAG_PROXY)
     val group = SagerDatabase.groupDao.getById(proxy.groupId)
@@ -872,60 +889,46 @@ fun buildConfig(
                     tagMap[front.id] ?: buildChain(front.id, front).also { tagMap[front.id] = it }
                 }
 
-                val memberEntities = (if (balancerBean.balancerType == BalancerBean.TYPE_GROUP) {
-                    val targetGids = when {
-                        balancerBean.targetGroupIds.isNotEmpty() -> balancerBean.targetGroupIds
-                        balancerBean.targetGroupId > 0L -> listOf(balancerBean.targetGroupId)
-                        else -> emptyList()
-                    }
-                    var list = targetGids.flatMap { gid ->
-                        SagerDatabase.proxyDao.getByGroup(gid)
-                    }.distinctBy { it.id }
+                val memberEntities = BalancerMemberResolver.resolve(
+                    balancer = balancerBean,
+                    selfId = entity.id,
+                    frontProxyId = balancerFrontEntity?.id ?: 0L,
+                    landingProxyId = balancerLandingEntity?.id ?: 0L,
+                ).members
 
-                    if (!balancerBean.nameInclude.isNullOrBlank()) {
-                        val regex = runCatching { Regex(balancerBean.nameInclude) }.getOrNull()
-                        if (regex != null) {
-                            list = list.filter { regex.containsMatchIn(it.displayName()) }
-                        }
-                    }
-                    if (!balancerBean.nameExclude.isNullOrBlank()) {
-                        val regex = runCatching { Regex(balancerBean.nameExclude) }.getOrNull()
-                        if (regex != null) {
-                            list = list.filterNot { regex.containsMatchIn(it.displayName()) }
-                        }
-                    }
-                    list
-                } else {
-                    val rawEntities = SagerDatabase.proxyDao.getEntities(balancerBean.proxies).associateBy { it.id }
-                    balancerBean.proxies.mapNotNull { rawEntities[it] }
-                }).filter {
-                    it.id != entity.id &&
-                    it.id != (balancerFrontEntity?.id ?: 0L) &&
-                    it.id != (balancerLandingEntity?.id ?: 0L) &&
-                    it.type != ProxyEntity.TYPE_BALANCER &&
-                    !DataStore.isGroupDisabled(it.groupId)
-                }
-
-                val useFront = if (balancerBean.balancerType == BalancerBean.TYPE_GROUP) balancerBean.useFrontProxy else true
-                val useLanding = if (balancerBean.balancerType == BalancerBean.TYPE_GROUP) balancerBean.useLandingProxy else true
+                val hasGroupMode = balancerBean.balancerType == BalancerBean.TYPE_GROUP ||
+                    balancerBean.balancerType == BalancerBean.TYPE_MIXED
+                val useFront = if (hasGroupMode) balancerBean.useFrontProxy else true
+                val useLanding = if (hasGroupMode) balancerBean.useLandingProxy else true
 
                 val memberEffectiveDetour = balancerFrontTag ?: externalDetour
 
                 val memberTags = memberEntities.mapNotNull { member ->
-                    val customKey = if (memberEffectiveDetour != null) {
-                        -member.id
-                    } else if (balancerBean.balancerType == BalancerBean.TYPE_GROUP && (!useFront || !useLanding)) {
-                        -member.id
+                    val effectiveUseGroupFront = if (memberEffectiveDetour != null) false else useFront
+                    val isCustomMemberChain = memberEffectiveDetour != null || !effectiveUseGroupFront || !useLanding
+                    val memberTag = if (isCustomMemberChain) {
+                        val chainKey = BalancerMemberChainKey(
+                            profileId = member.id,
+                            useGroupFront = effectiveUseGroupFront,
+                            useGroupLanding = useLanding,
+                            externalDetour = memberEffectiveDetour,
+                        )
+                        customChainTagMap.getOrPut(chainKey) {
+                            buildChain(
+                                nextCustomChainId--,
+                                member,
+                                useGroupFront = effectiveUseGroupFront,
+                                useGroupLanding = useLanding,
+                                externalDetour = memberEffectiveDetour,
+                            )
+                        }
                     } else {
-                        member.id
+                        tagMap.getOrPut(member.id) {
+                            buildChain(member.id, member)
+                        }
                     }
-                    tagMap[customKey] ?: buildChain(
-                        member.id,
-                        member,
-                        useGroupFront = if (memberEffectiveDetour != null) false else useFront,
-                        useGroupLanding = useLanding,
-                        externalDetour = memberEffectiveDetour
-                    ).also { tagMap[customKey] = it }
+                    outboundTagProfileMap[memberTag] = member.id
+                    memberTag
                 }.ifEmpty { listOf(TAG_DIRECT) }
 
                 val balancerTag = readableTag(entity.displayName())
@@ -969,10 +972,11 @@ fun buildConfig(
                 outbounds.add(balancerOutbound)
                 trafficMap[balancerTag] = listOf(entity)
                 balancerMemberMap[entity.id] = memberEntities.map { it.id }
+                balancerTagMap[entity.id] = balancerTag
 
                 val finalBalancerTag = if (balancerLandingEntity != null) {
                     val landingTag = buildChain(
-                        chainId = -balancerLandingEntity.id,
+                        chainId = nextCustomChainId--,
                         entity = balancerLandingEntity,
                         useGroupFront = false,
                         useGroupLanding = false,
@@ -1031,11 +1035,14 @@ fun buildConfig(
 
                 // needGlobal: can only contain one?
                 var needGlobal = false
+                val isCustomChainContext = !externalDetour.isNullOrBlank() || !useGroupFront || !useGroupLanding
 
-                // first profile set as global
+                // first profile set as global (unless isolated for custom balancer front/landing chains)
                 if (index == profileList.lastIndex) {
-                    needGlobal = true
-                    tagOut = "g-" + proxyEntity.id
+                    if (!isCustomChainContext) {
+                        needGlobal = true
+                        tagOut = "g-" + proxyEntity.id
+                    }
 
                     val ownerGid = entity.groupId
                     val ownerGroup = groupCache.getOrPut(ownerGid) {
@@ -1339,7 +1346,11 @@ fun buildConfig(
             }
 
             list.forEach {
-                tagMap[it.id] = buildChain(it.id, it)
+                val builtTag = buildChain(it.id, it)
+                tagMap[it.id] = builtTag
+                if (it.type != ProxyEntity.TYPE_BALANCER) {
+                    outboundTagProfileMap[builtTag] = it.id
+                }
             }
             if (useAutoSelect && tagMap.isNotEmpty()) {
                 val testUrl = group?.let { DataStore.groupUrlTestUrl(it.id) }
@@ -2268,6 +2279,14 @@ fun buildConfig(
                 "endpoints=$endpointTags outbounds=$outboundTags " +
                 "references=$references unresolved=$unresolvedTargets"
         )
+        val (activeStrategyTag, activeStrategyKind, activeStrategyId) = when {
+            !forTest && !forExport && (useAutoSelect || useLoadBalance) ->
+                Triple(TAG_PROXY, "group", group?.id ?: 0L)
+            !forTest && !forExport && proxy.type == ProxyEntity.TYPE_BALANCER && balancerTagMap[proxy.id] != null ->
+                Triple(balancerTagMap[proxy.id].orEmpty(), "balancer", proxy.id)
+            else -> Triple("", "", 0L)
+        }
+
         ConfigBuildResult(
             gson.toJson(configMap),
             externalIndexMap,
@@ -2275,7 +2294,12 @@ fun buildConfig(
             trafficMap,
             tagMap,
             if (buildSelector || useAutoSelect || useLoadBalance) group?.id ?: 0L else -1L,
-            balancerMemberMap
+            balancerMemberMap,
+            balancerTagMap,
+            outboundTagProfileMap,
+            activeStrategyTag,
+            activeStrategyKind,
+            activeStrategyId,
         )
     }
 

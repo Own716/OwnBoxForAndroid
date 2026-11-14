@@ -3,12 +3,14 @@ package libcore
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"libcore/device"
 	"libcore/protocol/juicity"
 	"libcore/protocol/loadbalance"
+	"libcore/protocol/urltest"
 	"log"
 	"net"
 	"net/http"
@@ -631,6 +633,69 @@ func (b *BoxInstance) GetActiveOutboundTag(groupTag string) string {
 		return ""
 	}
 	return resolveRealTag(detour, "tcp")
+}
+
+func (b *BoxInstance) resolveStrategyController(groupTag string) urltest.StrategyGroupController {
+	if b == nil || b.Box == nil {
+		return nil
+	}
+	outboundMgr := b.Outbound()
+	if outboundMgr == nil {
+		return nil
+	}
+	var detour adapter.Outbound
+	if groupTag != "" {
+		detour, _ = outboundMgr.Outbound(groupTag)
+	} else {
+		var ok bool
+		detour, ok = outboundMgr.Outbound("proxy")
+		if !ok {
+			detour = outboundMgr.Default()
+		}
+	}
+	if detour == nil {
+		return nil
+	}
+	if ctrl, ok := detour.(urltest.StrategyGroupController); ok {
+		return ctrl
+	}
+	return nil
+}
+
+func (b *BoxInstance) GetGroupSnapshotJSON(groupTag string) string {
+	ctrl := b.resolveStrategyController(groupTag)
+	if ctrl == nil {
+		return ""
+	}
+	snap := ctrl.GroupSnapshot()
+	data, err := json.Marshal(snap)
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
+func (b *BoxInstance) CheckGroupOutboundsJSON(groupTag string) string {
+	ctrl := b.resolveStrategyController(groupTag)
+	if ctrl == nil {
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	snap := ctrl.CheckAndSnapshot(ctx)
+	data, err := json.Marshal(snap)
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
+func (b *BoxInstance) PinGroupOutbound(groupTag, memberTag string) bool {
+	ctrl := b.resolveStrategyController(groupTag)
+	if ctrl == nil {
+		return false
+	}
+	return ctrl.PinOutbound(memberTag)
 }
 
 func resolveRealTag(detour adapter.Outbound, network string) string {

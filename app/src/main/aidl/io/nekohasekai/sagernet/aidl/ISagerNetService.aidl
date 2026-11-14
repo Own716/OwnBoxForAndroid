@@ -14,4 +14,8 @@ interface ISagerNetService {
   int urlTest();
   int urlTestCustomUrl(String url, int timeoutMs);
   oneway void postNotificationSpeed(in SpeedDisplayData speed);
+
+  String getActiveStrategySnapshotJson();
+  String checkActiveStrategyNowJson();
+  String pinActiveStrategyMember(long memberProfileId);
 }

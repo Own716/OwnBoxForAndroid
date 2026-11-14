@@ -499,7 +499,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var balancerStrategy by profileCacheStore.string("balancerStrategy") { "random" }
     var balancerTestUrl by profileCacheStore.string("balancerTestUrl") { "" }
     var balancerInterval by profileCacheStore.stringToInt("balancerInterval") { 300 }
-    var balancerTolerance by profileCacheStore.stringToInt("balancerTolerance") { 300 }
+    var balancerTolerance by profileCacheStore.stringToInt("balancerTolerance") { 50 }
     var balancerToleranceUnit by profileCacheStore.string("balancerToleranceUnit") { "ms" }
     var balancerUseFrontProxy by profileCacheStore.boolean("balancerUseFrontProxy")
     var balancerUseLandingProxy by profileCacheStore.boolean("balancerUseLandingProxy")
@@ -573,6 +573,20 @@ object DataStore : OnPreferenceDataStoreChangeListener {
 
     fun groupUrlTestTolerance(groupId: Long): Int =
         configurationStore.getString("group_${groupId}_urlTestTolerance", "50")?.toIntOrNull() ?: 50
+
+    fun getStrategyPinnedProfileId(strategyKey: String): Long {
+        if (strategyKey.isBlank()) return 0L
+        return configurationStore.getLong("strategy_pin_$strategyKey", 0L)
+    }
+
+    fun setStrategyPinnedProfileId(strategyKey: String, profileId: Long) {
+        if (strategyKey.isBlank()) return
+        if (profileId > 0L) {
+            configurationStore.putLong("strategy_pin_$strategyKey", profileId)
+        } else {
+            configurationStore.remove("strategy_pin_$strategyKey")
+        }
+    }
     fun setGroupUrlTestTolerance(groupId: Long, value: Int) {
         configurationStore.putString("group_${groupId}_urlTestTolerance", value.toString())
     }

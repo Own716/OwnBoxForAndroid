@@ -332,18 +332,28 @@ object ActiveOutboundTracker {
             return false
         }
 
-        // Target tag for this specific strategy group (do not blindly query "proxy")
-        val balancerTag = runCatching { proxy.safeConfig?.profileTagMap?.get(profile.id) }.getOrNull()
-            ?.takeIf { it.isNotBlank() } ?: profile.displayName()
-        val clashMap = queryClashMap()
-        var candidateTag = clashMap[balancerTag]
-        if (candidateTag.isNullOrBlank() && balancerTag != "proxy" && isGroupStrategy) {
-            candidateTag = clashMap["proxy"]
+        // Target tag for this specific strategy group (prefer Go core direct query without requiring Clash API)
+        val strategyCtx = StrategySnapshotHelper.resolveActiveStrategy(proxy)
+        val balancerTag = strategyCtx?.strategyTag
+            ?: runCatching { proxy.safeConfig?.balancerTagMap?.get(profile.id) }.getOrNull()?.takeIf { it.isNotBlank() }
+            ?: runCatching { proxy.safeConfig?.profileTagMap?.get(profile.id) }.getOrNull()?.takeIf { it.isNotBlank() }
+            ?: profile.displayName()
+
+        var candidateTag = runCatching { proxy.box.getActiveOutboundTag(balancerTag) }.getOrNull()
+        if (candidateTag.isNullOrBlank()) {
+            val clashMap = queryClashMap()
+            candidateTag = clashMap[balancerTag]
+            if (candidateTag.isNullOrBlank() && balancerTag != "proxy" && isGroupStrategy) {
+                candidateTag = clashMap["proxy"]
+            }
         }
 
         var candidateId: Long? = null
         if (!candidateTag.isNullOrBlank()) {
-            val resolved = runCatching {
+            val directResolved = runCatching {
+                proxy.safeConfig?.outboundTagProfileMap?.get(candidateTag)
+            }.getOrNull()
+            val resolved = directResolved ?: runCatching {
                 proxy.safeConfig?.profileTagMap?.entries
                     ?.firstOrNull { it.value == candidateTag }
                     ?.key

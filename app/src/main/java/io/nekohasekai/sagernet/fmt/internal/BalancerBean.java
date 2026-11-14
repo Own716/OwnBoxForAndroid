@@ -17,6 +17,7 @@ public class BalancerBean extends InternalBean {
 
     public static final int TYPE_LIST = 0;
     public static final int TYPE_GROUP = 1;
+    public static final int TYPE_MIXED = 2;
 
     public static final String STRATEGY_LEAST_PING = "leastPing";
     public static final String STRATEGY_LEAST_LOAD = "leastLoad";
@@ -89,6 +90,10 @@ public class BalancerBean extends InternalBean {
         if (balancerType == TYPE_GROUP) {
             int gCount = targetGroupIds != null && !targetGroupIds.isEmpty() ? targetGroupIds.size() : (targetGroupId > 0 ? 1 : 0);
             return "分组 " + gCount + (stratName != null && !stratName.isEmpty() ? " · " + stratName : "");
+        } else if (balancerType == TYPE_MIXED) {
+            int gCount = targetGroupIds != null && !targetGroupIds.isEmpty() ? targetGroupIds.size() : (targetGroupId > 0 ? 1 : 0);
+            int pCount = proxies != null ? proxies.size() : 0;
+            return "混合 " + gCount + "+" + pCount + (stratName != null && !stratName.isEmpty() ? " · " + stratName : "");
         } else {
             int count = proxies != null ? proxies.size() : 0;
             return "节点 " + count + (stratName != null && !stratName.isEmpty() ? " · " + stratName : "");
@@ -99,6 +104,10 @@ public class BalancerBean extends InternalBean {
         if (balancerType == TYPE_GROUP) {
             int gCount = targetGroupIds != null && !targetGroupIds.isEmpty() ? targetGroupIds.size() : (targetGroupId > 0 ? 1 : 0);
             return "分组 " + gCount;
+        } else if (balancerType == TYPE_MIXED) {
+            int gCount = targetGroupIds != null && !targetGroupIds.isEmpty() ? targetGroupIds.size() : (targetGroupId > 0 ? 1 : 0);
+            int pCount = proxies != null ? proxies.size() : 0;
+            return "混合 " + gCount + "+" + pCount;
         } else {
             int count = proxies != null ? proxies.size() : 0;
             return "节点 " + count;
@@ -106,19 +115,22 @@ public class BalancerBean extends InternalBean {
     }
 
     public String displayWithNodeName(String nodeName) {
+        String prefix;
         if (balancerType == TYPE_GROUP) {
             int gCount = targetGroupIds != null && !targetGroupIds.isEmpty() ? targetGroupIds.size() : (targetGroupId > 0 ? 1 : 0);
-            if (nodeName != null && !nodeName.trim().isEmpty()) {
-                return "分组 " + gCount + " · " + nodeName.trim();
-            }
-            return "分组 " + gCount;
+            prefix = "分组 " + gCount;
+        } else if (balancerType == TYPE_MIXED) {
+            int gCount = targetGroupIds != null && !targetGroupIds.isEmpty() ? targetGroupIds.size() : (targetGroupId > 0 ? 1 : 0);
+            int pCount = proxies != null ? proxies.size() : 0;
+            prefix = "混合 " + gCount + "+" + pCount;
         } else {
             int count = proxies != null ? proxies.size() : 0;
-            if (nodeName != null && !nodeName.trim().isEmpty()) {
-                return "节点 " + count + " · " + nodeName.trim();
-            }
-            return "节点 " + count;
+            prefix = "节点 " + count;
         }
+        if (nodeName != null && !nodeName.trim().isEmpty()) {
+            return prefix + " · " + nodeName.trim();
+        }
+        return prefix;
     }
 
     @Override
@@ -130,7 +142,7 @@ public class BalancerBean extends InternalBean {
         if (strategy == null || strategy.isEmpty()) strategy = STRATEGY_LEAST_PING;
         if (testUrl == null) testUrl = "";
         if (interval <= 0) interval = 300;
-        if (tolerance < 0) tolerance = 300;
+        if (tolerance < 0) tolerance = 50;
         if (toleranceUnit == null || toleranceUnit.isEmpty()) toleranceUnit = "ms";
         if (nameExclude == null) nameExclude = "";
         if (nameInclude == null) nameInclude = "";
@@ -201,7 +213,7 @@ public class BalancerBean extends InternalBean {
                 tolerance = input.readInt();
                 toleranceUnit = input.readString();
             } else {
-                tolerance = 300;
+                tolerance = 50;
                 toleranceUnit = "ms";
             }
 

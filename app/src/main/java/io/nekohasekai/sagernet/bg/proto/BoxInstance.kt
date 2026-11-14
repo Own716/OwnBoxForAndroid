@@ -4,6 +4,7 @@ import android.os.SystemClock
 import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.bg.AbstractInstance
 import io.nekohasekai.sagernet.bg.GuardedProcessPool
+import io.nekohasekai.sagernet.bg.StrategySnapshotHelper
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.fmt.ConfigBuildResult
@@ -220,6 +221,7 @@ abstract class BoxInstance(
         )
         try {
             box.start()
+            runCatching { StrategySnapshotHelper.applyPersistedPin(this) }
             Logs.i(
                 "BoxLifecycleTrace androidId=$diagnosticId profileId=${profile.id} " +
                     "stage=start success"
