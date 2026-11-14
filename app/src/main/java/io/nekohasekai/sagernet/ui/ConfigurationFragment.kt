@@ -1837,12 +1837,23 @@ class ConfigurationFragment @JvmOverloads constructor(
         latestStrategySnapshot = snap
         card.visibility = View.VISIBLE
 
+        val currentMember = snap.members.firstOrNull { it.pinned }
+            ?: snap.members.firstOrNull { it.active }
+        val delayMs = currentMember?.delay ?: snap.activeDelay
+        val unavailable = currentMember?.isUnavailable == true
+        val pinnedUnavailable = snap.isPinned && unavailable
+
         val primaryColor = context.getColorAttr(R.attr.colorPrimary)
+        val iconTint = if (pinnedUnavailable) {
+            context.getColour(R.color.material_red_500)
+        } else {
+            primaryColor
+        }
         strategyStatusIcon?.apply {
             setImageResource(
                 if (snap.isPinned) R.drawable.ic_baseline_lock_24 else R.drawable.ic_baseline_speed_24
             )
-            setColorFilter(primaryColor)
+            setColorFilter(iconTint)
         }
 
         val modeLabel = StrategySnapshot.formatStrategyLabel(context, snap.strategyType)
@@ -1853,16 +1864,18 @@ class ConfigurationFragment @JvmOverloads constructor(
             else -> getString(R.string.strategy_status_running_no_node, modeLabel)
         }
 
-        val currentMember = snap.members.firstOrNull { it.pinned }
-            ?: snap.members.firstOrNull { it.active }
-        val delayMs = currentMember?.delay ?: snap.activeDelay
-        val unavailable = currentMember?.isUnavailable == true
         strategyStatusDelay?.apply {
             when {
                 unavailable -> {
                     visibility = View.VISIBLE
                     setText(R.string.unavailable)
-                    setTextColor(context.getColorAttr(android.R.attr.textColorSecondary))
+                    setTextColor(
+                        if (pinnedUnavailable) {
+                            context.getColour(R.color.material_red_500)
+                        } else {
+                            context.getColorAttr(android.R.attr.textColorSecondary)
+                        }
+                    )
                 }
 
                 delayMs > 0 -> {

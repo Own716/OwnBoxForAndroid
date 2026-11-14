@@ -251,86 +251,155 @@ func (s *URLTest) wrapPacketConn(ctx context.Context, conn net.PacketConn) net.P
 	return s.group.interruptGroup.NewPacketConn(conn, interrupt.IsExternalConnectionFromContext(ctx))
 }
 
-func (s *URLTest) DialContext(ctx context.Context, network string, destination M.Socksaddr) (net.Conn, error) {
-	s.group.Touch()
-	netName := N.NetworkName(network)
-	if netName != N.NetworkTCP && netName != N.NetworkUDP {
-		return nil, E.Extend(N.ErrUnknownNetwork, network)
+const (
+	urlTestDefaultDialTimeout = 3500 * time.Millisecond
+	urlTestMinDialTimeout     = 3000 * time.Millisecond
+	urlTestMaxDialTimeout     = 4500 * time.Millisecond
+	urlTestFailedDialTimeout  = 2000 * time.Millisecond
+	urlTestMaxPenalizedDelay  = uint16(65000)
+	urlTestProbePenaltyFloor  = uint16(5000)
+)
+
+func penalizeURLTestDelay(base, delta uint16) uint16 {
+	sum := uint32(base) + uint32(delta)
+	if sum > uint32(urlTestMaxPenalizedDelay) {
+		return urlTestMaxPenalizedDelay
 	}
+	return uint16(sum)
+}
+
+func (g *URLTestGroup) dialAttemptTimeout(detour adapter.Outbound, network string) time.Duration {
+	if g == nil || detour == nil {
+		return urlTestDefaultDialTimeout
+	}
+	tag := detour.Tag()
+	g.selectAccess.RLock()
+	recentlyFailed := false
+	if g.dialFailCount != nil && g.dialFailCount[tag] > 0 {
+		if t, ok := g.dialFailTime[tag]; ok && time.Since(t) <= dialFailWindow {
+			recentlyFailed = true
+		}
+	}
+	g.selectAccess.RUnlock()
+	if recentlyFailed {
+		return urlTestFailedDialTimeout
+	}
+	if g.history != nil {
+		if hist := g.history.LoadURLTestHistory(group.RealTag(detour, network)); hist != nil && hist.Delay > 0 {
+			dynamic := time.Duration(hist.Delay) * 3 * time.Millisecond
+			if dynamic < urlTestMinDialTimeout {
+				return urlTestMinDialTimeout
+			}
+			if dynamic > urlTestMaxDialTimeout {
+				return urlTestMaxDialTimeout
+			}
+			return dynamic
+		}
+	}
+	return urlTestDefaultDialTimeout
+}
+
+func attemptOutboundDial[T any](
+	parentCtx context.Context,
+	timeout time.Duration,
+	bounded bool,
+	outbound adapter.Outbound,
+	dialFn func(context.Context, adapter.Outbound) (T, error),
+) (T, error) {
+	if !bounded || timeout <= 0 {
+		return dialFn(parentCtx, outbound)
+	}
+	attemptCtx, cancel := context.WithTimeout(parentCtx, timeout)
+	defer cancel()
+	return dialFn(attemptCtx, outbound)
+}
+
+func dialURLTestWithFailover[T any](
+	s *URLTest,
+	ctx context.Context,
+	netName string,
+	dialFn func(context.Context, adapter.Outbound) (T, error),
+	wrapFn func(T) T,
+) (T, error) {
+	var zero T
+	s.group.Touch()
 	detour := s.group.currentSelected(netName)
 	if detour == nil {
 		detour, _ = s.group.Select(netName)
 	}
 	if detour == nil {
-		return nil, E.New("missing supported outbound")
+		return zero, E.New("missing supported outbound")
 	}
-	conn, err := detour.DialContext(ctx, network, destination)
+
+	pinned := s.group.PinnedOutbound() != ""
+	var backups []adapter.Outbound
+	if !pinned {
+		backups = s.group.failoverCandidates(netName, detour)
+	}
+
+	primaryTimeout := s.group.dialAttemptTimeout(detour, netName)
+	conn, err := attemptOutboundDial(ctx, primaryTimeout, !pinned && len(backups) > 0, detour, dialFn)
 	if err == nil {
 		s.group.recordDialSuccess(detour)
-		return s.wrapConn(ctx, conn), nil
+		return wrapFn(conn), nil
 	}
 	if s.logger != nil {
 		s.logger.ErrorContext(ctx, err)
 	}
-	if ctx.Err() != nil {
-		return nil, err
-	}
-	if s.group.PinnedOutbound() != "" {
-		return nil, err
+	if ctx.Err() != nil || pinned {
+		return zero, err
 	}
 
 	// 按测速延迟优先、近期故障降权排序后容灾拨号，确认主节点连续失败后自动避让并保持现有健康连接不断流
-	for _, alt := range s.group.failoverCandidates(netName, detour) {
+	for i, alt := range backups {
 		if ctx.Err() != nil {
 			break
 		}
-		altConn, altErr := alt.DialContext(ctx, network, destination)
+		altTimeout := s.group.dialAttemptTimeout(alt, netName)
+		altConn, altErr := attemptOutboundDial(ctx, altTimeout, i < len(backups)-1, alt, dialFn)
 		if altErr == nil {
 			s.group.recordDialFailover(netName, detour, alt)
-			return s.wrapConn(ctx, altConn), nil
+			return wrapFn(altConn), nil
+		}
+		if ctx.Err() != nil {
+			break
 		}
 		s.group.recordBackupDialFailure(alt)
 	}
-	return nil, err
+	return zero, err
+}
+
+func (s *URLTest) DialContext(ctx context.Context, network string, destination M.Socksaddr) (net.Conn, error) {
+	netName := N.NetworkName(network)
+	if netName != N.NetworkTCP && netName != N.NetworkUDP {
+		s.group.Touch()
+		return nil, E.Extend(N.ErrUnknownNetwork, network)
+	}
+	return dialURLTestWithFailover(
+		s,
+		ctx,
+		netName,
+		func(attemptCtx context.Context, outbound adapter.Outbound) (net.Conn, error) {
+			return outbound.DialContext(attemptCtx, network, destination)
+		},
+		func(conn net.Conn) net.Conn {
+			return s.wrapConn(ctx, conn)
+		},
+	)
 }
 
 func (s *URLTest) ListenPacket(ctx context.Context, destination M.Socksaddr) (net.PacketConn, error) {
-	s.group.Touch()
-	detour := s.group.currentSelected(N.NetworkUDP)
-	if detour == nil {
-		detour, _ = s.group.Select(N.NetworkUDP)
-	}
-	if detour == nil {
-		return nil, E.New("missing supported outbound")
-	}
-	conn, err := detour.ListenPacket(ctx, destination)
-	if err == nil {
-		s.group.recordDialSuccess(detour)
-		return s.wrapPacketConn(ctx, conn), nil
-	}
-	if s.logger != nil {
-		s.logger.ErrorContext(ctx, err)
-	}
-	if ctx.Err() != nil {
-		return nil, err
-	}
-	if s.group.PinnedOutbound() != "" {
-		return nil, err
-	}
-
-	// UDP 候选按测速延迟优先快速容灾
-	for _, alt := range s.group.failoverCandidates(N.NetworkUDP, detour) {
-		if ctx.Err() != nil {
-			break
-		}
-		altConn, altErr := alt.ListenPacket(ctx, destination)
-		if altErr == nil {
-			s.group.recordDialFailover(N.NetworkUDP, detour, alt)
-			return s.wrapPacketConn(ctx, altConn), nil
-		}
-		s.group.recordBackupDialFailure(alt)
-	}
-	return nil, err
+	return dialURLTestWithFailover(
+		s,
+		ctx,
+		N.NetworkUDP,
+		func(attemptCtx context.Context, outbound adapter.Outbound) (net.PacketConn, error) {
+			return outbound.ListenPacket(attemptCtx, destination)
+		},
+		func(conn net.PacketConn) net.PacketConn {
+			return s.wrapPacketConn(ctx, conn)
+		},
+	)
 }
 
 func (s *URLTest) NewConnection(ctx context.Context, conn net.Conn, metadata adapter.InboundContext, onClose N.CloseHandlerFunc) {
@@ -727,10 +796,6 @@ func (g *URLTestGroup) recordDialFailover(network string, failed, backup adapter
 		// 仅惩罚已确认失效的原主节点测速缓存（不中断现有健康连接），避免下轮 CheckOutbounds 读回旧低延迟或跳过重测
 		failedTag := group.RealTag(failed, network)
 		if oldHist := g.history.LoadURLTestHistory(failedTag); oldHist != nil && oldHist.Delay > 0 {
-			penalized := oldHist.Delay + 1000
-			if penalized < oldHist.Delay || penalized > 65000 {
-				penalized = 65000
-			}
 			staleTime := oldHist.Time
 			probeCutoff := now.Add(-g.interval - time.Second)
 			if g.interval > 0 && staleTime.After(probeCutoff) {
@@ -738,7 +803,7 @@ func (g *URLTestGroup) recordDialFailover(network string, failed, backup adapter
 			}
 			g.history.StoreURLTestHistory(failedTag, &adapter.URLTestHistory{
 				Time:  staleTime,
-				Delay: penalized,
+				Delay: penalizeURLTestDelay(oldHist.Delay, 1000),
 			})
 		}
 		g.history.NotifyUpdated()
@@ -946,11 +1011,11 @@ func (b *urlTestBatch) test(outbounds []adapter.Outbound, link string, interval 
 						b.logger.Debug("outbound ", tag, " unavailable: ", testResult.err)
 					}
 					oldHist := b.history.LoadURLTestHistory(tag)
-					if oldHist != nil && time.Since(oldHist.Time) < 3*interval {
-						// 节点历史保护：单次超时或网络瞬态抖动不直接抹除历史，增加惩罚延迟保活
+					if oldHist != nil && oldHist.Delay < urlTestProbePenaltyFloor && time.Since(oldHist.Time) < 2*interval {
+						// 节点历史保护：仅宽容单次偶发抖动，保留原测试时间戳不续命并施加高惩罚延迟让位于可用节点；连续失败即淘汰出历史
 						b.history.StoreURLTestHistory(tag, &adapter.URLTestHistory{
-							Time:  checkedAt,
-							Delay: oldHist.Delay + 300,
+							Time:  oldHist.Time,
+							Delay: max(penalizeURLTestDelay(oldHist.Delay, urlTestProbePenaltyFloor), urlTestProbePenaltyFloor),
 						})
 					} else {
 						b.history.DeleteURLTestHistory(tag)

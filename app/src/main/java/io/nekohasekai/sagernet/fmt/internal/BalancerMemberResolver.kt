@@ -156,4 +156,28 @@ object BalancerMemberResolver {
             includeRegexInvalid = includeInvalid,
         )
     }
+
+    /**
+     * Orders strategy members for cold-start latency strategies so healthy lowest-ping nodes
+     * take index 0 before the first background URLTest probe completes.
+     */
+    fun sortForColdStart(entities: List<ProxyEntity>): List<ProxyEntity> {
+        if (entities.size <= 1) return entities
+        return entities.sortedWith(
+            compareBy<ProxyEntity> { entity ->
+                when {
+                    entity.status == 1 && entity.ping > 0 -> 0
+                    entity.status != 2 && entity.status != 3 && entity.status >= 0 && entity.ping > 0 -> 1
+                    entity.status != 2 && entity.status != 3 && entity.status >= 0 -> 2
+                    else -> 3
+                }
+            }.thenBy { entity ->
+                if (entity.ping > 0 && entity.status != 2 && entity.status != 3 && entity.status >= 0) {
+                    entity.ping
+                } else {
+                    Int.MAX_VALUE
+                }
+            },
+        )
+    }
 }

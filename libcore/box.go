@@ -283,9 +283,10 @@ type BoxInstance struct {
 	closeBox func() error
 	startErr error
 
-	v2api        *v2rayapi.StatsService
-	selector     *group.Selector
-	pauseManager pause.Manager
+	v2api           *v2rayapi.StatsService
+	selector        *group.Selector
+	pauseManager    pause.Manager
+	platformWrapper *boxPlatformInterfaceWrapper
 
 	diagnosticID  uint64
 	diagnosticTag string
@@ -429,14 +430,15 @@ func newSingBoxInstance(config string, localTransport LocalDNSTransport, platfor
 	platformWrapper.diagnosticTag = diagnosticTag
 
 	b = &BoxInstance{
-		Box:           instance,
-		cancel:        cancel,
-		startBox:      instance.Start,
-		closeBox:      instance.Close,
-		pauseManager:  service.FromContext[pause.Manager](ctx),
-		diagnosticID:  diagnosticID,
-		diagnosticTag: diagnosticTag,
-		isURLTest:     !platformLog,
+		Box:             instance,
+		cancel:          cancel,
+		startBox:        instance.Start,
+		closeBox:        instance.Close,
+		pauseManager:    service.FromContext[pause.Manager](ctx),
+		platformWrapper: platformWrapper,
+		diagnosticID:    diagnosticID,
+		diagnosticTag:   diagnosticTag,
+		isURLTest:       !platformLog,
 	}
 	b.urlTestTrace("create-box", "ok elapsed=%s", time.Since(createStarted))
 
@@ -479,6 +481,11 @@ func (b *BoxInstance) Start() (err error) {
 			b.lifecycleTrace("start", "failed state=%s elapsed=%s error=%v", b.state, time.Since(started), err)
 		} else {
 			b.state = boxStateStarted
+			if b.platformWrapper != nil && b.Box != nil {
+				if router := b.Box.Router(); router != nil {
+					b.platformWrapper.setRouterReset(router.ResetNetwork)
+				}
+			}
 			b.urlTestTrace("box-start", "ok elapsed=%s", time.Since(started))
 			b.lifecycleTrace("start", "success state=%s elapsed=%s", b.state, time.Since(started))
 		}
@@ -520,6 +527,10 @@ func (b *BoxInstance) Close() (err error) {
 		b.lifecycleTrace("close", "done state=%s previous=%s elapsed=%s error=%v", b.state, previousState, time.Since(started), err)
 	}()
 	defer device.DeferPanicToError("box.Close", func(err_ error) { err = err_ })
+
+	if b.platformWrapper != nil {
+		b.platformWrapper.setRouterReset(nil)
+	}
 
 	// clear main instance
 	if mainInstance == b {

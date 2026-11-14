@@ -889,12 +889,20 @@ fun buildConfig(
                     tagMap[front.id] ?: buildChain(front.id, front).also { tagMap[front.id] = it }
                 }
 
-                val memberEntities = BalancerMemberResolver.resolve(
+                val resolvedMembers = BalancerMemberResolver.resolve(
                     balancer = balancerBean,
                     selfId = entity.id,
                     frontProxyId = balancerFrontEntity?.id ?: 0L,
                     landingProxyId = balancerLandingEntity?.id ?: 0L,
                 ).members
+                val memberEntities = if (balancerBean.strategy.isNullOrBlank() ||
+                    balancerBean.strategy == BalancerBean.STRATEGY_LEAST_PING ||
+                    balancerBean.strategy == "least_ping"
+                ) {
+                    BalancerMemberResolver.sortForColdStart(resolvedMembers)
+                } else {
+                    resolvedMembers
+                }
 
                 val hasGroupMode = balancerBean.balancerType == BalancerBean.TYPE_GROUP ||
                     balancerBean.balancerType == BalancerBean.TYPE_MIXED
@@ -1335,12 +1343,9 @@ fun buildConfig(
             val list = if (useAutoSelect) {
                 // 解决策略组初始建立连接慢：在内核首次并发测速出结果前，
                 // sing-box 默认将 outbounds[0] 作为首发出站。
-                // 优先将此前已知有效且延迟最低的健康节点置于首位，未测试/离线节点排在后面，
+                // 优先将此前已知有效且延迟最低的健康节点置于首位，未测试排中间，已知失效排在末尾，
                 // 确保首包绝不阻塞死等，建立连接瞬时秒开。
-                rawList.sortedWith(
-                    compareBy<ProxyEntity> { if (it.ping > 0) 0 else 1 }
-                        .thenBy { if (it.ping > 0) it.ping else Int.MAX_VALUE }
-                )
+                BalancerMemberResolver.sortForColdStart(rawList)
             } else {
                 rawList
             }

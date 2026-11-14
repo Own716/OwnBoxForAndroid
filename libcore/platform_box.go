@@ -36,19 +36,47 @@ import (
 // 多个 box 的 Initialize 互相覆盖，导致 interfaceMonitor.UpdateDefaultInterface 里
 // UpdateInterfaces() 刷错 NetworkManager，落选 box 的接口缓存永远为空，
 // 其所有拨号秒报 "no available network interface"。
+type routerNetworkResetTarget struct {
+	reset func()
+}
+
 type boxPlatformInterfaceWrapper struct {
-	networkManager adapter.NetworkManager
-	myTunName      string
-	myTunAddress   []netip.Addr
-	diagnosticID   uint64
-	diagnosticTag  string
-	isURLTest      bool
+	networkManager    adapter.NetworkManager
+	myTunName         string
+	myTunAddress      []netip.Addr
+	diagnosticID      uint64
+	diagnosticTag     string
+	isURLTest         bool
+	routerResetTarget atomic.Pointer[routerNetworkResetTarget]
 }
 
 var _ adapter.PlatformInterface = (*boxPlatformInterfaceWrapper)(nil)
 
+func (w *boxPlatformInterfaceWrapper) setRouterReset(resetFn func()) {
+	if w == nil {
+		return
+	}
+	if resetFn == nil {
+		w.routerResetTarget.Store(nil)
+		return
+	}
+	w.routerResetTarget.Store(&routerNetworkResetTarget{reset: resetFn})
+}
+
+func (w *boxPlatformInterfaceWrapper) resetRouterNetwork() bool {
+	if w == nil {
+		return false
+	}
+	target := w.routerResetTarget.Load()
+	if target == nil || target.reset == nil {
+		return false
+	}
+	target.reset()
+	return true
+}
+
 func (w *boxPlatformInterfaceWrapper) urlTestTrace(stage string, format string, args ...any) {
-	if !w.isURLTest {
+	if w == nil || !w.isURLTest {
 		return
 	}
 	prefix := fmt.Sprintf("URLTestTrace goId=%d tag=%q stage=%s ", w.diagnosticID, w.diagnosticTag, stage)

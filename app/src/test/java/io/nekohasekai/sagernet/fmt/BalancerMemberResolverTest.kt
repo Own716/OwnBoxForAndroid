@@ -127,5 +127,39 @@ class BalancerMemberResolverTest {
         assertTrue(configBuilderSource.contains("BalancerMemberChainKey"))
         assertTrue(configBuilderSource.contains("customChainTagMap"))
         assertTrue(configBuilderSource.contains("isCustomChainContext"))
+        assertTrue(configBuilderSource.contains("BalancerMemberResolver.sortForColdStart"))
+    }
+
+    @Test
+    fun coldStartSortPlacesHealthyLowestLatencyFirstAndFailedLast() {
+        val untested = socksEntity(1L, 10L, "Untested").apply {
+            status = 0
+            ping = 0
+        }
+        val failedWithStalePing = socksEntity(2L, 10L, "Failed").apply {
+            status = 3
+            ping = 12
+        }
+        val slowHealthy = socksEntity(3L, 10L, "SlowHealthy").apply {
+            status = 1
+            ping = 180
+        }
+        val fastHealthy = socksEntity(4L, 10L, "FastHealthy").apply {
+            status = 1
+            ping = 45
+        }
+        val legacyCached = socksEntity(5L, 10L, "CachedPing").apply {
+            status = 0
+            ping = 90
+        }
+
+        val sorted = BalancerMemberResolver.sortForColdStart(
+            listOf(untested, failedWithStalePing, slowHealthy, fastHealthy, legacyCached)
+        )
+
+        assertEquals(
+            listOf(fastHealthy.id, slowHealthy.id, legacyCached.id, untested.id, failedWithStalePing.id),
+            sorted.map { it.id },
+        )
     }
 }
