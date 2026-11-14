@@ -14,7 +14,4 @@ interface ISagerNetService {
   int urlTest();
   int urlTestCustomUrl(String url, int timeoutMs);
   oneway void postNotificationSpeed(in SpeedDisplayData speed);
-  String getAutoSelectorStatus(boolean withMembers);
-  oneway void autoSelectorRecheck();
-  oneway void autoSelectorSelect(long memberProfileId);
 }

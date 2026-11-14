@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"libcore/device"
-	"libcore/protocol/autoselector"
 	"libcore/protocol/juicity"
 	"libcore/protocol/loadbalance"
 	"log"
@@ -173,10 +172,6 @@ func sanitizeOutbounds(outbounds []option.Outbound) {
 		case "loadbalance":
 			if lbOpt, ok := ob.Options.(*loadbalance.LoadBalanceOptions); ok {
 				lbOpt.Outbounds = deduplicateTags(lbOpt.Outbounds)
-			}
-		case "auto-selector":
-			if autoOpt, ok := ob.Options.(*autoselector.AutoSelectorOptions); ok {
-				autoOpt.Outbounds = deduplicateTags(autoOpt.Outbounds)
 			}
 		case "naive":
 			if naiveOpt, ok := ob.Options.(*option.NaiveOutboundOptions); ok {

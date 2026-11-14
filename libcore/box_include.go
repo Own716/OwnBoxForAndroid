@@ -41,7 +41,6 @@ import (
 	"github.com/sagernet/sing-box/protocol/vmess"
 	"github.com/sagernet/sing-box/protocol/wireguard"
 
-	"libcore/protocol/autoselector"
 	h2http "libcore/protocol/http"
 	"libcore/protocol/juicity"
 	"libcore/protocol/loadbalance"
@@ -83,7 +82,6 @@ func nekoboxAndroidOutboundRegistry() *outbound.Registry {
 	// 支持容差 tolerance >= 0，限制 InterfaceUpdated 强刷频率，不断开已建立的长连接
 	customUrltest.RegisterURLTest(registry)
 	loadbalance.RegisterLoadBalance(registry)
-	autoselector.RegisterAutoSelector(registry)
 
 	socks.RegisterOutbound(registry)
 	http.RegisterOutbound(registry)

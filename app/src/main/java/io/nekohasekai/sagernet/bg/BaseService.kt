@@ -292,18 +292,6 @@ class BaseService {
             broadcast { it.missingPlugin(profileName, pluginName) }
         }
 
-        override fun getAutoSelectorStatus(withMembers: Boolean): String {
-            return io.nekohasekai.sagernet.bg.autoselector.AutoSelectorRuntime.currentStatusJson(withMembers)
-        }
-
-        override fun autoSelectorRecheck() {
-            io.nekohasekai.sagernet.bg.autoselector.AutoSelectorRuntime.recheck(data?.proxy?.service)
-        }
-
-        override fun autoSelectorSelect(memberProfileId: Long) {
-            io.nekohasekai.sagernet.bg.autoselector.AutoSelectorRuntime.select(data?.proxy?.service, memberProfileId)
-        }
-
         override fun close() {
             callbacks.kill()
             callbackIdMap.clear()
@@ -374,9 +362,7 @@ class BaseService {
                     Logs.d("BaseService: ignore reload while suspended by Smart Auto-Stop")
                 }
                 s == State.Stopped -> startRunner()
-                s.canStop -> io.nekohasekai.sagernet.bg.autoselector.AutoSelectorRuntime.restart(this) {
-                    stopRunner(true)
-                }
+                s.canStop -> stopRunner(true)
                 else -> {
                     Logs.w("State $s encountered during reload, restarting runner")
                     stopRunner(true)
@@ -600,9 +586,6 @@ class BaseService {
                     data.changeState(State.Stopped, originalMessage)
                 } catch (error: Throwable) {
                     recordCleanupFailure("state-stopped", error)
-                }
-                if (!restart) {
-                    io.nekohasekai.sagernet.bg.autoselector.AutoSelectorRuntime.serviceStopped()
                 }
                 Logs.i(
                     "ServiceStopTrace serviceId=$serviceId proxyId=$proxyId " +

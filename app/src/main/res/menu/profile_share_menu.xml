@@ -7,10 +7,6 @@
         android:id="@+id/action_urltest"
         android:title="URLTEST" />
     <item
-        android:id="@+id/action_auto_selector_stats"
-        android:title="@string/autosel_stats_title"
-        android:visible="false" />
-    <item
         android:id="@+id/action_edit"
         android:title="@string/edit" />
     <item

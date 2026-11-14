@@ -1,5 +1,10 @@
 # OwnBox for Android 更新日志 (Changelog)
 
+# OwnBox for Android v26.11.8.11 预览版
+
+### 【版本回退说明】
+1. **完整回退至 `v26.11.8.10-preview` 稳定代码基线**：撤销上一测试构建中的策略组实验性改动，保持与 `v26.11.8.10-preview` 一致的核心与界面稳定性，并递增构建版本号（`VERSION_CODE=496`）以支持已安装测试构建的设备直接覆盖安装回退。
+
 # OwnBox for Android v26.11.8.10 预览版
 
 ### 【界面与交互修复】

@@ -35,9 +35,6 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = 
     }
 
     override suspend fun init() {
-        if (notTmp) {
-            io.nekohasekai.sagernet.bg.autoselector.AutoSelectorRuntime.beforeStart(this)
-        }
         super.init()
         pluginConfigs.forEach { (_, plugin) ->
             val (_, content) = plugin
@@ -52,9 +49,6 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = 
     override fun launch() {
         box.setAsMain()
         super.launch() // start box
-        if (notTmp) {
-            io.nekohasekai.sagernet.bg.autoselector.AutoSelectorRuntime.onStarted(this)
-        }
         runOnDefaultDispatcher {
             looper = service?.let { TrafficLooper(it.data, this) }
             looper?.start()
@@ -62,9 +56,6 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = 
     }
 
     override fun close() {
-        if (notTmp) {
-            io.nekohasekai.sagernet.bg.autoselector.AutoSelectorRuntime.onClosed(this)
-        }
         var closeError: Throwable? = null
         try {
             super.close()

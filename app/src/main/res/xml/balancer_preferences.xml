@@ -2,23 +2,12 @@
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <PreferenceCategory
-        app:key="balancerMainCategory"
-        app:title="@string/balancer_settings">
+    <PreferenceCategory app:title="@string/balancer_settings">
 
         <EditTextPreference
             app:icon="@drawable/ic_social_emoji_symbols"
             app:key="profileName"
             app:title="@string/profile_name"
-            app:useSimpleSummaryProvider="true" />
-
-        <moe.matsuri.nb4a.ui.SimpleMenuPreference
-            app:defaultValue="random"
-            app:entries="@array/balancer_strategy_entries"
-            app:entryValues="@array/balancer_strategy_values"
-            app:icon="@drawable/ic_baseline_compare_arrows_24"
-            app:key="balancerStrategy"
-            app:title="@string/balancer_strategy"
             app:useSimpleSummaryProvider="true" />
 
         <moe.matsuri.nb4a.ui.SimpleMenuPreference
@@ -30,16 +19,19 @@
             app:title="@string/balancer_type"
             app:useSimpleSummaryProvider="true" />
 
-        <Preference
-            app:icon="@drawable/ic_baseline_layers_24"
-            app:key="balancerTargetGroup"
-            app:title="@string/balancer_select_group" />
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:defaultValue="random"
+            app:entries="@array/balancer_strategy_entries"
+            app:entryValues="@array/balancer_strategy_values"
+            app:icon="@drawable/ic_baseline_compare_arrows_24"
+            app:key="balancerStrategy"
+            app:title="@string/balancer_strategy"
+            app:useSimpleSummaryProvider="true" />
 
         <Preference
             app:icon="@drawable/ic_baseline_view_list_24"
-            app:isPreferenceVisible="false"
-            app:key="autoselSpecificNodes"
-            app:title="@string/autosel_custom_nodes" />
+            app:key="balancerTargetGroup"
+            app:title="@string/balancer_select_group" />
 
         <io.nekohasekai.sagernet.widget.OutboundPreference
             app:icon="@drawable/ic_hardware_router"
@@ -72,44 +64,10 @@
             app:useSimpleSummaryProvider="false" />
 
         <EditTextPreference
-            app:icon="@drawable/ic_baseline_filter_list_24"
+            app:icon="@drawable/ic_baseline_manage_search_24"
             app:key="balancerNameInclude"
             app:title="@string/balancer_name_include"
             app:useSimpleSummaryProvider="false" />
-
-        <SwitchPreferenceCompat
-            app:defaultValue="false"
-            app:icon="@drawable/ic_baseline_shuffle_24"
-            app:isPreferenceVisible="false"
-            app:key="balancerBalance"
-            app:summary="@string/autosel_balance_tip"
-            app:title="@string/autosel_balance" />
-
-        <Preference
-            app:icon="@drawable/ic_baseline_push_pin_24"
-            app:isPreferenceVisible="false"
-            app:key="autoselPinned"
-            app:title="@string/autosel_pinned" />
-
-        <Preference
-            app:icon="@drawable/ic_baseline_refresh_24"
-            app:isPreferenceVisible="false"
-            app:key="autoselUseAutomatic"
-            app:summary="@string/autosel_use_automatic_tip"
-            app:title="@string/autosel_use_automatic" />
-
-        <Preference
-            app:icon="@drawable/ic_baseline_info_24"
-            app:isPreferenceVisible="false"
-            app:key="autoselPlan"
-            app:title="@string/autosel_plan" />
-
-        <Preference
-            app:icon="@drawable/ic_baseline_expand_more_24"
-            app:isPreferenceVisible="false"
-            app:key="autoselAdvanced"
-            app:summary="@string/autosel_advanced_show"
-            app:title="@string/autosel_advanced" />
 
         <EditTextPreference
             app:icon="@drawable/ic_baseline_cast_connected_24"
@@ -142,156 +100,5 @@
 
     </PreferenceCategory>
 
-    <PreferenceCategory
-        app:isPreferenceVisible="false"
-        app:key="autoselCatMembership"
-        app:title="@string/autosel_cat_membership">
-
-        <EditTextPreference
-            app:dialogMessage="@string/autosel_country_filter_tip"
-            app:key="balancerCountryFilter"
-            app:title="@string/autosel_country_filter" />
-
-        <EditTextPreference
-            app:defaultValue="300"
-            app:dialogMessage="@string/autosel_build_limit_tip"
-            app:key="balancerBuildLimit"
-            app:title="@string/autosel_build_limit" />
-
-        <EditTextPreference
-            app:defaultValue="1000"
-            app:dialogMessage="@string/autosel_pool_cap_tip"
-            app:key="balancerPoolCap"
-            app:title="@string/autosel_pool_cap" />
-
-        <EditTextPreference
-            app:defaultValue="1440"
-            app:dialogMessage="@string/autosel_result_validity_tip"
-            app:key="balancerResultValidityMins"
-            app:title="@string/autosel_result_validity" />
-
-        <SwitchPreferenceCompat
-            app:defaultValue="true"
-            app:key="balancerExcludeUnavailable"
-            app:summary="@string/autosel_exclude_unavailable_tip"
-            app:title="@string/autosel_exclude_unavailable" />
-
-    </PreferenceCategory>
-
-    <PreferenceCategory
-        app:isPreferenceVisible="false"
-        app:key="autoselCatHealth"
-        app:title="@string/autosel_cat_health">
-
-        <EditTextPreference
-            app:defaultValue="3"
-            app:dialogMessage="@string/autosel_expected_tip"
-            app:key="balancerExpected"
-            app:title="@string/autosel_expected" />
-
-        <EditTextPreference
-            app:defaultValue="8"
-            app:dialogMessage="@string/autosel_active_size_tip"
-            app:key="balancerActiveSize"
-            app:title="@string/autosel_active_size" />
-
-        <EditTextPreference
-            app:defaultValue="300"
-            app:dialogMessage="@string/autosel_interval_tip"
-            app:key="autoselCheckInterval"
-            app:title="@string/autosel_interval" />
-
-        <EditTextPreference
-            app:defaultValue="600"
-            app:dialogMessage="@string/autosel_bench_interval_tip"
-            app:key="balancerBenchIntervalSec"
-            app:title="@string/autosel_bench_interval" />
-
-        <EditTextPreference
-            app:defaultValue="15"
-            app:dialogMessage="@string/autosel_watch_interval_tip"
-            app:key="balancerWatchIntervalSec"
-            app:title="@string/autosel_watch_interval" />
-
-        <EditTextPreference
-            app:defaultValue="10"
-            app:dialogMessage="@string/autosel_sampling_tip"
-            app:key="balancerSampling"
-            app:title="@string/autosel_sampling" />
-
-    </PreferenceCategory>
-
-    <PreferenceCategory
-        app:isPreferenceVisible="false"
-        app:key="autoselCatSwitching"
-        app:title="@string/autosel_cat_switching">
-
-        <EditTextPreference
-            app:defaultValue="50"
-            app:dialogMessage="@string/autosel_tolerance_tip"
-            app:key="autoselTolerance"
-            app:title="@string/autosel_tolerance" />
-
-        <EditTextPreference
-            app:defaultValue="0"
-            app:dialogMessage="@string/autosel_max_rtt_tip"
-            app:key="balancerMaxRttMs"
-            app:title="@string/autosel_max_rtt" />
-
-        <EditTextPreference
-            app:defaultValue="2"
-            app:dialogMessage="@string/autosel_dial_retries_tip"
-            app:key="balancerDialRetries"
-            app:title="@string/autosel_dial_retries" />
-
-        <SwitchPreferenceCompat
-            app:defaultValue="false"
-            app:key="balancerInterruptOnSwitch"
-            app:summary="@string/autosel_interrupt_tip"
-            app:title="@string/autosel_interrupt" />
-
-    </PreferenceCategory>
-
-    <PreferenceCategory
-        app:isPreferenceVisible="false"
-        app:key="autoselCatBalance"
-        app:title="@string/autosel_cat_balance">
-
-        <moe.matsuri.nb4a.ui.SimpleMenuPreference
-            app:defaultValue="rotate"
-            app:entries="@array/autosel_balance_modes"
-            app:entryValues="@array/autosel_balance_mode_values"
-            app:key="balancerBalanceMode"
-            app:title="@string/autosel_balance_mode"
-            app:useSimpleSummaryProvider="true" />
-
-        <EditTextPreference
-            app:defaultValue="30"
-            app:dialogMessage="@string/autosel_balance_interval_tip"
-            app:key="balancerBalanceIntervalSec"
-            app:title="@string/autosel_balance_interval" />
-
-        <Preference
-            app:key="autoselBalanceHint"
-            app:selectable="false" />
-
-    </PreferenceCategory>
-
-    <PreferenceCategory
-        app:isPreferenceVisible="false"
-        app:key="autoselCatEndpoints"
-        app:title="@string/autosel_cat_endpoints">
-
-        <EditTextPreference
-            app:dialogMessage="@string/autosel_test_url_tip"
-            app:key="autoselTestUrl"
-            app:title="@string/autosel_test_url" />
-
-        <EditTextPreference
-            app:dialogMessage="@string/autosel_connectivity_url_tip"
-            app:key="balancerConnectivityUrl"
-            app:title="@string/autosel_connectivity_url" />
-
-    </PreferenceCategory>
-
 </PreferenceScreen>
+

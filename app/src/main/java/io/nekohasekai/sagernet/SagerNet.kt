@@ -91,7 +91,6 @@ class SagerNet : Application(),
             )
 
             if (isBgProcess) {
-                io.nekohasekai.sagernet.bg.autoselector.AutoSelectorRuntime.install()
                 // 常驻注册默认网络监听：预热 DefaultNetworkListener 的 network 缓存，
                 // 使本进程 box 的接口监视器 Start 即同步拿到默认接口
                 // （主进程已在下方 isMainProcess 分支做同样的事；

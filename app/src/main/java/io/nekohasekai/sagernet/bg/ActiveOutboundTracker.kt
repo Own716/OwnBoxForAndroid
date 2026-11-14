@@ -50,7 +50,6 @@ object ActiveOutboundTracker {
                 BalancerBean.STRATEGY_FAILOVER -> "故障转移"
                 BalancerBean.STRATEGY_STABLE -> "最稳定"
                 BalancerBean.STRATEGY_CONSISTENT_HASH, BalancerBean.STRATEGY_CONSISTENT_HASH_CAMEL -> "一致性哈希"
-                BalancerBean.STRATEGY_AUTO_SELECTOR -> "自动选择"
                 else -> "策略组"
             }
         }
@@ -336,43 +335,23 @@ object ActiveOutboundTracker {
         // Target tag for this specific strategy group (do not blindly query "proxy")
         val balancerTag = runCatching { proxy.safeConfig?.profileTagMap?.get(profile.id) }.getOrNull()
             ?.takeIf { it.isNotBlank() } ?: profile.displayName()
-        var candidateId: Long? = null
-        if (io.nekohasekai.sagernet.bg.autoselector.AutoSelectorProfiles.isAutoSelectorEntity(profile)) {
-            val selectedTag = runCatching {
-                io.nekohasekai.sagernet.bg.autoselector.AutoSelectorCore
-                    .queryStatuses(proxy, withMembers = false)
-                    .firstOrNull { it.tag == balancerTag }
-                    ?.selectedTag
-                    ?: io.nekohasekai.sagernet.bg.autoselector.AutoSelectorCore
-                        .queryStatuses(proxy, withMembers = false)
-                        .firstOrNull()
-                        ?.selectedTag
-            }.getOrNull()
-            if (!selectedTag.isNullOrBlank()) {
-                val resolved = proxy.safeConfig?.autoSelector?.members?.get(selectedTag)
-                if (resolved != null && resolved in memberMap) {
-                    candidateId = resolved
-                }
-            }
+        val clashMap = queryClashMap()
+        var candidateTag = clashMap[balancerTag]
+        if (candidateTag.isNullOrBlank() && balancerTag != "proxy" && isGroupStrategy) {
+            candidateTag = clashMap["proxy"]
         }
-        if (candidateId == null) {
-            val clashMap = queryClashMap()
-            var candidateTag = clashMap[balancerTag]
-            if (candidateTag.isNullOrBlank() && balancerTag != "proxy" && isGroupStrategy) {
-                candidateTag = clashMap["proxy"]
-            }
 
-            if (!candidateTag.isNullOrBlank()) {
-                val resolved = runCatching {
-                    proxy.safeConfig?.profileTagMap?.entries
-                        ?.firstOrNull { it.value == candidateTag }
-                        ?.key
-                        ?.let { abs(it) }
-                }.getOrNull()
-                // Strict member whitelist check: candidate MUST belong to this strategy group's members!
-                if (resolved != null && resolved in memberMap) {
-                    candidateId = resolved
-                }
+        var candidateId: Long? = null
+        if (!candidateTag.isNullOrBlank()) {
+            val resolved = runCatching {
+                proxy.safeConfig?.profileTagMap?.entries
+                    ?.firstOrNull { it.value == candidateTag }
+                    ?.key
+                    ?.let { abs(it) }
+            }.getOrNull()
+            // Strict member whitelist check: candidate MUST belong to this strategy group's members!
+            if (resolved != null && resolved in memberMap) {
+                candidateId = resolved
             }
         }
 
