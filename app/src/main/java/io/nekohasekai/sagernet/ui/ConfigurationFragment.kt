@@ -4992,7 +4992,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                     if (update) {
                         ProfileManager.postUpdate(lastSelected, noTraffic = true)
                         if (DataStore.serviceState != BaseService.State.Stopped && reloadAccess.tryLock()) {
-                            SagerNet.reloadService()
+                            SagerNet.switchProfileService(proxyEntity.id)
                             reloadAccess.unlock()
                         }
                     } else if (SagerNet.isTv) {

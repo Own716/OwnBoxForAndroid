@@ -156,7 +156,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var autoSelectLowestLatency by configurationStore.boolean(Key.AUTO_SELECT_LOWEST_LATENCY)
 
     var allowAccess by configurationStore.boolean(Key.ALLOW_ACCESS)
-    var speedInterval by configurationStore.stringToInt(Key.SPEED_INTERVAL)
+    var speedInterval by configurationStore.stringToInt(Key.SPEED_INTERVAL) { 1000 }
     var showGroupInNotification by configurationStore.boolean(Key.SHOW_GROUP_IN_NOTIFICATION)
     var liveUpdateEnabled by configurationStore.boolean(Key.LIVE_UPDATE_ENABLED)
     var liveUpdateShowCapsule by configurationStore.boolean(Key.LIVE_UPDATE_SHOW_CAPSULE) { true }
@@ -621,7 +621,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
         set(value) = configurationStore.putString("webdavPassword", value)
 
     var webdavPath: String?
-        get() = configurationStore.getString("webdavPath") ?: "Throne"  // 设置默认值
+        get() = configurationStore.getString("webdavPath") ?: "OwnBox"  // 设置默认值
         set(value) = configurationStore.putString("webdavPath", value)
 
     var globalMode by configurationStore.boolean(Key.GLOBAL_MODE)

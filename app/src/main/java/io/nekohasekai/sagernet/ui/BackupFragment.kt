@@ -47,7 +47,32 @@ import java.util.zip.ZipInputStream
 import java.util.concurrent.TimeUnit
 import java.util.zip.Deflater
 import java.io.BufferedOutputStream
+import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+
+internal object WebdavBackupPaths {
+    const val DEFAULT_PATH = "OwnBox"
+    const val LEGACY_PATH = "Throne"
+
+    fun normalizeBackupPath(configuredPath: String?): String =
+        configuredPath?.trim('/')?.takeIf { it.isNotEmpty() } ?: DEFAULT_PATH
+
+    fun restoreCandidates(configuredPath: String?): List<String> {
+        val primary = normalizeBackupPath(configuredPath)
+        return if (primary == DEFAULT_PATH) {
+            listOf(DEFAULT_PATH, LEGACY_PATH)
+        } else {
+            listOf(primary)
+        }
+    }
+
+    fun buildDirectoryUrl(baseHttpUrl: HttpUrl, path: String): HttpUrl =
+        baseHttpUrl.newBuilder().apply {
+            path.split('/').filter { it.isNotEmpty() }.forEach { segment ->
+                addPathSegment(segment)
+            }
+        }.build()
+}
 
 class BackupFragment : NamedFragment(R.layout.layout_backup) {
 
@@ -206,7 +231,7 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
 
                 // 规范化 URL
                 val baseUrl = DataStore.webdavServer!!.trimEnd('/')
-                val path = DataStore.webdavPath?.trim('/')?.takeIf { it.isNotEmpty() } ?: "OwnBox"
+                val path = WebdavBackupPaths.normalizeBackupPath(DataStore.webdavPath)
 
                 // 使用英文格式的时间戳作为文件名，修改后缀为 .zip
                 val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
@@ -222,11 +247,7 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
                 val baseHttpUrl = baseUrl.toHttpUrlOrNull()
                     ?: throw Exception("Invalid server URL: $baseUrl")
 
-                val dirUrl = baseHttpUrl.newBuilder().apply {
-                    path.split('/').filter { it.isNotEmpty() }.forEach { segment ->
-                        addPathSegment(segment)
-                    }
-                }.build()
+                val dirUrl = WebdavBackupPaths.buildDirectoryUrl(baseHttpUrl, path)
 
                 val fileUrl = dirUrl.newBuilder()
                     .addPathSegment(fileName)
@@ -342,7 +363,7 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
             try {
                 val client = OkHttpClient()
                 val baseUrl = DataStore.webdavServer!!.trimEnd('/')
-                val path = DataStore.webdavPath?.trim('/')?.takeIf { it.isNotEmpty() } ?: "Throne"
+                val candidatePaths = WebdavBackupPaths.restoreCandidates(DataStore.webdavPath)
 
                 if (!baseUrl.startsWith("http://") && !baseUrl.startsWith("https://")) {
                     throw Exception("Invalid server URL: must start with http:// or https://")
@@ -351,67 +372,89 @@ class BackupFragment : NamedFragment(R.layout.layout_backup) {
                 val baseHttpUrl = baseUrl.toHttpUrlOrNull()
                     ?: throw Exception("Invalid server URL: $baseUrl")
 
-                val dirUrl = baseHttpUrl.newBuilder().apply {
-                    path.split('/').filter { it.isNotEmpty() }.forEach { segment ->
-                        addPathSegment(segment)
-                    }
-                }.build()
+                val patterns = listOf(
+                    """<D:href>[^<]*?(?:OwnBox|ownbox|throne)_backup_[^<]*?\d{8}_\d{6}\.(json|zip)</D:href>""".toRegex(RegexOption.IGNORE_CASE),
+                    """<d:href>[^<]*?(?:OwnBox|ownbox|throne)_backup_[^<]*?\d{8}_\d{6}\.(json|zip)</d:href>""".toRegex(RegexOption.IGNORE_CASE),
+                    """<href>[^<]*?(?:OwnBox|ownbox|throne)_backup_[^<]*?\d{8}_\d{6}\.(json|zip)</href>""".toRegex(RegexOption.IGNORE_CASE)
+                )
 
-                Logs.d("WebDAV restore - Directory URL: $dirUrl")
+                var resolvedDirUrl: HttpUrl? = null
+                var latestBackup: String? = null
+                var anyDirectoryExisted = false
+                var lastNotFoundMessage: String? = null
 
-                // 先列出目录内容找到最新的备份文件
-                val propfindRequest = Request.Builder()
-                    .url(dirUrl)
-                    .method("PROPFIND", null)
-                    .header("Authorization", Credentials.basic(
-                        DataStore.webdavUsername ?: "",
-                        DataStore.webdavPassword ?: ""
-                    ))
-                    .header("Depth", "1")
-                    .build()
+                for ((index, path) in candidatePaths.withIndex()) {
+                    val hasFallback = index < candidatePaths.lastIndex
+                    val candidateDirUrl = WebdavBackupPaths.buildDirectoryUrl(baseHttpUrl, path)
+                    Logs.d("WebDAV restore - Directory URL: $candidateDirUrl")
 
-                // 获取最新的备份文件名
-                val latestBackup = client.newCall(propfindRequest).execute().use { response ->
-                    if (!response.isSuccessful && response.code != 207) {
-                        val errorBody = response.body?.string()
-                        Logs.e("WebDAV restore - PROPFIND error: $errorBody")
-                        throw Exception("Failed to list directory: ${response.message}")
-                    }
+                    val propfindRequest = Request.Builder()
+                        .url(candidateDirUrl)
+                        .method("PROPFIND", null)
+                        .header("Authorization", Credentials.basic(
+                            DataStore.webdavUsername ?: "",
+                            DataStore.webdavPassword ?: ""
+                        ))
+                        .header("Depth", "1")
+                        .build()
 
-                    val responseBody = response.body?.string() ?: throw Exception("Empty response")
-                    Logs.d("WebDAV restore - Directory listing: $responseBody")
-                    
-                    val patterns = listOf(
-                        """<D:href>[^<]*?(?:OwnBox|ownbox|throne)_backup_[^<]*?\d{8}_\d{6}\.(json|zip)</D:href>""".toRegex(RegexOption.IGNORE_CASE),
-                        """<d:href>[^<]*?(?:OwnBox|ownbox|throne)_backup_[^<]*?\d{8}_\d{6}\.(json|zip)</d:href>""".toRegex(RegexOption.IGNORE_CASE),
-                        """<href>[^<]*?(?:OwnBox|ownbox|throne)_backup_[^<]*?\d{8}_\d{6}\.(json|zip)</href>""".toRegex(RegexOption.IGNORE_CASE)
-                    )
-                    
-                    val backupFiles = mutableListOf<String>()
-                    
-                    for (pattern in patterns) {
-                        val matches = pattern.findAll(responseBody)
-                        matches.forEach { match ->
-                            val href = match.value
-                            Logs.d("WebDAV restore - Found backup file with pattern ${pattern.pattern}: $href")
-                            val fileName = """(?:OwnBox|ownbox|throne)_backup_[^<]*?\d{8}_\d{6}\.(json|zip)""".toRegex(RegexOption.IGNORE_CASE)
-                                .find(href)?.value
-                            if (fileName != null) {
-                                backupFiles.add(fileName)
+                    val foundInDir = client.newCall(propfindRequest).execute().use { response ->
+                        if (response.code == 404) {
+                            lastNotFoundMessage = response.message
+                            if (hasFallback || anyDirectoryExisted) {
+                                Logs.d("WebDAV restore - Directory '$path' returned 404, skipping")
+                                return@use null
                             }
+                            throw Exception("Failed to list directory: ${response.message}")
                         }
-                        if (backupFiles.isNotEmpty()) break
-                    }
-                    
-                    Logs.d("WebDAV restore - Found ${backupFiles.size} backup files: ${backupFiles.joinToString()}")
+                        if (!response.isSuccessful && response.code != 207) {
+                            val errorBody = response.body?.string()
+                            Logs.e("WebDAV restore - PROPFIND error: $errorBody")
+                            throw Exception("Failed to list directory: ${response.message}")
+                        }
+                        anyDirectoryExisted = true
 
-                    backupFiles.maxByOrNull { fileName ->
-                        """(\d{8}_\d{6})""".toRegex().find(fileName)?.value ?: ""
-                    } ?: throw Exception("No backup found")
+                        val responseBody = response.body?.string() ?: throw Exception("Empty response")
+                        Logs.d("WebDAV restore - Directory listing: $responseBody")
+
+                        val backupFiles = mutableListOf<String>()
+                        for (pattern in patterns) {
+                            pattern.findAll(responseBody).forEach { match ->
+                                val href = match.value
+                                Logs.d("WebDAV restore - Found backup file with pattern ${pattern.pattern}: $href")
+                                val fileName = """(?:OwnBox|ownbox|throne)_backup_[^<]*?\d{8}_\d{6}\.(json|zip)""".toRegex(RegexOption.IGNORE_CASE)
+                                    .find(href)?.value
+                                if (fileName != null) {
+                                    backupFiles.add(fileName)
+                                }
+                            }
+                            if (backupFiles.isNotEmpty()) break
+                        }
+
+                        Logs.d("WebDAV restore - Found ${backupFiles.size} backup files: ${backupFiles.joinToString()}")
+                        backupFiles.maxByOrNull { fileName ->
+                            """(\d{8}_\d{6})""".toRegex().find(fileName)?.value ?: ""
+                        }
+                    }
+
+                    if (foundInDir != null) {
+                        resolvedDirUrl = candidateDirUrl
+                        latestBackup = foundInDir
+                        break
+                    } else if (hasFallback) {
+                        Logs.d("WebDAV restore - No backup found in '$path', trying fallback path")
+                    }
+                }
+
+                if (resolvedDirUrl == null || latestBackup == null) {
+                    if (!anyDirectoryExisted && lastNotFoundMessage != null) {
+                        throw Exception("Failed to list directory: $lastNotFoundMessage")
+                    }
+                    throw Exception("No backup found")
                 }
 
                 // 下载最新的备份文件
-                val fileUrl = dirUrl.newBuilder()
+                val fileUrl = resolvedDirUrl.newBuilder()
                     .addPathSegment(latestBackup)
                     .build()
                 Logs.d("WebDAV restore - File URL: $fileUrl")

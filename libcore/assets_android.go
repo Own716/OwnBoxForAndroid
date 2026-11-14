@@ -19,7 +19,7 @@ func extractAssets() {
 	extract := func(name string) {
 		err := extractAssetName(name, useOfficialAssets)
 		if err != nil {
-			log.Println("Extract", geoipDat, "failed:", err)
+			log.Println("Extract", name, "failed:", err)
 		}
 	}
 
@@ -88,7 +88,7 @@ func extractAssetName(name string, useOfficialAssets bool) error {
 		if err != nil {
 			// versionFileMissing
 			doExtract = true
-			_ = os.RemoveAll(version)
+			_ = os.RemoveAll(dir + version)
 		} else {
 			localVersion = string(b)
 			if localVersion == "Custom" {
@@ -138,10 +138,14 @@ func extractAssetName(name string, useOfficialAssets bool) error {
 	}
 
 	if f, err := asset.Open(apkPrefix + name + ".xz"); err == nil {
-		extractXz(f)
+		if err := extractXz(f); err != nil {
+			return err
+		}
 	} else if f, err := asset.Open("yacd.zip"); err == nil {
 		os.RemoveAll(dstName)
-		extracZip(f, internalAssetsPath)
+		if err := extracZip(f, internalAssetsPath); err != nil {
+			return err
+		}
 		m, err := filepath.Glob(internalAssetsPath + "/Yacd-*")
 		if err != nil {
 			return fmt.Errorf("glob Yacd: %v", err)

@@ -81,6 +81,11 @@ func handleProtectConn(conn *net.UnixConn, callback func(fd int)) {
 		log.Println("protect: parse unix rights failed:", err)
 		return
 	}
+	defer func() {
+		for _, fd := range fds {
+			_ = unix.Close(fd)
+		}
+	}()
 
 	callback(fds[0])
 

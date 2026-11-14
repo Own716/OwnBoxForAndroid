@@ -311,7 +311,7 @@ class BaseService {
         fun switchProfile(id: Long) {
             if (id <= 0L) return
             DataStore.selectedProxy = id
-            reload()
+            reload(allowSelector = true)
         }
 
         fun switchRelative(step: Int) {
@@ -320,12 +320,12 @@ class BaseService {
             switchProfile(target.id)
         }
 
-        fun reload() {
+        fun reload(allowSelector: Boolean = false) {
             if (DataStore.selectedProxy == 0L) {
                 stopRunner(false, (this as Context).getString(R.string.profile_empty))
                 return
             }
-            if (canReloadSelector()) {
+            if (allowSelector && canReloadSelector()) {
                 val proxy = data.proxy ?: return
                 val box = runCatching { proxy.box }.getOrNull()
                 val tag = proxy.config.profileTagMap[DataStore.selectedProxy] ?: ""

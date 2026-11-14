@@ -261,6 +261,13 @@ class SagerNet : Application(),
         fun reloadService() =
             application.sendBroadcast(Intent(Action.RELOAD).setPackage(application.packageName))
 
+        fun switchProfileService(profileId: Long) =
+            application.sendBroadcast(
+                Intent(Action.SWITCH_PROFILE)
+                    .setPackage(application.packageName)
+                    .putExtra(Action.EXTRA_PROFILE_ID, profileId)
+            )
+
         fun restartService() =
             application.sendBroadcast(Intent(Action.RESTART).setPackage(application.packageName))
 

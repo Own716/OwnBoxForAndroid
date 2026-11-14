@@ -144,17 +144,69 @@ object LiveUpdateFormatter {
         }
     }
 
-    fun isStrategyProfile(profile: ProxyEntity?): Boolean {
-        if (profile == null) return false
-        if (profile.type == ProxyEntity.TYPE_BALANCER) return true
-        val group = runCatching { SagerDatabase.groupDao.getById(profile.groupId) }.getOrNull() ?: return false
+    private const val ENTITY_CACHE_TTL_MS = 3_000L
+
+    private data class CachedEntity<T>(val id: Long, val value: T?, val timestampMs: Long)
+
+    @Volatile
+    private var cachedGroup: CachedEntity<io.nekohasekai.sagernet.database.ProxyGroup>? = null
+
+    @Volatile
+    private var cachedLeafProfile: CachedEntity<ProxyEntity>? = null
+
+    internal fun clearLookupCache() {
+        cachedGroup = null
+        cachedLeafProfile = null
+    }
+
+    private fun resolveGroup(groupId: Long): io.nekohasekai.sagernet.database.ProxyGroup? {
+        if (groupId <= 0L) return null
+        val now = System.currentTimeMillis()
+        val cached = cachedGroup
+        if (cached != null && cached.id == groupId && now - cached.timestampMs < ENTITY_CACHE_TTL_MS) {
+            return cached.value
+        }
+        val loaded = runCatching { SagerDatabase.groupDao.getById(groupId) }.getOrNull()
+        cachedGroup = CachedEntity(groupId, loaded, now)
+        return loaded
+    }
+
+    private fun resolveLeafProfile(leafId: Long): ProxyEntity? {
+        if (leafId <= 0L) return null
+        val now = System.currentTimeMillis()
+        val cached = cachedLeafProfile
+        if (cached != null && cached.id == leafId && now - cached.timestampMs < ENTITY_CACHE_TTL_MS) {
+            return cached.value
+        }
+        val loaded = runCatching { SagerDatabase.proxyDao.getById(leafId) }.getOrNull()
+        cachedLeafProfile = CachedEntity(leafId, loaded, now)
+        return loaded
+    }
+
+    private fun isGroupStrategy(group: io.nekohasekai.sagernet.database.ProxyGroup?): Boolean {
+        if (group == null) return false
         return runCatching { DataStore.isGroupUrlTest(group.id) }.getOrDefault(false) ||
             runCatching { DataStore.isGroupLoadBalance(group.id) }.getOrDefault(false)
     }
 
+    fun isStrategyProfile(profile: ProxyEntity?): Boolean {
+        if (profile == null) return false
+        if (profile.type == ProxyEntity.TYPE_BALANCER) return true
+        return isGroupStrategy(resolveGroup(profile.groupId))
+    }
+
     fun resolveEffectiveProfileId(profile: ProxyEntity?, fallbackProfileId: Long = 0L): Long {
         if (profile == null) return fallbackProfileId
-        if (isStrategyProfile(profile)) {
+        return resolveEffectiveProfileId(profile, isStrategy = isStrategyProfile(profile), fallbackProfileId = fallbackProfileId)
+    }
+
+    private fun resolveEffectiveProfileId(
+        profile: ProxyEntity?,
+        isStrategy: Boolean,
+        fallbackProfileId: Long = 0L,
+    ): Long {
+        if (profile == null) return fallbackProfileId
+        if (isStrategy) {
             val leafId = ActiveOutboundTracker.activeLeafProfileId
             if (leafId > 0L) return leafId
         }
@@ -181,8 +233,13 @@ object LiveUpdateFormatter {
         val showGroup = runCatching { DataStore.showGroupInNotification }.getOrDefault(true)
         val showDirect = runCatching { DataStore.showDirectSpeed }.getOrDefault(true)
 
-        val isStrategy = isStrategyProfile(profile)
-        val effectiveProfileId = resolveEffectiveProfileId(profile)
+        val resolvedGroup = if (profile != null && profile.type != ProxyEntity.TYPE_BALANCER) {
+            resolveGroup(profile.groupId)
+        } else {
+            null
+        }
+        val isStrategy = profile != null && (profile.type == ProxyEntity.TYPE_BALANCER || isGroupStrategy(resolvedGroup))
+        val effectiveProfileId = resolveEffectiveProfileId(profile, isStrategy = isStrategy)
 
         if (country.isEmpty() || ip.isEmpty()) {
             val cachedLanding = if (effectiveProfileId > 0L) {
@@ -207,7 +264,7 @@ object LiveUpdateFormatter {
             groupName = if (showGroup) actualGroupName else ""
             val leafNode = ActiveOutboundTracker.getActiveLeafNodeDisplay(profile)
             val leafId = ActiveOutboundTracker.activeLeafProfileId
-            val leafEntity = if (leafId > 0L) runCatching { SagerDatabase.proxyDao.getById(leafId) }.getOrNull() else null
+            val leafEntity = resolveLeafProfile(leafId)
 
             profileName = leafNode ?: leafEntity?.displayName() ?: ActiveOutboundTracker.activeLeafProfileName.takeIf { it.isNotBlank() } ?: actualGroupName
 
@@ -220,7 +277,7 @@ object LiveUpdateFormatter {
             if (refProfile.ping > 0) latency = "${refProfile.ping}ms"
         } else if (profile != null) {
             groupName = if (showGroup) {
-                runCatching { SagerDatabase.groupDao.getById(profile.groupId)?.displayName() }.getOrNull().orEmpty()
+                resolvedGroup?.displayName().orEmpty()
             } else ""
             profileName = profile.displayName()
             if (ip.isEmpty()) {

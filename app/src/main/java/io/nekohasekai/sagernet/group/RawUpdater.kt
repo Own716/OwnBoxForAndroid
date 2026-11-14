@@ -87,7 +87,7 @@ object RawUpdater : GroupUpdater() {
             var lastRespHeaderProfileTitle: String? = null
             var lastException: Throwable? = null
 
-            fun executeRequest(ua: String, useProxy: Boolean): libcore.HTTPResponse {
+            suspend fun <T> executeRequest(ua: String, useProxy: Boolean, consume: suspend (libcore.HTTPResponse) -> T): T {
                 val client = Libcore.newHttpClient().apply {
                     if (useProxy) {
                         tryProxyOutbound()
@@ -96,14 +96,49 @@ object RawUpdater : GroupUpdater() {
                         "1.3" -> restrictedTLS()
                     }
                 }
-                val request = client.newRequest().apply {
-                    if (DataStore.allowInsecureOnRequest) {
-                        allowInsecure()
+                try {
+                    val request = client.newRequest().apply {
+                        if (DataStore.allowInsecureOnRequest) {
+                            allowInsecure()
+                        }
+                        setURL(subscription.link)
+                        setUserAgent(ua)
                     }
-                    setURL(subscription.link)
-                    setUserAgent(ua)
+                    return consume(request.execute())
+                } finally {
+                    client.close()
                 }
-                return request.execute()
+            }
+
+            suspend fun processResponse(response: libcore.HTTPResponse): Boolean {
+                val userInfo = response.getHeader("Subscription-Userinfo")
+                    ?: response.getHeader("subscription-userinfo")
+                    ?: response.getHeader("Subscription-UserInfo")
+                val userInfoStr = Util.getStringBox(userInfo)
+                if (userInfoStr.isNotBlank()) {
+                    lastRespHeaderUserinfo = userInfoStr
+                }
+                val remoteName = Util.getStringBox(response.getHeader("content-disposition"))
+                if (remoteName.isNotBlank()) {
+                    lastRespHeaderFilename = remoteName
+                }
+                val profileTitle = Util.getStringBox(
+                    response.getHeader("Profile-Title")
+                        ?: response.getHeader("profile-title")
+                        ?: response.getHeader("X-Profile-Title")
+                        ?: response.getHeader("x-profile-title")
+                )
+                if (profileTitle.isNotBlank()) {
+                    lastRespHeaderProfileTitle = profileTitle
+                }
+
+                val contentStr = Util.getStringBox(response.contentString)
+                val parsed = parseRaw(contentStr)
+                if (!parsed.isNullOrEmpty()) {
+                    fetchedProxies = parsed
+                    return true
+                }
+                return false
             }
 
             val shouldTryProxy = DataStore.serviceState.connected ||
@@ -112,43 +147,19 @@ object RawUpdater : GroupUpdater() {
 
             for (ua in candidateUas) {
                 try {
-                    val response = if (shouldTryProxy) {
+                    val found = if (shouldTryProxy) {
                         try {
-                            executeRequest(ua, useProxy = true)
+                            executeRequest(ua, useProxy = true, consume = ::processResponse)
                         } catch (proxyError: Throwable) {
                             Logs.w("Subscription proxy fetch failed for UA $ua (${proxyError.readableMessage}), falling back to direct network...")
-                            executeRequest(ua, useProxy = false)
+                            executeRequest(ua, useProxy = false, consume = ::processResponse)
                         }
                     } else {
-                        executeRequest(ua, useProxy = false)
+                        executeRequest(ua, useProxy = false, consume = ::processResponse)
                     }
 
-                    val userInfo = response.getHeader("Subscription-Userinfo")
-                        ?: response.getHeader("subscription-userinfo")
-                        ?: response.getHeader("Subscription-UserInfo")
-                    val userInfoStr = Util.getStringBox(userInfo)
-                    if (userInfoStr.isNotBlank()) {
-                        lastRespHeaderUserinfo = userInfoStr
-                    }
-                    val remoteName = Util.getStringBox(response.getHeader("content-disposition"))
-                    if (remoteName.isNotBlank()) {
-                        lastRespHeaderFilename = remoteName
-                    }
-                    val profileTitle = Util.getStringBox(
-                        response.getHeader("Profile-Title")
-                            ?: response.getHeader("profile-title")
-                            ?: response.getHeader("X-Profile-Title")
-                            ?: response.getHeader("x-profile-title")
-                    )
-                    if (profileTitle.isNotBlank()) {
-                        lastRespHeaderProfileTitle = profileTitle
-                    }
-
-                    val contentStr = Util.getStringBox(response.contentString)
-                    val parsed = parseRaw(contentStr)
-                    if (!parsed.isNullOrEmpty()) {
-                        fetchedProxies = parsed
-                        Logs.d("Subscription successfully parsed ${parsed.size} proxies with UA: $ua")
+                    if (found) {
+                        Logs.d("Subscription successfully parsed ${fetchedProxies?.size ?: 0} proxies with UA: $ua")
                         break
                     } else {
                         Logs.w("Subscription returned 0 proxies with UA: $ua, trying next candidate...")

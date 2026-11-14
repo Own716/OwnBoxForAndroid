@@ -111,7 +111,7 @@ class NodeSelectDialogActivity : AppCompatActivity() {
             DataStore.selectedProxy = proxy.id
             DataStore.currentProfile = proxy.id
             if (DataStore.serviceState.started) {
-                SagerNet.reloadService()
+                SagerNet.switchProfileService(proxy.id)
             }
             OwnBoxWidgetProvider.updateWidgets(this@NodeSelectDialogActivity)
 

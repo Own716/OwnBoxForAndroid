@@ -335,13 +335,24 @@ object ServiceDiagnosticsManager {
         )
     }
 
+    private val baseHttpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(4L, TimeUnit.SECONDS)
+            .readTimeout(4L, TimeUnit.SECONDS)
+            .writeTimeout(4L, TimeUnit.SECONDS)
+            .build()
+    }
+
     private fun buildOkHttpClient(followRedirects: Boolean = true, timeoutSec: Long = 4L): OkHttpClient {
-        val builder = OkHttpClient.Builder()
-            .connectTimeout(timeoutSec, TimeUnit.SECONDS)
-            .readTimeout(timeoutSec, TimeUnit.SECONDS)
-            .writeTimeout(timeoutSec, TimeUnit.SECONDS)
+        val builder = baseHttpClient.newBuilder()
             .followRedirects(followRedirects)
             .followSslRedirects(followRedirects)
+
+        if (timeoutSec != 4L) {
+            builder.connectTimeout(timeoutSec, TimeUnit.SECONDS)
+                .readTimeout(timeoutSec, TimeUnit.SECONDS)
+                .writeTimeout(timeoutSec, TimeUnit.SECONDS)
+        }
 
         val mixedPort = DataStore.mixedPort
         if (mixedPort > 0) {
