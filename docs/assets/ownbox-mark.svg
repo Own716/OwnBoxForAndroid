@@ -1,12 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
-  <title id="title">OwnBox mark</title><desc id="desc">A geometric folded path forming an abstract O and N mark.</desc>
-  <defs>
-    <linearGradient id="g" x1="90" y1="70" x2="420" y2="440" gradientUnits="userSpaceOnUse"><stop stop-color="#72F2E2"/><stop offset=".48" stop-color="#22C6D6"/><stop offset="1" stop-color="#547BFF"/></linearGradient>
-    <linearGradient id="g2" x1="130" y1="105" x2="383" y2="403" gradientUnits="userSpaceOnUse"><stop stop-color="#D7FFF8" stop-opacity=".92"/><stop offset="1" stop-color="#66A7FF" stop-opacity=".08"/></linearGradient>
-  </defs>
-  <rect x="28" y="28" width="456" height="456" rx="116" fill="#071426" stroke="#17334B" stroke-width="4"/>
-  <path d="M121 351 208 132c7-18 20-28 40-28h125c18 0 30 18 24 35l-88 218c-7 18-20 27-39 27H145c-18 0-30-17-24-33Z" fill="url(#g)"/>
-  <path d="m179 360 76-190 77 190h-61l-17-46-18 46Z" fill="#071426" fill-opacity=".88"/>
-  <path d="m213 131 70 0 87 225" fill="none" stroke="url(#g2)" stroke-width="10" stroke-linecap="round" opacity=".8"/>
-  <circle cx="377" cy="129" r="10" fill="#A6FFF2"/>
+  <title id="title">OwnBox for Android Logo</title>
+  <desc id="desc">Official OwnBox four-bar rounded pill logo on a crisp white squircle.</desc>
+  <rect x="24" y="24" width="464" height="464" rx="116" fill="#FFFFFF" stroke="#DCE6F2" stroke-width="6"/>
+  <rect x="147" y="125" width="44" height="262" rx="22" fill="#293156"/>
+  <rect x="205" y="191" width="44" height="196" rx="22" fill="#4A8DC2"/>
+  <rect x="263" y="125" width="44" height="262" rx="22" fill="#293156"/>
+  <rect x="321" y="258" width="44" height="129" rx="22" fill="#B8E7F1"/>
 </svg>

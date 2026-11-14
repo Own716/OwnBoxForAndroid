@@ -126,7 +126,7 @@ OwnBox 是客户端软件，**不内置或销售第三方代理订阅，也不�
       <sub>提供深浅色及多种主题外观，并包含桌面小组件、快捷设置磁贴等系统入口。</sub>
     </td>
     <td width="50%" valign="top" align="center">
-      <img src="docs/assets/ownbox-mark.svg" width="64" alt="OwnBox mark" /><br />
+      <img src="docs/assets/strategy.svg" width="64" alt="Strategy groups" /><br />
       <strong>策略组与连接管理</strong><br />
       <sub>支持多种自动选路策略，并可查看成员状态、检查结果及按需手动锁定节点。</sub>
     </td>
