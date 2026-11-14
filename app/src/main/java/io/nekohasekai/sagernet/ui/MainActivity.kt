@@ -34,6 +34,7 @@ import androidx.core.view.GravityCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
+import androidx.lifecycle.lifecycleScope
 import androidx.preference.PreferenceDataStore
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.navigation.NavigationView
@@ -48,9 +49,12 @@ import io.nekohasekai.sagernet.aidl.SpeedDisplayData
 import io.nekohasekai.sagernet.aidl.TrafficDataBatch
 import io.nekohasekai.sagernet.bg.BaseService
 import io.nekohasekai.sagernet.bg.SagerConnection
+import io.nekohasekai.sagernet.bg.autoselector.AutoSelectorClient
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.GroupManager
 import io.nekohasekai.sagernet.database.ProfileManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import libcore.Libcore
 import io.nekohasekai.sagernet.database.ProxyGroup
 import io.nekohasekai.sagernet.database.SubscriptionBean
@@ -1149,6 +1153,34 @@ class MainActivity : ThemedActivity(),
 
     override suspend fun cbTrafficUpdate(data: TrafficDataBatch) {
         ProfileManager.postUpdate(data.items)
+    }
+
+    private var lastAutoSelectorId: Long = 0L
+    private var lastAutoSelectorLeafId: Long = 0L
+
+    override fun cbAutoSelectorUpdate(json: String) {
+        val status = AutoSelectorClient.status.value
+        val changed = status.selectorId != lastAutoSelectorId || status.selectedId != lastAutoSelectorLeafId
+        if (!changed) return
+        val prevSelectorId = lastAutoSelectorId
+        lastAutoSelectorId = status.selectorId
+        lastAutoSelectorLeafId = status.selectedId
+        if (status.selectedId > 0L) {
+            lifecycleScope.launch(Dispatchers.IO) {
+                val leafName = ProfileManager.getProfile(status.selectedId)?.displayName().orEmpty()
+                if (leafName.isNotBlank()) {
+                    DataStore.activeLeafProfileId = status.selectedId
+                    DataStore.activeLeafProfileName = leafName
+                }
+                if (prevSelectorId > 0L) ProfileManager.postUpdate(prevSelectorId, true)
+                if (status.selectorId > 0L) ProfileManager.postUpdate(status.selectorId, true)
+            }
+        } else {
+            runOnDefaultDispatcher {
+                if (prevSelectorId > 0L) ProfileManager.postUpdate(prevSelectorId, true)
+                if (status.selectorId > 0L) ProfileManager.postUpdate(status.selectorId, true)
+            }
+        }
     }
 
     override fun cbSelectorUpdate(id: Long) {

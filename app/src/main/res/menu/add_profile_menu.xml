@@ -28,6 +28,9 @@
                         android:id="@+id/action_new_balancer"
                         android:title="@string/balancer" />
                     <item
+                        android:id="@+id/action_new_auto_selector"
+                        android:title="@string/action_new_auto_selector" />
+                    <item
                         android:id="@+id/action_new_socks"
                         android:title="@string/action_socks" />
                     <item

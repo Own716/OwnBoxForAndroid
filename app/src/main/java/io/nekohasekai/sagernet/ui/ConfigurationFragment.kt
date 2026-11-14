@@ -49,8 +49,14 @@ import androidx.core.widget.addTextChangedListener
 import io.nekohasekai.sagernet.utils.Theme
 import io.nekohasekai.sagernet.utils.CountryFlagUtils
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import io.nekohasekai.sagernet.bg.autoselector.AutoSelectorClient
+import io.nekohasekai.sagernet.bg.autoselector.AutoSelectorHealthStore
+import io.nekohasekai.sagernet.bg.autoselector.AutoSelectorProfiles
 import androidx.preference.PreferenceDataStore
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -1304,18 +1310,90 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
     }
 
+    private var autoSelectorStatusView: TextView? = null
+    internal val autoSelectorNameCache = ConcurrentHashMap<Long, String>()
+
+    private fun refreshAutoSelectorStatusLine() {
+        if (select) {
+            autoSelectorStatusView?.isVisible = false
+            return
+        }
+        val statusView = autoSelectorStatusView ?: return
+        val status = AutoSelectorClient.status.value
+        val owner = runCatching { viewLifecycleOwner }.getOrNull() ?: return
+        owner.lifecycleScope.launch {
+            val hasAuto = withContext(Dispatchers.IO) {
+                if (status.selectedId > 0L && !autoSelectorNameCache.containsKey(status.selectedId)) {
+                    ProfileManager.getProfile(status.selectedId)?.displayName()?.let { name ->
+                        autoSelectorNameCache[status.selectedId] = name
+                    }
+                }
+                status.running || AutoSelectorProfiles.loadAllAutoSelectors().isNotEmpty()
+            }
+            if (!isAdded) return@launch
+            AutoSelectorStatusLine.render(statusView, status, hasAuto) { id, tag ->
+                autoSelectorNameCache[id] ?: tag.ifBlank { if (id > 0L) "#$id" else "" }
+            }
+        }
+    }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
         groupPager = view.findViewById(R.id.group_pager)
         groupTabContainer = view.findViewById(R.id.group_tab_container)
         tabLayout = view.findViewById(R.id.group_tab)
+        autoSelectorStatusView = view.findViewById(R.id.auto_selector_runtime_status)
         adapter = GroupPagerAdapter()
         ProfileManager.addListener(adapter)
         GroupManager.addListener(adapter)
 
         groupPager.adapter = adapter
         groupPager.offscreenPageLimit = 2
+
+        if (!select) {
+            autoSelectorStatusView?.setOnClickListener {
+                val status = AutoSelectorClient.status.value
+                viewLifecycleOwner.lifecycleScope.launch {
+                    val targetId = withContext(Dispatchers.IO) {
+                        val visibleGroupId = getCurrentGroupFragment()?.takeIf { !it.isAllGroupsTab }?.proxyGroup?.id ?: 0L
+                        val allAuto = AutoSelectorProfiles.loadAllAutoSelectors()
+                        val visibleAutoId = if (visibleGroupId > 0L) {
+                            allAuto.firstOrNull { it.first.groupId == visibleGroupId }?.first?.id ?: 0L
+                        } else 0L
+                        val firstId = allAuto.firstOrNull()?.first?.id ?: 0L
+                        AutoSelectorStatusLine.pickFallbackSelectorId(
+                            status = status,
+                            visibleAutoSelectorId = visibleAutoId,
+                            firstKnownAutoSelectorId = firstId,
+                        )
+                    }
+                    if (!isAdded) return@launch
+                    startActivity(AutoSelectorStatusActivity.intent(requireContext(), targetId))
+                }
+            }
+
+            viewLifecycleOwner.lifecycleScope.launch {
+                viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    AutoSelectorClient.status.collect {
+                        refreshAutoSelectorStatusLine()
+                    }
+                }
+            }
+            viewLifecycleOwner.lifecycleScope.launch {
+                viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    while (isActive) {
+                        delay(1_000L)
+                        if (AutoSelectorClient.status.value.running) {
+                            refreshAutoSelectorStatusLine()
+                        }
+                    }
+                }
+            }
+            refreshAutoSelectorStatusLine()
+        } else {
+            autoSelectorStatusView?.isVisible = false
+        }
 
         val primaryTextColor = requireContext().getColorAttr(android.R.attr.textColorPrimary)
         if (!select) {
@@ -2189,6 +2267,13 @@ class ConfigurationFragment @JvmOverloads constructor(
                 startActivity(Intent(requireActivity(), BalancerSettingsActivity::class.java))
             }
 
+            R.id.action_new_auto_selector -> {
+                startActivity(
+                    Intent(requireActivity(), BalancerSettingsActivity::class.java)
+                        .putExtra("strategy", BalancerBean.STRATEGY_AUTO_SELECTOR)
+                )
+            }
+
             R.id.action_update_subscription -> {
                 val isAll = isCurrentAllGroups()
                 if (isAll) {
@@ -3032,6 +3117,12 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
             try {
                 SagerDatabase.proxyDao.updatePingResult(profile.id, profile.status, profile.ping, profile.error)
+                AutoSelectorHealthStore.record(
+                    profileId = profile.id,
+                    latencyMs = if (profile.status == 1) profile.ping else 0,
+                    atSec = System.currentTimeMillis() / 1000L,
+                    error = if (profile.status == 1) null else profile.error,
+                )
                 ProfileManager.postUpdate(profile, false)
             } catch (e: Exception) {
                 Logs.w(e)
@@ -3098,6 +3189,12 @@ class ConfigurationFragment @JvmOverloads constructor(
 
                         try {
                             SagerDatabase.proxyDao.updatePingResult(profile.id, profile.status, profile.ping, profile.error)
+                            AutoSelectorHealthStore.record(
+                                profileId = profile.id,
+                                latencyMs = if (profile.status == 1) profile.ping else 0,
+                                atSec = System.currentTimeMillis() / 1000L,
+                                error = if (profile.status == 1) null else profile.error,
+                            )
                             ProfileManager.postUpdate(profile, false)
                         } catch (e: Exception) {
                             Logs.w(e)
@@ -3408,17 +3505,25 @@ class ConfigurationFragment @JvmOverloads constructor(
                 DataStore.selectedGroup = profile.groupId
                 reload()
             }
+            if (AutoSelectorProfiles.isAutoSelectorEntity(profile)) {
+                onMainDispatcher { refreshAutoSelectorStatusLine() }
+            }
         }
 
         override suspend fun onUpdated(data: List<TrafficData>) = Unit
 
-        override suspend fun onUpdated(profile: ProxyEntity, noTraffic: Boolean) = Unit
+        override suspend fun onUpdated(profile: ProxyEntity, noTraffic: Boolean) {
+            if (profile.type == ProxyEntity.TYPE_BALANCER) {
+                onMainDispatcher { refreshAutoSelectorStatusLine() }
+            }
+        }
 
         override suspend fun onRemoved(groupId: Long, profileId: Long) {
             val group = groupList.find { it.id == groupId } ?: return
             if (group.ungrouped && SagerDatabase.proxyDao.countByGroup(groupId) == 0L) {
                 reload()
             }
+            onMainDispatcher { refreshAutoSelectorStatusLine() }
         }
     }
 
@@ -4248,6 +4353,25 @@ class ConfigurationFragment @JvmOverloads constructor(
                     (isSelected && pf?.isCurrentProfile(p.id) == true)
                 )
 
+                if (b.strategy == BalancerBean.STRATEGY_AUTO_SELECTOR) {
+                    val liveStatus = AutoSelectorClient.status.value
+                    if (isConnected || (DataStore.serviceState.started && liveStatus.running && liveStatus.selectorId == p.id)) {
+                        val activeLeaf = DataStore.activeLeafProfileName.takeIf { it.isNotBlank() }
+                            ?: (liveStatus.takeIf { it.running && it.selectorId == p.id && it.selectedId > 0L }?.let { st ->
+                                pf?.autoSelectorNameCache?.get(st.selectedId)
+                                    ?: runCatching { ProfileManager.getProfile(st.selectedId)?.displayName() }.getOrNull()?.also { name ->
+                                        pf?.autoSelectorNameCache?.set(st.selectedId, name)
+                                    }
+                                    ?: st.selectedTag
+                            })
+                            ?: ActiveOutboundTracker.getActiveLeafNodeDisplay(p)
+                        if (!activeLeaf.isNullOrBlank()) {
+                            return b.displayWithNodeName(activeLeaf)
+                        }
+                    }
+                    return b.displayNodeOnly()
+                }
+
                 if (isConnected) {
                     val activeLeaf = DataStore.activeLeafProfileName.takeIf { it.isNotBlank() }
                         ?: ActiveOutboundTracker.getActiveLeafNodeDisplay(p)
@@ -4852,6 +4976,8 @@ class ConfigurationFragment @JvmOverloads constructor(
                 if (select) {
                     popup.menu.removeItem(R.id.action_delete)
                 }
+                popup.menu.findItem(R.id.action_auto_selector_stats)?.isVisible =
+                    !select && AutoSelectorProfiles.isAutoSelectorEntity(proxyEntity)
 
                 popup.setOnMenuItemClickListener(this)
                 moe.matsuri.nb4a.ui.MenuScrimHelper.showPopupMenuWithScrim(popup, activity) {
@@ -5037,8 +5163,16 @@ class ConfigurationFragment @JvmOverloads constructor(
                 val popup = PopupMenu(requireContext(), anchor)
                 popup.menuInflater.inflate(R.menu.double_column_item_menu, popup.menu)
                 if (select) popup.menu.removeItem(R.id.action_delete)
+                popup.menu.findItem(R.id.action_auto_selector_stats)?.isVisible =
+                    !select && AutoSelectorProfiles.isAutoSelectorEntity(proxyEntity)
                 popup.setOnMenuItemClickListener { menuItem ->
                     when (menuItem.itemId) {
+                        R.id.action_auto_selector_stats -> {
+                            anchor.context.startActivity(
+                                AutoSelectorStatusActivity.intent(anchor.context, proxyEntity.id)
+                            )
+                            true
+                        }
                         R.id.action_edit -> {
                             anchor.context.startActivity(
                                 proxyEntity.settingIntent(
@@ -5424,6 +5558,11 @@ class ConfigurationFragment @JvmOverloads constructor(
                 try {
                     currentName = entity.displayName() ?: ""
                     when (item.itemId) {
+                        R.id.action_auto_selector_stats -> {
+                            view.context.startActivity(
+                                AutoSelectorStatusActivity.intent(view.context, entity.id)
+                            )
+                        }
                         R.id.action_test_profile_speed -> {
                             (parentFragment as? ConfigurationFragment)?.speedTestSingle(entity)
                         }

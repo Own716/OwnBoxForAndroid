@@ -3,6 +3,9 @@ package io.nekohasekai.sagernet.fmt
 import android.widget.Toast
 import io.nekohasekai.sagernet.*
 import io.nekohasekai.sagernet.bg.VpnService
+import io.nekohasekai.sagernet.bg.autoselector.AutoSelectorBuild
+import io.nekohasekai.sagernet.bg.autoselector.AutoSelectorHealthStore
+import io.nekohasekai.sagernet.bg.autoselector.AutoSelectorProfiles
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.database.ProxyEntity.Companion.TYPE_CONFIG
@@ -290,6 +293,7 @@ class ConfigBuildResult(
     var profileTagMap: Map<Long, String>,
     val selectorGroupId: Long,
     val balancerMemberMap: Map<Long, List<Long>> = emptyMap(),
+    val autoSelector: AutoSelectorBuild? = null,
 ) {
     data class IndexEntity(var chain: LinkedHashMap<Int, ProxyEntity>)
 }
@@ -368,6 +372,7 @@ fun buildConfig(
     val trafficMap = HashMap<String, List<ProxyEntity>>()
     val tagMap = HashMap<Long, String>()
     val balancerMemberMap = HashMap<Long, List<Long>>()
+    var autoSelectorBuild: AutoSelectorBuild? = null
     val globalOutbounds = HashMap<Long, String>()
     val readableNames = mutableSetOf(TAG_DIRECT, TAG_BYPASS, TAG_BLOCK, TAG_FRAGMENT, TAG_MIXED, TAG_PROXY)
     val group = SagerDatabase.groupDao.getById(proxy.groupId)
@@ -870,6 +875,165 @@ fun buildConfig(
 
                 val balancerFrontTag = balancerFrontEntity?.let { front ->
                     tagMap[front.id] ?: buildChain(front.id, front).also { tagMap[front.id] = it }
+                }
+
+                if (balancerBean.strategy == BalancerBean.STRATEGY_AUTO_SELECTOR) {
+                    val nowSec = System.currentTimeMillis() / 1000L
+                    val plan = AutoSelectorProfiles.buildPlan(
+                        bean = balancerBean,
+                        excludeProfileId = entity.id,
+                        nowSec = nowSec,
+                    )
+                    val excludedIds = hashSetOf(entity.id)
+                    balancerFrontEntity?.id?.let { excludedIds.add(it) }
+                    balancerLandingEntity?.id?.let { excludedIds.add(it) }
+
+                    val memberEntities = plan.build.mapNotNull { m ->
+                        if (m.id in excludedIds) return@mapNotNull null
+                        SagerDatabase.proxyDao.getById(m.id)?.takeIf {
+                            !DataStore.isGroupDisabled(it.groupId)
+                        }
+                    }
+
+                    val memberEffectiveDetour = balancerFrontTag ?: externalDetour
+                    val balancerTag = readableTag(entity.displayName())
+                    val useFront = if (balancerBean.frontProxy <= 0L && (balancerBean.targetGroupIds.isNotEmpty() || balancerBean.targetGroupId > 0L)) {
+                        balancerBean.useFrontProxy
+                    } else {
+                        false
+                    }
+                    val useLanding = if (balancerBean.landingProxy <= 0L && (balancerBean.targetGroupIds.isNotEmpty() || balancerBean.targetGroupId > 0L)) {
+                        balancerBean.useLandingProxy
+                    } else {
+                        false
+                    }
+
+                    val memberTags = ArrayList<String>(memberEntities.size)
+                    val builtMemberMap = LinkedHashMap<String, Long>(memberEntities.size)
+                    val builtMemberIds = ArrayList<Long>(memberEntities.size)
+                    val healthSnapshot = AutoSelectorHealthStore.snapshot()
+                    val validitySec = balancerBean.resultValidityMins.coerceAtLeast(0) * 60L
+                    val warmEntries = ArrayList<Map<String, Any>>()
+                    var pinnedTag = ""
+
+                    for (member in memberEntities) {
+                        val customKey = if (memberEffectiveDetour != null) -member.id else member.id
+                        val mTag = if (memberEffectiveDetour == null && tagMap.containsKey(customKey)) {
+                            tagMap[customKey]!!
+                        } else {
+                            val built = buildChain(
+                                chainId = customKey,
+                                entity = member,
+                                useGroupFront = useFront,
+                                useGroupLanding = useLanding,
+                                externalDetour = memberEffectiveDetour,
+                            )
+                            tagMap[customKey] = built
+                            built
+                        }
+                        if (mTag.isBlank() || mTag == TAG_DIRECT || mTag in builtMemberMap) continue
+                        memberTags.add(mTag)
+                        builtMemberMap[mTag] = member.id
+                        builtMemberIds.add(member.id)
+                        if (balancerBean.pinnedId > 0L && member.id == balancerBean.pinnedId) {
+                            pinnedTag = mTag
+                        }
+                        val h = AutoSelectorHealthStore.resolveMemberHealth(member, healthSnapshot)
+                        if (validitySec > 0L && h.latency > 0 && h.at > 0L && (nowSec - h.at) in 0..validitySec) {
+                            warmEntries.add(
+                                mapOf(
+                                    "tag" to mTag,
+                                    "rtt" to h.latency,
+                                    "age" to (nowSec - h.at).coerceAtLeast(0L),
+                                )
+                            )
+                        }
+                    }
+
+                    if (memberTags.isEmpty() && !forExport) {
+                        val hasSources = plan.trackedGroups.isNotEmpty() || !balancerBean.proxies.isNullOrEmpty()
+                        val msgRes = if (hasSources) {
+                            R.string.autosel_error_no_members
+                        } else {
+                            R.string.autosel_error_no_tracked_group
+                        }
+                        throw kotlin.IllegalStateException(SagerNet.application.getString(msgRes))
+                    }
+
+                    val finalMemberTags = if (memberTags.isEmpty()) listOf(TAG_DIRECT) else memberTags
+                    val effectiveTestUrl = balancerBean.testUrl?.trim()?.takeIf { it.isNotEmpty() }
+                        ?: DataStore.connectionTestURL
+                    val autoOutbound = SingBoxOption().apply {
+                        _hack_config_map["type"] = "auto-selector"
+                        _hack_config_map["tag"] = balancerTag
+                        _hack_config_map["outbounds"] = finalMemberTags
+                        _hack_config_map["url"] = effectiveTestUrl
+                        balancerBean.connectivityUrl?.trim()?.takeIf { it.isNotEmpty() }?.let {
+                            _hack_config_map["connectivity_url"] = it
+                        }
+                        val checkInterval = balancerBean.interval.coerceAtLeast(10)
+                        val benchInterval = balancerBean.benchIntervalSec.coerceAtLeast(checkInterval)
+                        val watchInterval = balancerBean.watchIntervalSec.coerceAtLeast(5)
+                        _hack_config_map["interval"] = "${checkInterval}s"
+                        _hack_config_map["bench_interval"] = "${benchInterval}s"
+                        _hack_config_map["watch_interval"] = "${watchInterval}s"
+                        _hack_config_map["active_size"] = balancerBean.activeSize.coerceAtLeast(1)
+                        _hack_config_map["sampling"] = balancerBean.sampling.coerceAtLeast(1)
+                        _hack_config_map["timeout"] = "${DataStore.connectionTestTimeout.coerceIn(1000, 30000)}ms"
+                        _hack_config_map["concurrency"] = DataStore.connectionTestConcurrent.coerceIn(1, 16)
+                        _hack_config_map["tolerance"] = balancerBean.calculateToleranceMs().toInt().coerceAtLeast(0)
+                        if (balancerBean.maxRttMs > 0) {
+                            _hack_config_map["max_rtt"] = "${balancerBean.maxRttMs}ms"
+                        }
+                        _hack_config_map["expected"] = balancerBean.expected.coerceAtLeast(1)
+                        _hack_config_map["dial_retries"] = balancerBean.dialRetries.coerceAtLeast(0)
+                        _hack_config_map["interrupt_exist_connections"] = balancerBean.interruptOnSwitch
+                        _hack_config_map["balance"] = balancerBean.balance
+                        if (balancerBean.balance) {
+                            _hack_config_map["balance_mode"] = balancerBean.balanceMode.takeIf { it == "connection" } ?: "rotate"
+                            _hack_config_map["balance_interval"] = "${balancerBean.balanceIntervalSec.coerceAtLeast(5)}s"
+                        }
+                        if (pinnedTag.isNotEmpty()) {
+                            _hack_config_map["pinned"] = pinnedTag
+                        }
+                        if (warmEntries.isNotEmpty()) {
+                            _hack_config_map["warm"] = warmEntries
+                        }
+                    }
+
+                    outbounds.add(autoOutbound)
+                    trafficMap[balancerTag] = listOf(entity)
+                    balancerMemberMap[entity.id] = builtMemberIds
+
+                    if ((chainId == 0L || entity.id == proxy.id) && !forTest && autoSelectorBuild == null) {
+                        autoSelectorBuild = AutoSelectorBuild(
+                            selectorId = entity.id,
+                            selectorName = balancerBean.displayName(),
+                            groupTag = balancerTag,
+                            members = builtMemberMap,
+                            memberIds = builtMemberIds,
+                            trackedGroups = plan.trackedGroups,
+                            testUrl = effectiveTestUrl,
+                            balance = balancerBean.balance,
+                            poolCap = balancerBean.poolCap,
+                            buildLimit = balancerBean.buildLimit,
+                            resultValidityMins = balancerBean.resultValidityMins,
+                        )
+                    }
+
+                    val finalBalancerTag = if (balancerLandingEntity != null) {
+                        buildChain(
+                            chainId = -balancerLandingEntity.id,
+                            entity = balancerLandingEntity,
+                            useGroupFront = false,
+                            useGroupLanding = false,
+                            externalDetour = balancerTag,
+                        )
+                    } else {
+                        balancerTag
+                    }
+                    tagMap[chainId] = finalBalancerTag
+                    return finalBalancerTag
                 }
 
                 val memberEntities = (if (balancerBean.balancerType == BalancerBean.TYPE_GROUP) {
@@ -2246,7 +2410,7 @@ fun buildConfig(
                 node["detour"]?.toString()?.takeIf { it.isNotBlank() }?.let {
                     add("$source->$it")
                 }
-                if (node["type"] == "selector") {
+                if (node["type"] == "selector" || node["type"] == "auto-selector") {
                     (node["outbounds"] as? List<*>)?.forEach { target ->
                         target?.toString()?.takeIf { it.isNotBlank() }?.let {
                             add("$source=>$it")
@@ -2275,7 +2439,8 @@ fun buildConfig(
             trafficMap,
             tagMap,
             if (buildSelector || useAutoSelect || useLoadBalance) group?.id ?: 0L else -1L,
-            balancerMemberMap
+            balancerMemberMap,
+            autoSelectorBuild
         )
     }
 

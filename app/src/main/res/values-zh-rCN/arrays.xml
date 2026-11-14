@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="autosel_balance_modes">
+        <item>按时间轮换（保持会话稳定）</item>
+        <item>按连接分配（分散最广）</item>
+    </string-array>
+</resources>

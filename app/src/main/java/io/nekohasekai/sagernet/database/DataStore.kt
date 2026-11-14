@@ -509,6 +509,23 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var balancerLandingProxyTmp by profileCacheStore.stringToInt("balancerLandingProxy")
     var balancerNameExclude by profileCacheStore.string("balancerNameExclude") { "" }
     var balancerNameInclude by profileCacheStore.string("balancerNameInclude") { "" }
+    var balancerCountryFilter by profileCacheStore.string("balancerCountryFilter") { "" }
+    var balancerExcludeUnavailable by profileCacheStore.boolean("balancerExcludeUnavailable") { true }
+    var balancerPoolCap by profileCacheStore.stringToInt("balancerPoolCap") { 1000 }
+    var balancerBuildLimit by profileCacheStore.stringToInt("balancerBuildLimit") { 300 }
+    var balancerResultValidityMins by profileCacheStore.stringToInt("balancerResultValidityMins") { 1440 }
+    var balancerConnectivityUrl by profileCacheStore.string("balancerConnectivityUrl") { "" }
+    var balancerBenchIntervalSec by profileCacheStore.stringToInt("balancerBenchIntervalSec") { 600 }
+    var balancerWatchIntervalSec by profileCacheStore.stringToInt("balancerWatchIntervalSec") { 15 }
+    var balancerActiveSize by profileCacheStore.stringToInt("balancerActiveSize") { 8 }
+    var balancerSampling by profileCacheStore.stringToInt("balancerSampling") { 10 }
+    var balancerMaxRttMs by profileCacheStore.stringToInt("balancerMaxRttMs") { 0 }
+    var balancerExpected by profileCacheStore.stringToInt("balancerExpected") { 3 }
+    var balancerDialRetries by profileCacheStore.stringToInt("balancerDialRetries") { 2 }
+    var balancerInterruptOnSwitch by profileCacheStore.boolean("balancerInterruptOnSwitch") { false }
+    var balancerBalance by profileCacheStore.boolean("balancerBalance") { false }
+    var balancerBalanceMode by profileCacheStore.string("balancerBalanceMode") { "rotate" }
+    var balancerBalanceIntervalSec by profileCacheStore.stringToInt("balancerBalanceIntervalSec") { 30 }
 
     var groupName by profileCacheStore.string(Key.GROUP_NAME)
     var groupType by profileCacheStore.stringToInt(Key.GROUP_TYPE)
