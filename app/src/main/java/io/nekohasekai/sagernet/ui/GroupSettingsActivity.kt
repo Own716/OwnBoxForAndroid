@@ -74,7 +74,7 @@ class GroupSettingsActivity(
         DataStore.subscriptionLockUserAgent = subscription.lockUserAgent ?: false
         DataStore.subscriptionRetainValidNodes = subscription.retainValidNodes ?: false
         DataStore.subscriptionAutoUpdate = subscription.autoUpdate
-        DataStore.subscriptionAutoUpdateDelay = subscription.autoUpdateDelay
+        DataStore.subscriptionAutoUpdateDelay = (subscription.autoUpdateDelay ?: 1440).coerceAtLeast(15)
         DataStore.subscriptionFilterMode = subscription.filterMode
         DataStore.subscriptionFilterRegex = subscription.filterRegex
         // Throne upstream 尚未支持自定义服务器 DNS，入口停用期间不再加载其 UI 缓存。
@@ -129,7 +129,7 @@ class GroupSettingsActivity(
                 lockUserAgent = DataStore.subscriptionLockUserAgent
                 retainValidNodes = DataStore.subscriptionRetainValidNodes
                 autoUpdate = DataStore.subscriptionAutoUpdate
-                autoUpdateDelay = DataStore.subscriptionAutoUpdateDelay
+                autoUpdateDelay = DataStore.subscriptionAutoUpdateDelay.coerceAtLeast(15)
                 filterMode = DataStore.subscriptionFilterMode
                 filterRegex = DataStore.subscriptionFilterRegex
                 // 入口停用期间不要用未展示的 UI 缓存覆盖历史数据库值。
@@ -219,19 +219,35 @@ class GroupSettingsActivity(
         val subscriptionAutoUpdate =
             findPreference<SwitchPreferenceCompat>(Key.SUBSCRIPTION_AUTO_UPDATE)!!
         val subscriptionAutoUpdateDelay =
-            findPreference<EditTextPreference>(Key.SUBSCRIPTION_AUTO_UPDATE_DELAY)!!
+            findPreference<Preference>(Key.SUBSCRIPTION_AUTO_UPDATE_DELAY)!!
 
-        subscriptionAutoUpdateDelay.isEnabled = subscriptionAutoUpdate.isChecked
-        subscriptionAutoUpdateDelay.setOnPreferenceChangeListener { _, newValue ->
-            val delay = (newValue as String).toIntOrNull()
-            if (delay == null) {
-                false
-            } else {
-                delay >= 15
-            }
+        fun updateDelaySummary(enabled: Boolean = subscriptionAutoUpdate.isChecked) {
+            subscriptionAutoUpdateDelay.isEnabled = enabled
+            subscriptionAutoUpdateDelay.summary = SubscriptionAutoUpdateDialog.formatSummary(
+                requireContext(),
+                DataStore.subscriptionAutoUpdateDelay,
+                enabled
+            )
         }
+        updateDelaySummary()
+
+        subscriptionAutoUpdateDelay.setOnPreferenceClickListener {
+            SubscriptionAutoUpdateDialog.show(
+                requireContext(),
+                DataStore.subscriptionAutoUpdateDelay
+            ) { newMinutes ->
+                DataStore.subscriptionAutoUpdateDelay = newMinutes
+                DataStore.dirty = true
+                updateDelaySummary()
+            }
+            true
+        }
+
         subscriptionAutoUpdate.setOnPreferenceChangeListener { _, newValue ->
-            subscriptionAutoUpdateDelay.isEnabled = (newValue as Boolean)
+            val enabled = newValue as Boolean
+            DataStore.subscriptionAutoUpdate = enabled
+            DataStore.dirty = true
+            updateDelaySummary(enabled)
             true
         }
 

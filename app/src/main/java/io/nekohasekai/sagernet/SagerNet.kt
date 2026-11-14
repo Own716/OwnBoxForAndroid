@@ -19,6 +19,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 import go.Seq
 import io.nekohasekai.sagernet.bg.SagerConnection
+import io.nekohasekai.sagernet.bg.SubscriptionUpdater
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.isOss
@@ -130,6 +131,10 @@ class SagerNet : Application(),
                 }
 
                 updateNotificationChannels()
+                runCatching {
+                    SubscriptionUpdater.reconfigureUpdater()
+                    SubscriptionUpdater.checkPendingUpdates(onlyIfConnected = false)
+                }
             }
         }
 
@@ -156,7 +161,7 @@ class SagerNet : Application(),
 
     override fun getWorkManagerConfiguration(): WorkConfiguration {
         return WorkConfiguration.Builder()
-            .setDefaultProcessName("${BuildConfig.APPLICATION_ID}:bg")
+            .setDefaultProcessName(BuildConfig.APPLICATION_ID)
             .build()
     }
 

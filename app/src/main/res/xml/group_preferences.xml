@@ -109,12 +109,10 @@
             app:icon="@drawable/ic_baseline_flip_camera_android_24"
             app:key="subscriptionAutoUpdate"
             app:title="@string/auto_update" />
-        <EditTextPreference
-            app:defaultValue="1440"
+        <Preference
             app:icon="@drawable/ic_baseline_timelapse_24"
             app:key="subscriptionAutoUpdateDelay"
-            app:title="@string/auto_update_delay"
-            app:useSimpleSummaryProvider="true" />
+            app:title="@string/auto_update_delay" />
     </PreferenceCategory>
 
 </PreferenceScreen>

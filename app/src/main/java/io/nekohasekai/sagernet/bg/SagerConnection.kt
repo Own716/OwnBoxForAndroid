@@ -67,6 +67,9 @@ class SagerConnection(
             if (state < 0) return // skip private
             val s = BaseService.State.values()[state]
             DataStore.serviceState = s
+            if (s == BaseService.State.Connected) {
+                SubscriptionUpdater.checkPendingUpdates(onlyIfConnected = true)
+            }
             val callback = callback ?: return
             runOnMainDispatcher {
                 callback.stateChanged(s, profileName, msg)

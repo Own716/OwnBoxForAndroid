@@ -599,7 +599,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var subscriptionLockUserAgent by profileCacheStore.boolean(Key.SUBSCRIPTION_LOCK_USER_AGENT) { false }
     var subscriptionRetainValidNodes by profileCacheStore.boolean(Key.SUBSCRIPTION_RETAIN_VALID_NODES) { false }
     var subscriptionAutoUpdate by profileCacheStore.boolean(Key.SUBSCRIPTION_AUTO_UPDATE)
-    var subscriptionAutoUpdateDelay by profileCacheStore.stringToInt(Key.SUBSCRIPTION_AUTO_UPDATE_DELAY) { 360 }
+    var subscriptionAutoUpdateDelay by profileCacheStore.stringToInt(Key.SUBSCRIPTION_AUTO_UPDATE_DELAY) { 1440 }
     var subscriptionFilterMode by profileCacheStore.stringToInt(Key.SUBSCRIPTION_FILTER_MODE) { 0 }
     var subscriptionFilterRegex by profileCacheStore.string(Key.SUBSCRIPTION_FILTER_REGEX)
     var subscriptionServerDns by profileCacheStore.string(Key.SUBSCRIPTION_SERVER_DNS)

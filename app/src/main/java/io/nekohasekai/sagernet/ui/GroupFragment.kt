@@ -18,6 +18,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import io.nekohasekai.sagernet.GroupType
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.SagerNet
+import io.nekohasekai.sagernet.bg.SubscriptionUpdater
 import io.nekohasekai.sagernet.database.*
 import io.nekohasekai.sagernet.databinding.LayoutGroupItemBinding
 import io.nekohasekai.sagernet.fmt.toUniversalLink
@@ -129,6 +130,7 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
             }
             lastCompactGroupCards = DataStore.compactGroupCards
         }
+        SubscriptionUpdater.checkPendingUpdates(onlyIfConnected = false)
     }
 
     override fun onMenuItemClick(item: MenuItem): Boolean {
