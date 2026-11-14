@@ -1,5 +1,6 @@
 package io.nekohasekai.sagernet.route
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -97,5 +98,74 @@ class SmartRouteRulesTest {
         )
         assertFalse(foreignBypassMode.contains("org.telegram.messenger"))
         assertTrue(domesticBypassMode.contains("org.telegram.messenger"))
+    }
+
+    @Test
+    fun classifyAppsExcludesSystemDownloadAndNetworkPackages() {
+        val systemPkgs = setOf(
+            "com.android.providers.downloads",
+            "com.android.providers.downloads.ui",
+            "com.android.providers.media",
+            "com.android.providers.media.module",
+            "com.android.captiveportallogin",
+            "com.android.networkstack",
+            "com.google.android.networkstack",
+            "com.android.externalstorage",
+            "com.android.shell",
+        )
+        val (domestic, foreign) = SmartRouteRules.classifyApps(
+            country = "cn",
+            installedPackages = systemPkgs + "com.tencent.mm",
+            bundledForeign = systemPkgs,
+            proxyAppsEnabled = false,
+            individualPackages = emptySet()
+        )
+        for (pkg in systemPkgs) {
+            assertFalse("System package $pkg must not be classified as domestic", domestic.contains(pkg))
+            assertFalse("System package $pkg must not be classified as foreign", foreign.contains(pkg))
+        }
+        assertTrue(domestic.contains("com.tencent.mm"))
+    }
+
+    @Test
+    fun classifyAppsDomesticPrefixBeatsBundledForeign() {
+        val (domestic, foreign) = SmartRouteRules.classifyApps(
+            country = "cn",
+            installedPackages = setOf("com.tencent.huatuo", "org.telegram.messenger"),
+            bundledForeign = setOf("com.tencent.huatuo"),
+            proxyAppsEnabled = false,
+            individualPackages = emptySet()
+        )
+        assertTrue(domestic.contains("com.tencent.huatuo"))
+        assertFalse(foreign.contains("com.tencent.huatuo"))
+        assertTrue(foreign.contains("org.telegram.messenger"))
+    }
+
+    @Test
+    fun classifyAppsLeavesOrdinaryAppsUnclassifiedAndOmitsUninstalled() {
+        val (domestic, foreign) = SmartRouteRules.classifyApps(
+            country = "cn",
+            installedPackages = setOf("com.example.unknownapp", "com.tencent.mm"),
+            bundledForeign = emptySet(),
+            proxyAppsEnabled = false,
+            individualPackages = emptySet()
+        )
+        assertFalse(domestic.contains("com.example.unknownapp"))
+        assertFalse(foreign.contains("com.example.unknownapp"))
+        assertTrue(domestic.contains("com.tencent.mm"))
+        assertFalse(foreign.contains("org.telegram.messenger"))
+        assertFalse(domestic.contains("com.eg.android.AlipayGphone"))
+    }
+
+    @Test
+    fun classifyAppsDefaultsToEmptyBundledForeign() {
+        val (domestic, foreign) = SmartRouteRules.classifyApps(
+            country = "cn",
+            installedPackages = setOf("com.tencent.mm", "com.android.providers.downloads"),
+            proxyAppsEnabled = false,
+            individualPackages = emptySet()
+        )
+        assertEquals(setOf("com.tencent.mm"), domestic)
+        assertTrue(foreign.isEmpty())
     }
 }

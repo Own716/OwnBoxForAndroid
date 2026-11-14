@@ -225,8 +225,11 @@ class RuleSetPickerActivity : ThemedActivity() {
                     result.add(Row(item, RuleSets.source(item), Kind.URL))
                 } else if (item.startsWith("local:")) {
                     val fn = item.removePrefix("local:")
-                    val f = File(rulesDir, fn)
-                    result.add(Row(item, getString(R.string.rule_set_local_source), Kind.LOCAL, if (f.isFile) f else null))
+                    val f = RuleSetCatalog.findLocalRuleSetFile(item, this)
+                    val isDb = fn.endsWith(".db", ignoreCase = true)
+                    val kind = if (isDb) Kind.CUSTOM_DB else Kind.LOCAL
+                    val source = if (isDb) getString(R.string.rule_set_custom_db_source) else getString(R.string.rule_set_local_source)
+                    result.add(Row(item, source, kind, f))
                 }
             }
         }
@@ -252,10 +255,8 @@ class RuleSetPickerActivity : ThemedActivity() {
                     when {
                         entry.startsWith("local:") -> {
                             val fn = entry.removePrefix("local:")
-                            val f = File(File(getExternalFilesDir("rulesets") ?: filesDir, "rulesets"), fn)
-                            val extF = File(getExternalFilesDir(null) ?: filesDir, fn)
-                            val isDb = fn.endsWith(".db")
-                            val finalFile = if (f.isFile) f else if (extF.isFile) extF else null
+                            val finalFile = RuleSetCatalog.findLocalRuleSetFile(entry, this)
+                            val isDb = fn.endsWith(".db", ignoreCase = true)
                             val kind = if (isDb) Kind.CUSTOM_DB else Kind.LOCAL
                             val source = if (isDb) getString(R.string.rule_set_custom_db_source) else getString(R.string.rule_set_local_source)
                             Row(entry, source, kind, finalFile)
@@ -492,6 +493,7 @@ class RuleSetPickerActivity : ThemedActivity() {
                             selected.remove(targetFile.name)
                             val set = DataStore.customRuleSets.toMutableSet()
                             set.remove(targetFile.name)
+                            set.remove(row.entry)
                             DataStore.customRuleSets = set
                             updateSubtitle()
                             rebuild()
@@ -533,10 +535,11 @@ class RuleSetPickerActivity : ThemedActivity() {
 
             val externalDir = io.nekohasekai.sagernet.SagerNet.application.getExternalFilesDir(null) ?: io.nekohasekai.sagernet.SagerNet.application.filesDir
             val srsDir = File(externalDir, "srs")
-            val cacheTag = RuleSets.tagFor(row.entry)
-            val cachedFile = File(srsDir, "$cacheTag.srs")
-            val altCachedFile = File(srsDir, "${cacheTag.replace(':', '_')}.srs")
-            val effectiveCache = if (cachedFile.isFile && cachedFile.length() > 0) cachedFile else if (altCachedFile.isFile && altCachedFile.length() > 0) altCachedFile else null
+            val effectiveCache = if (row.kind == Kind.KNOWN || row.kind == Kind.URL) {
+                RuleSets.findCachedSrsFile(srsDir, row.entry)
+            } else {
+                null
+            }
             val cacheSizeStr = if (effectiveCache != null) " · " + android.text.format.Formatter.formatFileSize(this@RuleSetPickerActivity, effectiveCache.length()) else ""
 
             binding.source.text = when (row.kind) {

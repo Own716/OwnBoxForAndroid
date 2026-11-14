@@ -70,6 +70,15 @@ object RouteRuleEditor {
         if (p.any { it.isNotEmpty() && !port(it) }) return false
         return (p[0].toIntOrNull() ?: 0) <= (p[1].toIntOrNull() ?: 65535)
     }
+    fun isValidLocalRuleSet(entry: String): Boolean {
+        val trimmed = entry.trim()
+        if (!trimmed.startsWith("local:")) return false
+        val target = trimmed.removePrefix("local:").trim()
+        if (target.isEmpty() || target == "." || target == "..") return false
+        if ('\u0000' in target) return false
+        return target.split('/', '\\').none { it == ".." }
+    }
+
     enum class Error { VALUE, JSON, UNSUPPORTED, EMPTY, ACTION_OPTIONS }
     data class Problem(val field: String, val error: Error)
     fun problems(rule: RuleEntity): List<Problem> {
@@ -91,6 +100,7 @@ object RouteRuleEditor {
         check("rule_set", rule.ruleset.listByLineOrComma()) { entry ->
             val trimmed = entry.trim()
             when {
+                isValidLocalRuleSet(trimmed) -> true
                 catalog.urlOf(trimmed) != null -> true
                 RuleSets.isUrl(trimmed) -> {
                     val cleaned = RuleSets.cleanUrl(trimmed)
@@ -110,12 +120,19 @@ object RouteRuleEditor {
         val knownSets = (rule.domains.listByLineOrComma() + rule.ip.listByLineOrComma())
             .filter { it.startsWith("geosite:") || it.startsWith("geosite-") || it.startsWith("geoip:") || it.startsWith("geoip-") }.toMutableSet()
         rule.ruleset.listByLineOrComma().forEach {
-            val url = RuleSets.cleanUrl(it)
-            knownSets += it.trim()
-            knownSets += RuleSets.tagFor(it)
-            knownSets += "ruleset-${kotlin.math.abs(url.hashCode())}"
+            val trimmed = it.trim()
+            val url = RuleSets.cleanUrl(trimmed)
+            knownSets += trimmed
+            knownSets += RuleSets.tagFor(trimmed)
+            if (trimmed.startsWith("local:")) {
+                knownSets += RuleSetCatalog.localRuleSetTag(trimmed)
+            } else {
+                knownSets += "ruleset-${kotlin.math.abs(url.hashCode())}"
+            }
         }
-        check("rule_set", values(obj, "rule_set")) { it in knownSets || catalog.urlOf(it) != null || RuleSets.isUrl(it) }
+        check("rule_set", values(obj, "rule_set")) {
+            it in knownSets || catalog.urlOf(it) != null || RuleSets.isUrl(it) || isValidLocalRuleSet(it)
+        }
         val act = action(rule.config, rule.outbound)
         if (act !in actions && obj.has("action")) out += Problem("action", Error.UNSUPPORTED)
         if (act == "reject" && (obj.optString("method") !in setOf("", "default", "drop", "reply") ||

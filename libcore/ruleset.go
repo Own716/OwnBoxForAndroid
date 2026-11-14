@@ -12,6 +12,10 @@ package libcore
 // 生成的 .srs 缓存于 <externalAssets>/srs/，db 更新后自动重建。
 
 import (
+	"bufio"
+	"bytes"
+	"compress/zlib"
+	"encoding/binary"
 	"fmt"
 	"log"
 	"os"
@@ -89,6 +93,33 @@ func prepareLocalGeoRuleSets(ruleSets []option.RuleSet) error {
 	return nil
 }
 
+// isPopulatedSRSFile 判断缓存规则集是否为有效非空文件（排除启动兜底生成的 0 规则空 SRS 占位）。
+func isPopulatedSRSFile(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() || info.Size() == 0 {
+		return false
+	}
+	// 正常包含规则的 .srs/.json 文件远超 128 字节，直接放行避免启动遍历读盘
+	if info.Size() > 128 {
+		return true
+	}
+	data, err := os.ReadFile(path)
+	if err != nil || len(data) == 0 {
+		return false
+	}
+	if len(data) < 4 || !bytes.Equal(data[:3], srs.MagicBytes[:]) {
+		// 非二进制 SRS（例如极简 JSON 规则源）只需非空
+		return len(data) > 2
+	}
+	zr, err := zlib.NewReader(bytes.NewReader(data[4:]))
+	if err != nil {
+		return false
+	}
+	defer zr.Close()
+	ruleCount, err := binary.ReadUvarint(bufio.NewReader(zr))
+	return err == nil && ruleCount > 0
+}
+
 // prepareRemoteRuleSets 预处理远端 rule-set，配置本地 initial_path 兜底文件。
 // 当首次启动或无缓存时，生成空 SRS 占位，避免 sing-box 在 box.Start 同步下载超时（context deadline exceeded），
 // 确保核心在几毫秒内秒启并畅通 VPN，随后由内置 RuleSetUpdater 在后台异步平滑拉取并更新规则。
@@ -114,25 +145,27 @@ func prepareRemoteRuleSets(ruleSets []option.RuleSet) error {
 		safeTag := strings.NewReplacer(":", "_", "/", "_", "\\", "_", "?", "_", "&", "_", "=", "_").Replace(tag)
 		dstPath := filepath.Join(dir, safeTag+".srs")
 
-		// 兼顾 Kotlin 端 tagFor 标准命名（如 geoip-cn.srs 与 geoip_cn.srs 互通），优先复用真实缓存
+		// 兼顾 Kotlin 端 tagFor 标准命名（如 geoip-cn.srs 与 geoip_cn.srs 互通），优先复用真实已填充缓存
 		altTag := strings.NewReplacer(":", "-", "/", "-", "\\", "-", "?", "-", "&", "-", "=", "-").Replace(tag)
 		altPath := filepath.Join(dir, altTag+".srs")
 
-		if altInfo, err := os.Stat(altPath); err == nil && altInfo.Size() > 0 {
+		if isPopulatedSRSFile(altPath) {
 			rs.RemoteOptions.InitialPath = altPath
 			continue
 		}
-		if dstInfo, err := os.Stat(dstPath); err == nil && dstInfo.Size() > 0 {
+		if isPopulatedSRSFile(dstPath) {
 			rs.RemoteOptions.InitialPath = dstPath
 			continue
 		}
 
-		// 两者均无真实缓存时，创建占位文件避免启动阻塞
+		// 两者均无真实缓存时，保留或创建占位文件避免启动阻塞
 		effectivePath := altPath
-		file, createErr := os.Create(effectivePath)
-		if createErr == nil {
-			_ = srs.Write(file, option.PlainRuleSet{}, C.RuleSetVersionCurrent)
-			_ = file.Close()
+		if _, statErr := os.Stat(effectivePath); statErr != nil {
+			file, createErr := os.Create(effectivePath)
+			if createErr == nil {
+				_ = srs.Write(file, option.PlainRuleSet{}, C.RuleSetVersionCurrent)
+				_ = file.Close()
+			}
 		}
 		rs.RemoteOptions.InitialPath = effectivePath
 	}

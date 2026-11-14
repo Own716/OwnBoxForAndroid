@@ -1,5 +1,16 @@
 # OwnBox for Android 更新日志 (Changelog)
 
+# OwnBox for Android v26.11.8.8 预览版
+
+### 【智能分流重构（域名 / IP / DNS 优先）】
+1. **升级智能分流分类策略**：默认不再加载冗长的预置包名表 `proxy_packagename.txt`（`classifyApps` 的 `bundledForeign` 默认为空），仅强绑定高置信度国内外核心应用与前缀，普通第三方应用交由底层 `geosite` / `geoip` 与 DNS 规则自动进行国内外分流（类似 FlClash 模式）。
+2. **扩大底层系统组件排除范围**：在 `SYSTEM_EXCLUDED_PACKAGES` 中新增排除系统下载器（`com.android.providers.downloads`、`com.android.providers.downloads.ui`）、媒体存储、网络栈及 Captive Portal 门户组件，避免系统下载或网络认证页被应用层规则错分流。
+3. **优化分类匹配优先级与后台服务兼容性**：按 `CORE_FOREIGN_PACKAGES` → `explicitDomestic` → `FOREIGN_PACKAGE_PREFIXES` → `domesticPrefixes` → `bundledForeign` 顺序匹配，避免国内同前缀应用被外网包名表误伤；修复 `:bg` 后台进程通过 `PackageCache.installedApps` 安全获取已安装应用列表，并在非 Android 测试环境安全守卫 `SagerNet.application`。
+
+### 【稳定性修复与规则集增强】
+1. **增强 URLTest 自动测速组并发保护与故障转移**：为测速选路状态补充读写锁保护（`selectAccess`），在上下文未取消时按延迟由低到高尝试备用候选节点（`failoverCandidates`），并引入失败阈值防抖切换与探测冷却期，避免偶发拨号失败打断全部现有连接。
+2. **修复 RuleSet 空缓存误判并完善 `local:` 本地规则集支持**：前后端同步校验 `.srs` 文件实际规则条数（`isPopulatedSRSFile` / `isPopulatedSrsCache`），防止 0 规则占位文件被当作有效缓存；兼容连字符与旧下划线命名缓存，完善 `local:` 规则校验与多目录解析，并在远程规则集定时刷新时跳过 `local:` 条目。
+
 # OwnBox for Android v26.11.8.7 预览版
 
 ### 【稳定性修复与性能优化】

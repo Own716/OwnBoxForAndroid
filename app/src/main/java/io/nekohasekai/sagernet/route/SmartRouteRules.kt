@@ -59,6 +59,15 @@ object SmartRouteRules {
         "com.android.systemui",
         "com.android.settings",
         "com.android.providers.telephony",
+        "com.android.providers.downloads",
+        "com.android.providers.downloads.ui",
+        "com.android.providers.media",
+        "com.android.providers.media.module",
+        "com.android.captiveportallogin",
+        "com.android.networkstack",
+        "com.google.android.networkstack",
+        "com.android.externalstorage",
+        "com.android.shell",
         "com.android.phone",
         "com.android.nfc",
         "com.android.bluetooth",
@@ -378,6 +387,7 @@ object SmartRouteRules {
         else -> listOf(country)
     }
 
+    @Suppress("unused")
     private fun loadBundledForeignPackages(): Set<String> {
         return runCatching {
             SagerNet.application.assets.open("proxy_packagename.txt")
@@ -390,17 +400,33 @@ object SmartRouteRules {
         }.getOrDefault(emptySet())
     }
 
+    private fun loadInstalledPackageNames(): Set<String> {
+        runCatching { SagerNet.application }.getOrNull() ?: return emptySet()
+        return runCatching {
+            var pkgs = runCatching { PackageCache.installedPackages }.getOrNull()
+            var apps = runCatching { PackageCache.installedApps }.getOrNull()
+            if (pkgs.isNullOrEmpty() && apps.isNullOrEmpty()) {
+                runCatching { PackageCache.awaitLoadSync() }
+                pkgs = runCatching { PackageCache.installedPackages }.getOrNull()
+                apps = runCatching { PackageCache.installedApps }.getOrNull()
+            }
+            when {
+                !pkgs.isNullOrEmpty() -> pkgs.keys.toSet()
+                !apps.isNullOrEmpty() -> apps.keys.toSet()
+                else -> emptySet()
+            }
+        }.getOrDefault(emptySet())
+    }
+
     /**
-     * 对本机已安装应用（或预置集合）进行国内/国外智能分类。
-     * 返回 Pair(domesticPackages, foreignPackages)，浏览器与系统核心被排除在外以走下层域名/IP 分流。
+     * 对本机已安装应用（或预置集合）进行国内/国外智能分类（FlClash 域名/IP/DNS 优先模式）。
+     * 默认不加载预置长包名表 `proxy_packagename.txt`，仅强绑定高置信度国内外应用与前缀，
+     * 浏览器、系统下载/媒体/网络组件及普通未命中应用均不绑定应用包名，交由下层域名与 IP 分流。
      */
     fun classifyApps(
         country: String,
-        installedPackages: Set<String> = runCatching {
-            if (PackageCache.installedPackages.isEmpty()) PackageCache.awaitLoadSync()
-            PackageCache.installedPackages.keys.toSet()
-        }.getOrDefault(emptySet()),
-        bundledForeign: Set<String> = loadBundledForeignPackages(),
+        installedPackages: Set<String> = loadInstalledPackageNames(),
+        bundledForeign: Set<String> = emptySet(),
         proxyAppsEnabled: Boolean = runCatching { DataStore.proxyApps }.getOrDefault(false),
         bypassMode: Boolean = runCatching { DataStore.bypass }.getOrDefault(true),
         individualPackages: Set<String> = runCatching {
@@ -415,10 +441,6 @@ object SmartRouteRules {
         val explicitDomestic = domesticExplicitPackages(normCountry)
         val domesticPrefixes = domesticPackagePrefixes(normCountry)
 
-        val foreignCandidatePool = LinkedHashSet<String>()
-        foreignCandidatePool.addAll(CORE_FOREIGN_PACKAGES)
-        foreignCandidatePool.addAll(bundledForeign)
-
         val resolvedForeign = LinkedHashSet<String>()
         val resolvedDomestic = LinkedHashSet<String>()
 
@@ -426,20 +448,12 @@ object SmartRouteRules {
             for (pkg in installedPackages) {
                 if (pkg in SYSTEM_EXCLUDED_PACKAGES || pkg in BROWSER_AND_HYBRID_PACKAGES) continue
 
-                val isExplicitForeign = pkg in CORE_FOREIGN_PACKAGES ||
-                    (pkg in foreignCandidatePool && pkg !in explicitDomestic)
-                val isPrefixForeign = FOREIGN_PACKAGE_PREFIXES.any { pkg.startsWith(it) } &&
-                    pkg !in explicitDomestic
-
-                if (isExplicitForeign || isPrefixForeign) {
-                    resolvedForeign.add(pkg)
-                    continue
-                }
-
-                val isExplicitDom = pkg in explicitDomestic
-                val isPrefixDom = domesticPrefixes.any { pkg.startsWith(it) }
-                if (isExplicitDom || isPrefixDom) {
-                    resolvedDomestic.add(pkg)
+                when {
+                    pkg in CORE_FOREIGN_PACKAGES -> resolvedForeign.add(pkg)
+                    pkg in explicitDomestic -> resolvedDomestic.add(pkg)
+                    FOREIGN_PACKAGE_PREFIXES.any { pkg.startsWith(it) } -> resolvedForeign.add(pkg)
+                    domesticPrefixes.any { pkg.startsWith(it) } -> resolvedDomestic.add(pkg)
+                    pkg in bundledForeign -> resolvedForeign.add(pkg)
                 }
             }
         }

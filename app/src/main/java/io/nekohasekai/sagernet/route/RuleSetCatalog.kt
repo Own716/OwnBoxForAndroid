@@ -1,5 +1,6 @@
 package io.nekohasekai.sagernet.route
 
+import android.content.Context
 import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.SagerDatabase
@@ -113,6 +114,44 @@ class RuleSetCatalog(entries: List<Pair<String, String>>) {
             }
         }
 
+        fun localRuleSetTag(pathOrName: String): String {
+            val clean = pathOrName.trim().removePrefix("local:").trim()
+            val file = File(clean)
+            val base = file.nameWithoutExtension.ifEmpty { file.name }
+            return "local-" + base.replace(Regex("[^a-zA-Z0-9_-]"), "_")
+        }
+
+        fun localRuleSetDirs(context: Context = SagerNet.application): List<File> {
+            val raw = listOf(
+                File(context.getExternalFilesDir("rulesets") ?: context.filesDir, "rulesets"),
+                context.getExternalFilesDir(null) ?: context.filesDir,
+                context.filesDir
+            )
+            return raw.distinctBy { runCatching { it.canonicalPath }.getOrElse { _ -> it.absolutePath } }
+        }
+
+        fun findLocalRuleSetFile(pathOrName: String, candidateDirs: List<File>): File? {
+            val clean = pathOrName.trim().removePrefix("local:").trim()
+            if (clean.isEmpty()) return null
+            val direct = File(clean)
+            if (direct.isAbsolute) return direct.takeIf { it.isFile }
+            return candidateDirs.map { File(it, clean) }.firstOrNull { it.isFile }
+        }
+
+        fun findLocalRuleSetFile(pathOrName: String, context: Context = SagerNet.application): File? =
+            findLocalRuleSetFile(pathOrName, localRuleSetDirs(context))
+
+        fun resolveLocalRuleSetFile(pathOrName: String, candidateDirs: List<File>): File {
+            val clean = pathOrName.trim().removePrefix("local:").trim()
+            findLocalRuleSetFile(clean, candidateDirs)?.let { return it }
+            val direct = File(clean)
+            if (direct.isAbsolute || candidateDirs.isEmpty()) return direct
+            return File(candidateDirs.first(), clean)
+        }
+
+        fun resolveLocalRuleSetFile(pathOrName: String, context: Context = SagerNet.application): File =
+            resolveLocalRuleSetFile(pathOrName, localRuleSetDirs(context))
+
         /**
          * Resolves any rule-set entry (catalog name like `geoip-ad` / `geosite-cn` / `geosite:cn`,
          * direct `.srs` URL, or legacy `rsip:` / `rssite:` URL) to `(url, isIPRuleset, tag)`.
@@ -120,20 +159,15 @@ class RuleSetCatalog(entries: List<Pair<String, String>>) {
         fun resolveEntry(origEntry: String): Triple<String, Boolean, String> {
             val trimmed = origEntry.trim()
             if (trimmed.startsWith("local:")) {
-                val pathOrName = trimmed.removePrefix("local:")
-                val rulesDir = File(SagerNet.application.getExternalFilesDir("rulesets") ?: SagerNet.application.filesDir, "rulesets")
-                val file = if (File(pathOrName).isAbsolute) File(pathOrName) else File(rulesDir, pathOrName)
+                val pathOrName = trimmed.removePrefix("local:").trim()
+                val file = resolveLocalRuleSetFile(pathOrName)
                 val isIp = pathOrName.contains("geoip", ignoreCase = true) || pathOrName.contains("ip", ignoreCase = true)
-                val safeTag = "local-" + file.nameWithoutExtension.replace(Regex("[^a-zA-Z0-9_-]"), "_")
-                return Triple(file.absolutePath, isIp, safeTag)
+                return Triple(file.absolutePath, isIp, localRuleSetTag(pathOrName))
             }
-            val rulesDir = File(SagerNet.application.getExternalFilesDir("rulesets") ?: SagerNet.application.filesDir, "rulesets")
-            val candidateFile = File(rulesDir, trimmed)
-            if (candidateFile.isFile || (File(trimmed).isAbsolute && File(trimmed).isFile)) {
-                val file = if (candidateFile.isFile) candidateFile else File(trimmed)
-                val isIp = file.name.contains("geoip", ignoreCase = true) || file.name.contains("ip", ignoreCase = true)
-                val safeTag = "local-" + file.nameWithoutExtension.replace(Regex("[^a-zA-Z0-9_-]"), "_")
-                return Triple(file.absolutePath, isIp, safeTag)
+            val candidateFile = findLocalRuleSetFile(trimmed)
+            if (candidateFile != null) {
+                val isIp = candidateFile.name.contains("geoip", ignoreCase = true) || candidateFile.name.contains("ip", ignoreCase = true)
+                return Triple(candidateFile.absolutePath, isIp, localRuleSetTag(candidateFile.name))
             }
             val catalog = current()
             catalog.urlOf(trimmed)?.let { url ->
@@ -220,7 +254,12 @@ class RuleSetCatalog(entries: List<Pair<String, String>>) {
             val rules = SagerDatabase.rulesDao.allRules()
             val entries = LinkedHashSet<String>()
             for (rule in rules) {
-                rule.ruleset.listByLineOrComma().forEach { if (it.isNotBlank()) entries.add(it.trim()) }
+                rule.ruleset.listByLineOrComma().forEach { raw ->
+                    val t = raw.trim()
+                    if (t.isNotEmpty() && !t.startsWith("local:") && findLocalRuleSetFile(t) == null) {
+                        entries.add(t)
+                    }
+                }
                 rule.domains.listByLineOrComma()
                     .filter { it.startsWith("geosite:") || it.startsWith("geosite-") }
                     .forEach { entries.add(it.trim()) }

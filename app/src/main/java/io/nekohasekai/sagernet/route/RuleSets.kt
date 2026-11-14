@@ -3,7 +3,11 @@ package io.nekohasekai.sagernet.route
 import android.content.Context
 import android.net.Uri
 import io.nekohasekai.sagernet.R
+import java.io.ByteArrayInputStream
+import java.io.File
+import java.io.InputStream
 import java.util.zip.CRC32
+import java.util.zip.InflaterInputStream
 
 object RuleSets {
     const val ADBLOCK_TAG = "throne-adblocksingbox"
@@ -59,6 +63,64 @@ object RuleSets {
             .replace(".json", "-json", ignoreCase = true)
         val base = rawBase.replace(Regex("[^a-zA-Z0-9_-]"), "_")
         return "$base-" + java.lang.Long.toHexString(crc).padStart(8, '0')
+    }
+
+    /**
+     * Checks whether a cached `.srs` / rule-set file actually contains rules, rejecting the empty
+     * `PlainRuleSet{}` placeholder created by Go `prepareRemoteRuleSets` to avoid blocking VPN start.
+     */
+    fun isPopulatedSrsCache(file: File): Boolean {
+        if (!file.isFile) return false
+        val len = file.length()
+        if (len <= 0L) return false
+        if (len > 128L) return true
+        return runCatching {
+            val bytes = file.readBytes()
+            if (bytes.size >= 4 &&
+                bytes[0] == 0x53.toByte() &&
+                bytes[1] == 0x52.toByte() &&
+                bytes[2] == 0x53.toByte()
+            ) {
+                InflaterInputStream(ByteArrayInputStream(bytes, 4, bytes.size - 4)).use { inflater ->
+                    readUnsignedVarint(inflater) > 0L
+                }
+            } else {
+                bytes.size > 2
+            }
+        }.getOrDefault(false)
+    }
+
+    private fun readUnsignedVarint(input: InputStream): Long {
+        var value = 0L
+        var shift = 0
+        while (shift < 64) {
+            val b = input.read()
+            if (b < 0) return 0L
+            value = value or ((b and 0x7F).toLong() shl shift)
+            if ((b and 0x80) == 0) return value
+            shift += 7
+        }
+        return 0L
+    }
+
+    /** Looks up the first populated `.srs` cache file matching any supported tag filename variant. */
+    fun findCachedSrsFile(srsDir: File, entry: String): File? {
+        val tag = tagFor(entry)
+        val candidates = LinkedHashSet<String>()
+        candidates.add("$tag.srs")
+        candidates.add("${tag.replace(':', '_')}.srs")
+        if (entry.contains(':') || tag.startsWith("geoip-") || tag.startsWith("geosite-")) {
+            candidates.add("${tag.replaceFirst('-', '_')}.srs")
+        }
+        val rawSafe = entry.trim().replace(Regex("[:/\\\\?&=]"), "_")
+        if (rawSafe.isNotEmpty()) {
+            candidates.add("$rawSafe.srs")
+        }
+        for (name in candidates) {
+            val candidate = File(srsDir, name)
+            if (isPopulatedSrsCache(candidate)) return candidate
+        }
+        return null
     }
 
     /** A rule-set name as is; an .srs URL as its file name. */
