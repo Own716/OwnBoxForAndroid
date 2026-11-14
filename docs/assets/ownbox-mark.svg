@@ -1,9 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
-  <title id="title">OwnBox for Android Logo</title>
-  <desc id="desc">Official OwnBox four-bar rounded pill logo on a crisp white squircle.</desc>
-  <rect x="24" y="24" width="464" height="464" rx="116" fill="#FFFFFF" stroke="#DCE6F2" stroke-width="6"/>
-  <rect x="147" y="125" width="44" height="262" rx="22" fill="#293156"/>
-  <rect x="205" y="191" width="44" height="196" rx="22" fill="#4A8DC2"/>
-  <rect x="263" y="125" width="44" height="262" rx="22" fill="#293156"/>
-  <rect x="321" y="258" width="44" height="129" rx="22" fill="#B8E7F1"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="346" height="420" viewBox="0 0 346 420" role="img" aria-labelledby="title desc">
+  <title id="title">OwnBox app logo</title>
+  <desc id="desc">Four rounded vertical bars: navy, blue, navy and light cyan.</desc>
+  <rect x="0" y="0" width="68" height="420" rx="34" fill="#293256"/>
+  <rect x="93" y="108" width="68" height="312" rx="34" fill="#4B8CC2"/>
+  <rect x="186" y="0" width="68" height="420" rx="34" fill="#293256"/>
+  <rect x="278" y="213" width="68" height="207" rx="34" fill="#B8E7F1"/>
 </svg>

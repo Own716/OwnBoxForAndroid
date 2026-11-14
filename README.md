@@ -96,49 +96,36 @@ OwnBox 是客户端软件，**不内置或销售第三方代理订阅，也不�
 
 <table>
   <tr>
-    <td width="50%" valign="top" align="center">
-      <img src="docs/assets/speed.svg" width="64" alt="Speed testing" /><br />
+    <td width="50%" valign="top">
       <strong>连接与速度测试</strong><br />
       <sub>节点延迟检测、分组 URL 测试与带宽测试入口，帮助观察连接表现。</sub>
     </td>
-    <td width="50%" valign="top" align="center">
-      <img src="docs/assets/diagnostics.svg" width="64" alt="Network diagnostics" /><br />
+    <td width="50%" valign="top">
       <strong>网络诊断中心</strong><br />
       <sub>按类别检查常见 AI、流媒体、社交及开发服务的网络连通状态，并支持单项或批量重测。</sub>
     </td>
   </tr>
   <tr>
-    <td width="50%" valign="top" align="center">
-      <img src="docs/assets/routing.svg" width="64" alt="Routing" /><br />
+    <td width="50%" valign="top">
       <strong>智能分流与路由</strong><br />
       <sub>支持应用、域名与 IP 维度的分流配置，提供规则编辑、远程规则集与分应用代理入口。</sub>
     </td>
-    <td width="50%" valign="top" align="center">
-      <img src="docs/assets/backup.svg" width="64" alt="Backup" /><br />
+    <td width="50%" valign="top">
       <strong>配置备份与恢复</strong><br />
       <sub>支持配置导入导出，并提供 WebDAV 备份与恢复能力，便于迁移和保存配置。</sub>
     </td>
   </tr>
   <tr>
-    <td width="50%" valign="top" align="center">
-      <img src="docs/assets/theme.svg" width="64" alt="Themes" /><br />
+    <td width="50%" valign="top">
       <strong>主题与界面定制</strong><br />
       <sub>提供深浅色及多种主题外观，并包含桌面小组件、快捷设置磁贴等系统入口。</sub>
     </td>
-    <td width="50%" valign="top" align="center">
-      <img src="docs/assets/strategy.svg" width="64" alt="Strategy groups" /><br />
+    <td width="50%" valign="top">
       <strong>策略组与连接管理</strong><br />
       <sub>支持多种自动选路策略，并可查看成员状态、检查结果及按需手动锁定节点。</sub>
     </td>
   </tr>
 </table>
-
-### 策略与诊断补充
-
-- **策略组：** 当前代码更新日志涉及最低延迟、轮询、随机、最低负载、一致性哈希、故障转移和最稳定等策略；实际可用选项以安装版本为准。
-- **路由资产：** 支持编辑路由条件，并管理远程规则集及本地规则集；规则命中结果会受规则内容、DNS 行为和所选模式影响。
-- **服务诊断：** 检测结果反映当前设备和网络环境下的测试情况，不代表账号状态、内容解锁、播放能力或服务商可用性保证。
-- **系统集成：** 提供 VPN 连接授权、桌面小组件和快捷设置入口；具体呈现会受到 Android 版本及厂商系统实现影响。
 
 ## 下载与安装
 
@@ -163,19 +150,11 @@ OwnBox 是客户端软件，**不内置或销售第三方代理订阅，也不�
 
 > **版本说明（截至 2026-11-15）：** GitHub 最新正式 Release 为 `v26.11.8`；仓库 `main` 分支源码元数据已进入 `26.11.8.12-preview` 预览迭代，内核配置为 `sing-box v1.15.0-alpha.13`。开发分支版本不等同于正式发布版本。普通用户建议以 Releases 页面标记的正式版本为准。
 
-## 使用说明与问题反馈
-
-### 基本使用
-
-- **导入配置：** 在应用中导入本地配置文件、订阅，或使用系统支持的分享/链接导入方式。不同订阅服务输出格式可能存在差异。
-- **选择节点：** 更新订阅后，在配置列表中选择需要使用的节点；可按需使用策略组进行自动选路。
-- **配置分流：** 根据自己的使用场景设置代理模式、分应用代理及路由规则。修改规则前建议先备份现有配置。
-- **检查连接：** 连接失败时，先查看节点测试结果，再通过网络诊断排查具体服务的连通情况。
-- **备份配置：** 在备份功能中导出本地文件，或按应用界面配置 WebDAV 备份信息。请妥善保管备份文件及 WebDAV 凭据。
+## 使用与问题反馈
 
 ### 提交问题前建议准备
 
-请通过 [GitHub Issues](https://github.com/Own716/OwnBoxForAndroid/issues) 提交可复现的问题，并尽量提供：
+如遇到可复现的异常或功能问题，请通过 [GitHub Issues](https://github.com/Own716/OwnBoxForAndroid/issues) 提交。建议尽量附上以下信息，便于定位问题：
 
 - OwnBox 版本号，以及安装包来源（正式版 / 预览版）。
 - Android 版本、设备型号与 CPU 架构。
@@ -184,7 +163,7 @@ OwnBox 是客户端软件，**不内置或销售第三方代理订阅，也不�
 
 **请勿在公开 Issue 或群聊中粘贴完整订阅链接、节点密码、UUID、访问令牌、私钥、账号密码、WebDAV 凭据或其他敏感信息。**
 
-社区交流：[Telegram @OwnBoxs](https://t.me/OwnBoxs)
+问题反馈：[GitHub Issues](https://github.com/Own716/OwnBoxForAndroid/issues) · 社区交流：[Telegram @OwnBoxs](https://t.me/OwnBoxs)
 
 ## 安全与免责声明
 
