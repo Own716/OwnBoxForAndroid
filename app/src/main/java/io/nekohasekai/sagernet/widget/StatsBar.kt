@@ -77,6 +77,7 @@ class StatsBar @JvmOverloads constructor(
     private var currentState = BaseService.State.Idle
     private var pendingTransition: Transition? = Transition.HideImmediate
     private var isAnimatingVisibility = false
+    private var pendingDisconnectedReset = false
 
     private var scrollHidden = false
     private var scrollDirection = 0 // 1 = hide (dy>0), -1 = show (dy<0), 0 = none
@@ -151,10 +152,6 @@ class StatsBar @JvmOverloads constructor(
             return
         }
         if (isAnimatingVisibility) {
-            // Re-sync immediately if height changed while animating into the hidden state
-            if (changed && (!shouldShow() || scrollHidden)) {
-                syncHiddenPosition()
-            }
             return
         }
         if (!shouldShow() || scrollHidden) {
@@ -427,16 +424,14 @@ class StatsBar @JvmOverloads constructor(
         resetScrollDriverState()
         isClickable = true
         alpha = 1f
-        animate().setListener(null).withEndAction(null).cancel()
         getBehavior().slideUp(this)
+        animate().setListener(null).withEndAction(null).cancel()
         if (!animated || !isLaidOut || height <= 0) {
             isAnimatingVisibility = false
-            animate().setListener(null).withEndAction(null).cancel()
             translationY = 0f
             return
         }
         isAnimatingVisibility = true
-        animate().setListener(null).withEndAction(null).cancel()
         animate()
             .translationY(0f)
             .setDuration(SHOW_ANIM_DURATION_MS)
@@ -458,14 +453,11 @@ class StatsBar @JvmOverloads constructor(
         resetScrollDriverState()
         isClickable = false
         animate().setListener(null).withEndAction(null).cancel()
-        getBehavior().slideDown(this)
         if (!animated || !isLaidOut || height <= 0) {
-            isAnimatingVisibility = false
             syncHiddenPosition()
             return
         }
         isAnimatingVisibility = true
-        animate().setListener(null).withEndAction(null).cancel()
         val targetY = hiddenOffset()
         animate()
             .translationY(targetY)
@@ -485,9 +477,10 @@ class StatsBar @JvmOverloads constructor(
         isAnimatingVisibility = false
         getBehavior().slideDown(this)
         animate().setListener(null).withEndAction(null).cancel()
-        translationY = hiddenOffset()
         alpha = 0f
         isClickable = false
+        resetDisconnectedViews()
+        translationY = hiddenOffset()
     }
 
     private fun cancelPendingTransition() {
@@ -588,11 +581,22 @@ class StatsBar @JvmOverloads constructor(
         }
     }
 
+    private fun resetDisconnectedViews() {
+        if (!pendingDisconnectedReset) return
+        pendingDisconnectedReset = false
+        if (currentState != BaseService.State.Connected && !DataStore.serviceState.connected) {
+            btnIpDetail?.visibility = View.GONE
+            updateSpeed(0, 0)
+            updateStatusViews()
+        }
+    }
+
     fun changeState(state: BaseService.State) {
         runOnUi {
             currentState = state
             updateHideOnScroll()
             if (state == BaseService.State.Connected) {
+                pendingDisconnectedReset = false
                 btnIpDetail?.visibility = if (DataStore.showLandingIp) View.VISIBLE else View.GONE
                 updateStatusViews()
                 if (DataStore.showLandingIp) {
@@ -600,11 +604,14 @@ class StatsBar @JvmOverloads constructor(
                 }
                 testConnection(silent = true)
             } else {
-                btnIpDetail?.visibility = View.GONE
                 resetLatencyState()
                 LandingIpManager.clearCache()
-                updateSpeed(0, 0)
-                updateStatusViews()
+                pendingDisconnectedReset = true
+                val isVisiblyOnScreen =
+                    isLaidOut && alpha > 0f && translationY < hiddenOffset() - 1f
+                if (!isVisiblyOnScreen && !isAnimatingVisibility) {
+                    resetDisconnectedViews()
+                }
             }
         }
     }
