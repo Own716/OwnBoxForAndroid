@@ -742,9 +742,17 @@ internal class ChainGraphContext(
 
                 _hack_config_map["tag"] = tagOut
                 _hack_config_map["tcp_multi_path"] = false
-                // 不再强制注入 tcp_fast_open=true：sing-box 中开启 TFO 会关闭 Happy Eyeballs 并行竞速（parallel=false），
-                // 且 DialSlowContext 会在真正建连前返回 nil，导致 prefer_ipv6 节点在纯 IPv4/断 v6 网络下死锁且无法触发 AutoSelect 故障切换。
-                _hack_config_map.remove("tcp_fast_open")
+                val supportsTFO = when (bean) {
+                    is ShadowsocksBean, is ShadowsocksRBean, is SOCKSBean -> true
+                    is ShadowTLSBean -> false
+                    is StandardV2RayBean -> bean.type != "quic" && bean.type != "splithttp" && bean.type != "xhttp"
+                    else -> false
+                }
+                if (supportsTFO) {
+                    _hack_config_map["tcp_fast_open"] = true
+                } else {
+                    _hack_config_map.remove("tcp_fast_open")
+                }
 
                 _hack_custom_config = bean.customOutboundJson
             }
@@ -1970,14 +1978,7 @@ fun buildConfig(
         } else if (ipv6Mode == IPv6Mode.ONLY) {
             dns.strategy = "ipv6_only"
         } else if (ipv6Mode == IPv6Mode.PREFER) {
-            // 代理流量默认采用 prefer_ipv4（若用户显式覆盖远程 DNS 策略则遵循用户配置），
-            // 避免纯 IPv4 落地节点在非 FakeDNS/mixed 场景下因前端抢先锁定 IPv6 而黑洞；
-            // 直连流量仍由 dns-direct 与 TAG_DIRECT 各自的 prefer_ipv6 策略提供 IPv6 优先。
-            dns.strategy = if (forTest) {
-                "prefer_ipv6"
-            } else {
-                autoDnsDomainStrategy(SingBoxOptionsUtil.domainStrategy("dns-remote"), isProxied = true)
-            }
+            dns.strategy = "prefer_ipv6"
         }
 
         // dns object user rules
@@ -2074,28 +2075,14 @@ fun buildConfig(
                 "com.google.android.gsf"
             )
 
-            val fakeDnsQueryTypes = when (ipv6Mode) {
-                IPv6Mode.DISABLE -> listOf("A")
-                IPv6Mode.ONLY -> listOf("AAAA")
-                else -> listOf("A", "AAAA")
-            }
-            fun addGooglePlayDnsRule(configure: DNSRule_DefaultOptions.() -> Unit) {
-                if (useFakeDns) {
-                    dns.rules.add(DNSRule_DefaultOptions().apply {
-                        configure()
-                        inbound = listOf("tun-in")
-                        server = "dns-fake"
-                        disable_cache = true
-                        query_type = fakeDnsQueryTypes
-                    })
-                }
-                dns.rules.add(DNSRule_DefaultOptions().apply {
-                    configure()
-                    server = "dns-remote"
-                })
-            }
-            addGooglePlayDnsRule { domain = googlePlayDomains }
-            addGooglePlayDnsRule { domain_suffix = googlePlayDomainSuffixes }
+            dns.rules.add(DNSRule_DefaultOptions().apply {
+                domain = googlePlayDomains
+                server = "dns-remote"
+            })
+            dns.rules.add(DNSRule_DefaultOptions().apply {
+                domain_suffix = googlePlayDomainSuffixes
+                server = "dns-remote"
+            })
 
             // 所属国家/地区核心应用与常用域名后缀静态直连保底名单
             val domesticCoreDomainSuffixes = io.nekohasekai.sagernet.route.SmartRouteRules.domesticCoreDomainSuffixes(DataStore.smartRouteCountry)
@@ -2166,14 +2153,7 @@ fun buildConfig(
             if (DataStore.resolveDestination) {
                 topRouteRules.add(Rule_DefaultOptions().apply {
                     action = "resolve"
-                    strategy = if (ipv6Mode == IPv6Mode.PREFER) {
-                        autoDnsDomainStrategy(
-                            SingBoxOptionsUtil.domainStrategy("dns-remote"),
-                            isProxied = true
-                        ) ?: "prefer_ipv4"
-                    } else {
-                        genDomainStrategy(true)
-                    }
+                    strategy = genDomainStrategy(true)
                 })
             }
 
@@ -2279,7 +2259,11 @@ fun buildConfig(
                     inbound = listOf("tun-in")
                     server = "dns-fake"
                     disable_cache = true
-                    query_type = fakeDnsQueryTypes
+                    query_type = when (ipv6Mode) {
+                        IPv6Mode.DISABLE -> listOf("A")
+                        IPv6Mode.ONLY -> listOf("AAAA")
+                        else -> listOf("A", "AAAA")
+                    }
                 })
             }
             if (dnsHosts.isNotEmpty()) {
