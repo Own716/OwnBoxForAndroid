@@ -42,21 +42,10 @@ object ActiveOutboundTracker {
     fun getStrategyDisplayName(profile: ProxyEntity): String {
         if (profile.type == ProxyEntity.TYPE_BALANCER) {
             val bean = profile.requireBean() as? BalancerBean
-            return when (bean?.strategy) {
-                BalancerBean.STRATEGY_LEAST_PING -> "最低延迟"
-                BalancerBean.STRATEGY_LEAST_LOAD -> "最低负载"
-                BalancerBean.STRATEGY_RANDOM -> "随机"
-                BalancerBean.STRATEGY_ROUND_ROBIN, BalancerBean.STRATEGY_ROUND_ROBIN_LEGACY -> "轮询"
-                BalancerBean.STRATEGY_FAILOVER -> "故障转移"
-                BalancerBean.STRATEGY_STABLE -> "最稳定"
-                BalancerBean.STRATEGY_CONSISTENT_HASH, BalancerBean.STRATEGY_CONSISTENT_HASH_CAMEL -> "一致性哈希"
-                else -> "策略组"
+            return buildString {
+                append(if (bean?.isPriorityMode() == true) "按优先级" else "最快最稳")
+                if (bean?.balanceEnabled == true) append(" · 流量分配")
             }
-        }
-        val group = runCatching { SagerDatabase.groupDao.getById(profile.groupId) }.getOrNull()
-        if (group != null) {
-            if (runCatching { DataStore.isGroupUrlTest(group.id) }.getOrDefault(false)) return "自动测速"
-            if (runCatching { DataStore.isGroupLoadBalance(group.id) }.getOrDefault(false)) return "负载均衡"
         }
         val isGlobal = runCatching { DataStore.globalMode }.getOrDefault(false)
         val isSmart = runCatching { DataStore.smartMode }.getOrDefault(false)
@@ -91,13 +80,7 @@ object ActiveOutboundTracker {
     }
 
     fun getActiveLeafNodeDisplay(profile: ProxyEntity): String? {
-        val isBalancer = profile.type == ProxyEntity.TYPE_BALANCER
-        val group = runCatching { SagerDatabase.groupDao.getById(profile.groupId) }.getOrNull()
-        val isGroupStrategy = group != null && (
-            runCatching { DataStore.isGroupUrlTest(group.id) }.getOrDefault(false) ||
-            runCatching { DataStore.isGroupLoadBalance(group.id) }.getOrDefault(false)
-        )
-        if (!isBalancer && !isGroupStrategy) return null
+        if (profile.type != ProxyEntity.TYPE_BALANCER) return null
 
         val leafId = activeLeafProfileId.takeIf { it > 0L }
             ?: runCatching { DataStore.activeLeafProfileId }.getOrDefault(0L)
@@ -120,13 +103,7 @@ object ActiveOutboundTracker {
         profile: ProxyEntity,
         isGlobalMode: Boolean? = null
     ): String {
-        val isBalancer = profile.type == ProxyEntity.TYPE_BALANCER
-        val group = runCatching { SagerDatabase.groupDao.getById(profile.groupId) }.getOrNull()
-        val isGroupStrategy = group != null && (
-            runCatching { DataStore.isGroupUrlTest(group.id) }.getOrDefault(false) ||
-            runCatching { DataStore.isGroupLoadBalance(group.id) }.getOrDefault(false)
-        )
-        val isStrategy = isBalancer || isGroupStrategy
+        val isStrategy = profile.type == ProxyEntity.TYPE_BALANCER
 
         if (isStrategy) {
             val leafNode = getActiveLeafNodeDisplay(profile)
@@ -135,7 +112,7 @@ object ActiveOutboundTracker {
                 // 用户关闭了“显示分组”：策略组下直接以当前连上的节点名作为主标题
                 return leafNode
             }
-            val baseName = if (isBalancer) profile.displayName() else (group?.displayName() ?: profile.displayName())
+            val baseName = profile.displayName()
             if (!leafNode.isNullOrBlank()) {
                 return if (baseName.isNotBlank() && !baseName.contains(leafNode)) {
                     "$baseName · $leafNode"
@@ -167,12 +144,7 @@ object ActiveOutboundTracker {
             )
         }
 
-        val isBalancer = profile.type == ProxyEntity.TYPE_BALANCER
-        val isGroupStrategy = groupName != null && (
-            runCatching { DataStore.isGroupUrlTest(profile.groupId) }.getOrDefault(false) ||
-            runCatching { DataStore.isGroupLoadBalance(profile.groupId) }.getOrDefault(false)
-        )
-        val isStrategy = isBalancer || isGroupStrategy
+        val isStrategy = profile.type == ProxyEntity.TYPE_BALANCER
 
         val title: String
         val collapsedText: String
@@ -181,7 +153,7 @@ object ActiveOutboundTracker {
         if (isStrategy) {
             if (showGroup) {
                 // Template 1: 策略组 + 显示组名开启
-                val baseGroupName = if (isBalancer) profile.displayName() else (groupName ?: profile.displayName())
+                val baseGroupName = profile.displayName()
                 title = if (!leafNode.isNullOrBlank()) {
                     if (baseGroupName.isNotBlank() && !baseGroupName.contains(leafNode)) {
                         "$baseGroupName · $leafNode"
@@ -304,13 +276,8 @@ object ActiveOutboundTracker {
         if (!proxy.isInitialized()) return false
         val profile = proxy.profile
         val isBalancer = profile.type == ProxyEntity.TYPE_BALANCER
-        val group = runCatching { SagerDatabase.groupDao.getById(profile.groupId) }.getOrNull()
-        val isGroupStrategy = group != null && (
-            runCatching { DataStore.isGroupUrlTest(group.id) }.getOrDefault(false) ||
-            runCatching { DataStore.isGroupLoadBalance(group.id) }.getOrDefault(false)
-        )
 
-        if (!isBalancer && !isGroupStrategy) {
+        if (!isBalancer) {
             if (activeLeafProfileId != profile.id) {
                 activeLeafProfileId = profile.id
                 activeLeafProfileName = profile.displayName()
@@ -320,9 +287,7 @@ object ActiveOutboundTracker {
         }
 
         // Strategy group: resolve active member
-        val balancerMembers = runCatching { proxy.safeConfig?.balancerMemberMap?.get(profile.id) }.getOrNull()
-        val memberMap = balancerMembers
-            ?: if (isGroupStrategy) runCatching { SagerDatabase.proxyDao.getByGroup(group!!.id).map { it.id } }.getOrNull() else null
+        val memberMap = runCatching { proxy.safeConfig?.balancerMemberMap?.get(profile.id) }.getOrNull()
 
         if (memberMap.isNullOrEmpty()) {
             if (activeLeafProfileId != 0L) {
@@ -343,9 +308,6 @@ object ActiveOutboundTracker {
         if (candidateTag.isNullOrBlank()) {
             val clashMap = queryClashMap()
             candidateTag = clashMap[balancerTag]
-            if (candidateTag.isNullOrBlank() && balancerTag != "proxy" && isGroupStrategy) {
-                candidateTag = clashMap["proxy"]
-            }
         }
 
         var candidateId: Long? = null

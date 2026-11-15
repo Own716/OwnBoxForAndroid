@@ -183,16 +183,8 @@ object LiveUpdateFormatter {
         return loaded
     }
 
-    private fun isGroupStrategy(group: io.nekohasekai.sagernet.database.ProxyGroup?): Boolean {
-        if (group == null) return false
-        return runCatching { DataStore.isGroupUrlTest(group.id) }.getOrDefault(false) ||
-            runCatching { DataStore.isGroupLoadBalance(group.id) }.getOrDefault(false)
-    }
-
     fun isStrategyProfile(profile: ProxyEntity?): Boolean {
-        if (profile == null) return false
-        if (profile.type == ProxyEntity.TYPE_BALANCER) return true
-        return isGroupStrategy(resolveGroup(profile.groupId))
+        return profile?.type == ProxyEntity.TYPE_BALANCER
     }
 
     fun resolveEffectiveProfileId(profile: ProxyEntity?, fallbackProfileId: Long = 0L): Long {
@@ -238,7 +230,7 @@ object LiveUpdateFormatter {
         } else {
             null
         }
-        val isStrategy = profile != null && (profile.type == ProxyEntity.TYPE_BALANCER || isGroupStrategy(resolvedGroup))
+        val isStrategy = profile?.type == ProxyEntity.TYPE_BALANCER
         val effectiveProfileId = resolveEffectiveProfileId(profile, isStrategy = isStrategy)
 
         if (country.isEmpty() || ip.isEmpty()) {

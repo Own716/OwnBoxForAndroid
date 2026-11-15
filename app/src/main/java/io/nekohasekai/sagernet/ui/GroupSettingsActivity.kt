@@ -50,13 +50,7 @@ class GroupSettingsActivity(
         DataStore.groupType = type
         DataStore.groupOrder = order
         DataStore.groupIsSelector = isSelector
-        DataStore.groupIsUrlTest = DataStore.groupIsUrlTest(id)
-        DataStore.groupIsLoadBalance = DataStore.groupIsLoadBalance(id)
         DataStore.groupUrlTestUrl = DataStore.rawGroupUrlTestUrl(id)
-        DataStore.groupUrlTestInterval = DataStore.groupUrlTestInterval(id).toInt()
-        DataStore.groupUrlTestTolerance = DataStore.groupUrlTestTolerance(id)
-        DataStore.groupUrlTestIdleTimeout = DataStore.groupUrlTestIdleTimeout(id)
-        DataStore.groupUrlTestInterruptExist = DataStore.groupUrlTestInterruptExist(id)
 
         DataStore.frontProxy = frontProxy
         DataStore.landingProxy = landingProxy
@@ -97,13 +91,7 @@ class GroupSettingsActivity(
         type = DataStore.groupType
         order = DataStore.groupOrder
         isSelector = DataStore.groupIsSelector
-        DataStore.setGroupIsUrlTest(id, false)
-        DataStore.setGroupIsLoadBalance(id, false)
         DataStore.setGroupUrlTestUrl(id, DataStore.groupUrlTestUrl)
-        DataStore.setGroupUrlTestInterval(id, DataStore.groupUrlTestInterval.toLong())
-        DataStore.setGroupUrlTestTolerance(id, DataStore.groupUrlTestTolerance)
-        DataStore.setGroupUrlTestIdleTimeout(id, DataStore.groupUrlTestIdleTimeout)
-        DataStore.setGroupUrlTestInterruptExist(id, DataStore.groupUrlTestInterruptExist)
 
         frontProxy =
             if (DataStore.frontProxyTmp == OutboundPreference.VALUE_SELECT_PROFILE.toInt()) {

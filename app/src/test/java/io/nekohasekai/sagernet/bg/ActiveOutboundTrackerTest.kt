@@ -12,29 +12,32 @@ class ActiveOutboundTrackerTest {
 
     @Test
     fun testGetStrategyDisplayName() {
-        val balancer = ProxyEntity().apply {
+        val balancerLatency = ProxyEntity().apply {
             type = ProxyEntity.TYPE_BALANCER
             putBean(BalancerBean().apply {
-                strategy = BalancerBean.STRATEGY_LEAST_PING
+                selectionMode = BalancerBean.SELECTION_LATENCY
+                balanceEnabled = false
             })
         }
-        assertEquals("最低延迟", ActiveOutboundTracker.getStrategyDisplayName(balancer))
+        assertEquals("最快最稳", ActiveOutboundTracker.getStrategyDisplayName(balancerLatency))
 
-        val balancerLoad = ProxyEntity().apply {
+        val balancerPriority = ProxyEntity().apply {
             type = ProxyEntity.TYPE_BALANCER
             putBean(BalancerBean().apply {
-                strategy = BalancerBean.STRATEGY_LEAST_LOAD
+                selectionMode = BalancerBean.SELECTION_PRIORITY
+                balanceEnabled = false
             })
         }
-        assertEquals("最低负载", ActiveOutboundTracker.getStrategyDisplayName(balancerLoad))
+        assertEquals("按优先级", ActiveOutboundTracker.getStrategyDisplayName(balancerPriority))
 
-        val balancerRR = ProxyEntity().apply {
+        val balancerDistributed = ProxyEntity().apply {
             type = ProxyEntity.TYPE_BALANCER
             putBean(BalancerBean().apply {
-                strategy = BalancerBean.STRATEGY_ROUND_ROBIN
+                selectionMode = BalancerBean.SELECTION_LATENCY
+                balanceEnabled = true
             })
         }
-        assertEquals("轮询", ActiveOutboundTracker.getStrategyDisplayName(balancerRR))
+        assertEquals("最快最稳 · 流量分配", ActiveOutboundTracker.getStrategyDisplayName(balancerDistributed))
     }
 
     @Test

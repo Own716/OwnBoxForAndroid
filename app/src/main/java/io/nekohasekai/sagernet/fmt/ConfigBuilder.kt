@@ -441,10 +441,6 @@ fun buildConfig(
             rule.outbound.takeIf { it > 0 && it != proxy.id }
         }.toHashSet().toList()).associateBy { it.id }
     val buildSelector = !forTest && group?.isSelector == true && !forExport
-    val isGroupUrlTest = group?.let { DataStore.isGroupUrlTest(it.id) } == true
-    val isGroupLoadBalance = group?.let { DataStore.isGroupLoadBalance(it.id) } == true
-    val useAutoSelect = !forTest && !forExport && isGroupUrlTest
-    val useLoadBalance = !forTest && !forExport && isGroupLoadBalance
     val userDNSRuleList = mutableListOf<DNSRule_DefaultOptions>()
     val domainListDNSDirectForce = mutableListOf<String>()
     val bypassDNSBeans = hashSetOf<AbstractBean>()
@@ -1330,8 +1326,8 @@ fun buildConfig(
         }
 
         // build outbounds
-        if (buildSelector || useAutoSelect || useLoadBalance) {
-            val rawList = if (group != null && group.id != 0L) {
+        if (buildSelector) {
+            val list = if (group != null && group.id != 0L) {
                 SagerDatabase.proxyDao.getByGroup(group.id)
             } else {
                 val all = SagerDatabase.proxyDao.getAll()
@@ -1340,16 +1336,6 @@ fun buildConfig(
                 !DataStore.isGroupDisabled(entity.groupId)
             }.ifEmpty { listOf(proxy) }
 
-            val list = if (useAutoSelect) {
-                // 解决策略组初始建立连接慢：在内核首次并发测速出结果前，
-                // sing-box 默认将 outbounds[0] 作为首发出站。
-                // 优先将此前已知有效且延迟最低的健康节点置于首位，未测试排中间，已知失效排在末尾，
-                // 确保首包绝不阻塞死等，建立连接瞬时秒开。
-                BalancerMemberResolver.sortForColdStart(rawList)
-            } else {
-                rawList
-            }
-
             list.forEach {
                 val builtTag = buildChain(it.id, it)
                 tagMap[it.id] = builtTag
@@ -1357,29 +1343,7 @@ fun buildConfig(
                     outboundTagProfileMap[builtTag] = it.id
                 }
             }
-            if (useAutoSelect && tagMap.isNotEmpty()) {
-                val testUrl = group?.let { DataStore.groupUrlTestUrl(it.id) }
-                val intervalVal = group?.let { DataStore.groupUrlTestInterval(it.id) }
-                val toleranceVal = group?.let { DataStore.groupUrlTestTolerance(it.id) }
-                val idleTimeoutVal = group?.let { DataStore.groupUrlTestIdleTimeout(it.id) }
-                val interruptVal = group?.let { DataStore.groupUrlTestInterrupt(it.id) }
-                outbounds.add(
-                    0, buildUrlTestOutbound(
-                        tagMap.values.toList(),
-                        testUrl = testUrl,
-                        intervalSec = intervalVal,
-                        toleranceMs = toleranceVal,
-                        idleTimeoutStr = idleTimeoutVal,
-                        interruptExist = interruptVal,
-                        customTag = TAG_PROXY
-                    )
-                )
-            } else if (useLoadBalance && tagMap.isNotEmpty()) {
-                outbounds.add(0, buildLoadBalanceOutbound(tagMap.values.toList(), customTag = TAG_PROXY))
-                balancerMemberMap[proxy.id] = list.mapNotNull { it.id.takeIf { id -> id != proxy.id } }
-            } else {
-                outbounds.add(0, buildSelectorOutbound(tagMap[proxy.id], tagMap.values.toList(), customTag = TAG_PROXY))
-            }
+            outbounds.add(0, buildSelectorOutbound(tagMap[proxy.id], tagMap.values.toList(), customTag = TAG_PROXY))
             trafficMap[TAG_PROXY] = listOf(proxy)
         } else {
             val mainTag = buildChain(0, proxy)
@@ -1390,7 +1354,7 @@ fun buildConfig(
             tagMap[key] = buildChain(key, p)
         }
 
-        val mainProxyTag = (if (buildSelector || useAutoSelect || useLoadBalance) TAG_PROXY else tagMap[proxy.id]) ?: TAG_PROXY
+        val mainProxyTag = (if (buildSelector) TAG_PROXY else tagMap[proxy.id]) ?: TAG_PROXY
 
         if (!forTest) {
             // 关键安全隔离：本地回环、多播与链路本地地址强制直连，
@@ -2285,8 +2249,6 @@ fun buildConfig(
                 "references=$references unresolved=$unresolvedTargets"
         )
         val (activeStrategyTag, activeStrategyKind, activeStrategyId) = when {
-            !forTest && !forExport && (useAutoSelect || useLoadBalance) ->
-                Triple(TAG_PROXY, "group", group?.id ?: 0L)
             !forTest && !forExport && proxy.type == ProxyEntity.TYPE_BALANCER && balancerTagMap[proxy.id] != null ->
                 Triple(balancerTagMap[proxy.id].orEmpty(), "balancer", proxy.id)
             else -> Triple("", "", 0L)
@@ -2298,7 +2260,7 @@ fun buildConfig(
             proxy.id,
             trafficMap,
             tagMap,
-            if (buildSelector || useAutoSelect || useLoadBalance) group?.id ?: 0L else -1L,
+            if (buildSelector) group?.id ?: 0L else -1L,
             balancerMemberMap,
             balancerTagMap,
             outboundTagProfileMap,

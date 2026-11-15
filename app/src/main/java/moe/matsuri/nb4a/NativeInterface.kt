@@ -329,15 +329,9 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
 
                 val activeProfile = data.proxy?.profile
                 val isBalancer = activeProfile?.type == ProxyEntity.TYPE_BALANCER
-                val group = if (activeProfile != null) runCatching { SagerDatabase.groupDao.getById(activeProfile.groupId) }.getOrNull() else null
-                val isGroupStrategy = group != null && (
-                    runCatching { DataStore.isGroupUrlTest(group.id) }.getOrDefault(false) ||
-                    runCatching { DataStore.isGroupLoadBalance(group.id) }.getOrDefault(false)
-                )
 
-                if (isBalancer || isGroupStrategy) {
-                    val memberMap = runCatching { data.proxy?.safeConfig?.balancerMemberMap?.get(activeProfile?.id) }.getOrNull()
-                        ?: if (isGroupStrategy) runCatching { SagerDatabase.proxyDao.getByGroup(group!!.id).map { it.id } }.getOrNull() else null
+                if (isBalancer) {
+                    val memberMap = runCatching { data.proxy?.safeConfig?.balancerMemberMap?.get(activeProfile.id) }.getOrNull()
                     if (memberMap != null && id in memberMap) {
                         ActiveOutboundTracker.updateActiveLeaf(id, ent.displayName())
                         LandingIpManager.clearCache()
