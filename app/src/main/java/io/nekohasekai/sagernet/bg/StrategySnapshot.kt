@@ -146,13 +146,112 @@ object StrategySnapshot {
         )
     }
 
+    enum class ErrorKind {
+        NONE,
+        TIMEOUT,
+        REFUSED,
+        RESET,
+        TLS,
+        DNS,
+        UNREACHABLE,
+        EOF,
+        PROBE_FAILED,
+        UNKNOWN,
+    }
+
+    fun shouldShowPartialFailureWarning(member: StrategyMemberSnapshot): Boolean {
+        return member.failCount >= 2 && member.checkCount > 0 && member.failCount * 10 >= member.checkCount * 3
+    }
+
+    fun sortMembersForDisplay(members: List<StrategyMemberSnapshot>): List<StrategyMemberSnapshot> {
+        if (members.size <= 1) return members
+        return members.sortedBy { member ->
+            when {
+                member.isUnavailable -> 2
+                member.pinned || member.active || member.role == "active" -> 0
+                else -> 1
+            }
+        }
+    }
+
+    fun classifyError(raw: String): ErrorKind {
+        val text = raw.trim().lowercase()
+        if (text.isEmpty()) return ErrorKind.NONE
+        return when {
+            text.contains("timeout") ||
+                text.contains("timed out") ||
+                text.contains("deadline exceeded") ||
+                text.contains("i/o timeout") -> ErrorKind.TIMEOUT
+
+            text.contains("connection refused") ||
+                text.contains("econnrefused") ||
+                text.contains("connectex: no connection could be made") -> ErrorKind.REFUSED
+
+            text.contains("connection reset") ||
+                text.contains("broken pipe") ||
+                text.contains("econnreset") ||
+                text.contains("forcibly closed") ||
+                text.contains("wsarecv") -> ErrorKind.RESET
+
+            text.contains("tls") ||
+                text.contains("x509") ||
+                text.contains("certificate") ||
+                text.contains("handshake") -> ErrorKind.TLS
+
+            text.contains("no such host") ||
+                text.contains("lookup ") ||
+                text.contains("name resolution") ||
+                text.contains("servfail") ||
+                text.contains("nxdomain") ||
+                text.contains("dns") -> ErrorKind.DNS
+
+            text.contains("network is unreachable") ||
+                text.contains("no route to host") ||
+                text.contains("host is unreachable") ||
+                text.contains("enetunreach") ||
+                text.contains("ehostunreach") -> ErrorKind.UNREACHABLE
+
+            text == "eof" ||
+                text.endsWith(": eof") ||
+                text.contains("unexpected eof") ||
+                text.contains(" eof") ||
+                text.contains("closed network connection") -> ErrorKind.EOF
+
+            text.contains("probe failed") ||
+                text.contains("get \"") ||
+                text.contains("head \"") ||
+                text.contains("dial ") ||
+                text.contains("bad status") ||
+                text.contains("http ") ||
+                text.contains("status ") -> ErrorKind.PROBE_FAILED
+
+            else -> ErrorKind.UNKNOWN
+        }
+    }
+
+    fun formatReadableError(context: Context, raw: String): String {
+        val trimmed = raw.trim()
+        return when (classifyError(trimmed)) {
+            ErrorKind.NONE -> context.getString(R.string.unavailable)
+            ErrorKind.TIMEOUT -> context.getString(R.string.strategy_err_timeout)
+            ErrorKind.REFUSED -> context.getString(R.string.strategy_err_connection_refused)
+            ErrorKind.RESET -> context.getString(R.string.strategy_err_connection_reset)
+            ErrorKind.TLS -> context.getString(R.string.strategy_err_tls)
+            ErrorKind.DNS -> context.getString(R.string.strategy_err_dns)
+            ErrorKind.UNREACHABLE -> context.getString(R.string.strategy_err_unreachable)
+            ErrorKind.EOF -> context.getString(R.string.strategy_err_eof)
+            ErrorKind.PROBE_FAILED -> context.getString(R.string.strategy_err_probe_failed)
+            ErrorKind.UNKNOWN -> if (trimmed.length > 48) trimmed.take(45) + "..." else trimmed
+        }
+    }
+
     fun resolveMemberSubtitleKind(member: StrategyMemberSnapshot): MemberSubtitleKind {
         return when {
             member.role == "suspect" -> MemberSubtitleKind.SUSPECT
             member.role == "failed" || member.error.isNotBlank() -> MemberSubtitleKind.FAILED
             member.role == "active" || member.active -> MemberSubtitleKind.CARRYING_TRAFFIC
             member.role == "standby" -> MemberSubtitleKind.STANDBY
-            member.failCount > 0 && member.checkCount > 0 -> MemberSubtitleKind.PARTIAL_FAILURES
+            shouldShowPartialFailureWarning(member) -> MemberSubtitleKind.PARTIAL_FAILURES
             else -> MemberSubtitleKind.NONE
         }
     }

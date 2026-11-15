@@ -178,8 +178,9 @@ class StrategyStatsActivity : ThemedActivity(), SagerConnection.Callback {
                     refreshSnapshot()
                 } else if (snap != null) {
                     renderHeader(snap)
-                    if (snap.members.isNotEmpty()) {
-                        memberAdapter.notifyItemRangeChanged(0, snap.members.size, PAYLOAD_TIME)
+                    val itemCount = memberAdapter.itemCount
+                    if (itemCount > 0) {
+                        memberAdapter.notifyItemRangeChanged(0, itemCount, PAYLOAD_TIME)
                     }
                 }
             }
@@ -436,10 +437,11 @@ class StrategyStatsActivity : ThemedActivity(), SagerConnection.Callback {
         binding.textStrategyEmpty.visibility = if (hasMembers) View.GONE else View.VISIBLE
         binding.recyclerStrategyMembers.visibility = if (hasMembers) View.VISIBLE else View.GONE
 
+        val sortedMembers = StrategySnapshot.sortMembersForDisplay(snap.members)
         val previousMembers = memberAdapter.currentList
-        memberAdapter.submitList(snap.members)
-        if (hasMembers && previousMembers == snap.members) {
-            memberAdapter.notifyItemRangeChanged(0, snap.members.size, PAYLOAD_TIME)
+        memberAdapter.submitList(sortedMembers)
+        if (hasMembers && previousMembers == sortedMembers) {
+            memberAdapter.notifyItemRangeChanged(0, sortedMembers.size, PAYLOAD_TIME)
         }
         invalidateOptionsMenu()
     }
@@ -496,32 +498,35 @@ class StrategyStatsActivity : ThemedActivity(), SagerConnection.Callback {
                 }
 
                 val subtitleKind = StrategySnapshot.resolveMemberSubtitleKind(item)
-                val failRatioText = if (item.failCount > 0 && item.checkCount > 0) {
-                    context.getString(R.string.strategy_role_partial_failures, item.checkCount, item.failCount)
+                val fluctuationText = if (StrategySnapshot.shouldShowPartialFailureWarning(item)) {
+                    context.getString(R.string.strategy_role_frequent_fluctuations, item.checkCount, item.failCount)
                 } else {
                     ""
                 }
                 val subtitleText = when (subtitleKind) {
                     StrategySnapshot.MemberSubtitleKind.CARRYING_TRAFFIC -> {
                         val base = context.getString(R.string.strategy_role_carrying_traffic)
-                        if (failRatioText.isNotEmpty()) "$base · $failRatioText" else base
+                        if (fluctuationText.isNotEmpty()) "$base · $fluctuationText" else base
                     }
                     StrategySnapshot.MemberSubtitleKind.STANDBY -> {
                         val base = context.getString(R.string.strategy_role_standby)
-                        if (failRatioText.isNotEmpty()) "$base · $failRatioText" else base
+                        if (fluctuationText.isNotEmpty()) "$base · $fluctuationText" else base
                     }
-                    StrategySnapshot.MemberSubtitleKind.SUSPECT -> {
-                        if (item.suspectRemainingSec > 0) {
-                            context.getString(R.string.strategy_role_suspect_cooldown, item.suspectRemainingSec)
+                    StrategySnapshot.MemberSubtitleKind.SUSPECT,
+                    StrategySnapshot.MemberSubtitleKind.FAILED -> {
+                        val readableError = StrategySnapshot.formatReadableError(context, item.error)
+                        if (item.failCount > 0 && item.checkCount > 0) {
+                            val ratioText = context.getString(
+                                R.string.strategy_role_recent_failed_ratio,
+                                item.checkCount,
+                                item.failCount,
+                            )
+                            "$readableError ($ratioText)"
                         } else {
-                            item.error.ifBlank { context.getString(R.string.unavailable) }
+                            readableError
                         }
                     }
-                    StrategySnapshot.MemberSubtitleKind.FAILED -> {
-                        val err = item.error.ifBlank { context.getString(R.string.unavailable) }
-                        if (failRatioText.isNotEmpty()) "$failRatioText · $err" else err
-                    }
-                    StrategySnapshot.MemberSubtitleKind.PARTIAL_FAILURES -> failRatioText
+                    StrategySnapshot.MemberSubtitleKind.PARTIAL_FAILURES -> fluctuationText
                     StrategySnapshot.MemberSubtitleKind.NONE -> ""
                 }
                 if (subtitleText.isNotBlank()) {

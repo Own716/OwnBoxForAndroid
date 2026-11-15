@@ -14,18 +14,15 @@ import (
 )
 
 const (
-	recentOutcomeWindow = 10
+	recentOutcomeWindow  = 10
 	maxSiteMemoryEntries = 2048
-	siteAvoidDuration   = 10 * time.Minute
-	maxSuspectBackoff   = 15 * time.Minute
+	siteAvoidDuration    = 10 * time.Minute
 )
 
 type passiveNodeStats struct {
 	recent           []bool
 	consecutiveFails int
 	ttfbEMA          float64
-	suspectLevel     int
-	suspectUntil     time.Time
 	lastFailAt       time.Time
 }
 
@@ -107,13 +104,6 @@ func (p *passiveTracker) RecordSuccess(nodeTag, destHost string, ttfb time.Durat
 		}
 	}
 
-	// Reset backoff once cooldown expired and stability returns
-	succ := countTrue(st.recent)
-	if !st.suspectUntil.IsZero() && !now.Before(st.suspectUntil) && succ >= 2 {
-		st.suspectUntil = time.Time{}
-		st.suspectLevel = 0
-	}
-
 	if siteKey != "" {
 		delete(p.siteAvoid, avoidKey{siteKey: siteKey, nodeTag: nodeTag})
 		if p.siteStickyTTL > 0 {
@@ -140,20 +130,6 @@ func (p *passiveTracker) RecordFailure(nodeTag, destHost string) {
 	st.consecutiveFails++
 	st.lastFailAt = now
 
-	recentSucc := countTrue(st.recent)
-	if st.consecutiveFails >= 3 && st.consecutiveFails >= recentSucc {
-		if st.suspectUntil.IsZero() || !now.Before(st.suspectUntil) {
-			dur := time.Minute << st.suspectLevel
-			if dur > maxSuspectBackoff {
-				dur = maxSuspectBackoff
-			}
-			st.suspectUntil = now.Add(dur)
-			if st.suspectLevel < 4 {
-				st.suspectLevel++
-			}
-		}
-	}
-
 	if siteKey != "" {
 		p.siteAvoid[avoidKey{siteKey: siteKey, nodeTag: nodeTag}] = now.Add(siteAvoidDuration)
 		if el, ok := p.siteMap[siteKey]; ok {
@@ -164,22 +140,6 @@ func (p *passiveTracker) RecordFailure(nodeTag, destHost string) {
 			}
 		}
 	}
-}
-
-func (p *passiveTracker) IsSuspect(nodeTag string, now time.Time) bool {
-	if p == nil || nodeTag == "" {
-		return false
-	}
-	if now.IsZero() {
-		now = p.now()
-	}
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	st, ok := p.nodes[nodeTag]
-	if !ok {
-		return false
-	}
-	return !st.suspectUntil.IsZero() && now.Before(st.suspectUntil)
 }
 
 func (p *passiveTracker) LastFailureAt(nodeTag string) time.Time {
@@ -194,24 +154,17 @@ func (p *passiveTracker) LastFailureAt(nodeTag string) time.Time {
 	return time.Time{}
 }
 
-func (p *passiveTracker) NodeStats(nodeTag string, now time.Time) (ttfbMs float64, recentSuccesses int, consecutiveFails int, suspectUntil time.Time) {
+func (p *passiveTracker) NodeStats(nodeTag string, now time.Time) (ttfbMs float64, recentSuccesses int, consecutiveFails int) {
 	if p == nil || nodeTag == "" {
-		return 0, 0, 0, time.Time{}
-	}
-	if now.IsZero() {
-		now = p.now()
+		return 0, 0, 0
 	}
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	st, ok := p.nodes[nodeTag]
 	if !ok {
-		return 0, 0, 0, time.Time{}
+		return 0, 0, 0
 	}
-	su := time.Time{}
-	if !st.suspectUntil.IsZero() && now.Before(st.suspectUntil) {
-		su = st.suspectUntil
-	}
-	return st.ttfbEMA, countTrue(st.recent), st.consecutiveFails, su
+	return st.ttfbEMA, countTrue(st.recent), st.consecutiveFails
 }
 
 func (p *passiveTracker) PreferredSiteNode(destHost string, now time.Time) string {

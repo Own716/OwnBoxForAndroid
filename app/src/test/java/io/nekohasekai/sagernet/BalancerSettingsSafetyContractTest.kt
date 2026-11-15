@@ -36,18 +36,28 @@ class BalancerSettingsSafetyContractTest {
     @Test
     fun balancerSettingsGuardsLateinitAndAvoidsForcedUnwraps() {
         val text = sourceFile("src/main/java/io/nekohasekai/sagernet/ui/profile/BalancerSettingsActivity.kt").readText()
+        val orderActivityText = sourceFile("src/main/java/io/nekohasekai/sagernet/ui/profile/BalancerNodeOrderActivity.kt").readText()
         val nodePrefText = sourceFile("src/main/java/io/nekohasekai/sagernet/widget/BalancerNodeListPreference.kt").readText()
+        val manifestText = sourceFile("src/main/AndroidManifest.xml").readText()
         assertFalse(
             "BalancerSettingsActivity must not use any force-unwrap !! operators",
             text.contains("!!"),
+        )
+        assertFalse(
+            "BalancerNodeOrderActivity must not use any force-unwrap !! operators",
+            orderActivityText.contains("!!"),
         )
         assertFalse(
             "BalancerNodeListPreference must not use any force-unwrap !! operators",
             nodePrefText.contains("!!"),
         )
         assertTrue(
-            "BalancerSettingsActivity must bind BalancerNodeListPreference",
-            text.contains("BalancerNodeListPreference")
+            "BalancerSettingsActivity must launch BalancerNodeOrderActivity",
+            text.contains("BalancerNodeOrderActivity")
+        )
+        assertTrue(
+            "AndroidManifest.xml must declare BalancerNodeOrderActivity",
+            manifestText.contains("io.nekohasekai.sagernet.ui.profile.BalancerNodeOrderActivity")
         )
         assertTrue(
             "BalancerSettingsActivity must guard frontProxyPreference with isInitialized",
@@ -114,6 +124,10 @@ class BalancerSettingsSafetyContractTest {
         val addTierIdx = prefXml.indexOf("app:key=\"balancerAddTier\"")
         val nodeListIdx = prefXml.indexOf("app:key=\"balancerNodeList\"")
         assertTrue("balancerAddTier must precede balancerNodeList", addTierIdx in 0 until nodeListIdx)
+        assertFalse(
+            "balancer_preferences.xml must use compact Preference instead of inline BalancerNodeListPreference",
+            prefXml.contains("BalancerNodeListPreference"),
+        )
 
         assertTrue(arraysXml.contains("name=\"balancer_selection_mode_values\""))
         assertTrue(arraysXml.contains("name=\"balancer_balance_mode_values\""))

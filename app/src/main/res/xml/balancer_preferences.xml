@@ -56,10 +56,13 @@
         app:summary="@string/balancer_add_tier_empty_hint"
         app:title="@string/balancer_add_tier" />
 
-    <io.nekohasekai.sagernet.widget.BalancerNodeListPreference
+    <Preference
         android:order="7000"
+        app:icon="@drawable/ic_baseline_view_list_24"
         app:isPreferenceVisible="false"
-        app:key="balancerNodeList" />
+        app:key="balancerNodeList"
+        app:summary="@string/balancer_node_order_summary_empty"
+        app:title="@string/balancer_node_order_title" />
 
     <SwitchPreferenceCompat
         android:order="8000"

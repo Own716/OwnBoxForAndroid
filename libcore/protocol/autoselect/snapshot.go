@@ -2,7 +2,6 @@ package autoselect
 
 import (
 	"context"
-	"math"
 	"sort"
 	"time"
 
@@ -13,7 +12,6 @@ const (
 	RoleActive  = "active"
 	RoleStandby = "standby"
 	RoleReserve = "reserve"
-	RoleSuspect = "suspect"
 	RoleFailed  = "failed"
 )
 
@@ -39,7 +37,6 @@ func (g *AutoSelect) GroupSnapshot() customUrltest.GroupSnapshot {
 		lastCheckedAt time.Time
 		index         int
 		tier          int
-		suspectUntil  time.Time
 	}
 
 	activeTier := 0
@@ -54,15 +51,9 @@ func (g *AutoSelect) GroupSnapshot() customUrltest.GroupSnapshot {
 		if avail {
 			availCount++
 		}
-		var su time.Time
-		if g.passive != nil {
-			_, _, _, su = g.passive.NodeStats(tag, now)
-		}
 		errMsg := st.lastError
 		if avail {
 			errMsg = ""
-		} else if !su.IsZero() && errMsg == "" {
-			errMsg = "passive suspect cooldown"
 		}
 		views = append(views, memberView{
 			tag:           tag,
@@ -75,7 +66,6 @@ func (g *AutoSelect) GroupSnapshot() customUrltest.GroupSnapshot {
 			lastCheckedAt: st.lastCheckedAt,
 			index:         st.index,
 			tier:          st.tier,
-			suspectUntil:  su,
 		})
 	}
 	g.scorer.mu.RUnlock()
@@ -114,21 +104,7 @@ func (g *AutoSelect) GroupSnapshot() customUrltest.GroupSnapshot {
 	members := make([]customUrltest.MemberSnapshot, 0, len(views))
 	for _, v := range views {
 		role := RoleReserve
-		var suspectUntilMs int64
-		var suspectRemSec int
-
-		if !v.suspectUntil.IsZero() && now.Before(v.suspectUntil) {
-			suspectUntilMs = v.suspectUntil.UnixMilli()
-			suspectRemSec = int(math.Ceil(v.suspectUntil.Sub(now).Seconds()))
-			if suspectRemSec < 1 {
-				suspectRemSec = 1
-			}
-			if v.tag == activeTag && pinnedTag == activeTag {
-				role = RoleActive
-			} else {
-				role = RoleSuspect
-			}
-		} else if v.tag == activeTag {
+		if v.tag == activeTag {
 			role = RoleActive
 		} else if !v.available {
 			role = RoleFailed
@@ -142,7 +118,7 @@ func (g *AutoSelect) GroupSnapshot() customUrltest.GroupSnapshot {
 		}
 
 		displayDelay := int(v.delay)
-		if !v.available && v.suspectUntil.IsZero() && v.err != "" && v.checkCount > 0 && v.delay == 0 {
+		if !v.available && v.err != "" && v.checkCount > 0 && v.delay == 0 {
 			displayDelay = 0
 		}
 
@@ -152,16 +128,14 @@ func (g *AutoSelect) GroupSnapshot() customUrltest.GroupSnapshot {
 		}
 
 		members = append(members, customUrltest.MemberSnapshot{
-			Tag:                 v.tag,
-			Delay:               displayDelay,
-			Error:               v.err,
-			LastCheckMs:         lastCheckMs,
-			Role:                role,
-			Tier:                tierValue,
-			CheckCount:          v.checkCount,
-			FailCount:           v.failCount,
-			SuspectUntilMs:      suspectUntilMs,
-			SuspectRemainingSec: suspectRemSec,
+			Tag:         v.tag,
+			Delay:       displayDelay,
+			Error:       v.err,
+			LastCheckMs: lastCheckMs,
+			Role:        role,
+			Tier:        tierValue,
+			CheckCount:  v.checkCount,
+			FailCount:   v.failCount,
 		})
 	}
 

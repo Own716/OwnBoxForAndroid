@@ -577,11 +577,11 @@ func selectIntensiveTargets(all []string, s *scorer, passive *passiveTracker, cf
 		add(all[i])
 	}
 
-	// Any nodes whose suspect cooldown just expired (give chance to recover)
+	// Give nodes with recent passive failures an intensive probe chance
 	if passive != nil {
 		for i := 0; i < limit; i++ {
 			tag := all[i]
-			if !passive.IsSuspect(tag, now) && !passive.LastFailureAt(tag).IsZero() {
+			if !passive.LastFailureAt(tag).IsZero() {
 				add(tag)
 			}
 		}

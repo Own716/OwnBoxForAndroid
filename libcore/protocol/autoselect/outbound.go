@@ -413,7 +413,8 @@ func (g *AutoSelect) onPassiveFailure(tag, siteHost string) {
 	}
 	now := g.now()
 	g.passive.RecordFailure(tag, siteHost)
-	if g.passive.IsSuspect(tag, now) {
+	_, _, consecFails := g.passive.NodeStats(tag, now)
+	if consecFails >= 2 && tag == g.scorer.activeTagSnapshot() {
 		_, _, switched, isFailback := g.scorer.evaluateWithTransition(now, g.passive)
 		if switched {
 			g.handleSwitchInterrupt(isFailback)
@@ -422,15 +423,17 @@ func (g *AutoSelect) onPassiveFailure(tag, siteHost string) {
 }
 
 func (g *AutoSelect) onDialAttemptFailed(tag, siteHost string, now time.Time) {
+	passiveFails := 0
 	if g.cfg.learnFromConnections && g.passive != nil {
 		g.passive.RecordFailure(tag, siteHost)
+		_, _, passiveFails = g.passive.NodeStats(tag, now)
 	}
 	g.dialFailMu.Lock()
 	g.dialFails[tag]++
 	count := g.dialFails[tag]
 	g.dialFailMu.Unlock()
 
-	if count >= 2 || (g.passive != nil && g.passive.IsSuspect(tag, now)) {
+	if count >= 2 || passiveFails >= 2 {
 		_, _, switched, isFailback := g.scorer.evaluateWithTransition(now, g.passive)
 		if switched {
 			g.handleSwitchInterrupt(isFailback)

@@ -255,11 +255,104 @@ class StrategySnapshotTest {
 
         assertEquals(StrategySnapshot.MemberSubtitleKind.CARRYING_TRAFFIC, StrategySnapshot.resolveMemberSubtitleKind(snap.members[0]))
         assertEquals(StrategySnapshot.MemberSubtitleKind.STANDBY, StrategySnapshot.resolveMemberSubtitleKind(snap.members[1]))
-        assertEquals(StrategySnapshot.MemberSubtitleKind.PARTIAL_FAILURES, StrategySnapshot.resolveMemberSubtitleKind(snap.members[2]))
+        assertEquals(StrategySnapshot.MemberSubtitleKind.NONE, StrategySnapshot.resolveMemberSubtitleKind(snap.members[2]))
+        assertFalse(StrategySnapshot.shouldShowPartialFailureWarning(snap.members[2]))
         assertEquals(StrategySnapshot.MemberSubtitleKind.NONE, StrategySnapshot.resolveMemberSubtitleKind(snap.members[3]))
         assertEquals(StrategySnapshot.MemberSubtitleKind.SUSPECT, StrategySnapshot.resolveMemberSubtitleKind(snap.members[4]))
         assertEquals(45, snap.members[4].suspectRemainingSec)
         assertEquals(-2L, StrategySnapshotHelper.ACTION_CLEAR_LEARNED)
         assertEquals(":clear_learned", StrategySnapshot.CLEAR_LEARNED_TAG)
+    }
+
+    @Test
+    fun partialFailureWarningRequiresRepeatedFailures() {
+        val singleBlip = StrategyMemberSnapshot(
+            tag = "out-1", profileId = 1, name = "N1", delay = 100, error = "", lastCheckMs = 0L,
+            active = false, pinned = false, role = "reserve", checkCount = 8, failCount = 1,
+        )
+        assertFalse(StrategySnapshot.shouldShowPartialFailureWarning(singleBlip))
+        assertEquals(StrategySnapshot.MemberSubtitleKind.NONE, StrategySnapshot.resolveMemberSubtitleKind(singleBlip))
+
+        val lowRatioTwoFails = singleBlip.copy(checkCount = 10, failCount = 2)
+        assertFalse(StrategySnapshot.shouldShowPartialFailureWarning(lowRatioTwoFails))
+
+        val unstable = singleBlip.copy(checkCount = 8, failCount = 3)
+        assertTrue(StrategySnapshot.shouldShowPartialFailureWarning(unstable))
+        assertEquals(StrategySnapshot.MemberSubtitleKind.PARTIAL_FAILURES, StrategySnapshot.resolveMemberSubtitleKind(unstable))
+    }
+
+    @Test
+    fun sortMembersForDisplaySinksUnavailableNodesPreservingRelativeOrder() {
+        val failedA = StrategyMemberSnapshot(
+            tag = "out-a", profileId = 1, name = "Failed A", delay = 0, error = "i/o timeout", lastCheckMs = 0L,
+            active = false, pinned = false, role = "failed",
+        )
+        val standby1 = StrategyMemberSnapshot(
+            tag = "out-b", profileId = 2, name = "Standby 1", delay = 180, error = "", lastCheckMs = 0L,
+            active = false, pinned = false, role = "standby",
+        )
+        val pinnedActive = StrategyMemberSnapshot(
+            tag = "out-c", profileId = 3, name = "Pinned Active", delay = 220, error = "", lastCheckMs = 0L,
+            active = true, pinned = true, role = "active",
+        )
+        val failedB = StrategyMemberSnapshot(
+            tag = "out-d", profileId = 4, name = "Failed B", delay = 0, error = "connection refused", lastCheckMs = 0L,
+            active = false, pinned = false, role = "failed",
+        )
+        val standby2 = StrategyMemberSnapshot(
+            tag = "out-e", profileId = 5, name = "Standby 2", delay = 150, error = "", lastCheckMs = 0L,
+            active = false, pinned = false, role = "standby",
+        )
+
+        val sorted = StrategySnapshot.sortMembersForDisplay(listOf(failedA, standby1, pinnedActive, failedB, standby2))
+        assertEquals(
+            listOf("out-c", "out-b", "out-e", "out-a", "out-d"),
+            sorted.map { it.tag },
+        )
+    }
+
+    @Test
+    fun classifyErrorMapsWrappedGoErrorsBeforeGenericProbeWrapper() {
+        assertEquals(StrategySnapshot.ErrorKind.NONE, StrategySnapshot.classifyError("   "))
+        assertEquals(
+            StrategySnapshot.ErrorKind.TIMEOUT,
+            StrategySnapshot.classifyError("Get \"https://www.gstatic.com/generate_204\": dial tcp 1.2.3.4:443: i/o timeout"),
+        )
+        assertEquals(
+            StrategySnapshot.ErrorKind.TIMEOUT,
+            StrategySnapshot.classifyError("context deadline exceeded"),
+        )
+        assertEquals(
+            StrategySnapshot.ErrorKind.REFUSED,
+            StrategySnapshot.classifyError("dial tcp 127.0.0.1:443: connect: connection refused"),
+        )
+        assertEquals(
+            StrategySnapshot.ErrorKind.RESET,
+            StrategySnapshot.classifyError("read tcp 10.0.0.2:12345->1.2.3.4:443: read: connection reset by peer"),
+        )
+        assertEquals(
+            StrategySnapshot.ErrorKind.TLS,
+            StrategySnapshot.classifyError("Get \"https://example.com\": tls: failed to verify certificate: x509: certificate signed by unknown authority"),
+        )
+        assertEquals(
+            StrategySnapshot.ErrorKind.DNS,
+            StrategySnapshot.classifyError("Get \"https://example.com\": dial tcp: lookup example.com: no such host"),
+        )
+        assertEquals(
+            StrategySnapshot.ErrorKind.UNREACHABLE,
+            StrategySnapshot.classifyError("connect: network is unreachable"),
+        )
+        assertEquals(
+            StrategySnapshot.ErrorKind.EOF,
+            StrategySnapshot.classifyError("Get \"https://example.com\": unexpected EOF"),
+        )
+        assertEquals(
+            StrategySnapshot.ErrorKind.PROBE_FAILED,
+            StrategySnapshot.classifyError("probe failed: unexpected status 502"),
+        )
+        assertEquals(
+            StrategySnapshot.ErrorKind.UNKNOWN,
+            StrategySnapshot.classifyError("custom backend error"),
+        )
     }
 }

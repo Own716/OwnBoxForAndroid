@@ -40,7 +40,7 @@ func TestPassiveConnReplaceableAndUnansweredCloseFailure(t *testing.T) {
 	_, _ = wrapped1.Read(tmp) // EOF
 	_ = wrapped1.Close()
 
-	_, _, consecutiveFails, _ := tracker.NodeStats("node-a", now)
+	_, _, consecutiveFails := tracker.NodeStats("node-a", now)
 	if consecutiveFails != 1 {
 		t.Fatalf("expected 1 unanswered passive failure, got %d", consecutiveFails)
 	}
@@ -55,7 +55,7 @@ func TestPassiveConnReplaceableAndUnansweredCloseFailure(t *testing.T) {
 	_ = wrapped2.Close()
 	_ = server2.Close()
 
-	_, _, consecutiveFails, _ = tracker.NodeStats("node-a", now)
+	_, _, consecutiveFails = tracker.NodeStats("node-a", now)
 	if consecutiveFails != 1 {
 		t.Fatalf("closing idle conn before Write should NOT add failure, got %d", consecutiveFails)
 	}
@@ -86,50 +86,37 @@ func TestPassiveConnReplaceableAndUnansweredCloseFailure(t *testing.T) {
 	}
 	_ = wrapped3.Close()
 
-	ttfbMs, recentSucc, consecutiveFails, _ := tracker.NodeStats("node-a", now)
+	ttfbMs, recentSucc, consecutiveFails := tracker.NodeStats("node-a", now)
 	if consecutiveFails != 0 || recentSucc != 1 || ttfbMs <= 0 {
 		t.Fatalf("expected success to clear fails & update TTFB, got ttfb=%.2f succ=%d fail=%d", ttfbMs, recentSucc, consecutiveFails)
 	}
 }
 
-func TestPassiveSuspectExponentialBackoffAndReset(t *testing.T) {
+func TestPassiveConsecutiveFailsDoNotQuarantineGlobally(t *testing.T) {
 	now := time.Unix(1700000000, 0)
 	tracker := newPassiveTracker(60 * time.Minute)
 	tracker.nowFn = func() time.Time { return now }
 
-	// 1 success followed by 3 consecutive failures -> >=3 && >=recentSuccesses -> 1m suspect
+	// Repeated passive failures track consecutive count and site avoidance without global quarantine
 	tracker.RecordSuccess("node-a", "a.com", 50*time.Millisecond)
-	tracker.RecordFailure("node-a", "a.com")
-	tracker.RecordFailure("node-a", "a.com")
-	if tracker.IsSuspect("node-a", now) {
-		t.Fatalf("should not be suspect after only 2 fails")
+	for i := 0; i < 4; i++ {
+		tracker.RecordFailure("node-a", "a.com")
 	}
-	tracker.RecordFailure("node-a", "a.com")
-	if !tracker.IsSuspect("node-a", now) {
-		t.Fatalf("expected suspect quarantine on 3rd fail (>= 1 recent success)")
+	ttfbMs, recentSucc, consecutiveFails := tracker.NodeStats("node-a", now)
+	if consecutiveFails != 4 || recentSucc != 1 || ttfbMs <= 0 {
+		t.Fatalf("expected passive stats retained, got ttfb=%.2f succ=%d fail=%d", ttfbMs, recentSucc, consecutiveFails)
 	}
-	_, _, _, suspectUntil := tracker.NodeStats("node-a", now)
-	if got := suspectUntil.Sub(now); got != 1*time.Minute {
-		t.Fatalf("expected first suspect duration 1m, got %v", got)
+	if !tracker.ShouldAvoidSite("node-a", "a.com", now) {
+		t.Fatalf("expected per-site avoidance for a.com after failures")
+	}
+	if tracker.ShouldAvoidSite("node-a", "unrelated.org", now) {
+		t.Fatalf("did not expect global/unrelated-site avoidance")
 	}
 
-	// Expire 1m cooldown, then fail again -> doubles to 2m -> 4m -> 8m -> capped at 15m
-	expected := []time.Duration{2 * time.Minute, 4 * time.Minute, 8 * time.Minute, 15 * time.Minute, 15 * time.Minute}
-	for _, exp := range expected {
-		now = suspectUntil.Add(1 * time.Second)
-		tracker.RecordFailure("node-a", "a.com")
-		tracker.RecordFailure("node-a", "a.com")
-		tracker.RecordFailure("node-a", "a.com")
-		_, _, _, suspectUntil = tracker.NodeStats("node-a", now)
-		if got := suspectUntil.Sub(now); got != exp {
-			t.Fatalf("expected backoff %v, got %v", exp, got)
-		}
-	}
-
-	// ClearLearned resets suspect state immediately
 	tracker.ClearLearned()
-	if tracker.IsSuspect("node-a", now) {
-		t.Fatalf("ClearLearned should immediately lift suspect state")
+	_, recentSucc, consecutiveFails = tracker.NodeStats("node-a", now)
+	if consecutiveFails != 0 || recentSucc != 0 {
+		t.Fatalf("ClearLearned should reset passive stats")
 	}
 }
 

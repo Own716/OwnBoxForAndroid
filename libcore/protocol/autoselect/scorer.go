@@ -236,16 +236,20 @@ func (s *scorer) memberScoreLocked(st *memberState, passive *passiveTracker, now
 		}
 	}
 
-	suspect := passive != nil && passive.IsSuspect(st.tag, now)
-
 	if checkCount == 0 {
 		if st.initialDelay > 0 {
 			effectiveDelay = st.initialDelay
 			score = float64(st.initialDelay)
-			available = !suspect && (s.cfg.maxRttMs == 0 || effectiveDelay <= s.cfg.maxRttMs)
+			if passive != nil && s.cfg.learnFromConnections {
+				_, _, consecFails := passive.NodeStats(st.tag, now)
+				if consecFails >= 2 {
+					score += float64(consecFails) * 80.0
+				}
+			}
+			available = s.cfg.maxRttMs == 0 || effectiveDelay <= s.cfg.maxRttMs
 		} else if passive != nil && s.cfg.learnFromConnections {
-			ttfbMs, recentSucc, consecFails, _ := passive.NodeStats(st.tag, now)
-			if ttfbMs > 0 && recentSucc > 0 && consecFails < 2 && !suspect {
+			ttfbMs, recentSucc, consecFails := passive.NodeStats(st.tag, now)
+			if ttfbMs > 0 && recentSucc > 0 && consecFails < 2 {
 				effectiveDelay = uint16(math.Round(ttfbMs))
 				score = ttfbMs
 				available = s.cfg.maxRttMs == 0 || effectiveDelay <= s.cfg.maxRttMs
@@ -281,7 +285,7 @@ func (s *scorer) memberScoreLocked(st *memberState, passive *passiveTracker, now
 	}
 
 	if passive != nil && s.cfg.learnFromConnections {
-		ttfbMs, _, consecFails, _ := passive.NodeStats(st.tag, now)
+		ttfbMs, _, consecFails := passive.NodeStats(st.tag, now)
 		if ttfbMs > 0 {
 			if score > 0 {
 				score = 0.7*score + 0.3*ttfbMs
@@ -296,7 +300,7 @@ func (s *scorer) memberScoreLocked(st *memberState, passive *passiveTracker, now
 
 	activelyDead := st.consecutiveFail >= 2 || okCount == 0
 	withinMaxRtt := effectiveDelay > 0 && (s.cfg.maxRttMs == 0 || effectiveDelay <= s.cfg.maxRttMs)
-	available = !suspect && !activelyDead && withinMaxRtt
+	available = !activelyDead && withinMaxRtt
 	return
 }
 
@@ -341,7 +345,6 @@ func (s *scorer) evaluateLocked(now time.Time, passive *passiveTracker) (string,
 			score:     score,
 			delay:     delay,
 			available: avail,
-			suspect:   passive != nil && passive.IsSuspect(tag, now),
 		}
 		items = append(items, item)
 		if tag == s.activeTag {
@@ -361,7 +364,6 @@ type scoredEntryRef struct {
 	score     float64
 	delay     uint16
 	available bool
-	suspect   bool
 }
 
 func (s *scorer) evaluatePriorityLocked(now time.Time, passive *passiveTracker, items []scoredEntryRef, current *scoredEntryRef) (string, string, bool, bool) {
@@ -376,15 +378,7 @@ func (s *scorer) evaluatePriorityLocked(now time.Time, passive *passiveTracker, 
 		}
 	}
 
-	// Fallback if all unhealthy: non-suspect first, else priority 0
-	if firstHealthy == nil {
-		for i := range items {
-			if !items[i].suspect {
-				firstHealthy = &items[i]
-				break
-			}
-		}
-	}
+	// Fallback if all unhealthy: priority 0
 	if firstHealthy == nil {
 		firstHealthy = &items[0]
 	}
@@ -427,9 +421,6 @@ func (s *scorer) evaluatePriorityLocked(now time.Time, passive *passiveTracker, 
 func betterTieredFallback(a, b *scoredEntryRef) bool {
 	if a.st.tier != b.st.tier {
 		return a.st.tier < b.st.tier
-	}
-	if a.suspect != b.suspect {
-		return !a.suspect
 	}
 	if (a.score > 0) != (b.score > 0) {
 		return a.score > 0
@@ -571,12 +562,9 @@ func (s *scorer) evaluateLatencyLocked(now time.Time, items []scoredEntryRef, cu
 		})
 		best = healthy[0]
 	} else {
-		// Fallback: non-suspect with positive score, else lowest fail count, else index 0
+		// Fallback: positive score, else index order
 		fallbacks := append([]scoredEntryRef(nil), items...)
 		sort.SliceStable(fallbacks, func(i, j int) bool {
-			if fallbacks[i].suspect != fallbacks[j].suspect {
-				return !fallbacks[i].suspect
-			}
 			if (fallbacks[i].score > 0) != (fallbacks[j].score > 0) {
 				return fallbacks[i].score > 0
 			}
@@ -735,7 +723,7 @@ func (s *scorer) pickConnectionCarrierLocked(now time.Time, passive *passiveTrac
 		return s.pinnedTag
 	}
 	if !s.cfg.balanceEnabled {
-		if s.activeTag == "" || (passive != nil && passive.IsSuspect(s.activeTag, now)) {
+		if s.activeTag == "" {
 			s.evaluateLocked(now, passive)
 		}
 		return s.activeTag
@@ -793,13 +781,12 @@ func (s *scorer) candidateOrder(siteKey string, now time.Time, passive *passiveT
 
 	// Build scored slice for deterministic ordering
 	type ranked struct {
-		tag     string
-		index   int
-		tier    int
-		score   float64
-		avail   bool
-		suspect bool
-		avoid   bool
+		tag   string
+		index int
+		tier  int
+		score float64
+		avail bool
+		avoid bool
 	}
 	all := make([]ranked, 0, len(s.order))
 	healthyMap := make(map[string]bool, len(s.order))
@@ -811,13 +798,12 @@ func (s *scorer) candidateOrder(siteKey string, now time.Time, passive *passiveT
 			healthyMap[tag] = true
 		}
 		all = append(all, ranked{
-			tag:     tag,
-			index:   st.index,
-			tier:    st.tier,
-			score:   score,
-			avail:   avail,
-			suspect: passive != nil && passive.IsSuspect(tag, now),
-			avoid:   avoid,
+			tag:   tag,
+			index: st.index,
+			tier:  st.tier,
+			score: score,
+			avail: avail,
+			avoid: avoid,
 		})
 	}
 
@@ -828,10 +814,9 @@ func (s *scorer) candidateOrder(siteKey string, now time.Time, passive *passiveT
 		}
 	}
 
-	// 2. Current carrier (single active or balanced rotation/per-conn slot) if neither site-avoided nor suspect
+	// 2. Current carrier (single active or balanced rotation/per-conn slot) if not site-avoided
 	carrier := s.pickConnectionCarrierLocked(now, passive)
 	if carrier != "" &&
-		(passive == nil || !passive.IsSuspect(carrier, now)) &&
 		(passive == nil || siteKey == "" || !passive.ShouldAvoidSite(carrier, siteKey, now)) {
 		addUnique(carrier)
 	}
@@ -843,9 +828,6 @@ func (s *scorer) candidateOrder(siteKey string, now time.Time, passive *passiveT
 		}
 		if all[i].avoid != all[j].avoid {
 			return !all[i].avoid
-		}
-		if all[i].suspect != all[j].suspect {
-			return !all[i].suspect
 		}
 		if s.cfg.selectionMode == SelectionModePriority {
 			if s.hasTiers {

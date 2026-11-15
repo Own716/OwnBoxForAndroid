@@ -31,7 +31,6 @@ import io.nekohasekai.sagernet.fmt.internal.BalancerBean
 import io.nekohasekai.sagernet.fmt.internal.BalancerMemberResolver
 import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.ui.ProfileSelectActivity
-import io.nekohasekai.sagernet.widget.BalancerNodeListPreference
 import io.nekohasekai.sagernet.widget.OutboundPreference
 import moe.matsuri.nb4a.ui.SimpleMenuPreference
 import java.util.Locale
@@ -55,7 +54,6 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
 
     private lateinit var frontProxyPreference: OutboundPreference
     private lateinit var landingProxyPreference: OutboundPreference
-    private var nodeListPref: BalancerNodeListPreference? = null
     private val groupNameMap = HashMap<Long, String>()
     private val tiersList = ArrayList<BalancerBean.PriorityTier>()
     private val tierPrefs = ArrayList<Preference>()
@@ -309,8 +307,7 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
 
         val groupPref = findPreference<Preference>("balancerTargetGroup")
         val explicitNodesPref = findPreference<Preference>("balancerExplicitNodes")
-        val localNodeListPref = findPreference<BalancerNodeListPreference>("balancerNodeList")
-        nodeListPref = localNodeListPref
+        val localNodeListPref = findPreference<Preference>("balancerNodeList")
         val allGroups = runCatching { SagerDatabase.groupDao.allGroups() }.getOrDefault(emptyList())
         groupNameMap.clear()
         allGroups.filter { !it.ungrouped }.forEach { groupNameMap[it.id] = it.displayName() }
@@ -652,49 +649,36 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         }
         refreshMatchSummaryFn = { ov -> refreshMatchSummary(ov) }
 
+        fun formatNodeOrderSummary(): String {
+            if (proxyList.isEmpty()) return getString(R.string.balancer_node_order_summary_empty)
+            val previewNames = proxyList.take(3).joinToString(", ") { it.displayName() }
+            val suffix = if (proxyList.size > 3) "..." else ""
+            return getString(R.string.balancer_node_order_summary, proxyList.size, previewNames + suffix)
+        }
+
         fun syncNodeListUi(
             type: Int = DataStore.balancerType,
             selectionMode: String = DataStore.balancerSelectionMode,
         ) {
             localNodeListPref?.isVisible = shouldShowNodeList(type, selectionMode)
-            localNodeListPref?.submitList(proxyList, groupNameMap)
+            localNodeListPref?.summary = formatNodeOrderSummary()
         }
         refreshNodeListFn = { syncNodeListUi() }
 
-        localNodeListPref?.bindCallbacks(
-            onMove = { from, to ->
-                BalancerNodeListPreference.moveItem(proxyList, from, to)
-                syncServerProtocol()
-                DataStore.dirty = true
-            },
-            onOrderCommitted = {
-                updateExplicitNodesSummary()
-                refreshMatchSummary()
-            },
-            onRemove = { position ->
-                if (position in proxyList.indices) {
-                    proxyList.removeAt(position)
-                    syncServerProtocol()
-                    DataStore.dirty = true
-                    localNodeListPref.notifyItemRemovedAt(position)
-                    localNodeListPref.isVisible = shouldShowNodeList()
-                    updateExplicitNodesSummary()
-                    refreshMatchSummary()
-                }
-            },
-            onReplace = { position, entity ->
-                replacingIndex = position
-                val excludeIds = buildExcludeIds()
-                selectProfileForAdd.launch(
-                    Intent(this@BalancerSettingsActivity, ProfileSelectActivity::class.java).apply {
-                        putExtra(ProfileSelectActivity.EXTRA_SELECTED, entity)
-                        if (excludeIds.isNotEmpty()) {
-                            putExtra(ProfileSelectActivity.EXTRA_EXCLUDE_IDS, excludeIds)
-                        }
+        localNodeListPref?.setOnPreferenceClickListener {
+            val excludeIds = buildExcludeIds()
+            editNodeOrderLauncher.launch(
+                Intent(this@BalancerSettingsActivity, BalancerNodeOrderActivity::class.java).apply {
+                    putExtra(BalancerNodeOrderActivity.EXTRA_NODE_IDS, proxyList.map { it.id }.toLongArray())
+                    putExtra(BalancerNodeOrderActivity.EXTRA_TIERS_JSON, BalancerBean.tiersToJson(tiersList))
+                    putExtra(BalancerNodeOrderActivity.EXTRA_EDITING_ID, DataStore.editingId)
+                    if (excludeIds.isNotEmpty()) {
+                        putExtra(BalancerNodeOrderActivity.EXTRA_EXCLUDE_IDS, excludeIds)
                     }
-                )
-            },
-        )
+                },
+            )
+            true
+        }
 
         fun updateTypeVisibility(type: Int) {
             val hasGroup = type == BalancerBean.TYPE_GROUP || type == BalancerBean.TYPE_MIXED
@@ -934,7 +918,6 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
     }
 
     private fun launchMultiSelectNodes() {
-        replacingIndex = -1
         val excludeIds = buildExcludeIds()
 
         selectProfileForAdd.launch(
@@ -993,7 +976,35 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         return true
     }
 
-    private var replacingIndex = -1
+    val editNodeOrderLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == Activity.RESULT_OK) runOnDefaultDispatcher {
+                val data = result.data ?: return@runOnDefaultDispatcher
+                val resultIds = data.getLongArrayExtra(BalancerNodeOrderActivity.EXTRA_RESULT_NODE_IDS)
+                    ?: return@runOnDefaultDispatcher
+                val profileMap = if (resultIds.isNotEmpty()) {
+                    ProfileManager.getProfiles(resultIds.toList()).associateBy { it.id }
+                } else {
+                    emptyMap()
+                }
+                val reordered = ArrayList<ProxyEntity>()
+                val seen = HashSet<Long>()
+                for (id in resultIds) {
+                    if (seen.add(id)) {
+                        profileMap[id]?.let { reordered.add(it) }
+                    }
+                }
+                onMainDispatcher {
+                    proxyList.clear()
+                    proxyList.addAll(reordered)
+                    syncServerProtocol()
+                    DataStore.dirty = true
+                    refreshNodeListFn?.invoke()
+                    refreshExplicitSummaryFn?.invoke()
+                    refreshMatchSummaryFn?.invoke(PreviewOverrides())
+                }
+            }
+        }
 
     val selectProfileForAdd =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -1037,7 +1048,6 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
                         val profile = ProfileManager.getProfile(singleId)
                         if (profile != null) {
                             if (!testProfileAllowed(profile)) {
-                                replacingIndex = -1
                                 onMainDispatcher {
                                     MaterialAlertDialogBuilder(this@BalancerSettingsActivity)
                                         .setTitle(R.string.circular_reference)
@@ -1047,18 +1057,7 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
                                 }
                             } else {
                                 onMainDispatcher {
-                                    val targetIndex = replacingIndex
-                                    replacingIndex = -1
-                                    if (targetIndex in proxyList.indices) {
-                                        val existingIdx = proxyList.indexOfFirst { it.id == profile.id }
-                                        if (existingIdx >= 0 && existingIdx != targetIndex) {
-                                            BalancerNodeListPreference.moveItem(proxyList, existingIdx, targetIndex)
-                                            refreshNodeListFn?.invoke()
-                                        } else {
-                                            proxyList[targetIndex] = profile
-                                            nodeListPref?.notifyItemReplacedAt(targetIndex, profile)
-                                        }
-                                    } else if (proxyList.none { it.id == profile.id }) {
+                                    if (proxyList.none { it.id == profile.id }) {
                                         proxyList.add(profile)
                                         refreshNodeListFn?.invoke()
                                     }

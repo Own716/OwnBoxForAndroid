@@ -293,23 +293,31 @@ func TestRouteNewConnectionPassiveLearningSiteStickyAndDialRetries(t *testing.T)
 		t.Fatalf("expected node-b to serve failover traffic")
 	}
 
-	// 4. Three consecutive global unanswered failures across unrelated domains put node-a in suspect backoff.
-	for i := 0; i < 2; i++ {
-		cA, cR := net.Pipe()
-		doneCh := make(chan struct{})
-		go g.NewConnection(context.Background(), cR, adapter.InboundContext{
-			Domain:      fmt.Sprintf("drop-%d.org", i),
-			Destination: M.ParseSocksaddrHostPort("1.1.1.1", 443),
-		}, func(error) {
-			close(doneCh)
-		})
-		_, _ = cA.Write([]byte("CLIENT HELLO"))
-		select {
-		case <-doneCh:
-		case <-time.After(2 * time.Second):
-			t.Fatalf("timed out waiting for unanswered drop %d", i)
+	// 4. Two consecutive global unanswered failures demote active node-a via soft score penalty without global quarantine.
+	cA, cR := net.Pipe()
+	doneCh := make(chan struct{})
+	go g.NewConnection(context.Background(), cR, adapter.InboundContext{
+		Domain:      "drop-0.org",
+		Destination: M.ParseSocksaddrHostPort("1.1.1.1", 443),
+	}, func(error) {
+		close(doneCh)
+	})
+	_, _ = cA.Write([]byte("CLIENT HELLO"))
+	select {
+	case <-doneCh:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("timed out waiting for unanswered drop-0.org")
+	}
+	_ = cA.Close()
+
+	snapAfterDrops := g.GroupSnapshot()
+	if snapAfterDrops.AvailableCount != 2 {
+		t.Fatalf("expected node-a to remain globally available (no suspect cooldown ban), got avail=%d", snapAfterDrops.AvailableCount)
+	}
+	for _, m := range snapAfterDrops.Members {
+		if m.Role == "suspect" || m.SuspectRemainingSec > 0 {
+			t.Fatalf("did not expect global suspect cooldown role in snapshot, got %+v", m)
 		}
-		_ = cA.Close()
 	}
 
 	nodeB.dialCount.Store(0)
@@ -323,7 +331,7 @@ func TestRouteNewConnectionPassiveLearningSiteStickyAndDialRetries(t *testing.T)
 	n, err = fApp.Read(reply)
 	_ = fApp.Close()
 	if err != nil || n == 0 || nodeB.dialCount.Load() != 1 {
-		t.Fatalf("expected suspect backoff to demote node-a and route fresh site to node-b, err=%v bCount=%d", err, nodeB.dialCount.Load())
+		t.Fatalf("expected passive penalty to switch active node to node-b for fresh site, err=%v bCount=%d", err, nodeB.dialCount.Load())
 	}
 
 	// 5. Hard dial error triggers dialRetries automatically on real routed connection
@@ -332,10 +340,6 @@ func TestRouteNewConnectionPassiveLearningSiteStickyAndDialRetries(t *testing.T)
 	nodeA.dropAfterWrite = false
 	nodeA.dialErr = errors.New("connection refused")
 	nodeA.mu.Unlock()
-	if g.passive != nil {
-		// Un-suspect nodeA only for sub.example.com site sticky check by verifying nodeB serves failover
-		// regardless when nodeA hard-fails DialContext.
-	}
 	dApp, dRouter := net.Pipe()
 	go g.NewConnection(context.Background(), dRouter, adapter.InboundContext{
 		Domain:      "sub.example.com",
