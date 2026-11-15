@@ -351,11 +351,20 @@ func (p *prober) runProbeBatch(ctx context.Context, targets []string, now time.T
 		p.checkDoneMu.Unlock()
 	}()
 
+	var earlyMu sync.Mutex
+	recordedEarly := make(map[string]bool, len(uniq))
+
 	b, _ := batch.New[probeOutcome](ctx, batch.WithConcurrencyNum[probeOutcome](probeConcurrency))
 	for _, tag := range uniq {
 		memberTag := tag
 		b.Go(memberTag, func() (probeOutcome, error) {
 			delay, err := p.probeFn(ctx, memberTag)
+			if err == nil && delay > 0 {
+				earlyMu.Lock()
+				recordedEarly[memberTag] = true
+				earlyMu.Unlock()
+				p.recordProbeProgress(memberTag, delay, p.now())
+			}
 			return probeOutcome{tag: memberTag, delay: delay, err: err}, nil
 		})
 	}
@@ -400,6 +409,12 @@ func (p *prober) runProbeBatch(ctx context.Context, targets []string, now time.T
 	p.mu.Unlock()
 
 	for _, out := range outcomes {
+		earlyMu.Lock()
+		alreadyRecorded := recordedEarly[out.tag]
+		earlyMu.Unlock()
+		if alreadyRecorded {
+			continue
+		}
 		p.scorer.recordSample(out.tag, out.delay, out.err, now)
 		if p.history != nil {
 			if out.err == nil && out.delay > 0 {
@@ -421,6 +436,29 @@ func (p *prober) runProbeBatch(ctx context.Context, targets []string, now time.T
 		p.onSwitchFn()
 	}
 	return delays
+}
+
+func (p *prober) recordProbeProgress(tag string, delay uint16, now time.Time) {
+	if delay == 0 {
+		return
+	}
+	if now.IsZero() {
+		now = p.now()
+	}
+	p.scorer.recordSample(tag, delay, nil, now)
+	if p.history != nil {
+		p.history.StoreURLTestHistory(tag, &adapter.URLTestHistory{
+			Time:  now,
+			Delay: delay,
+		})
+	}
+	_, _, switched, _ := p.scorer.evaluateWithTransition(now, p.passive)
+	if p.history != nil {
+		p.history.NotifyUpdated()
+	}
+	if switched && p.onSwitchFn != nil {
+		p.onSwitchFn()
+	}
 }
 
 var _ = N.NetworkTCP

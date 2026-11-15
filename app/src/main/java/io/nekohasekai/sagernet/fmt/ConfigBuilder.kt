@@ -172,7 +172,28 @@ internal fun buildAutoSelectOutbound(
 ): Outbound_AutoSelectOptions = Outbound_AutoSelectOptions().apply {
     type = "autoselect"
     tag = customTag?.takeIf { it.isNotBlank() } ?: TAG_PROXY
-    val uniqueTags = memberTags.distinct()
+
+    val initialDelays = HashMap<String, Int>()
+    memberEntities.forEachIndexed { idx, member ->
+        val mTag = memberTags.getOrNull(idx) ?: return@forEachIndexed
+        if (member.ping > 0) {
+            initialDelays[mTag] = member.ping
+        }
+    }
+    if (initialDelays.isNotEmpty()) {
+        initial_delays = initialDelays
+    }
+
+    val uniqueTags = if (balancer.isPriorityMode()) {
+        memberTags.distinct()
+    } else {
+        memberTags.distinct().sortedWith(compareBy<String> { tag ->
+            val p = initialDelays[tag] ?: 0
+            if (p > 0) 0 else 1
+        }.thenBy { tag ->
+            initialDelays[tag] ?: Int.MAX_VALUE
+        })
+    }
     outbounds = uniqueTags
     val fallbackUrl = defaultTestUrl?.takeIf { it.isNotBlank() }
         ?: (if (SagerNet.isInitialized()) runCatching { DataStore.connectionTestURL }.getOrNull()?.takeIf { it.isNotBlank() } else null)

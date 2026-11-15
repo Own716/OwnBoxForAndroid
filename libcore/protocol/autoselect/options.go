@@ -17,8 +17,9 @@ const (
 
 	ClearLearnedControlTag = ":clear_learned"
 
-	defaultSiteStickyTTL  = 60 * time.Minute
-	defaultMaxDialRetries = 2
+	defaultSiteStickyTTL       = 60 * time.Minute
+	defaultMaxDialRetries      = 2
+	defaultFastFailoverTimeout = 2 * time.Second
 )
 
 // AutoSelectOptions defines JSON configuration for the unified autoselect outbound.
@@ -34,6 +35,7 @@ type AutoSelectOptions struct {
 	InterruptExistConnections bool               `json:"interrupt_exist_connections,omitempty"`
 	LearnFromConnections      *bool              `json:"learn_from_connections,omitempty"`
 	Tiers                     [][]string         `json:"tiers,omitempty"`
+	InitialDelays             map[string]uint16  `json:"initial_delays,omitempty"`
 }
 
 type normalizedConfig struct {

@@ -697,7 +697,9 @@ func (s *scorer) candidateOrder(siteKey string, now time.Time, passive *passiveT
 	carrier := s.pickConnectionCarrierLocked(now, passive)
 	if carrier != "" &&
 		(passive == nil || siteKey == "" || !passive.ShouldAvoidSite(carrier, siteKey, now)) {
-		addUnique(carrier)
+		if len(healthyMap) == 0 || healthyMap[carrier] {
+			addUnique(carrier)
+		}
 	}
 
 	// Sort remaining candidates deterministically

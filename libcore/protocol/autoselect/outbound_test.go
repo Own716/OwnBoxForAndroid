@@ -211,3 +211,43 @@ func TestAutoSelectLearnFromConnectionsDisabledDisablesPassiveTracker(t *testing
 		t.Fatalf("expected LearnEnabled=false and LearnedSiteCount=0, got %+v", snap)
 	}
 }
+
+func TestAutoSelectInitialDelaysColdStartSeed(t *testing.T) {
+	m1 := newMockMember("dead-node")
+	m2 := newMockMember("fast-node")
+	m3 := newMockMember("slow-node")
+	mgr := &mockOutboundManager{
+		items: map[string]adapter.Outbound{
+			"dead-node": m1,
+			"fast-node": m2,
+			"slow-node": m3,
+		},
+	}
+	ctx := newAutoSelectTestContext(mgr)
+
+	ob, err := NewAutoSelect(ctx, nil, log.NewNOPFactory().Logger(), "strategy-seed", AutoSelectOptions{
+		Outbounds:     []string{"dead-node", "fast-node", "slow-node"},
+		SelectionMode: SelectionModeLatency,
+		InitialDelays: map[string]uint16{
+			"fast-node": 150,
+			"slow-node": 800,
+		},
+	})
+	if err != nil {
+		t.Fatalf("NewAutoSelect error: %v", err)
+	}
+
+	if active := ob.Now(); active != "fast-node" {
+		t.Fatalf("expected Now()='fast-node' on cold start with initial delays, got %q", active)
+	}
+
+	snap := ob.GroupSnapshot()
+	if snap.ActiveTag != "fast-node" {
+		t.Fatalf("expected snap.ActiveTag='fast-node', got %q", snap.ActiveTag)
+	}
+
+	candidates := ob.scorer.candidateOrder("", time.Now(), nil)
+	if len(candidates) == 0 || candidates[0] != "fast-node" {
+		t.Fatalf("expected candidateOrder to lead with fast-node, got %v", candidates)
+	}
+}

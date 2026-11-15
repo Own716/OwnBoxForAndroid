@@ -4660,6 +4660,8 @@ public class SingBoxOptions {
 
         public List<List<String>> tiers;
 
+        public Map<String, Integer> initial_delays;
+
     }
 
     public static class Rule_DefaultOptions extends Rule {

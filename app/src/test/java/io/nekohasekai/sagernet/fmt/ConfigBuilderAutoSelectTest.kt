@@ -95,6 +95,37 @@ class ConfigBuilderAutoSelectTest {
     }
 
     @Test
+    fun buildAutoSelectOutboundSeedsInitialDelaysAndPrioritizesHealthyInLatencyMode() {
+        val dead = socksEntity(1L, "Dead", status = 2, ping = 0)
+        val slow = socksEntity(2L, "Slow", status = 1, ping = 800)
+        val fast = socksEntity(3L, "Fast", status = 1, ping = 150)
+
+        val balancer = BalancerBean().apply {
+            selectionMode = BalancerBean.SELECTION_LATENCY
+            balanceEnabled = false
+            interval = 300
+        }
+
+        val option = buildAutoSelectOutbound(
+            balancer = balancer,
+            memberEntities = listOf(dead, slow, fast),
+            memberTags = listOf("tag-dead", "tag-slow", "tag-fast"),
+            customTag = "SG-Latency",
+        )
+
+        val map = option.asMap()
+        @Suppress("UNCHECKED_CAST")
+        val outbounds = map["outbounds"] as List<String>
+        assertEquals(listOf("tag-fast", "tag-slow", "tag-dead"), outbounds)
+
+        @Suppress("UNCHECKED_CAST")
+        val initialDelays = map["initial_delays"] as Map<String, Number>
+        assertEquals(150, initialDelays["tag-fast"]?.toInt())
+        assertEquals(800, initialDelays["tag-slow"]?.toInt())
+        assertFalse(initialDelays.containsKey("tag-dead"))
+    }
+
+    @Test
     fun buildAutoSelectOutboundUsesDefaultsAndAllowsZeroTolerance() {
         val m1 = socksEntity(1L, "SG 01", status = 0, ping = 0)
         val balancer = BalancerBean().apply {

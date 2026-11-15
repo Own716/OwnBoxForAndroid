@@ -195,3 +195,65 @@ func TestProbeConnectivityGuardRollsBackMassOutage(t *testing.T) {
 		t.Fatalf("expected active node n1 preserved during outage, got %s", activeAfter)
 	}
 }
+
+func TestProberStreamingEarlyReadyWithoutWaitingSlowMembers(t *testing.T) {
+	opts := AutoSelectOptions{
+		Outbounds:     []string{"dead-node", "fast-node"},
+		CheckInterval: badoption.Duration(300 * time.Second),
+	}.normalized()
+
+	scorer := newScorer([]string{"dead-node", "fast-node"}, opts)
+	prober := newProber(opts, scorer, nil, urltest.NewHistoryStorage(), nil, nil, nil)
+
+	fastReturned := make(chan struct{})
+	slowCanFinish := make(chan struct{})
+
+	prober.probeFn = func(ctx context.Context, tag string) (uint16, error) {
+		if tag == "fast-node" {
+			close(fastReturned)
+			return 120, nil
+		}
+		// dead-node blocks until signaled
+		select {
+		case <-slowCanFinish:
+			return 0, errTestFail
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		}
+	}
+
+	batchDone := make(chan struct{})
+	go func() {
+		prober.runProbeBatch(context.Background(), []string{"dead-node", "fast-node"}, time.Now())
+		close(batchDone)
+	}()
+
+	// Wait for fast-node to return
+	select {
+	case <-fastReturned:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("timed out waiting for fast probe")
+	}
+
+	// Give a moment for early progress goroutine
+	time.Sleep(20 * time.Millisecond)
+
+	// Verify that fast-node is ALREADY the active node even though slowCanFinish has NOT been closed!
+	if active := scorer.activeTagSnapshot(); active != "fast-node" {
+		t.Fatalf("expected streaming prober to activate fast-node early while slow node is still running, got %q", active)
+	}
+
+	// Release slow node to finish batch
+	close(slowCanFinish)
+
+	select {
+	case <-batchDone:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("timed out waiting for batch to finish")
+	}
+
+	// Still fast-node
+	if active := scorer.activeTagSnapshot(); active != "fast-node" {
+		t.Fatalf("expected fast-node still active after batch completion, got %q", active)
+	}
+}

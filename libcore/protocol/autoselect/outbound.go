@@ -99,6 +99,20 @@ func NewAutoSelect(ctx context.Context, router adapter.Router, logger log.Contex
 	}
 
 	g.resolveOutboundsLocked()
+	if len(options.InitialDelays) > 0 {
+		now := g.now()
+		for tag, delay := range options.InitialDelays {
+			if delay > 0 {
+				g.scorer.recordSample(tag, delay, nil, now)
+				if history != nil {
+					history.StoreURLTestHistory(tag, &adapter.URLTestHistory{
+						Time:  now,
+						Delay: delay,
+					})
+				}
+			}
+		}
+	}
 	g.scorer.evaluate(g.now(), g.passive)
 
 	pauseMgr := service.FromContext[pause.Manager](ctx)
@@ -297,7 +311,7 @@ func (g *AutoSelect) DialContext(ctx context.Context, network string, destinatio
 		var cancel context.CancelFunc
 		if attempts < maxAttempts && len(candidates) > 1 {
 			if _, hasDeadline := ctx.Deadline(); !hasDeadline {
-				attemptCtx, cancel = context.WithTimeout(ctx, probeTimeout)
+				attemptCtx, cancel = context.WithTimeout(ctx, defaultFastFailoverTimeout)
 			}
 		}
 
