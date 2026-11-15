@@ -3,7 +3,6 @@ package autoselect
 import (
 	"context"
 	"errors"
-	"io"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -26,8 +25,6 @@ import (
 
 var (
 	_ adapter.Outbound                = (*AutoSelect)(nil)
-	_ adapter.OutboundGroup           = (*AutoSelect)(nil)
-	_ adapter.URLTestGroup            = (*AutoSelect)(nil)
 	_ adapter.ConnectionHandler       = (*AutoSelect)(nil)
 	_ adapter.PacketConnectionHandler = (*AutoSelect)(nil)
 	_ adapter.InterfaceUpdateListener = (*AutoSelect)(nil)
@@ -187,30 +184,6 @@ func (g *AutoSelect) Now() string {
 	return g.scorer.activeTagSnapshot()
 }
 
-func (g *AutoSelect) Selected(network string) adapter.Outbound {
-	tag := g.Now()
-	if tag == "" && len(g.tags) > 0 {
-		tag = g.tags[0]
-	}
-	ob := g.outboundByTag(tag)
-	if ob != nil && (network == "" || common.Contains(ob.Network(), network)) {
-		return ob
-	}
-	for _, candidate := range g.tags {
-		if m := g.outboundByTag(candidate); m != nil && (network == "" || common.Contains(m.Network(), network)) {
-			return m
-		}
-	}
-	return ob
-}
-
-func (g *AutoSelect) AttachConnection(closer io.Closer) (detach func()) {
-	if g.interruptGroup == nil {
-		return func() {}
-	}
-	return g.interruptGroup.Add(closer, false)
-}
-
 func (g *AutoSelect) PerformUpdateCheck() {
 	g.scorer.evaluate(g.now(), g.passive)
 }
@@ -346,7 +319,7 @@ func (g *AutoSelect) DialContext(ctx context.Context, network string, destinatio
 				conn = newPassiveConn(conn, func(ttfb time.Duration) {
 					g.passive.RecordSuccess(nodeTag, destHost, ttfb)
 				}, func() {
-					g.passive.RecordFailure(nodeTag, destHost)
+					g.onPassiveFailure(nodeTag, destHost)
 				}, g.nowFn)
 			}
 			if g.interruptGroup != nil {
@@ -407,7 +380,7 @@ func (g *AutoSelect) ListenPacket(ctx context.Context, destination M.Socksaddr) 
 				pConn = newPassivePacketConn(pConn, func(ttfb time.Duration) {
 					g.passive.RecordSuccess(nodeTag, destHost, ttfb)
 				}, func() {
-					g.passive.RecordFailure(nodeTag, destHost)
+					g.onPassiveFailure(nodeTag, destHost)
 				}, g.nowFn)
 			}
 			if g.interruptGroup != nil {
@@ -432,6 +405,20 @@ func (g *AutoSelect) resetDialFail(tag string) {
 	g.dialFailMu.Lock()
 	delete(g.dialFails, tag)
 	g.dialFailMu.Unlock()
+}
+
+func (g *AutoSelect) onPassiveFailure(tag, siteHost string) {
+	if g.passive == nil {
+		return
+	}
+	now := g.now()
+	g.passive.RecordFailure(tag, siteHost)
+	if g.passive.IsSuspect(tag, now) {
+		_, _, switched, isFailback := g.scorer.evaluateWithTransition(now, g.passive)
+		if switched {
+			g.handleSwitchInterrupt(isFailback)
+		}
+	}
 }
 
 func (g *AutoSelect) onDialAttemptFailed(tag, siteHost string, now time.Time) {

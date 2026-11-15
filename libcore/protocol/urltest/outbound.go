@@ -950,7 +950,7 @@ type urlTestBatch struct {
 	logger   log.Logger
 	batch    *batch.Batch[any]
 	checked  map[string]bool
-	groups   []adapter.OutboundGroup
+	groups   []adapter.Outbound
 	access   sync.Mutex
 	result   map[string]uint16
 	meta     map[string]ProbeMeta
@@ -981,6 +981,13 @@ func (b *urlTestBatch) test(outbounds []adapter.Outbound, link string, interval 
 		case adapter.OutboundGroup:
 			b.checked[tag] = true
 			b.groups = append(b.groups, nested)
+			b.test(common.FilterNotNil(common.Map(nested.All(), func(it string) adapter.Outbound {
+				member, _ := b.outbound.Outbound(it)
+				return member
+			})), link, interval, force)
+		case interface{ All() []string }:
+			b.checked[tag] = true
+			b.groups = append(b.groups, detour)
 			b.test(common.FilterNotNil(common.Map(nested.All(), func(it string) adapter.Outbound {
 				member, _ := b.outbound.Outbound(it)
 				return member

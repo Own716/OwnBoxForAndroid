@@ -570,7 +570,7 @@ func (s *scorer) pickConnectionCarrierLocked(now time.Time, passive *passiveTrac
 		return s.pinnedTag
 	}
 	if !s.cfg.balanceEnabled {
-		if s.activeTag == "" {
+		if s.activeTag == "" || (passive != nil && passive.IsSuspect(s.activeTag, now)) {
 			s.evaluateLocked(now, passive)
 		}
 		return s.activeTag
@@ -654,16 +654,18 @@ func (s *scorer) candidateOrder(siteKey string, now time.Time, passive *passiveT
 		})
 	}
 
-	// 1. Site sticky preferred healthy node (not avoided for this site)
-	if s.cfg.learnFromConnections && passive != nil && siteKey != "" {
+	// 1. Site sticky preferred healthy node (only when load-balancing is disabled so balancing spreads connections)
+	if !s.cfg.balanceEnabled && s.cfg.learnFromConnections && passive != nil && siteKey != "" {
 		if pref := passive.PreferredSiteNode(siteKey, now); pref != "" && healthyMap[pref] && !passive.ShouldAvoidSite(pref, siteKey, now) {
 			addUnique(pref)
 		}
 	}
 
-	// 2. Current carrier (single active or balanced rotation/per-conn slot) if not site-avoided
+	// 2. Current carrier (single active or balanced rotation/per-conn slot) if neither site-avoided nor suspect
 	carrier := s.pickConnectionCarrierLocked(now, passive)
-	if carrier != "" && (passive == nil || siteKey == "" || !passive.ShouldAvoidSite(carrier, siteKey, now)) {
+	if carrier != "" &&
+		(passive == nil || !passive.IsSuspect(carrier, now)) &&
+		(passive == nil || siteKey == "" || !passive.ShouldAvoidSite(carrier, siteKey, now)) {
 		addUnique(carrier)
 	}
 

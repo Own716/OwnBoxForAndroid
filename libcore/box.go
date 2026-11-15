@@ -643,7 +643,7 @@ func (b *BoxInstance) GetActiveOutboundTag(groupTag string) string {
 	if detour == nil {
 		return ""
 	}
-	return resolveRealTag(detour, "tcp")
+	return resolveRealTag(b.Outbound(), detour, "tcp")
 }
 
 func (b *BoxInstance) resolveStrategyController(groupTag string) urltest.StrategyGroupController {
@@ -709,7 +709,7 @@ func (b *BoxInstance) PinGroupOutbound(groupTag, memberTag string) bool {
 	return ctrl.PinOutbound(memberTag)
 }
 
-func resolveRealTag(detour adapter.Outbound, network string) string {
+func resolveRealTag(outboundMgr adapter.OutboundManager, detour adapter.Outbound, network string) string {
 	visited := make(map[string]bool)
 	for detour != nil {
 		tag := detour.Tag()
@@ -717,15 +717,30 @@ func resolveRealTag(detour adapter.Outbound, network string) string {
 			return tag
 		}
 		visited[tag] = true
-		group, isGroup := detour.(adapter.OutboundGroup)
-		if !isGroup {
-			return tag
+		if group, isGroup := detour.(adapter.OutboundGroup); isGroup {
+			selected := group.Selected(network)
+			if selected == nil {
+				return tag
+			}
+			detour = selected
+			continue
 		}
-		selected := group.Selected(network)
-		if selected == nil {
-			return tag
+		if nowGroup, hasNow := detour.(interface{ Now() string }); hasNow {
+			activeTag := nowGroup.Now()
+			if activeTag == "" || activeTag == tag {
+				return tag
+			}
+			if outboundMgr == nil {
+				return activeTag
+			}
+			next, loaded := outboundMgr.Outbound(activeTag)
+			if !loaded || next == nil {
+				return activeTag
+			}
+			detour = next
+			continue
 		}
-		detour = selected
+		return tag
 	}
 	return ""
 }

@@ -95,10 +95,8 @@ func BuildMemberSnapshots(
 			var hist *adapter.URLTestHistory
 			if outboundMgr != nil {
 				if ob, ok := outboundMgr.Outbound(tag); ok && ob != nil {
-					if g, isGrp := ob.(adapter.OutboundGroup); isGrp {
-						if realTag := ResolveGroupRealTag(g, N.NetworkTCP); realTag != "" {
-							hist = history.LoadURLTestHistory(realTag)
-						}
+					if realTag := ResolveOutboundRealTag(outboundMgr, ob, N.NetworkTCP); realTag != "" && realTag != tag {
+						hist = history.LoadURLTestHistory(realTag)
 					}
 				}
 			}
@@ -122,23 +120,43 @@ func BuildMemberSnapshots(
 
 // ResolveGroupRealTag returns the leaf outbound tag currently chosen by a nested group.
 func ResolveGroupRealTag(grp adapter.OutboundGroup, network string) string {
+	return ResolveOutboundRealTag(nil, grp, network)
+}
+
+// ResolveOutboundRealTag returns the leaf outbound tag currently chosen by a nested group
+// (including strategy groups such as AutoSelect that avoid adapter.OutboundGroup).
+func ResolveOutboundRealTag(outboundMgr adapter.OutboundManager, cur adapter.Outbound, network string) string {
 	visited := make(map[string]bool)
-	var cur adapter.Outbound = grp
 	for cur != nil {
 		tag := cur.Tag()
 		if visited[tag] {
 			return tag
 		}
 		visited[tag] = true
-		nested, isGrp := cur.(adapter.OutboundGroup)
-		if !isGrp {
-			return tag
+		if nested, isGrp := cur.(adapter.OutboundGroup); isGrp {
+			selected := nested.Selected(network)
+			if selected == nil {
+				return tag
+			}
+			cur = selected
+			continue
 		}
-		selected := nested.Selected(network)
-		if selected == nil {
-			return tag
+		if nowGrp, hasNow := cur.(interface{ Now() string }); hasNow {
+			activeTag := nowGrp.Now()
+			if activeTag == "" || activeTag == tag {
+				return tag
+			}
+			if outboundMgr == nil {
+				return activeTag
+			}
+			next, loaded := outboundMgr.Outbound(activeTag)
+			if !loaded || next == nil {
+				return activeTag
+			}
+			cur = next
+			continue
 		}
-		cur = selected
+		return tag
 	}
 	return ""
 }
@@ -169,9 +187,8 @@ func URLTestOutboundsWithMeta(
 	b.Wait()
 	for _, outboundGroup := range testBatch.groups {
 		groupTag := outboundGroup.Tag()
-		if g, isGrp := outboundGroup.(adapter.OutboundGroup); isGrp {
-			if realTag := ResolveGroupRealTag(g, N.NetworkTCP); realTag != "" {
-				groupHistory := history.LoadURLTestHistory(realTag)
+		if realTag := ResolveOutboundRealTag(outboundManager, outboundGroup, N.NetworkTCP); realTag != "" {
+			groupHistory := history.LoadURLTestHistory(realTag)
 				if groupHistory != nil {
 					testBatch.result[groupTag] = groupHistory.Delay
 					testBatch.access.Lock()
@@ -183,7 +200,6 @@ func URLTestOutboundsWithMeta(
 					}
 					testBatch.access.Unlock()
 				}
-			}
 		}
 	}
 	return testBatch.result, testBatch.meta
