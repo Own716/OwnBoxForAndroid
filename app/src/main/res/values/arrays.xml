@@ -777,15 +777,6 @@
         <item>per_connection</item>
     </string-array>
 
-    <string-array name="tolerance_unit_entries">
-        <item>@string/unit_ms</item>
-        <item>@string/unit_s</item>
-    </string-array>
-    <string-array name="tolerance_unit_values" translatable="false">
-        <item>ms</item>
-        <item>s</item>
-    </string-array>
-
     <string-array name="empty_array">
     </string-array>
 

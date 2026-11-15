@@ -192,7 +192,7 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
             }
         }
         // shared menu item
-        menu.findItem(R.id.action_custom_outbound_json)?.isVisible = true
+        menu.findItem(R.id.action_custom_outbound_json)?.isVisible = this !is BalancerSettingsActivity
         menu.findItem(R.id.action_custom_config_json)?.isVisible = true
         return true
     }

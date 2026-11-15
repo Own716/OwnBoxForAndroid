@@ -223,7 +223,8 @@
     <string name="balancer_server_source">伺服器來源</string>
     <string name="balancer_no_group_selected">未選擇分組</string>
     <string name="balancer_explicit_nodes">指定節點</string>
-    <string name="balancer_explicit_nodes_empty">點擊選擇節點（下方清單可拖動調整優先順序）</string>
+    <string name="balancer_explicit_nodes_empty">點擊選擇節點</string>
+    <string name="balancer_node_list_hint">節點優先順序 · 拖動 ≡ 調序 · 點擊替換</string>
     <string name="balancer_explicit_nodes_summary">已選擇 %1$d 個節點：%2$s</string>
     <string name="balancer_name_include_all">分組中的每個配置</string>
     <string name="balancer_selection_mode">選擇方式</string>
@@ -235,7 +236,9 @@
     <string name="balancer_balance_enabled_off_sum">預設關閉：由一個配置承載全部流量，其餘待命。開啟後可將流量分散到已確認可用的配置上。</string>
     <string name="balancer_balance_enabled_on_sum">已開啟：%s。流量將分散到已確認可用的配置上。</string>
     <string name="balancer_preview_title">配置</string>
-    <string name="balancer_preview_summary">分組中 %1$d 個配置有 %2$d 個可用；將執行 %3$d 個。%4$d 個有近期測試結果將被複用。</string>
+    <string name="balancer_preview_summary">所選分組 %1$d 個配置中有 %2$d 個可用；將納入 %3$d 個。%4$d 個有近期測試結果將被複用。</string>
+    <string name="balancer_preview_summary_list">已選清單 %1$d 個配置中有 %2$d 個可用；將納入 %3$d 個。%4$d 個有近期測試結果將被複用。</string>
+    <string name="balancer_preview_summary_mixed">混搭池 %1$d 個配置中有 %2$d 個可用；將納入 %3$d 個。%4$d 個有近期測試結果將被複用。</string>
     <string name="balancer_advanced_title">進階</string>
     <string name="balancer_advanced_show">顯示進階選項</string>
     <string name="balancer_advanced_hide">隱藏進階選項</string>
@@ -247,8 +250,7 @@
     <string name="balancer_cat_chain">鏈式代理與中轉</string>
     <string name="balancer_country_filter">僅限國家</string>
     <string name="balancer_country_filter_any">任意國家 (如 DE, NL, FR)</string>
-    <string name="balancer_run_top_n">執行前</string>
-    <string name="balancer_rank_top_n">排名上限</string>
+    <string name="balancer_run_top_n">最大納入節點數</string>
     <string name="balancer_result_trust_minutes">結果信任時長</string>
     <string name="balancer_skip_failed_within_trust">略過失敗的配置</string>
     <string name="balancer_skip_failed_within_trust_sum">只要結果仍在信任視窗內，就將上次測試失敗的伺服器直接略過。如果測試不可靠、寧願讓選擇器自行判斷，可關閉。</string>
@@ -262,7 +264,7 @@
     <string name="balancer_max_rtt">最大延遲</string>
     <string name="balancer_dial_retries">故障轉移重試</string>
     <string name="balancer_interrupt_on_switch">切換時中斷連線</string>
-    <string name="balancer_interrupt_on_switch_sum">在選擇器因更佳延遲或失敗而切換時生效。開：所有連線立即遷移至新配置。關：進行中的下載在舊配置上完成。無論開關，故障轉移都會中斷連線。</string>
+    <string name="balancer_interrupt_on_switch_sum">因延遲更佳、失效或降級而切換時生效（按優先順序移回高順位由下方單獨開關控制）。開：立即中斷現有活躍連線使其重建至新配置；關：已建立的連線保持執行，新連線切換至新配置。</string>
     <string name="balancer_failback_checks">移回前需通過</string>
     <string name="balancer_failback_delay">無失敗持續</string>
     <string name="balancer_interrupt_on_failback">移回時中斷連線</string>
@@ -274,8 +276,6 @@
     <string name="balancer_balance_mode_timed">按時間輪換 (保持會話穩定)</string>
     <string name="balancer_balance_mode_per_conn">按連線分散 (均衡每條新連線)</string>
     <string name="balancer_balance_interval">輪換間隔</string>
-    <string name="balancer_balance_hint_off">最佳配置承載全部流量；其餘就緒配置保持已驗證狀態，以便隨時接管。</string>
-    <string name="balancer_balance_hint_on">已開啟流量分配：已確認可用的最佳配置將按所選模式共同分擔新連線。</string>
     <string name="balancer_test_url_title">測試 URL</string>
     <string name="balancer_test_url_default">全域延遲測試 URL (%s)</string>
     <string name="balancer_connectivity_url">連通性 URL</string>
@@ -286,6 +286,11 @@
     <string name="balancer_unit_checks">%d 次檢查</string>
     <string name="balancer_unit_ms">%d 毫秒</string>
     <string name="balancer_unlimited">不限</string>
+    <string name="balancer_use_front_proxy">沿用成員所在分組的前置代理</string>
+    <string name="balancer_use_front_proxy_sum">預設關閉：忽略成員各自所屬分組的前置代理；開啟後將沿用。</string>
+    <string name="balancer_use_front_proxy_overridden_sum">已設定下方的自訂前置代理，將優先使用自訂前置代理。</string>
+    <string name="balancer_use_landing_proxy">沿用成員所在分組的落地代理</string>
+    <string name="balancer_use_landing_proxy_sum">預設關閉：忽略成員各自所屬分組的落地代理；開啟後將沿用。</string>
     <string name="strategy_toolbar_subtitle_group">(%s)策略組</string>
     <string name="strategy_header_auto_use">自動選擇使用 %1$s (%2$d個中%3$d個可用)</string>
     <string name="strategy_header_pinned_use">已手動鎖定 %1$s (%2$d個中%3$d個可用)</string>

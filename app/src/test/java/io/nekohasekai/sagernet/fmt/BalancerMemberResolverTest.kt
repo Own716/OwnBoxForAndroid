@@ -260,7 +260,7 @@ class BalancerMemberResolverTest {
     }
 
     @Test
-    fun rankAndRunTopNAreAppliedInLatencyWhilePriorityPreservesManualOrder() {
+    fun runTopNAreAppliedInLatencyWhilePriorityPreservesManualOrderAndZeroMeansUnlimited() {
         val slowFirst = socksEntity(1L, 10L, "Node 1").apply { status = 1; ping = 220 }
         val fastSecond = socksEntity(2L, 10L, "Node 2").apply { status = 1; ping = 25 }
         val midThird = socksEntity(3L, 10L, "Node 3").apply { status = 1; ping = 80 }
@@ -274,7 +274,6 @@ class BalancerMemberResolverTest {
                 targetGroupIds = listOf(10L),
                 explicitProxyIds = listOf(5L),
                 selectionMode = BalancerBean.SELECTION_LATENCY,
-                rankTopN = 4,
                 runTopN = 3,
             ),
             groupProfilesProvider = { listOf(slowFirst, fastSecond, midThird, failedFourth) },
@@ -291,7 +290,6 @@ class BalancerMemberResolverTest {
                 targetGroupIds = listOf(10L),
                 explicitProxyIds = listOf(5L),
                 selectionMode = BalancerBean.SELECTION_PRIORITY,
-                rankTopN = 4,
                 runTopN = 3,
             ),
             groupProfilesProvider = { listOf(slowFirst, fastSecond, midThird, failedFourth) },
@@ -300,5 +298,24 @@ class BalancerMemberResolverTest {
         )
         // Priority preserves exact order [1, 2, 3, 4, 5], capped to first 3
         assertEquals(listOf(1L, 2L, 3L), priorityResult.members.map { it.id })
+
+        val unlimitedBean = BalancerBean().apply {
+            balancerType = BalancerBean.TYPE_MIXED
+            targetGroupIds = mutableListOf(10L)
+            proxies = mutableListOf(5L)
+            selectionMode = BalancerBean.SELECTION_PRIORITY
+            runTopN = 0
+            rankTopN = 0
+            initializeDefaultValues()
+        }
+        assertEquals(0, unlimitedBean.runTopN)
+        assertEquals(0, unlimitedBean.effectiveRunTopN)
+        val unlimitedResult = BalancerMemberResolver.resolve(
+            balancer = unlimitedBean,
+            groupProfilesProvider = { listOf(slowFirst, fastSecond, midThird, failedFourth) },
+            entitiesByIdsProvider = { ids -> ids.mapNotNull { byId[it] } },
+            isGroupDisabled = { false },
+        )
+        assertEquals(listOf(1L, 2L, 3L, 4L, 5L), unlimitedResult.members.map { it.id })
     }
 }

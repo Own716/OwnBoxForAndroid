@@ -1,26 +1,15 @@
 package io.nekohasekai.sagernet.ui.profile
 
-import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
-import android.view.ViewGroup
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.isGone
-import androidx.core.view.isVisible
-import androidx.core.view.updatePadding
-import androidx.core.widget.NestedScrollView
 import androidx.preference.EditTextPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.SwitchPreferenceCompat
-import androidx.recyclerview.widget.ItemTouchHelper
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.DataStore
@@ -28,14 +17,12 @@ import io.nekohasekai.sagernet.database.ProfileManager
 import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.database.preference.EditTextPreferenceModifiers
-import io.nekohasekai.sagernet.databinding.LayoutAddEntityBinding
-import io.nekohasekai.sagernet.databinding.LayoutProfileBinding
 import io.nekohasekai.sagernet.fmt.internal.BalancerBean
 import io.nekohasekai.sagernet.fmt.internal.BalancerMemberResolver
 import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.ui.ProfileSelectActivity
+import io.nekohasekai.sagernet.widget.BalancerNodeListPreference
 import io.nekohasekai.sagernet.widget.OutboundPreference
-import moe.matsuri.nb4a.Protocols.getProtocolColor
 import moe.matsuri.nb4a.ui.SimpleMenuPreference
 import java.util.Locale
 
@@ -51,15 +38,18 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         val include: String? = null,
         val selectionMode: String? = null,
         val runTopN: Int? = null,
-        val rankTopN: Int? = null,
         val resultTrustMinutes: Int? = null,
         val skipFailedWithinTrust: Boolean? = null,
     )
 
     private lateinit var frontProxyPreference: OutboundPreference
     private lateinit var landingProxyPreference: OutboundPreference
+    private var nodeListPref: BalancerNodeListPreference? = null
+    private val groupNameMap = HashMap<Long, String>()
     private var refreshMatchSummaryFn: ((PreviewOverrides) -> Unit)? = null
     private var refreshExplicitSummaryFn: (() -> Unit)? = null
+    private var refreshNodeListFn: (() -> Unit)? = null
+    private var refreshChainProxyUiFn: ((String?) -> Unit)? = null
     private var advancedExpanded = false
 
     val selectProfileForAddFront = registerForActivityResult(
@@ -74,6 +64,7 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
                 if (::frontProxyPreference.isInitialized) {
                     frontProxyPreference.value = OutboundPreference.VALUE_SELECT_PROFILE
                 }
+                refreshChainProxyUiFn?.invoke(OutboundPreference.VALUE_SELECT_PROFILE)
                 refreshMatchSummaryFn?.invoke(PreviewOverrides())
             }
         }
@@ -136,8 +127,9 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         DataStore.balancerBalanceIntervalSec = balanceIntervalSec.takeIf { it > 0 } ?: 30
 
         DataStore.balancerCountryFilter = countryFilter ?: ""
-        DataStore.balancerRunTopN = runTopN
-        DataStore.balancerRankTopN = rankTopN
+        val effectiveTopN = effectiveRunTopN
+        DataStore.balancerRunTopN = effectiveTopN
+        DataStore.balancerRankTopN = effectiveTopN
         DataStore.balancerResultTrustMinutes = resultTrustMinutes
         DataStore.balancerSkipFailedWithinTrust = skipFailedWithinTrust
 
@@ -148,8 +140,13 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         DataStore.balancerWatchIntervalSec = watchIntervalSec
         DataStore.balancerSampleCount = sampleCount
 
-        DataStore.balancerTolerance = tolerance
-        DataStore.balancerToleranceUnit = if (toleranceUnit.isNullOrBlank()) "ms" else toleranceUnit
+        val normalizedTolerance = if (toleranceUnit == "s") {
+            tolerance.coerceAtLeast(0) * 1000
+        } else {
+            tolerance
+        }
+        DataStore.balancerTolerance = normalizedTolerance
+        DataStore.balancerToleranceUnit = "ms"
         DataStore.balancerMaxRttMs = maxRttMs
         DataStore.balancerDialRetries = dialRetries
         DataStore.balancerInterruptOnSwitch = interruptOnSwitch
@@ -196,7 +193,7 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
 
         countryFilter = DataStore.balancerCountryFilter.trim()
         runTopN = DataStore.balancerRunTopN
-        rankTopN = DataStore.balancerRankTopN
+        rankTopN = DataStore.balancerRunTopN
         resultTrustMinutes = DataStore.balancerResultTrustMinutes
         skipFailedWithinTrust = DataStore.balancerSkipFailedWithinTrust
 
@@ -208,7 +205,7 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         sampleCount = DataStore.balancerSampleCount
 
         tolerance = DataStore.balancerTolerance
-        toleranceUnit = DataStore.balancerToleranceUnit
+        toleranceUnit = "ms"
         maxRttMs = DataStore.balancerMaxRttMs
         dialRetries = DataStore.balancerDialRetries
         interruptOnSwitch = DataStore.balancerInterruptOnSwitch
@@ -266,6 +263,7 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
                     )
                     false
                 } else {
+                    refreshChainProxyUiFn?.invoke(newValue.toString())
                     runOnMainDispatcher { refreshMatchSummaryFn?.invoke(PreviewOverrides()) }
                     true
                 }
@@ -297,7 +295,11 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
 
         val groupPref = findPreference<Preference>("balancerTargetGroup")
         val explicitNodesPref = findPreference<Preference>("balancerExplicitNodes")
+        val localNodeListPref = findPreference<BalancerNodeListPreference>("balancerNodeList")
+        nodeListPref = localNodeListPref
         val allGroups = runCatching { SagerDatabase.groupDao.allGroups() }.getOrDefault(emptyList())
+        groupNameMap.clear()
+        allGroups.filter { !it.ungrouped }.forEach { groupNameMap[it.id] = it.displayName() }
 
         fun updateGroupSummary() {
             val selectedGids = parseGroupIds(DataStore.balancerTargetGroups).toSet()
@@ -374,7 +376,6 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
             val includePattern = overrides.include ?: DataStore.balancerNameInclude
             val selectionMode = overrides.selectionMode ?: DataStore.balancerSelectionMode
             val runTopN = overrides.runTopN ?: DataStore.balancerRunTopN
-            val rankTopN = overrides.rankTopN ?: DataStore.balancerRankTopN
             val trustMin = overrides.resultTrustMinutes ?: DataStore.balancerResultTrustMinutes
             val skipFailed = overrides.skipFailedWithinTrust ?: DataStore.balancerSkipFailedWithinTrust
             val selfId = DataStore.editingId
@@ -403,12 +404,12 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
                         countryFilter = countryPattern,
                         selectionMode = selectionMode,
                         runTopN = runTopN,
-                        rankTopN = rankTopN,
+                        rankTopN = runTopN,
                         resultTrustMinutes = trustMin,
                         skipFailedWithinTrust = skipFailed,
                     )
                 )
-                val summaryText = formatPreviewSummary(res)
+                val summaryText = formatPreviewSummary(res, type)
                 onMainDispatcher {
                     matchSummaryPref?.summary = summaryText
                 }
@@ -416,21 +417,56 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         }
         refreshMatchSummaryFn = { ov -> refreshMatchSummary(ov) }
 
+        fun syncNodeListUi(type: Int = DataStore.balancerType) {
+            val hasList = hasExplicitListType(type)
+            localNodeListPref?.isVisible = hasList && proxyList.isNotEmpty()
+            localNodeListPref?.submitList(proxyList, groupNameMap)
+        }
+        refreshNodeListFn = { syncNodeListUi() }
+
+        localNodeListPref?.bindCallbacks(
+            onMove = { from, to ->
+                BalancerNodeListPreference.moveItem(proxyList, from, to)
+                syncServerProtocol()
+                DataStore.dirty = true
+            },
+            onOrderCommitted = {
+                updateExplicitNodesSummary()
+                refreshMatchSummary()
+            },
+            onRemove = { position ->
+                if (position in proxyList.indices) {
+                    proxyList.removeAt(position)
+                    syncServerProtocol()
+                    DataStore.dirty = true
+                    localNodeListPref.notifyItemRemovedAt(position)
+                    localNodeListPref.isVisible = hasExplicitListType(DataStore.balancerType) && proxyList.isNotEmpty()
+                    updateExplicitNodesSummary()
+                    refreshMatchSummary()
+                }
+            },
+            onReplace = { position, entity ->
+                replacingIndex = position
+                val excludeIds = buildExcludeIds()
+                selectProfileForAdd.launch(
+                    Intent(this@BalancerSettingsActivity, ProfileSelectActivity::class.java).apply {
+                        putExtra(ProfileSelectActivity.EXTRA_SELECTED, entity)
+                        if (excludeIds.isNotEmpty()) {
+                            putExtra(ProfileSelectActivity.EXTRA_EXCLUDE_IDS, excludeIds)
+                        }
+                    }
+                )
+            },
+        )
+
         fun updateTypeVisibility(type: Int) {
             val hasGroup = type == BalancerBean.TYPE_GROUP || type == BalancerBean.TYPE_MIXED
-            val hasList = type == BalancerBean.TYPE_LIST || type == BalancerBean.TYPE_MIXED
+            val hasList = hasExplicitListType(type)
             groupPref?.isVisible = hasGroup
             nameIncludePref?.isVisible = hasGroup
             nameExcludePref?.isVisible = hasGroup
             explicitNodesPref?.isVisible = hasList
-            useFrontProxyPref?.isVisible = hasGroup
-            useLandingProxyPref?.isVisible = hasGroup
-            if (::configurationList.isInitialized) {
-                configurationList.isVisible = hasList
-            }
-            if (::listCell.isInitialized) {
-                listCell.isVisible = hasList
-            }
+            localNodeListPref?.isVisible = hasList && proxyList.isNotEmpty()
             refreshMatchSummary()
         }
 
@@ -495,9 +531,6 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         bindIntPref("balancerRunTopN", 300, 0, R.string.balancer_unit_profiles, zeroAsUnlimited = true) { v ->
             refreshMatchSummary(PreviewOverrides(runTopN = v))
         }
-        bindIntPref("balancerRankTopN", 1000, 0, R.string.balancer_unit_profiles, zeroAsUnlimited = true) { v ->
-            refreshMatchSummary(PreviewOverrides(rankTopN = v))
-        }
         bindIntPref("balancerResultTrustMinutes", 1440, 0, R.string.balancer_unit_minutes) { v ->
             refreshMatchSummary(PreviewOverrides(resultTrustMinutes = v))
         }
@@ -512,39 +545,7 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         bindIntPref("balancerFullScanIntervalSec", 600, 10, R.string.balancer_unit_seconds)
         bindIntPref("balancerWatchIntervalSec", 15, 0, R.string.balancer_unit_seconds)
         bindIntPref("balancerSampleCount", 10, 1, null)
-
-        val tolerancePref = findPreference<EditTextPreference>("balancerTolerance")
-        val toleranceUnitPref = findPreference<SimpleMenuPreference>("balancerToleranceUnit")
-        tolerancePref?.setOnBindEditTextListener(EditTextPreferenceModifiers.Number)
-        fun updateToleranceSummary(unitOverride: String? = null) {
-            val text = tolerancePref?.text?.trim()
-            val unit = unitOverride ?: DataStore.balancerToleranceUnit
-            val value = text?.toIntOrNull()
-            tolerancePref?.summary = when {
-                value != null && value >= 0 -> "$value $unit"
-                unit == "s" -> "1 s"
-                else -> "30 ms"
-            }
-        }
-        tolerancePref?.setOnPreferenceChangeListener { _, newValue ->
-            val parsed = (newValue as? String)?.trim()?.toIntOrNull()
-            if (parsed != null && parsed >= 0) {
-                DataStore.balancerTolerance = parsed
-                tolerancePref.text = parsed.toString()
-                updateToleranceSummary()
-                true
-            } else {
-                false
-            }
-        }
-        toleranceUnitPref?.value = DataStore.balancerToleranceUnit
-        toleranceUnitPref?.setOnPreferenceChangeListener { _, newValue ->
-            val unit = (newValue as? String) ?: "ms"
-            DataStore.balancerToleranceUnit = unit
-            updateToleranceSummary(unit)
-            true
-        }
-        updateToleranceSummary()
+        bindIntPref("balancerTolerance", 30, 0, R.string.balancer_unit_ms)
 
         bindIntPref("balancerMaxRttMs", 0, 0, R.string.balancer_unit_ms, zeroAsUnlimited = true)
         bindIntPref("balancerDialRetries", 2, 0, null)
@@ -558,7 +559,6 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         val balanceSwitchPref = findPreference<SwitchPreferenceCompat>("balancerBalanceEnabled")
         val balanceModePref = findPreference<SimpleMenuPreference>("balancerBalanceMode")
         val balanceIntervalPref = bindIntPref("balancerBalanceIntervalSec", 30, 1, R.string.balancer_unit_seconds)
-        val balanceHintPref = findPreference<Preference>("balancerBalanceHint")
         val selectionModePref = findPreference<SimpleMenuPreference>("balancerSelectionMode")
 
         fun updateSelectionAndBalanceUi(
@@ -599,8 +599,20 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
 
             balanceModePref?.isEnabled = balanceOn
             balanceIntervalPref?.isEnabled = balanceOn && balMode != BalancerBean.BALANCE_PER_CONNECTION
-            balanceHintPref?.setSummary(if (balanceOn) R.string.balancer_balance_hint_on else R.string.balancer_balance_hint_off)
         }
+
+        fun updateChainProxyUi(frontTmpOverride: String? = null) {
+            val frontTmp = frontTmpOverride ?: DataStore.balancerFrontProxyTmp.toString()
+            val customFrontSelected = frontTmp == OutboundPreference.VALUE_SELECT_PROFILE
+            useFrontProxyPref?.isEnabled = !customFrontSelected
+            useFrontProxyPref?.setSummary(
+                if (customFrontSelected) R.string.balancer_use_front_proxy_overridden_sum
+                else R.string.balancer_use_front_proxy_sum
+            )
+            useLandingProxyPref?.setSummary(R.string.balancer_use_landing_proxy_sum)
+        }
+        refreshChainProxyUiFn = { ov -> updateChainProxyUi(ov) }
+        updateChainProxyUi()
 
         selectionModePref?.setOnPreferenceChangeListener { _, newValue ->
             val mode = (newValue as? String) ?: BalancerBean.SELECTION_LATENCY
@@ -690,12 +702,35 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
             .filter { it > 0L }
     }
 
-    private fun formatPreviewSummary(res: BalancerMemberResolver.ResolutionResult): String {
+    private fun hasExplicitListType(type: Int): Boolean =
+        type == BalancerBean.TYPE_LIST || type == BalancerBean.TYPE_MIXED
+
+    private fun syncServerProtocol() {
+        DataStore.serverProtocol = proxyList.joinToString(",") { it.id.toString() }
+    }
+
+    private fun buildExcludeIds(): LongArray {
+        val excludeList = mutableListOf<Long>()
+        if (DataStore.editingId > 0L) excludeList.add(DataStore.editingId)
+        if (DataStore.balancerFrontProxy > 0L) excludeList.add(DataStore.balancerFrontProxy)
+        if (DataStore.balancerLandingProxy > 0L) excludeList.add(DataStore.balancerLandingProxy)
+        return excludeList.toLongArray()
+    }
+
+    private fun formatPreviewSummary(
+        res: BalancerMemberResolver.ResolutionResult,
+        type: Int = DataStore.balancerType,
+    ): String {
+        val resId = when (type) {
+            BalancerBean.TYPE_LIST -> R.string.balancer_preview_summary_list
+            BalancerBean.TYPE_MIXED -> R.string.balancer_preview_summary_mixed
+            else -> R.string.balancer_preview_summary
+        }
         val base = if (res.matchedCandidateCount <= 0) {
             getString(R.string.balancer_match_summary_empty)
         } else {
             getString(
-                R.string.balancer_preview_summary,
+                resId,
                 res.matchedCandidateCount,
                 res.availableCount,
                 res.totalCount,
@@ -710,11 +745,8 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
     }
 
     private fun launchMultiSelectNodes() {
-        replacing = 0
-        val excludeList = mutableListOf<Long>()
-        if (DataStore.editingId > 0L) excludeList.add(DataStore.editingId)
-        if (DataStore.balancerFrontProxy > 0L) excludeList.add(DataStore.balancerFrontProxy)
-        if (DataStore.balancerLandingProxy > 0L) excludeList.add(DataStore.balancerLandingProxy)
+        replacingIndex = -1
+        val excludeIds = buildExcludeIds()
 
         selectProfileForAdd.launch(
             Intent(this@BalancerSettingsActivity, ProfileSelectActivity::class.java).apply {
@@ -723,174 +755,41 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
                     ProfileSelectActivity.EXTRA_SELECTED_IDS,
                     proxyList.map { it.id }.toLongArray(),
                 )
-                if (excludeList.isNotEmpty()) {
-                    putExtra(ProfileSelectActivity.EXTRA_EXCLUDE_IDS, excludeList.toLongArray())
+                if (excludeIds.isNotEmpty()) {
+                    putExtra(ProfileSelectActivity.EXTRA_EXCLUDE_IDS, excludeIds)
                 }
             }
         )
     }
 
-    lateinit var configurationList: RecyclerView
-    lateinit var configurationAdapter: ProxiesAdapter
-    lateinit var layoutManager: LinearLayoutManager
-    lateinit var listCell: View
-
-    @SuppressLint("InlinedApi")
     override fun onCreate(savedInstanceState: Bundle?) {
         advancedExpanded = savedInstanceState?.getBoolean(STATE_ADVANCED_EXPANDED, false) ?: false
         super.onCreate(savedInstanceState)
-
         supportActionBar?.setTitle(R.string.balancer_settings_autoselect)
-        configurationList = findViewById(R.id.configuration_list)
-        listCell = findViewById(R.id.list_cell)
-        val hasList = DataStore.balancerType == BalancerBean.TYPE_LIST || DataStore.balancerType == BalancerBean.TYPE_MIXED
-        configurationList.isVisible = hasList
-        listCell.isVisible = hasList
-        layoutManager = FixedLinearLayoutManager(configurationList)
-        configurationList.layoutManager = layoutManager
-        configurationAdapter = ProxiesAdapter()
-        configurationList.adapter = configurationAdapter
-        configurationList.isNestedScrollingEnabled = false
-
-        runOnDefaultDispatcher {
-            configurationAdapter.reload()
-        }
-
-        findViewById<NestedScrollView>(R.id.nested_scroll_view)?.apply {
-            clipToPadding = false
-            ViewCompat.setOnApplyWindowInsetsListener(this) { v, insets ->
-                val navBars = insets.getInsets(
-                    WindowInsetsCompat.Type.navigationBars() or WindowInsetsCompat.Type.systemBars()
-                )
-                v.updatePadding(bottom = navBars.bottom)
-                insets
-            }
-            ViewCompat.requestApplyInsets(this)
-        }
-
-        ItemTouchHelper(object : ItemTouchHelper.SimpleCallback(
-            ItemTouchHelper.UP or ItemTouchHelper.DOWN, ItemTouchHelper.START
-        ) {
-            override fun getSwipeDirs(
-                recyclerView: RecyclerView,
-                viewHolder: RecyclerView.ViewHolder,
-            ) = if (viewHolder is ProfileHolder) {
-                super.getSwipeDirs(recyclerView, viewHolder)
-            } else {
-                0
-            }
-
-            override fun getDragDirs(
-                recyclerView: RecyclerView,
-                viewHolder: RecyclerView.ViewHolder,
-            ) = if (viewHolder is ProfileHolder) {
-                super.getDragDirs(recyclerView, viewHolder)
-            } else {
-                0
-            }
-
-            override fun onMove(
-                recyclerView: RecyclerView,
-                viewHolder: RecyclerView.ViewHolder,
-                target: RecyclerView.ViewHolder,
-            ): Boolean {
-                return if (target !is ProfileHolder) {
-                    false
-                } else {
-                    configurationAdapter.move(
-                        viewHolder.bindingAdapterPosition,
-                        target.bindingAdapterPosition,
-                    )
-                    true
-                }
-            }
-
-            override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
-                configurationAdapter.remove(viewHolder.bindingAdapterPosition)
-            }
-        }).attachToRecyclerView(configurationList)
     }
 
     override fun PreferenceFragmentCompat.viewCreated(view: View, savedInstanceState: Bundle?) {
-        view.rootView.findViewById<RecyclerView>(R.id.recycler_view)?.apply {
-            isNestedScrollingEnabled = false
-            (layoutParams ?: ViewGroup.LayoutParams(-1, -2)).apply {
-                height = -2
-                layoutParams = this
-            }
-        }
-
-        if (::configurationAdapter.isInitialized) {
-            runOnDefaultDispatcher {
-                configurationAdapter.reload()
-            }
+        runOnDefaultDispatcher {
+            reloadExplicitNodes()
         }
     }
 
-    inner class ProxiesAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
-
-        suspend fun reload() {
-            val idList = DataStore.serverProtocol.split(",")
-                .mapNotNull { it.takeIf { s -> s.isNotBlank() }?.toLongOrNull() }
-            val loaded = ArrayList<ProxyEntity>()
-            if (idList.isNotEmpty()) {
-                val profiles = ProfileManager.getProfiles(idList).associateBy { it.id }
-                for (id in idList) {
-                    profiles[id]?.let { loaded.add(it) }
-                }
-            }
-            onMainDispatcher {
-                proxyList.clear()
-                proxyList.addAll(loaded)
-                notifyDataSetChanged()
-                refreshExplicitSummaryFn?.invoke()
-                refreshMatchSummaryFn?.invoke(PreviewOverrides())
+    private suspend fun reloadExplicitNodes() {
+        val idList = DataStore.serverProtocol.split(",")
+            .mapNotNull { it.takeIf { s -> s.isNotBlank() }?.toLongOrNull() }
+        val loaded = ArrayList<ProxyEntity>()
+        if (idList.isNotEmpty()) {
+            val profiles = ProfileManager.getProfiles(idList).associateBy { it.id }
+            for (id in idList) {
+                profiles[id]?.let { loaded.add(it) }
             }
         }
-
-        fun move(from: Int, to: Int) {
-            val toMove = proxyList[to - 1]
-            proxyList[to - 1] = proxyList[from - 1]
-            proxyList[from - 1] = toMove
-            notifyItemMoved(from, to)
-            DataStore.dirty = true
-            refreshExplicitSummaryFn?.invoke()
-        }
-
-        fun remove(index: Int) {
-            proxyList.removeAt(index - 1)
-            notifyItemRemoved(index)
-            DataStore.dirty = true
+        onMainDispatcher {
+            proxyList.clear()
+            proxyList.addAll(loaded)
+            refreshNodeListFn?.invoke()
             refreshExplicitSummaryFn?.invoke()
             refreshMatchSummaryFn?.invoke(PreviewOverrides())
-        }
-
-        override fun getItemId(position: Int): Long {
-            return if (position == 0) 0 else proxyList[position - 1].id
-        }
-
-        override fun getItemViewType(position: Int): Int {
-            return if (position == 0) 0 else 1
-        }
-
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
-            return if (viewType == 0) {
-                AddHolder(LayoutAddEntityBinding.inflate(layoutInflater, parent, false))
-            } else {
-                ProfileHolder(LayoutProfileBinding.inflate(layoutInflater, parent, false))
-            }
-        }
-
-        override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
-            if (holder is AddHolder) {
-                holder.bind()
-            } else if (holder is ProfileHolder) {
-                holder.bind(proxyList[position - 1])
-            }
-        }
-
-        override fun getItemCount(): Int {
-            return proxyList.size + 1
         }
     }
 
@@ -905,7 +804,7 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         return true
     }
 
-    var replacing = 0
+    private var replacingIndex = -1
 
     val selectProfileForAdd =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -938,7 +837,8 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
                         }
                         proxyList.clear()
                         proxyList.addAll(newProxyList)
-                        configurationAdapter.notifyDataSetChanged()
+                        syncServerProtocol()
+                        refreshNodeListFn?.invoke()
                         refreshExplicitSummaryFn?.invoke()
                         refreshMatchSummaryFn?.invoke(PreviewOverrides())
                     }
@@ -948,6 +848,7 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
                         val profile = ProfileManager.getProfile(singleId)
                         if (profile != null) {
                             if (!testProfileAllowed(profile)) {
+                                replacingIndex = -1
                                 onMainDispatcher {
                                     MaterialAlertDialogBuilder(this@BalancerSettingsActivity)
                                         .setTitle(R.string.circular_reference)
@@ -957,13 +858,22 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
                                 }
                             } else {
                                 onMainDispatcher {
-                                    if (replacing != 0 && replacing <= proxyList.size) {
-                                        proxyList[replacing - 1] = profile
-                                        configurationAdapter.notifyItemChanged(replacing)
+                                    val targetIndex = replacingIndex
+                                    replacingIndex = -1
+                                    if (targetIndex in proxyList.indices) {
+                                        val existingIdx = proxyList.indexOfFirst { it.id == profile.id }
+                                        if (existingIdx >= 0 && existingIdx != targetIndex) {
+                                            BalancerNodeListPreference.moveItem(proxyList, existingIdx, targetIndex)
+                                            refreshNodeListFn?.invoke()
+                                        } else {
+                                            proxyList[targetIndex] = profile
+                                            nodeListPref?.notifyItemReplacedAt(targetIndex, profile)
+                                        }
                                     } else if (proxyList.none { it.id == profile.id }) {
                                         proxyList.add(profile)
-                                        configurationAdapter.notifyItemInserted(proxyList.size)
+                                        refreshNodeListFn?.invoke()
                                     }
+                                    syncServerProtocol()
                                     refreshExplicitSummaryFn?.invoke()
                                     refreshMatchSummaryFn?.invoke(PreviewOverrides())
                                 }
@@ -973,63 +883,4 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
                 }
             }
         }
-
-    inner class AddHolder(val binding: LayoutAddEntityBinding) :
-        RecyclerView.ViewHolder(binding.root) {
-        fun bind() {
-            binding.root.setOnClickListener {
-                launchMultiSelectNodes()
-            }
-        }
-    }
-
-    inner class ProfileHolder(val binding: LayoutProfileBinding) :
-        RecyclerView.ViewHolder(binding.root) {
-
-        fun bind(proxyEntity: ProxyEntity) {
-            val profile = proxyEntity.requireBean()
-
-            binding.profileName.text = profile.displayName()
-            binding.profileType.text = proxyEntity.displayType()
-            binding.profileType.setTextColor(getProtocolColor(proxyEntity.type))
-
-            val serverAddress = profile.displayAddress().trim()
-            val group = if (proxyEntity.groupId > 0L) {
-                runCatching { SagerDatabase.groupDao.getById(proxyEntity.groupId) }.getOrNull()
-            } else {
-                null
-            }
-            val groupName = group?.takeIf { !it.ungrouped }?.name?.trim()?.takeIf {
-                it.isNotBlank() && it != "null" && it != "[]"
-            }
-
-            val detailText = if (groupName != null) {
-                if (serverAddress.isNotBlank()) "$serverAddress      [$groupName]" else "[$groupName]"
-            } else {
-                serverAddress
-            }
-
-            binding.profileAddress.text = detailText
-            binding.profileAddress.isSelected = true
-            (binding.profileAddress.parent as View).isVisible = detailText.isNotBlank()
-            binding.trafficText.text = ""
-            binding.trafficText.isGone = true
-
-            binding.edit.setImageResource(R.drawable.ic_image_edit)
-            binding.edit.setOnClickListener {
-                replacing = bindingAdapterPosition
-                selectProfileForAdd.launch(
-                    Intent(this@BalancerSettingsActivity, ProfileSelectActivity::class.java)
-                )
-            }
-            binding.remove.isVisible = true
-            binding.remove.setOnClickListener {
-                val pos = bindingAdapterPosition
-                if (pos > 0 && pos <= proxyList.size) {
-                    configurationAdapter.remove(pos)
-                }
-            }
-            binding.share.isVisible = false
-        }
-    }
 }

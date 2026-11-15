@@ -154,6 +154,12 @@ public class BalancerBean extends InternalBean {
         return prefix;
     }
 
+    public int getEffectiveRunTopN() {
+        if (runTopN <= 0) return 0;
+        if (rankTopN > 0 && rankTopN < runTopN) return rankTopN;
+        return runTopN;
+    }
+
     private void resetV6Defaults() {
         selectionMode = SELECTION_LATENCY;
         balanceEnabled = false;
@@ -228,8 +234,8 @@ public class BalancerBean extends InternalBean {
         }
         if (balanceIntervalSec <= 0) balanceIntervalSec = 30;
         if (countryFilter == null) countryFilter = "";
-        if (runTopN <= 0) runTopN = 300;
-        if (rankTopN <= 0) rankTopN = 1000;
+        if (runTopN < 0) runTopN = 300;
+        if (rankTopN < 0) rankTopN = 1000;
         if (resultTrustMinutes < 0) resultTrustMinutes = 1440;
         if (standbySize < 0) standbySize = 3;
         if (intensiveCheckCount <= 0) intensiveCheckCount = 8;

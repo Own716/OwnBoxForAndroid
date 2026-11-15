@@ -16,10 +16,10 @@
 
         <item name="android:colorBackground">@color/md3_background</item>
         <item name="colorSurface">@color/md3_surface</item>
-        <item name="android:textColorPrimary">@color/md3_text_primary</item>
-        <item name="android:textColorSecondary">@color/md3_text_secondary</item>
-        <item name="colorOnSurface">?android:attr/textColorPrimary</item>
-        <item name="colorOnSurfaceVariant">?android:attr/textColorSecondary</item>
+        <item name="android:textColorPrimary">@color/text_color_primary</item>
+        <item name="android:textColorSecondary">@color/text_color_secondary</item>
+        <item name="colorOnSurface">@color/md3_text_primary</item>
+        <item name="colorOnSurfaceVariant">@color/md3_text_secondary</item>
         <item name="colorSurfaceVariant">@color/md3_background</item>
         <item name="colorOutline">@color/card_stroke</item>
 
@@ -117,10 +117,10 @@
 
         <item name="android:colorBackground">@color/md3_background</item>
         <item name="colorSurface">@color/md3_surface</item>
-        <item name="android:textColorPrimary">@color/md3_text_primary</item>
-        <item name="android:textColorSecondary">@color/md3_text_secondary</item>
-        <item name="colorOnSurface">?android:attr/textColorPrimary</item>
-        <item name="colorOnSurfaceVariant">?android:attr/textColorSecondary</item>
+        <item name="android:textColorPrimary">@color/text_color_primary</item>
+        <item name="android:textColorSecondary">@color/text_color_secondary</item>
+        <item name="colorOnSurface">@color/md3_text_primary</item>
+        <item name="colorOnSurfaceVariant">@color/md3_text_secondary</item>
         <item name="colorSurfaceVariant">@color/md3_background</item>
         <item name="colorControlActivated">?colorPrimary</item>
         <item name="textAppearanceHeadlineLarge">?attr/textAppearanceHeadline4</item>
@@ -851,8 +851,8 @@
         <item name="android:windowBackground">@color/black</item>
         <item name="colorSurface">@color/black</item>
         <item name="cardElevatedSurfaceColor">@color/color_black_theme_card_elevated</item>
-        <item name="android:textColorPrimary">@color/white</item>
-        <item name="android:textColorSecondary">@color/color_black_theme_text_secondary</item>
+        <item name="android:textColorPrimary">@color/text_color_primary_black</item>
+        <item name="android:textColorSecondary">@color/text_color_secondary_black</item>
         <item name="android:textColorTertiary">@color/color_black_theme_text_tertiary</item>
         <item name="colorOnSurface">@color/white</item>
         <item name="colorOnSurfaceVariant">@color/color_black_theme_text_secondary</item>
@@ -900,8 +900,8 @@
         <item name="colorOnPrimary">@color/white</item>
         <item name="colorOnSurface">@color/color_white_theme_text_primary</item>
         <item name="colorOnSurfaceVariant">@color/color_white_theme_text_secondary</item>
-        <item name="android:textColorPrimary">@color/color_white_theme_text_primary</item>
-        <item name="android:textColorSecondary">@color/color_white_theme_text_secondary</item>
+        <item name="android:textColorPrimary">@color/text_color_primary_white</item>
+        <item name="android:textColorSecondary">@color/text_color_secondary_white</item>
         <item name="android:colorBackground">@color/color_white_theme_bg</item>
         <item name="android:windowBackground">@color/color_white_theme_bg</item>
         <item name="actionBarTheme">@style/ThemeOverlay.SagerNet.Toolbar</item>
@@ -914,10 +914,10 @@
         <item name="fabColorBackground">@color/color_white_theme_accent</item>
         <item name="selectedColorPrimary">@color/color_white_theme_accent</item>
         <item name="itemShapeFillColor">@color/color_white_theme_material_300</item>
-        <item name="accentOrTextSecondary">?android:textColorSecondary</item>
-        <item name="accentOrTextPrimary">?android:textColorPrimary</item>
-        <item name="primaryOrTextSecondary">?android:textColorSecondary</item>
-        <item name="primaryOrTextPrimary">?android:textColorPrimary</item>
+        <item name="accentOrTextSecondary">@color/color_white_theme_text_secondary</item>
+        <item name="accentOrTextPrimary">@color/color_white_theme_text_primary</item>
+        <item name="primaryOrTextSecondary">@color/color_white_theme_text_secondary</item>
+        <item name="primaryOrTextPrimary">@color/color_white_theme_text_primary</item>
         <item name="appBarLayoutStyle">@style/Widget.SagerNet.AppBarLayout.White</item>
     </style>
     <style name="Theme.SagerNet.LightGray" parent="Theme.SagerNet">
@@ -932,8 +932,8 @@
         <item name="colorOnPrimary">@color/white</item>
         <item name="colorOnSurface">@color/color_light_gray_text_primary</item>
         <item name="colorOnSurfaceVariant">@color/color_light_gray_text_secondary</item>
-        <item name="android:textColorPrimary">@color/color_light_gray_text_primary</item>
-        <item name="android:textColorSecondary">@color/color_light_gray_text_secondary</item>
+        <item name="android:textColorPrimary">@color/text_color_primary_light_gray</item>
+        <item name="android:textColorSecondary">@color/text_color_secondary_light_gray</item>
         <item name="android:colorBackground">@color/color_light_gray_bg</item>
         <item name="android:windowBackground">@color/color_light_gray_bg</item>
         <item name="actionBarTheme">@style/ThemeOverlay.SagerNet.Toolbar</item>
@@ -946,10 +946,10 @@
         <item name="fabColorBackground">@color/color_light_gray_primary</item>
         <item name="selectedColorPrimary">@color/color_light_gray_primary</item>
         <item name="itemShapeFillColor">@color/color_light_gray_material_300</item>
-        <item name="accentOrTextSecondary">?android:textColorSecondary</item>
-        <item name="accentOrTextPrimary">?android:textColorPrimary</item>
-        <item name="primaryOrTextSecondary">?android:textColorSecondary</item>
-        <item name="primaryOrTextPrimary">?android:textColorPrimary</item>
+        <item name="accentOrTextSecondary">@color/color_light_gray_text_secondary</item>
+        <item name="accentOrTextPrimary">@color/color_light_gray_text_primary</item>
+        <item name="primaryOrTextSecondary">@color/color_light_gray_text_secondary</item>
+        <item name="primaryOrTextPrimary">@color/color_light_gray_text_primary</item>
         <item name="appBarLayoutStyle">@style/Widget.SagerNet.AppBarLayout.LightGray</item>
     </style>
     <style name="Theme.SagerNet.Dialog.Black" parent="Theme.SagerNet.Dialog">
@@ -962,13 +962,15 @@
         <item name="selectedColorPrimary">@color/white</item>
         <item name="fabColorBackground">@color/black</item>
         <item name="itemShapeFillColor">@color/color_black_theme_item_shape</item>
-        <item name="accentOrTextSecondary">?android:textColorSecondary</item>
-        <item name="accentOrTextPrimary">?android:textColorPrimary</item>
-        <item name="primaryOrTextSecondary">?android:textColorSecondary</item>
-        <item name="primaryOrTextPrimary">?android:textColorPrimary</item>
+        <item name="accentOrTextSecondary">@color/color_black_theme_text_secondary</item>
+        <item name="accentOrTextPrimary">@color/white</item>
+        <item name="primaryOrTextSecondary">@color/color_black_theme_text_secondary</item>
+        <item name="primaryOrTextPrimary">@color/white</item>
         <item name="colorOnPrimary">@color/black</item>
-        <item name="colorOnSurface">?android:textColorPrimary</item>
-        <item name="colorOnSurfaceVariant">?android:textColorSecondary</item>
+        <item name="colorOnSurface">@color/white</item>
+        <item name="colorOnSurfaceVariant">@color/color_black_theme_text_secondary</item>
+        <item name="android:textColorPrimary">@color/text_color_primary_black</item>
+        <item name="android:textColorSecondary">@color/text_color_secondary_black</item>
     </style>
 
     <style name="Theme.SagerNet.Dialog.VerdantMint" parent="Theme.SagerNet.Dialog">
@@ -991,8 +993,8 @@
         <item name="cardElevatedSurfaceColor">@color/color_white_theme_surface</item>
         <item name="colorSurface">@color/color_white_theme_surface</item>
         <item name="colorOnSurface">@color/color_white_theme_text_primary</item>
-        <item name="android:textColorPrimary">@color/color_white_theme_text_primary</item>
-        <item name="android:textColorSecondary">@color/color_white_theme_text_secondary</item>
+        <item name="android:textColorPrimary">@color/text_color_primary_white</item>
+        <item name="android:textColorSecondary">@color/text_color_secondary_white</item>
         <item name="fabColorBackground">@color/color_white_theme_accent</item>
         <item name="selectedColorPrimary">@color/color_white_theme_accent</item>
     </style>
@@ -1008,8 +1010,8 @@
         <item name="cardElevatedSurfaceColor">@color/color_light_gray_surface</item>
         <item name="colorSurface">@color/color_light_gray_surface</item>
         <item name="colorOnSurface">@color/color_light_gray_text_primary</item>
-        <item name="android:textColorPrimary">@color/color_light_gray_text_primary</item>
-        <item name="android:textColorSecondary">@color/color_light_gray_text_secondary</item>
+        <item name="android:textColorPrimary">@color/text_color_primary_light_gray</item>
+        <item name="android:textColorSecondary">@color/text_color_secondary_light_gray</item>
         <item name="fabColorBackground">@color/color_light_gray_primary</item>
         <item name="selectedColorPrimary">@color/color_light_gray_primary</item>
     </style>
@@ -1033,8 +1035,8 @@
         <item name="android:windowBackground">@color/black</item>
         <item name="colorSurface">@color/black</item>
         <item name="cardElevatedSurfaceColor">@color/color_amoled_card_elevated</item>
-        <item name="android:textColorPrimary">@color/white</item>
-        <item name="android:textColorSecondary">@color/color_amoled_text_secondary</item>
+        <item name="android:textColorPrimary">@color/text_color_primary_black</item>
+        <item name="android:textColorSecondary">@color/text_color_secondary_amoled</item>
         <item name="android:textColorTertiary">@color/color_amoled_text_tertiary</item>
         <item name="colorOnSurface">@color/white</item>
         <item name="colorOnSurfaceVariant">@color/color_amoled_text_secondary</item>

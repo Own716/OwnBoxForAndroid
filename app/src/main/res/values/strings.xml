@@ -1102,12 +1102,14 @@
     <string name="balancer_interval_sum">Periodic health-check and observation interval in seconds, default 300s</string>
     <string name="balancer_tolerance">Switch Tolerance (Tolerance)</string>
     <string name="balancer_tolerance_sum">Latency switch tolerance threshold, default 50ms</string>
-    <string name="balancer_tolerance_unit">Tolerance Unit (Unit)</string>
     <string name="unit_ms">Milliseconds (ms)</string>
     <string name="unit_s">Seconds (s)</string>
     <string name="balancer_select_group">Select Group</string>
-    <string name="balancer_use_front_proxy">Use Group Front Proxy</string>
-    <string name="balancer_use_landing_proxy">Use Group Landing Proxy</string>
+    <string name="balancer_use_front_proxy">Follow Member Group Front Proxy</string>
+    <string name="balancer_use_front_proxy_sum">Off by default: ignores member group front proxies unless a custom front proxy is set below.</string>
+    <string name="balancer_use_front_proxy_overridden_sum">Overridden because a custom Front Proxy is selected below.</string>
+    <string name="balancer_use_landing_proxy">Follow Member Group Landing Proxy</string>
+    <string name="balancer_use_landing_proxy_sum">Off by default: ignores member group landing proxies. Turn on to keep each member group\'s landing proxy.</string>
     <string name="balancer_name_exclude">Name Exclusion (Regex)</string>
     <string name="balancer_name_include">Name Inclusion (Regex)</string>
     <string name="selected_count">Selected %d items</string>
@@ -1449,7 +1451,8 @@
     <string name="balancer_server_source">Server Source</string>
     <string name="balancer_no_group_selected">No group selected</string>
     <string name="balancer_explicit_nodes">Explicit Profiles</string>
-    <string name="balancer_explicit_nodes_empty">Tap to select profiles (drag list below to reorder priority)</string>
+    <string name="balancer_explicit_nodes_empty">Tap to select profiles</string>
+    <string name="balancer_node_list_hint">Priority order · Drag ≡ to reorder · Tap to replace</string>
     <string name="balancer_explicit_nodes_summary">Selected %1$d profiles: %2$s</string>
     <string name="balancer_name_include_all">Every profile in group</string>
     <string name="balancer_selection_mode">Selection Mode</string>
@@ -1461,7 +1464,9 @@
     <string name="balancer_balance_enabled_off_sum">Off by default: one profile carries all traffic while others stand by. Enable to spread traffic across verified available profiles.</string>
     <string name="balancer_balance_enabled_on_sum">Enabled (%s): spreads traffic across verified available profiles.</string>
     <string name="balancer_preview_title">Profiles</string>
-    <string name="balancer_preview_summary">%2$d of %1$d profiles available; will run %3$d. %4$d with recent test results will be reused.</string>
+    <string name="balancer_preview_summary">%2$d of %1$d profiles in group available; will include %3$d. %4$d with recent test results will be reused.</string>
+    <string name="balancer_preview_summary_list">%2$d of %1$d selected profiles available; will include %3$d. %4$d with recent test results will be reused.</string>
+    <string name="balancer_preview_summary_mixed">%2$d of %1$d mixed profiles available; will include %3$d. %4$d with recent test results will be reused.</string>
     <string name="balancer_advanced_title">Advanced</string>
     <string name="balancer_advanced_show">Show advanced options</string>
     <string name="balancer_advanced_hide">Hide advanced options</string>
@@ -1473,8 +1478,7 @@
     <string name="balancer_cat_chain">Chaining &amp; Relay</string>
     <string name="balancer_country_filter">Countries Only</string>
     <string name="balancer_country_filter_any">Any country (e.g. DE, NL, FR)</string>
-    <string name="balancer_run_top_n">Run Top</string>
-    <string name="balancer_rank_top_n">Rank Cap</string>
+    <string name="balancer_run_top_n">Max Profiles Included</string>
     <string name="balancer_result_trust_minutes">Result Trust Duration</string>
     <string name="balancer_skip_failed_within_trust">Skip Failed Profiles</string>
     <string name="balancer_skip_failed_within_trust_sum">Skip profiles whose last test failed while still inside the trust window. Turn off if tests are unreliable and you prefer the selector to decide.</string>
@@ -1488,7 +1492,7 @@
     <string name="balancer_max_rtt">Max Latency</string>
     <string name="balancer_dial_retries">Failover Retries</string>
     <string name="balancer_interrupt_on_switch">Interrupt Connections on Switch</string>
-    <string name="balancer_interrupt_on_switch_sum">Applies when switching due to better latency or failure. On: existing connections move immediately. Off: ongoing downloads finish on the old profile (failover still resets broken dials).</string>
+    <string name="balancer_interrupt_on_switch_sum">Applies on latency switches, failures, and fallbacks (priority failback is controlled separately below). On: immediately closes active connections so they reconnect via the new profile. Off: existing connections continue while new connections use the new profile.</string>
     <string name="balancer_failback_checks">Checks Before Failback</string>
     <string name="balancer_failback_delay">Stable Before Failback</string>
     <string name="balancer_interrupt_on_failback">Interrupt Connections on Failback</string>
@@ -1500,8 +1504,6 @@
     <string name="balancer_balance_mode_timed">Timed Rotation (Session Stable)</string>
     <string name="balancer_balance_mode_per_conn">Per Connection (Round-Robin New Flows)</string>
     <string name="balancer_balance_interval">Rotation Interval</string>
-    <string name="balancer_balance_hint_off">The best profile carries all traffic; standby profiles stay verified and ready to take over.</string>
-    <string name="balancer_balance_hint_on">Traffic is distributed across verified available top profiles using the selected mode.</string>
     <string name="balancer_test_url_title">Test URL</string>
     <string name="balancer_test_url_default">Global delay test URL (%s)</string>
     <string name="balancer_connectivity_url">Connectivity URL</string>

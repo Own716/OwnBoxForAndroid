@@ -230,7 +230,7 @@ internal fun buildAutoSelectOutbound(
     balance_mode = balancer.balanceMode?.takeIf { it == BalancerBean.BALANCE_PER_CONNECTION }
         ?: BalancerBean.BALANCE_TIMED_ROTATION
     balance_interval = "${balancer.balanceIntervalSec.coerceAtLeast(1)}s"
-    rank_top_n = balancer.rankTopN.takeIf { it > 0 } ?: 1000
+    rank_top_n = balancer.effectiveRunTopN
     standby_size = balancer.standbySize.coerceAtLeast(0)
     intensive_check_count = balancer.intensiveCheckCount.coerceAtLeast(1)
     check_interval = "${balancer.interval.coerceAtLeast(5)}s"
@@ -484,10 +484,8 @@ internal class ChainGraphContext(
                 resolvedResult.members
             }
 
-            val hasGroupMode = balancerBean.balancerType == BalancerBean.TYPE_GROUP ||
-                balancerBean.balancerType == BalancerBean.TYPE_MIXED
-            val useFront = if (hasGroupMode) balancerBean.useFrontProxy else true
-            val useLanding = if (hasGroupMode) balancerBean.useLandingProxy else true
+            val useFront = balancerBean.useFrontProxy
+            val useLanding = balancerBean.useLandingProxy
             val memberEffectiveDetour = balancerFrontTag ?: externalDetour
 
             val memberTags = memberEntities.map { member ->

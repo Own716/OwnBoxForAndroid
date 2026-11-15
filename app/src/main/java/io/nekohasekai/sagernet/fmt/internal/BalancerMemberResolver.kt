@@ -22,7 +22,7 @@ object BalancerMemberResolver {
         val countryFilter: String = "",
         val selectionMode: String = BalancerBean.SELECTION_LATENCY,
         val runTopN: Int = 300,
-        val rankTopN: Int = 1000,
+        val rankTopN: Int = 0,
         val resultTrustMinutes: Int = 1440,
         val skipFailedWithinTrust: Boolean = false,
     )
@@ -70,8 +70,8 @@ object BalancerMemberResolver {
                 landingProxyId = landingProxyId,
                 countryFilter = balancer.countryFilter.orEmpty(),
                 selectionMode = if (balancer.isPriorityMode()) BalancerBean.SELECTION_PRIORITY else BalancerBean.SELECTION_LATENCY,
-                runTopN = balancer.runTopN,
-                rankTopN = balancer.rankTopN,
+                runTopN = balancer.effectiveRunTopN,
+                rankTopN = balancer.effectiveRunTopN,
                 resultTrustMinutes = balancer.resultTrustMinutes,
                 skipFailedWithinTrust = balancer.skipFailedWithinTrust,
             ),
@@ -211,15 +211,15 @@ object BalancerMemberResolver {
             sortForColdStart(runnable)
         }
 
-        val ranked = if (spec.rankTopN > 0 && ordered.size > spec.rankTopN) {
-            ordered.take(spec.rankTopN)
+        val effectiveTopN = when {
+            spec.runTopN <= 0 -> 0
+            spec.rankTopN > 0 -> minOf(spec.runTopN, spec.rankTopN)
+            else -> spec.runTopN
+        }
+        val finalMembers = if (effectiveTopN > 0 && ordered.size > effectiveTopN) {
+            ordered.take(effectiveTopN)
         } else {
             ordered
-        }
-        val finalMembers = if (spec.runTopN > 0 && ranked.size > spec.runTopN) {
-            ranked.take(spec.runTopN)
-        } else {
-            ranked
         }
 
         val groupMatchedCount = finalMembers.count { it.id in fromGroupIds }

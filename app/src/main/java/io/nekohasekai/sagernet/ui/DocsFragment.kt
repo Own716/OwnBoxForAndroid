@@ -591,23 +591,23 @@ class DocsFragment : ToolbarFragment(R.layout.layout_docs) {
         allItems.add(
             DocListItem.Item(
                 category = "连接观测与负载均衡",
-                title = "负载均衡策略与自动优选 (balancerStrategy)",
-                badge = "推荐: 最低延迟优先",
-                desc = "在负载均衡器中聚合多个节点，并配置“最低延迟优先 (round-robin + probe)”、“轮询 (round-robin)”或“随机 (random)”调度策略，支持自定义测试 URL 与观测间隔 (s)。",
-                prosCons = "【利】“最低延迟优先”能在后台全自动监测节点健康度并无缝漂移到最快可用节点，实现 100% 高可用断线自愈；【弊】高频探活在大量节点场景下会轻量消耗测试流量。",
-                recommendation = "【最稳推荐：推荐使用“最低延迟优先”，观测间隔保持 300s】兼顾断线毫秒级自愈与节约套餐流量。",
-                keywords = "负载均衡 策略组 最低延迟 轮询 随机 balancer strategy 自动切换 间隔",
+                title = "自动选择策略组 (balancerSelectionMode / balancerBalanceEnabled)",
+                badge = "推荐: 最快最稳",
+                desc = "在策略组中聚合分组或指定节点，支持“最快最稳”（始终优选延迟最低且健康的节点）与“按优先级顺序”（优先使用靠前可用节点并按健康检查自动移回），可按需开启“在最佳配置之间分配流量”（按时间轮换 / 按连接分散）。",
+                prosCons = "【利】融合主动健康探测、被动真实连接学习（自动冷却反复无响应节点）与网站选择记忆，避免单次测速抖动误判；【弊】高频探测在节点数量极大时会有轻量测速开销，可通过“最大纳入节点数”与“检查间隔”控制。",
+                recommendation = "【最稳推荐：保持默认“最快最稳”，关闭流量分配并开启“从真实连接中学习”】兼顾低延迟自愈、站点会话稳定与低电量消耗。",
+                keywords = "负载均衡 策略组 自动选择 最快最稳 按优先级 流量分配 健康检查 学习 balancer",
             )
         )
         allItems.add(
             DocListItem.Item(
                 category = "连接观测与负载均衡",
-                title = "负载均衡切换容差与单位 (balancerTolerance / balancerToleranceUnit)",
-                badge = "推荐: 300ms 或 0.3s (默认)",
-                desc = "配置基于最低延迟优选 (leastPing) 或 URLTest 策略时的节点切换容差阈值与时间单位（毫秒 ms / 秒 s）。底层根据选定单位自动精准换算为内核毫秒级容差参数。",
-                prosCons = "【利】核心防抖动防断流机制！在 leastPing 算法中，当备用节点的实测延迟仅比当前节点低一点点时（未超过设定的容差差值），调度器绝不会盲目切换，从而彻底消除公共网络微小抖动导致的频繁切节点、网页重连与音视频会议瞬间断流；【弊】若将容差设为过大（如 > 2000ms），会导致当前节点性能严重劣变时切换迟钝。",
-                recommendation = "【最稳推荐：保持默认 300ms 或 0.3s】完美过滤网络正常微幅波动，同时在节点发生真实故障或严重拥堵时仍能果断切换到高速节点。",
-                keywords = "容差 tolerance 切换容差 容差单位 balancerTolerance 毫秒 秒 ms s leastping 抖动 断流 防抖动 负载均衡",
+                title = "自动选择切换容差 (balancerTolerance)",
+                badge = "推荐: 30 ms (默认)",
+                desc = "配置“最快最稳”模式下的节点切换容差（单位固定为毫秒 ms）。只有当候选节点的延迟比当前使用中的节点至少低超过该容差阈值时，才会触发切换。",
+                prosCons = "【利】核心防抖动机制！避免公网延迟轻微波动几十毫秒就频繁切节点导致网页重连或断流；【弊】若设得过大（如 > 500ms），节点已明显变慢但仍未达到阈值时不会及时切换。",
+                recommendation = "【最稳推荐：保持默认 30 ms 或根据网络波动设为 30~80 ms】既防高频抖动，又能及时切向更快节点。",
+                keywords = "容差 tolerance 切换容差 balancerTolerance 毫秒 ms 防抖动 自动选择 策略组",
             )
         )
 

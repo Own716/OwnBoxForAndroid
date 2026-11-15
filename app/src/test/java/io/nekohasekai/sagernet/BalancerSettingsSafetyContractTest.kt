@@ -36,21 +36,22 @@ class BalancerSettingsSafetyContractTest {
     @Test
     fun balancerSettingsGuardsLateinitAndAvoidsForcedUnwraps() {
         val text = sourceFile("src/main/java/io/nekohasekai/sagernet/ui/profile/BalancerSettingsActivity.kt").readText()
+        val nodePrefText = sourceFile("src/main/java/io/nekohasekai/sagernet/widget/BalancerNodeListPreference.kt").readText()
         assertFalse(
             "BalancerSettingsActivity must not use any force-unwrap !! operators",
             text.contains("!!"),
         )
-        assertTrue(
-            "updateTypeVisibility must guard configurationList with isInitialized",
-            text.contains("::configurationList.isInitialized")
+        assertFalse(
+            "BalancerNodeListPreference must not use any force-unwrap !! operators",
+            nodePrefText.contains("!!"),
         )
         assertTrue(
-            "updateTypeVisibility must guard listCell with isInitialized",
-            text.contains("::listCell.isInitialized")
+            "BalancerSettingsActivity must bind BalancerNodeListPreference",
+            text.contains("BalancerNodeListPreference")
         )
         assertTrue(
-            "viewCreated must guard configurationAdapter with isInitialized",
-            text.contains("::configurationAdapter.isInitialized")
+            "BalancerSettingsActivity must guard frontProxyPreference with isInitialized",
+            text.contains("::frontProxyPreference.isInitialized")
         )
     }
 
@@ -65,13 +66,20 @@ class BalancerSettingsSafetyContractTest {
             prefXml.contains("balancerStrategy"),
         )
         listOf(
+            "balancerRankTopN",
+            "balancerToleranceUnit",
+            "balancerBalanceHint",
+        ).forEach { removed ->
+            assertFalse("removed key $removed must not remain in balancer_preferences.xml", prefXml.contains("app:key=\"$removed\""))
+        }
+        listOf(
+            "balancerNodeList",
             "balancerSelectionMode",
             "balancerBalanceEnabled",
             "balancerMatchSummary",
             "balancerAdvancedToggle",
             "balancerCountryFilter",
             "balancerRunTopN",
-            "balancerRankTopN",
             "balancerResultTrustMinutes",
             "balancerSkipFailedWithinTrust",
             "balancerStandbySize",

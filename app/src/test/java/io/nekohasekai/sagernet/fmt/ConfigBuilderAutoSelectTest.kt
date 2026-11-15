@@ -1,11 +1,13 @@
 package io.nekohasekai.sagernet.fmt
 
 import io.nekohasekai.sagernet.database.ProxyEntity
+import io.nekohasekai.sagernet.database.ProxyGroup
 import io.nekohasekai.sagernet.fmt.internal.BalancerBean
 import io.nekohasekai.sagernet.fmt.internal.ChainBean
 import io.nekohasekai.sagernet.fmt.socks.SOCKSBean
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -50,6 +52,7 @@ class ConfigBuilderAutoSelectTest {
             balanceEnabled = true
             balanceMode = BalancerBean.BALANCE_PER_CONNECTION
             balanceIntervalSec = 45
+            runTopN = 500
             rankTopN = 500
             standbySize = 5
             intensiveCheckCount = 12
@@ -269,5 +272,75 @@ class ConfigBuilderAutoSelectTest {
         val frontTagB = bMembers.map { mapB[it]!!["detour"] as String }.distinct().single()
         assertTrue(mapB.containsKey(frontTagB))
         assertNull(mapB[frontTagB]!!["detour"])
+    }
+
+    @Test
+    fun buildAutoSelectOutboundPreservesZeroUnlimitedRunTopN() {
+        val balancer = BalancerBean().apply {
+            balancerType = BalancerBean.TYPE_LIST
+            runTopN = 0
+            rankTopN = 0
+            initializeDefaultValues()
+        }
+        assertEquals(0, balancer.runTopN)
+        assertEquals(0, balancer.effectiveRunTopN)
+
+        val out = buildAutoSelectOutbound(
+            balancer = balancer,
+            memberEntities = listOf(socksEntity(10L, "SG-1")),
+            memberTags = listOf("tag-sg-1"),
+            defaultTestUrl = "https://cp.cloudflare.com/generate_204",
+        )
+        assertEquals(0, out.rank_top_n)
+    }
+
+    @Test
+    fun listBalancerRespectsUseFrontAndUseLandingProxyToggles() {
+        val groupFront = socksEntity(50L, "Group-Front")
+        val groupLanding = socksEntity(60L, "Group-Landing")
+        val member = socksEntity(10L, "SG-Member", status = 1, ping = 40)
+        val group = ProxyGroup(id = 10L, frontProxy = 50L, landingProxy = 60L)
+
+        fun buildWithToggles(useFront: Boolean, useLanding: Boolean): ChainGraphTestResult {
+            val balancer = ProxyEntity(
+                id = 2L,
+                groupId = 99L,
+                type = ProxyEntity.TYPE_BALANCER,
+                balancerBean = BalancerBean().apply {
+                    name = "List-Balancer"
+                    balancerType = BalancerBean.TYPE_LIST
+                    proxies = mutableListOf(10L)
+                    useFrontProxy = useFront
+                    useLandingProxy = useLanding
+                    testUrl = "https://cp.cloudflare.com/generate_204"
+                },
+            )
+            return assembleChainGraphForTest(
+                root = balancer,
+                entitiesById = mapOf(
+                    balancer.id to balancer,
+                    member.id to member,
+                    groupFront.id to groupFront,
+                    groupLanding.id to groupLanding,
+                ),
+                groupsById = mapOf(10L to group),
+            )
+        }
+
+        val disabled = buildWithToggles(useFront = false, useLanding = false)
+        assertFalse(disabled.outbounds.any { it["server"] == "198.51.100.50" })
+        assertFalse(disabled.outbounds.any { it["server"] == "198.51.100.60" })
+        val disabledMember = disabled.outbounds.first { it["server"] == "198.51.100.10" }
+        assertNull(disabledMember["detour"])
+
+        val enabled = buildWithToggles(useFront = true, useLanding = true)
+        val frontOut = enabled.outbounds.firstOrNull { it["server"] == "198.51.100.50" }
+        val landingOut = enabled.outbounds.firstOrNull { it["server"] == "198.51.100.60" }
+        val memberOut = enabled.outbounds.firstOrNull { it["server"] == "198.51.100.10" }
+        assertNotNull(frontOut)
+        assertNotNull(landingOut)
+        assertNotNull(memberOut)
+        assertEquals(frontOut?.get("tag"), memberOut?.get("detour"))
+        assertEquals(memberOut?.get("tag"), landingOut?.get("detour"))
     }
 }

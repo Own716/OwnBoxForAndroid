@@ -1006,12 +1006,14 @@
     <string name="balancer_interval_sum">节点健康检查与周期探测间隔，默认 300 秒</string>
     <string name="balancer_tolerance">切换容差 (Tolerance)</string>
     <string name="balancer_tolerance_sum">最低延迟切换阈值，避免微小抖动频繁切换，默认 50ms</string>
-    <string name="balancer_tolerance_unit">容差单位</string>
     <string name="unit_ms">毫秒 (ms)</string>
     <string name="unit_s">秒 (s)</string>
     <string name="balancer_select_group">选择分组</string>
-    <string name="balancer_use_front_proxy">使用分组前置代理</string>
-    <string name="balancer_use_landing_proxy">使用分组落地代理</string>
+    <string name="balancer_use_front_proxy">沿用成员所在分组的前置代理</string>
+    <string name="balancer_use_front_proxy_sum">默认关闭：忽略成员各自所属分组的前置代理；开启后将沿用。</string>
+    <string name="balancer_use_front_proxy_overridden_sum">已配置下方的自定义前置代理，将优先使用自定义前置代理。</string>
+    <string name="balancer_use_landing_proxy">沿用成员所在分组的落地代理</string>
+    <string name="balancer_use_landing_proxy_sum">默认关闭：忽略成员各自所属分组的落地代理；开启后将沿用。</string>
     <string name="balancer_name_exclude">节点名称排除 (正则)</string>
     <string name="balancer_name_include">节点名称包含 (正则)</string>
 
@@ -1367,7 +1369,8 @@
     <string name="balancer_server_source">服务器来源</string>
     <string name="balancer_no_group_selected">未选择分组</string>
     <string name="balancer_explicit_nodes">指定节点</string>
-    <string name="balancer_explicit_nodes_empty">点击选择节点（下方列表可拖动调整优先级顺序）</string>
+    <string name="balancer_explicit_nodes_empty">点击选择节点</string>
+    <string name="balancer_node_list_hint">节点优先级 · 拖动 ≡ 调序 · 点击替换</string>
     <string name="balancer_explicit_nodes_summary">已选择 %1$d 个节点：%2$s</string>
     <string name="balancer_name_include_all">分组中的每个配置</string>
     <string name="balancer_selection_mode">选择方式</string>
@@ -1379,7 +1382,9 @@
     <string name="balancer_balance_enabled_off_sum">默认关闭：一个配置承载全部流量，其余待命。开启后可将流量分散到已确认可用的配置上。</string>
     <string name="balancer_balance_enabled_on_sum">已开启：%s。流量将分散到已确认可用的配置上。</string>
     <string name="balancer_preview_title">配置</string>
-    <string name="balancer_preview_summary">分组中 %1$d 个配置有 %2$d 个可用；将运行 %3$d 个。%4$d 个有近期测试结果将被复用。</string>
+    <string name="balancer_preview_summary">所选分组 %1$d 个配置中有 %2$d 个可用；将纳入 %3$d 个。%4$d 个有近期测试结果将被复用。</string>
+    <string name="balancer_preview_summary_list">已选列表 %1$d 个配置中有 %2$d 个可用；将纳入 %3$d 个。%4$d 个有近期测试结果将被复用。</string>
+    <string name="balancer_preview_summary_mixed">混搭池 %1$d 个配置中有 %2$d 个可用；将纳入 %3$d 个。%4$d 个有近期测试结果将被复用。</string>
     <string name="balancer_advanced_title">高级</string>
     <string name="balancer_advanced_show">显示高级选项</string>
     <string name="balancer_advanced_hide">隐藏高级选项</string>
@@ -1391,8 +1396,7 @@
     <string name="balancer_cat_chain">链式代理与中转</string>
     <string name="balancer_country_filter">仅限国家</string>
     <string name="balancer_country_filter_any">任意国家 (如 DE, NL, FR)</string>
-    <string name="balancer_run_top_n">运行前</string>
-    <string name="balancer_rank_top_n">排名上限</string>
+    <string name="balancer_run_top_n">最大纳入节点数</string>
     <string name="balancer_result_trust_minutes">结果信任时长</string>
     <string name="balancer_skip_failed_within_trust">跳过失败的配置</string>
     <string name="balancer_skip_failed_within_trust_sum">只要结果仍在信任窗口内，就将上次测试失败的服务器直接跳过。如果测试不可靠、宁愿让选择器自行判断，可关闭。</string>
@@ -1406,7 +1410,7 @@
     <string name="balancer_max_rtt">最大延迟</string>
     <string name="balancer_dial_retries">故障转移重试</string>
     <string name="balancer_interrupt_on_switch">切换时断开连接</string>
-    <string name="balancer_interrupt_on_switch_sum">在选择器因更佳延迟或失败而切换时生效。开：所有连接立即迁移到新配置。关：运行中的下载在旧配置上完成。无论开关，故障转移都会断开连接。</string>
+    <string name="balancer_interrupt_on_switch_sum">因延迟更佳、失效或降级而切换时生效（按优先级移回高顺位由下方单独开关控制）。开：立即中断现有活跃连接使其重建到新配置；关：已建立的连接保持运行，新连接切换到新配置。</string>
     <string name="balancer_failback_checks">移回前需通过</string>
     <string name="balancer_failback_delay">无失败持续</string>
     <string name="balancer_interrupt_on_failback">移回时断开连接</string>
@@ -1418,8 +1422,6 @@
     <string name="balancer_balance_mode_timed">按时间轮换 (保持会话稳定)</string>
     <string name="balancer_balance_mode_per_conn">按连接分散 (均衡每条新连接)</string>
     <string name="balancer_balance_interval">轮换间隔</string>
-    <string name="balancer_balance_hint_off">最佳配置承载全部流量；其余就绪配置保持已验证状态，以便随时接管。</string>
-    <string name="balancer_balance_hint_on">已开启流量分配：已确认可用的最佳配置将按所选模式共同分担新连接。</string>
     <string name="balancer_test_url_title">测试 URL</string>
     <string name="balancer_test_url_default">全局延迟测试 URL (%s)</string>
     <string name="balancer_connectivity_url">连通性 URL</string>

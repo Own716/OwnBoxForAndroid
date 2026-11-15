@@ -29,6 +29,10 @@
         app:summary="@string/balancer_explicit_nodes_empty"
         app:title="@string/balancer_explicit_nodes" />
 
+    <io.nekohasekai.sagernet.widget.BalancerNodeListPreference
+        app:isPreferenceVisible="false"
+        app:key="balancerNodeList" />
+
     <EditTextPreference
         app:icon="@drawable/ic_baseline_filter_list_24"
         app:key="balancerNameInclude"
@@ -83,12 +87,6 @@
             app:iconSpaceReserved="false"
             app:key="balancerRunTopN"
             app:title="@string/balancer_run_top_n" />
-
-        <EditTextPreference
-            app:defaultValue="1000"
-            app:iconSpaceReserved="false"
-            app:key="balancerRankTopN"
-            app:title="@string/balancer_rank_top_n" />
 
         <EditTextPreference
             app:defaultValue="1440"
@@ -160,15 +158,6 @@
             app:iconSpaceReserved="false"
             app:key="balancerTolerance"
             app:title="@string/balancer_tolerance_title" />
-
-        <moe.matsuri.nb4a.ui.SimpleMenuPreference
-            app:defaultValue="ms"
-            app:entries="@array/tolerance_unit_entries"
-            app:entryValues="@array/tolerance_unit_values"
-            app:iconSpaceReserved="false"
-            app:key="balancerToleranceUnit"
-            app:title="@string/balancer_tolerance_unit"
-            app:useSimpleSummaryProvider="true" />
 
         <EditTextPreference
             app:defaultValue="0"
@@ -244,12 +233,6 @@
             app:key="balancerBalanceIntervalSec"
             app:title="@string/balancer_balance_interval" />
 
-        <Preference
-            app:iconSpaceReserved="false"
-            app:key="balancerBalanceHint"
-            app:selectable="false"
-            app:summary="@string/balancer_balance_hint_off" />
-
     </PreferenceCategory>
 
     <PreferenceCategory
@@ -278,24 +261,24 @@
 
         <SwitchPreferenceCompat
             app:defaultValue="false"
-            app:icon="@drawable/ic_baseline_link_24"
+            app:iconSpaceReserved="false"
             app:key="balancerUseFrontProxy"
             app:title="@string/balancer_use_front_proxy" />
 
         <io.nekohasekai.sagernet.widget.OutboundPreference
-            app:icon="@drawable/ic_baseline_low_priority_24"
+            app:iconSpaceReserved="false"
             app:key="balancerFrontProxy"
             app:title="@string/front_proxy"
             app:useSimpleSummaryProvider="true" />
 
         <SwitchPreferenceCompat
             app:defaultValue="false"
-            app:icon="@drawable/ic_baseline_link_24"
+            app:iconSpaceReserved="false"
             app:key="balancerUseLandingProxy"
             app:title="@string/balancer_use_landing_proxy" />
 
         <io.nekohasekai.sagernet.widget.OutboundPreference
-            app:icon="@drawable/baseline_flight_takeoff_24"
+            app:iconSpaceReserved="false"
             app:key="balancerLandingProxy"
             app:title="@string/landing_proxy"
             app:useSimpleSummaryProvider="true" />
