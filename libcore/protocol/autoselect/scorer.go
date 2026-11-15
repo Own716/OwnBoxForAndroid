@@ -18,6 +18,7 @@ type memberSample struct {
 type memberState struct {
 	tag              string
 	index            int
+	tier             int
 	initialDelay     uint16
 	ring             []memberSample
 	consecutiveOK    int
@@ -34,6 +35,8 @@ type scorer struct {
 	order        []string
 	members      map[string]*memberState
 	cfg          normalizedConfig
+	hasTiers     bool
+	tierCount    int
 	activeTag    string
 	pinnedTag    string
 	lastSwitchAt time.Time
@@ -47,6 +50,22 @@ type scorer struct {
 func newScorer(order []string, cfg normalizedConfig) *scorer {
 	cleanOrder := make([]string, 0, len(order))
 	members := make(map[string]*memberState, len(order))
+	tagTier := make(map[string]int, len(order))
+	hasTiers := len(cfg.tiers) > 0
+	tierCount := 0
+	if hasTiers {
+		tierCount = len(cfg.tiers) + 1
+		for tierIdx, tierTags := range cfg.tiers {
+			for _, t := range tierTags {
+				if t == "" {
+					continue
+				}
+				if _, exists := tagTier[t]; !exists {
+					tagTier[t] = tierIdx
+				}
+			}
+		}
+	}
 	for _, tag := range order {
 		if tag == "" {
 			continue
@@ -56,15 +75,26 @@ func newScorer(order []string, cfg normalizedConfig) *scorer {
 		}
 		idx := len(cleanOrder)
 		cleanOrder = append(cleanOrder, tag)
+		tier := 0
+		if hasTiers {
+			if t, ok := tagTier[tag]; ok {
+				tier = t
+			} else {
+				tier = len(cfg.tiers)
+			}
+		}
 		members[tag] = &memberState{
 			tag:   tag,
 			index: idx,
+			tier:  tier,
 		}
 	}
 	return &scorer{
-		order:   cleanOrder,
-		members: members,
-		cfg:     cfg,
+		order:     cleanOrder,
+		members:   members,
+		cfg:       cfg,
+		hasTiers:  hasTiers,
+		tierCount: tierCount,
 	}
 }
 
@@ -335,6 +365,9 @@ type scoredEntryRef struct {
 }
 
 func (s *scorer) evaluatePriorityLocked(now time.Time, passive *passiveTracker, items []scoredEntryRef, current *scoredEntryRef) (string, string, bool, bool) {
+	if s.hasTiers {
+		return s.evaluatePriorityTieredLocked(now, passive, items, current)
+	}
 	var firstHealthy *scoredEntryRef
 	for i := range items {
 		if items[i].available {
@@ -388,6 +421,118 @@ func (s *scorer) evaluatePriorityLocked(now time.Time, passive *passiveTracker, 
 	}
 
 	// Current node is healthy and already higher priority than candidate
+	return s.activeTag, s.switchReason, false, false
+}
+
+func betterTieredFallback(a, b *scoredEntryRef) bool {
+	if a.st.tier != b.st.tier {
+		return a.st.tier < b.st.tier
+	}
+	if a.suspect != b.suspect {
+		return !a.suspect
+	}
+	if (a.score > 0) != (b.score > 0) {
+		return a.score > 0
+	}
+	if a.score > 0 && b.score > 0 && a.score != b.score {
+		return a.score < b.score
+	}
+	return a.st.index < b.st.index
+}
+
+func (s *scorer) evaluatePriorityTieredLocked(now time.Time, passive *passiveTracker, items []scoredEntryRef, current *scoredEntryRef) (string, string, bool, bool) {
+	bestTier := -1
+	var bestInTier *scoredEntryRef
+	for i := range items {
+		it := &items[i]
+		if !it.available {
+			continue
+		}
+		t := it.st.tier
+		if bestTier == -1 || t < bestTier ||
+			(t == bestTier && (it.score < bestInTier.score || (it.score == bestInTier.score && it.st.index < bestInTier.st.index))) {
+			bestTier = t
+			bestInTier = it
+		}
+	}
+
+	if bestInTier == nil {
+		var fallback *scoredEntryRef
+		for i := range items {
+			cand := &items[i]
+			if fallback == nil || betterTieredFallback(cand, fallback) {
+				fallback = cand
+			}
+		}
+		if current == nil || s.activeTag == "" {
+			s.activeTag = fallback.st.tag
+			s.lastSwitchAt = now
+			s.switchReason = "priority select"
+			return s.activeTag, s.switchReason, true, false
+		}
+		if fallback.st.tag == current.st.tag {
+			return s.activeTag, s.switchReason, false, false
+		}
+		if !current.available && betterTieredFallback(fallback, current) {
+			s.activeTag = fallback.st.tag
+			s.lastSwitchAt = now
+			s.switchReason = "priority failover"
+			return s.activeTag, s.switchReason, true, false
+		}
+		return s.activeTag, s.switchReason, false, false
+	}
+
+	if current == nil || s.activeTag == "" {
+		s.activeTag = bestInTier.st.tag
+		s.lastSwitchAt = now
+		s.switchReason = "priority select"
+		return s.activeTag, s.switchReason, true, false
+	}
+
+	if bestInTier.st.tag == current.st.tag {
+		return s.activeTag, s.switchReason, false, false
+	}
+
+	if !current.available {
+		s.activeTag = bestInTier.st.tag
+		s.lastSwitchAt = now
+		s.switchReason = "priority failover"
+		return s.activeTag, s.switchReason, true, false
+	}
+
+	if bestTier < current.st.tier {
+		var eligible *scoredEntryRef
+		for i := range items {
+			it := &items[i]
+			if !it.available || it.st.tier != bestTier {
+				continue
+			}
+			if !s.canFailbackLocked(it.st, passive, now) {
+				continue
+			}
+			if eligible == nil || it.score < eligible.score || (it.score == eligible.score && it.st.index < eligible.st.index) {
+				eligible = it
+			}
+		}
+		if eligible != nil {
+			s.activeTag = eligible.st.tag
+			s.lastSwitchAt = now
+			s.switchReason = "priority failback"
+			return s.activeTag, s.switchReason, true, true
+		}
+		return s.activeTag, s.switchReason, false, false
+	}
+
+	if bestTier == current.st.tier {
+		if current.score > 0 && current.score-bestInTier.score <= float64(s.cfg.tolerance) {
+			return s.activeTag, s.switchReason, false, false
+		}
+		s.activeTag = bestInTier.st.tag
+		s.lastSwitchAt = now
+		s.switchReason = "tier best available"
+		return s.activeTag, s.switchReason, true, false
+	}
+
 	return s.activeTag, s.switchReason, false, false
 }
 
@@ -475,6 +620,7 @@ func (s *scorer) verifiedPoolLocked(now time.Time, passive *passiveTracker) []st
 	type ranked struct {
 		tag   string
 		index int
+		tier  int
 		score float64
 		avail bool
 	}
@@ -483,7 +629,7 @@ func (s *scorer) verifiedPoolLocked(now time.Time, passive *passiveTracker) []st
 		st := s.members[tag]
 		score, _, _, _, avail := s.memberScoreLocked(st, passive, now)
 		if avail {
-			healthy = append(healthy, ranked{tag: tag, index: st.index, score: score, avail: avail})
+			healthy = append(healthy, ranked{tag: tag, index: st.index, tier: st.tier, score: score, avail: avail})
 		}
 	}
 	if len(healthy) == 0 {
@@ -496,7 +642,47 @@ func (s *scorer) verifiedPoolLocked(now time.Time, passive *passiveTracker) []st
 		return nil
 	}
 
+	filterTopSpread := func(items []ranked) []string {
+		sort.SliceStable(items, func(i, j int) bool {
+			if items[i].score != items[j].score {
+				return items[i].score < items[j].score
+			}
+			return items[i].index < items[j].index
+		})
+		bestScore := items[0].score
+		spread := float64(s.cfg.tolerance)
+		if spread < 50 {
+			spread = 50
+		}
+		threshold := bestScore + spread
+		var pool []string
+		for _, h := range items {
+			if h.score <= threshold || len(pool) == 0 {
+				pool = append(pool, h.tag)
+			}
+			if len(pool) >= 8 {
+				break
+			}
+		}
+		return pool
+	}
+
 	if s.cfg.selectionMode == SelectionModePriority {
+		if s.hasTiers {
+			minTier := healthy[0].tier
+			for _, h := range healthy[1:] {
+				if h.tier < minTier {
+					minTier = h.tier
+				}
+			}
+			tierHealthy := make([]ranked, 0, len(healthy))
+			for _, h := range healthy {
+				if h.tier == minTier {
+					tierHealthy = append(tierHealthy, h)
+				}
+			}
+			return filterTopSpread(tierHealthy)
+		}
 		sort.SliceStable(healthy, func(i, j int) bool {
 			return healthy[i].index < healthy[j].index
 		})
@@ -514,28 +700,7 @@ func (s *scorer) verifiedPoolLocked(now time.Time, passive *passiveTracker) []st
 		return out
 	}
 
-	sort.SliceStable(healthy, func(i, j int) bool {
-		if healthy[i].score != healthy[j].score {
-			return healthy[i].score < healthy[j].score
-		}
-		return healthy[i].index < healthy[j].index
-	})
-	bestScore := healthy[0].score
-	spread := float64(s.cfg.tolerance)
-	if spread < 50 {
-		spread = 50
-	}
-	threshold := bestScore + spread
-	var pool []string
-	for _, h := range healthy {
-		if h.score <= threshold || len(pool) == 0 {
-			pool = append(pool, h.tag)
-		}
-		if len(pool) >= 8 {
-			break
-		}
-	}
-	return pool
+	return filterTopSpread(healthy)
 }
 
 func (s *scorer) advanceRotation(now time.Time, passive *passiveTracker) string {
@@ -630,6 +795,7 @@ func (s *scorer) candidateOrder(siteKey string, now time.Time, passive *passiveT
 	type ranked struct {
 		tag     string
 		index   int
+		tier    int
 		score   float64
 		avail   bool
 		suspect bool
@@ -647,6 +813,7 @@ func (s *scorer) candidateOrder(siteKey string, now time.Time, passive *passiveT
 		all = append(all, ranked{
 			tag:     tag,
 			index:   st.index,
+			tier:    st.tier,
 			score:   score,
 			avail:   avail,
 			suspect: passive != nil && passive.IsSuspect(tag, now),
@@ -681,7 +848,13 @@ func (s *scorer) candidateOrder(siteKey string, now time.Time, passive *passiveT
 			return !all[i].suspect
 		}
 		if s.cfg.selectionMode == SelectionModePriority {
-			return all[i].index < all[j].index
+			if s.hasTiers {
+				if all[i].tier != all[j].tier {
+					return all[i].tier < all[j].tier
+				}
+			} else {
+				return all[i].index < all[j].index
+			}
 		}
 		if all[i].score > 0 && all[j].score > 0 && all[i].score != all[j].score {
 			return all[i].score < all[j].score

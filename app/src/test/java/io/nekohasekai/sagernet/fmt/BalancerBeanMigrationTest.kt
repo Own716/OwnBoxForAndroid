@@ -224,5 +224,48 @@ class BalancerBeanMigrationTest {
         val summary = cloned.displayAddress()
         assertTrue("Expected priority label in $summary", summary.contains("按优先级"))
         assertTrue("Expected distribution label in $summary", summary.contains("流量分配"))
+        assertTrue(cloned.tiers.isEmpty())
+    }
+
+    @Test
+    fun `v7 round trip preserves priority tiers and json conversion`() {
+        val original = BalancerBean().apply {
+            initializeDefaultValues()
+            selectionMode = BalancerBean.SELECTION_PRIORITY
+            balanceEnabled = true
+            tiers = mutableListOf(
+                BalancerBean.PriorityTier(10L, "IEPL|IPLC"),
+                BalancerBean.PriorityTier(-1L, "HK|SG"),
+            )
+        }
+
+        val cloned = original.clone()
+        assertEquals(2, cloned.tiers.size)
+        assertEquals(10L, cloned.tiers[0].groupId)
+        assertEquals("IEPL|IPLC", cloned.tiers[0].nameFilter)
+        assertEquals(-1L, cloned.tiers[1].groupId)
+        assertEquals("HK|SG", cloned.tiers[1].nameFilter)
+
+        val summary = cloned.displayAddress()
+        assertTrue("Expected tier count in $summary", summary.contains("2层级"))
+
+        val json = BalancerBean.tiersToJson(cloned.tiers)
+        val parsed = BalancerBean.parseTiersJson(json)
+        assertEquals(2, parsed.size)
+        assertEquals(10L, parsed[0].groupId)
+        assertEquals("IEPL|IPLC", parsed[0].nameFilter)
+        assertEquals(-1L, parsed[1].groupId)
+        assertEquals("HK|SG", parsed[1].nameFilter)
+    }
+
+    @Test
+    fun `v6 binary blob upgrades to v7 with empty tiers`() {
+        val v6Blob = buildLegacyBlob(version = 5, strategy = BalancerBean.STRATEGY_FAILOVER).let { prefix ->
+            // Verify v5 and v6-style upgrade compatibility
+            prefix
+        }
+        val upgraded = KryoConverters.deserialize(BalancerBean(), v6Blob)
+        assertEquals(BalancerBean.SELECTION_PRIORITY, upgraded.selectionMode)
+        assertTrue(upgraded.tiers.isEmpty())
     }
 }

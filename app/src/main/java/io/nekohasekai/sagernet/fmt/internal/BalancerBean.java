@@ -4,6 +4,10 @@ import androidx.annotation.NonNull;
 
 import com.esotericsoftware.kryo.io.ByteBufferInput;
 import com.esotericsoftware.kryo.io.ByteBufferOutput;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import org.jetbrains.annotations.NotNull;
 
@@ -75,6 +79,70 @@ public class BalancerBean extends InternalBean {
     public boolean learnFromConnections = true;
     public int siteStickyMinutes = 60;
     public String connectivityUrl = "";
+    // v7 priority tiers
+    public List<PriorityTier> tiers = new ArrayList<>();
+
+    public static class PriorityTier {
+        public long groupId = -1L;
+        public String nameFilter = "";
+
+        public PriorityTier() {
+        }
+
+        public PriorityTier(long groupId, String nameFilter) {
+            this.groupId = groupId;
+            this.nameFilter = nameFilter != null ? nameFilter : "";
+        }
+
+        public PriorityTier copy() {
+            return new PriorityTier(groupId, nameFilter);
+        }
+
+        public boolean matchesAll() {
+            return groupId <= 0L && (nameFilter == null || nameFilter.trim().isEmpty());
+        }
+    }
+
+    public static String tiersToJson(List<PriorityTier> list) {
+        if (list == null || list.isEmpty()) {
+            return "[]";
+        }
+        JsonArray arr = new JsonArray();
+        for (PriorityTier t : list) {
+            if (t == null) continue;
+            JsonObject obj = new JsonObject();
+            obj.addProperty("groupId", t.groupId);
+            obj.addProperty("nameFilter", t.nameFilter != null ? t.nameFilter : "");
+            arr.add(obj);
+        }
+        return arr.toString();
+    }
+
+    public static List<PriorityTier> parseTiersJson(String json) {
+        List<PriorityTier> out = new ArrayList<>();
+        if (json == null || json.trim().isEmpty()) {
+            return out;
+        }
+        try {
+            JsonElement parsed = JsonParser.parseString(json);
+            if (!parsed.isJsonArray()) {
+                return out;
+            }
+            for (JsonElement elem : parsed.getAsJsonArray()) {
+                if (!elem.isJsonObject()) continue;
+                JsonObject obj = elem.getAsJsonObject();
+                long gid = obj.has("groupId") && obj.get("groupId").isJsonPrimitive()
+                        ? obj.get("groupId").getAsLong()
+                        : -1L;
+                String filter = obj.has("nameFilter") && obj.get("nameFilter").isJsonPrimitive()
+                        ? obj.get("nameFilter").getAsString()
+                        : "";
+                out.add(new PriorityTier(gid, filter));
+            }
+        } catch (Exception ignored) {
+        }
+        return out;
+    }
 
     public boolean isPriorityMode() {
         return SELECTION_PRIORITY.equals(selectionMode);
@@ -104,6 +172,9 @@ public class BalancerBean extends InternalBean {
     public String displayAddress() {
         StringBuilder stratBuilder = new StringBuilder();
         stratBuilder.append(isPriorityMode() ? "按优先级" : "最快最稳");
+        if (isPriorityMode() && tiers != null && !tiers.isEmpty()) {
+            stratBuilder.append(" · ").append(tiers.size()).append("层级");
+        }
         if (balanceEnabled) {
             stratBuilder.append(" · 流量分配");
         }
@@ -184,6 +255,7 @@ public class BalancerBean extends InternalBean {
         learnFromConnections = true;
         siteStickyMinutes = 60;
         connectivityUrl = "";
+        tiers = new ArrayList<>();
     }
 
     private void migrateLegacyStrategy(String rawStrategy) {
@@ -221,6 +293,7 @@ public class BalancerBean extends InternalBean {
         if (name == null) name = "";
         if (proxies == null) proxies = new ArrayList<>();
         if (targetGroupIds == null) targetGroupIds = new ArrayList<>();
+        if (tiers == null) tiers = new ArrayList<>();
         if (selectionMode == null || selectionMode.isEmpty()) {
             selectionMode = SELECTION_PRIORITY.equals(strategy) || STRATEGY_FAILOVER.equals(strategy)
                     ? SELECTION_PRIORITY
@@ -263,7 +336,7 @@ public class BalancerBean extends InternalBean {
         String effectiveSelection = SELECTION_PRIORITY.equals(selectionMode) ? SELECTION_PRIORITY : SELECTION_LATENCY;
         strategy = effectiveSelection;
 
-        output.writeInt(6); // version
+        output.writeInt(7); // version
         output.writeInt(balancerType);
         output.writeLong(targetGroupId);
         output.writeString(strategy);
@@ -316,6 +389,15 @@ public class BalancerBean extends InternalBean {
         output.writeBoolean(learnFromConnections);
         output.writeInt(siteStickyMinutes);
         output.writeString(connectivityUrl != null ? connectivityUrl : "");
+        // v7 fields
+        if (tiers == null) {
+            tiers = new ArrayList<>();
+        }
+        output.writeInt(tiers.size());
+        for (PriorityTier tier : tiers) {
+            output.writeLong(tier != null ? tier.groupId : -1L);
+            output.writeString(tier != null && tier.nameFilter != null ? tier.nameFilter : "");
+        }
     }
 
     @Override
@@ -402,6 +484,16 @@ public class BalancerBean extends InternalBean {
                 strategy = selectionMode;
             } else {
                 migrateLegacyStrategy(strategy);
+            }
+
+            tiers = new ArrayList<>();
+            if (version >= 7) {
+                int tCount = input.readInt();
+                for (int i = 0; i < tCount; i++) {
+                    long gId = input.readLong();
+                    String filter = input.readString();
+                    tiers.add(new PriorityTier(gId, filter));
+                }
             }
         }
     }

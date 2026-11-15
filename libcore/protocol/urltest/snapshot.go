@@ -32,6 +32,7 @@ type MemberSnapshot struct {
 	FailCount           int    `json:"failCount,omitempty"`
 	SuspectUntilMs      int64  `json:"suspectUntilMs,omitempty"`
 	SuspectRemainingSec int    `json:"suspectRemainingSec,omitempty"`
+	Tier                int    `json:"tier,omitempty"`
 }
 
 // GroupSnapshot represents the live state of a strategy group inside the Go core.
@@ -52,6 +53,8 @@ type GroupSnapshot struct {
 	LearnedSiteCount int              `json:"learnedSiteCount,omitempty"`
 	LearnEnabled     bool             `json:"learnEnabled,omitempty"`
 	LocalOffline     bool             `json:"localOffline,omitempty"`
+	ActiveTier       int              `json:"activeTier,omitempty"`
+	TierCount        int              `json:"tierCount,omitempty"`
 	Members          []MemberSnapshot `json:"members"`
 }
 

@@ -264,6 +264,21 @@ internal fun buildAutoSelectOutbound(
             initial_delays_ms = delays
         }
     }
+
+    if (balancer.isPriorityMode() && !balancer.tiers.isNullOrEmpty() && memberEntities.size == memberTags.size) {
+        val (tierMap, _) = BalancerMemberResolver.assignTierIndices(memberEntities, balancer.tiers)
+        val tierCount = balancer.tiers.size
+        val buckets = List(tierCount) { ArrayList<String>() }
+        val seenTags = HashSet<String>()
+        memberEntities.forEachIndexed { idx, member ->
+            val mTag = memberTags[idx]
+            val tIdx = tierMap[member.id] ?: tierCount
+            if (mTag in uniqueTags && tIdx in 0 until tierCount && seenTags.add(mTag)) {
+                buckets[tIdx].add(mTag)
+            }
+        }
+        tiers = buckets
+    }
 }
 
 internal data class ChainGraphTestResult(

@@ -343,4 +343,65 @@ class ConfigBuilderAutoSelectTest {
         assertEquals(frontOut?.get("tag"), memberOut?.get("detour"))
         assertEquals(memberOut?.get("tag"), landingOut?.get("detour"))
     }
+
+    @Test
+    fun tieredPriorityBalancerEmitsOrderedTiersToAutoSelectOutbound() {
+        val mTier1 = socksEntity(10L, "HK IEPL 01", status = 1, ping = 45).apply { groupId = 100L }
+        val mFallback = socksEntity(11L, "US Backup 01", status = 1, ping = 120).apply { groupId = 100L }
+        val mTier3 = socksEntity(12L, "SG Direct 01", status = 1, ping = 70).apply { groupId = 200L }
+
+        val balancer = ProxyEntity(
+            id = 2L,
+            groupId = 999L,
+            type = ProxyEntity.TYPE_BALANCER,
+            balancerBean = BalancerBean().apply {
+                initializeDefaultValues()
+                name = "Tiered-Auto"
+                balancerType = BalancerBean.TYPE_MIXED
+                targetGroupIds = mutableListOf(100L)
+                proxies = mutableListOf(12L)
+                selectionMode = BalancerBean.SELECTION_PRIORITY
+                tiers = mutableListOf(
+                    BalancerBean.PriorityTier(100L, "IEPL"),
+                    BalancerBean.PriorityTier(-1L, "NO_MATCH_JP"),
+                    BalancerBean.PriorityTier(-1L, "SG"),
+                )
+            },
+        )
+
+        val result = assembleChainGraphForTest(
+            root = balancer,
+            entitiesById = mapOf(
+                balancer.id to balancer,
+                mTier1.id to mTier1,
+                mFallback.id to mFallback,
+                mTier3.id to mTier3,
+            ),
+            groupsById = mapOf(
+                100L to ProxyGroup(id = 100L),
+                200L to ProxyGroup(id = 200L),
+            ),
+            groupProfiles = mapOf(
+                100L to listOf(mFallback, mTier1),
+            ),
+        )
+
+        val autoOut = result.outbounds.first { it["type"] == "autoselect" }
+        assertEquals("priority", autoOut["selection_mode"])
+
+        @Suppress("UNCHECKED_CAST")
+        val tiers = autoOut["tiers"] as List<List<String>>
+        assertEquals(3, tiers.size)
+        assertEquals(1, tiers[0].size)
+        assertTrue("Tier 1 should hold HK IEPL 01 tag", tiers[0][0].contains("HK IEPL 01"))
+        assertTrue("Middle unmatched tier must stay empty placeholder", tiers[1].isEmpty())
+        assertEquals(1, tiers[2].size)
+        assertTrue("Tier 3 should hold SG Direct 01 tag", tiers[2][0].contains("SG Direct 01"))
+
+        @Suppress("UNCHECKED_CAST")
+        val outbounds = autoOut["outbounds"] as List<String>
+        assertEquals(3, outbounds.size)
+        // Unmatched mFallback stays in outbounds as implicit fallback tier
+        assertTrue(outbounds.any { it.contains("US Backup 01") })
+    }
 }

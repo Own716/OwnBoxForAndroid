@@ -201,3 +201,108 @@ func TestScorerBalanceTimedRotationVsPerConnection(t *testing.T) {
 		t.Fatalf("expected per_connection to distribute across n1 and n2 only, got %v", seen)
 	}
 }
+
+func TestScorerPriorityTiersSelectionFailoverFailbackAndBalance(t *testing.T) {
+	now := time.Unix(1700000000, 0)
+	order := []string{"t1-slow", "t1-fast", "t2-ultra", "fallback"}
+	opts := AutoSelectOptions{
+		Outbounds:      order,
+		SelectionMode:  SelectionModePriority,
+		Tolerance:      uint16Ptr(30),
+		SampleCount:    intPtr(1),
+		FailbackChecks: intPtr(2),
+		FailbackDelay:  durationPtr(20 * time.Second),
+		BalanceEnabled: true,
+		BalanceMode:    BalanceModePerConnection,
+		Tiers: [][]string{
+			{"t1-slow", "t1-fast"},
+			{"t2-ultra"},
+		},
+	}.normalized()
+
+	s := newScorer(order, opts)
+	if !s.hasTiers || s.tierCount != 3 {
+		t.Fatalf("expected hasTiers=true tierCount=3, got hasTiers=%v tierCount=%d", s.hasTiers, s.tierCount)
+	}
+	if s.members["fallback"].tier != 2 {
+		t.Fatalf("expected unlisted member to sit in implicit fallback tier 2, got %d", s.members["fallback"].tier)
+	}
+
+	// Tier 2 is much faster, but healthy Tier 1 must win; within Tier 1, lowest latency wins.
+	s.recordSample("t1-slow", 120, nil, now)
+	s.recordSample("t1-fast", 70, nil, now)
+	s.recordSample("t2-ultra", 10, nil, now)
+	s.recordSample("fallback", 5, nil, now)
+
+	active, _, switched, _ := s.evaluateWithTransition(now, nil)
+	if !switched || active != "t1-fast" {
+		t.Fatalf("expected tier-1 fastest t1-fast, got %s", active)
+	}
+
+	// Within tolerance (70 -> 50 is 20ms <= 30ms), stay on t1-fast.
+	s.recordSample("t1-slow", 50, nil, now.Add(5*time.Second))
+	active, _, switched, _ = s.evaluateWithTransition(now.Add(5*time.Second), nil)
+	if switched || active != "t1-fast" {
+		t.Fatalf("expected hysteresis within tier 1, got %s switched=%v", active, switched)
+	}
+
+	// Beyond tolerance (90 - 40 = 50ms > 30ms), switch within tier 1 to t1-slow.
+	s.recordSample("t1-fast", 90, nil, now.Add(10*time.Second))
+	s.recordSample("t1-slow", 40, nil, now.Add(10*time.Second))
+	active, reason, switched, _ := s.evaluateWithTransition(now.Add(10*time.Second), nil)
+	if !switched || active != "t1-slow" || reason != "tier best available" {
+		t.Fatalf("expected intra-tier switch to t1-slow, got %s reason=%s switched=%v", active, reason, switched)
+	}
+
+	// Tiered verifiedPool must ONLY include tier-1 healthy nodes within spread (not t2-ultra or fallback).
+	s.recordSample("t1-fast", 55, nil, now.Add(11*time.Second))
+	s.mu.RLock()
+	pool := s.verifiedPoolLocked(now.Add(11*time.Second), nil)
+	s.mu.RUnlock()
+	if len(pool) != 2 || (pool[0] != "t1-slow" && pool[1] != "t1-slow") || (pool[0] != "t1-fast" && pool[1] != "t1-fast") {
+		t.Fatalf("expected tiered balance pool to only contain Tier 1 members, got %v", pool)
+	}
+
+	// Fail all Tier 1 members -> immediate failover to Tier 2.
+	tFail := now.Add(15 * time.Second)
+	s.recordSample("t1-slow", 0, errTestFail, tFail)
+	s.recordSample("t1-fast", 0, errTestFail, tFail)
+	active, reason, switched, _ = s.evaluateWithTransition(tFail, nil)
+	if !switched || active != "t2-ultra" || reason != "priority failover" {
+		t.Fatalf("expected failover to t2-ultra, got %s reason=%s", active, reason)
+	}
+
+	// Fail Tier 2 as well -> implicit fallback Tier 3 takes over.
+	s.recordSample("t2-ultra", 0, errTestFail, tFail.Add(2*time.Second))
+	active, _, switched, _ = s.evaluateWithTransition(tFail.Add(2*time.Second), nil)
+	if !switched || active != "fallback" {
+		t.Fatalf("expected implicit fallback tier member fallback, got %s", active)
+	}
+
+	// Recover t1-fast once -> blocked by failbackChecks=2 and failbackDelay=20s.
+	s.recordSample("t1-fast", 60, nil, tFail.Add(5*time.Second))
+	active, _, switched, _ = s.evaluateWithTransition(tFail.Add(5*time.Second), nil)
+	if switched || active != "fallback" {
+		t.Fatalf("expected failback held by dual-gate, got %s switched=%v", active, switched)
+	}
+
+	// Recover t1-fast second time after failbackDelay -> fails back to Tier 1.
+	tRecover := tFail.Add(25 * time.Second)
+	s.recordSample("t1-fast", 60, nil, tRecover)
+	active, reason, switched, isFailback := s.evaluateWithTransition(tRecover, nil)
+	if !switched || !isFailback || active != "t1-fast" || reason != "priority failback" {
+		t.Fatalf("expected priority failback to t1-fast, got %s reason=%s isFailback=%v", active, reason, isFailback)
+	}
+
+	// Verify candidateOrder ranks healthy Tier 1 before Tier 2 before implicit fallback.
+	s.recordSample("t2-ultra", 10, nil, tRecover)
+	optsSingle := opts
+	optsSingle.balanceEnabled = false
+	s.mu.Lock()
+	s.cfg = optsSingle
+	s.mu.Unlock()
+	cand := s.candidateOrder("", tRecover, nil)
+	if len(cand) != 4 || cand[0] != "t1-fast" {
+		t.Fatalf("expected candidateOrder to lead with t1-fast, got %v", cand)
+	}
+}

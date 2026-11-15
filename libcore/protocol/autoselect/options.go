@@ -44,6 +44,7 @@ type AutoSelectOptions struct {
 	SiteStickyTTL             *badoption.Duration `json:"site_sticky_ttl,omitempty"`
 	ConnectivityURL           string              `json:"connectivity_url,omitempty"`
 	InitialDelaysMs           map[string]uint16   `json:"initial_delays_ms,omitempty"`
+	Tiers                     [][]string          `json:"tiers,omitempty"`
 }
 
 type normalizedConfig struct {
@@ -69,6 +70,7 @@ type normalizedConfig struct {
 	learnFromConnections bool
 	siteStickyTTL        time.Duration
 	connectivityURL      string
+	tiers                [][]string
 }
 
 func (o AutoSelectOptions) normalized() normalizedConfig {
@@ -210,6 +212,16 @@ func (o AutoSelectOptions) normalized() normalizedConfig {
 		rankTopN = 0
 	}
 
+	var tiers [][]string
+	if len(o.Tiers) > 0 {
+		tiers = make([][]string, len(o.Tiers))
+		for i, tierTags := range o.Tiers {
+			if len(tierTags) > 0 {
+				tiers[i] = append([]string(nil), tierTags...)
+			}
+		}
+	}
+
 	return normalizedConfig{
 		url:                  o.URL,
 		selectionMode:        selectionMode,
@@ -233,5 +245,6 @@ func (o AutoSelectOptions) normalized() normalizedConfig {
 		learnFromConnections: learn,
 		siteStickyTTL:        siteStickyTTL,
 		connectivityURL:      o.ConnectivityURL,
+		tiers:                tiers,
 	}
 }

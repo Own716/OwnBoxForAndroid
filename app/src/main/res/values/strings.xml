@@ -1459,7 +1459,7 @@
     <string name="balancer_selection_latency">Fastest &amp; Most Stable</string>
     <string name="balancer_selection_priority">By Priority Order</string>
     <string name="balancer_selection_latency_sum">Fastest &amp; Most Stable: always uses the best-measured available profile.</string>
-    <string name="balancer_selection_priority_sum">By Priority Order: always prefers the highest-priority available profile.</string>
+    <string name="balancer_selection_priority_sum">By Priority Order: prefers higher-priority tiers in order, picking the fastest healthy profile inside each tier.</string>
     <string name="balancer_balance_enabled">Distribute Traffic Across Best Profiles</string>
     <string name="balancer_balance_enabled_off_sum">Off by default: one profile carries all traffic while others stand by. Enable to spread traffic across verified available profiles.</string>
     <string name="balancer_balance_enabled_on_sum">Enabled (%s): spreads traffic across verified available profiles.</string>
@@ -1492,7 +1492,7 @@
     <string name="balancer_max_rtt">Max Latency</string>
     <string name="balancer_dial_retries">Failover Retries</string>
     <string name="balancer_interrupt_on_switch">Interrupt Connections on Switch</string>
-    <string name="balancer_interrupt_on_switch_sum">Applies on latency switches, failures, and fallbacks (priority failback is controlled separately below). On: immediately closes active connections so they reconnect via the new profile. Off: existing connections continue while new connections use the new profile.</string>
+    <string name="balancer_interrupt_on_switch_sum">Applies when switching due to better latency, failure, or fallback. On: immediately closes active connections so they reconnect via the new profile. Off: existing connections continue while new flows switch.</string>
     <string name="balancer_failback_checks">Checks Before Failback</string>
     <string name="balancer_failback_delay">Stable Before Failback</string>
     <string name="balancer_interrupt_on_failback">Interrupt Connections on Failback</string>
@@ -1533,4 +1533,24 @@
     <string name="strategy_member_time_fail">Failed %s</string>
     <string name="strategy_clear_learned">Clear Learned Sites</string>
     <string name="strategy_learned_cleared">Cleared learned site memories</string>
+    <string name="balancer_cat_health_and_switch">Check &amp; Switching</string>
+    <string name="balancer_add_tier">Add tier</string>
+    <string name="balancer_add_tier_empty_hint">No tiers configured: falls back to list priority order (drag list or tap to add tiers).</string>
+    <string name="balancer_add_tier_sum">Prefers Tier 1 healthy profiles; falls back sequentially when exhausted, then to unmatched profiles.</string>
+    <string name="balancer_tier_title">Tier %d</string>
+    <string name="balancer_tier_dialog_add">Add Tier</string>
+    <string name="balancer_tier_dialog_edit">Edit Tier %d</string>
+    <string name="balancer_tier_group_label">Server Group</string>
+    <string name="balancer_tier_any_group">Any selected group</string>
+    <string name="balancer_tier_missing_group">Missing group (#%d)</string>
+    <string name="balancer_tier_filter_hint">Profile Name Regex (Optional)</string>
+    <string name="balancer_tier_filter_helper">Leave empty to match all profiles in scope (e.g. IEPL|IPLC)</string>
+    <string name="balancer_tier_regex_invalid">Invalid regular expression</string>
+    <string name="balancer_tier_move_up">Move up</string>
+    <string name="balancer_tier_move_down">Move down</string>
+    <string name="balancer_tier_sum_group_only">Group: %1$s (%2$d matched)</string>
+    <string name="balancer_tier_sum_regex_only">Name: %1$s (%2$d matched)</string>
+    <string name="balancer_tier_sum_both">%1$s · %2$s (%3$d matched)</string>
+    <string name="balancer_tier_sum_all">All matched profiles (%d)</string>
+    <string name="balancer_tier_fallback_note">Fallback tier: %d remaining</string>
 </resources>

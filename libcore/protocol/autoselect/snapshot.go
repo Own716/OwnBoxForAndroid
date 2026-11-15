@@ -24,6 +24,8 @@ func (g *AutoSelect) GroupSnapshot() customUrltest.GroupSnapshot {
 	pinnedTag := g.scorer.pinnedTag
 	lastSwitchAt := g.scorer.lastSwitchAt
 	switchReason := g.scorer.switchReason
+	hasTiers := g.scorer.hasTiers
+	tierCount := g.scorer.tierCount
 	order := append([]string(nil), g.scorer.order...)
 
 	type memberView struct {
@@ -36,13 +38,18 @@ func (g *AutoSelect) GroupSnapshot() customUrltest.GroupSnapshot {
 		err           string
 		lastCheckedAt time.Time
 		index         int
+		tier          int
 		suspectUntil  time.Time
 	}
 
+	activeTier := 0
 	views := make([]memberView, 0, len(order))
 	availCount := 0
 	for _, tag := range order {
 		st := g.scorer.members[tag]
+		if hasTiers && tag == activeTag {
+			activeTier = st.tier + 1
+		}
 		score, delay, checks, fails, avail := g.scorer.memberScoreLocked(st, g.passive, now)
 		if avail {
 			availCount++
@@ -67,6 +74,7 @@ func (g *AutoSelect) GroupSnapshot() customUrltest.GroupSnapshot {
 			err:           errMsg,
 			lastCheckedAt: st.lastCheckedAt,
 			index:         st.index,
+			tier:          st.tier,
 			suspectUntil:  su,
 		})
 	}
@@ -83,6 +91,14 @@ func (g *AutoSelect) GroupSnapshot() customUrltest.GroupSnapshot {
 		}
 		sort.SliceStable(candidates, func(i, j int) bool {
 			if g.cfg.selectionMode == SelectionModePriority {
+				if hasTiers {
+					if candidates[i].tier != candidates[j].tier {
+						return candidates[i].tier < candidates[j].tier
+					}
+					if candidates[i].score != candidates[j].score {
+						return candidates[i].score < candidates[j].score
+					}
+				}
 				return candidates[i].index < candidates[j].index
 			}
 			if candidates[i].score != candidates[j].score {
@@ -130,12 +146,18 @@ func (g *AutoSelect) GroupSnapshot() customUrltest.GroupSnapshot {
 			displayDelay = 0
 		}
 
+		var tierValue int
+		if hasTiers {
+			tierValue = v.tier + 1
+		}
+
 		members = append(members, customUrltest.MemberSnapshot{
 			Tag:                 v.tag,
 			Delay:               displayDelay,
 			Error:               v.err,
 			LastCheckMs:         lastCheckMs,
 			Role:                role,
+			Tier:                tierValue,
 			CheckCount:          v.checkCount,
 			FailCount:           v.failCount,
 			SuspectUntilMs:      suspectUntilMs,
@@ -165,6 +187,8 @@ func (g *AutoSelect) GroupSnapshot() customUrltest.GroupSnapshot {
 		Checking:         g.prober.IsChecking(),
 		LastCheckMs:      lastCheckMs,
 		SelectionMode:    g.cfg.selectionMode,
+		ActiveTier:       activeTier,
+		TierCount:        tierCount,
 		BalanceEnabled:   g.cfg.balanceEnabled,
 		AvailableCount:   availCount,
 		TotalCount:       len(order),

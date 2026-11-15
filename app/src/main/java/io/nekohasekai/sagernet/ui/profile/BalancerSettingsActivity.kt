@@ -3,14 +3,24 @@ package io.nekohasekai.sagernet.ui.profile
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
+import android.view.LayoutInflater
 import android.view.View
+import android.widget.ArrayAdapter
+import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.widget.AppCompatSpinner
 import androidx.preference.EditTextPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.SwitchPreferenceCompat
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProfileManager
@@ -30,6 +40,10 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
 
     companion object {
         private const val STATE_ADVANCED_EXPANDED = "balancer_advanced_expanded"
+        private const val ORDER_TIER_BASE = 6001
+        private const val FIXED_RUN_TOP_N = 300
+        private const val FIXED_RANK_TOP_N = 1000
+        private const val FIXED_RESULT_TRUST_MIN = 1440
     }
 
     private data class PreviewOverrides(
@@ -37,19 +51,19 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         val exclude: String? = null,
         val include: String? = null,
         val selectionMode: String? = null,
-        val runTopN: Int? = null,
-        val resultTrustMinutes: Int? = null,
-        val skipFailedWithinTrust: Boolean? = null,
     )
 
     private lateinit var frontProxyPreference: OutboundPreference
     private lateinit var landingProxyPreference: OutboundPreference
     private var nodeListPref: BalancerNodeListPreference? = null
     private val groupNameMap = HashMap<Long, String>()
+    private val tiersList = ArrayList<BalancerBean.PriorityTier>()
+    private val tierPrefs = ArrayList<Preference>()
+    private var lastTierCounts: List<Int> = emptyList()
     private var refreshMatchSummaryFn: ((PreviewOverrides) -> Unit)? = null
     private var refreshExplicitSummaryFn: (() -> Unit)? = null
     private var refreshNodeListFn: (() -> Unit)? = null
-    private var refreshChainProxyUiFn: ((String?) -> Unit)? = null
+    private var rebuildTierPrefsFn: (() -> Unit)? = null
     private var advancedExpanded = false
 
     val selectProfileForAddFront = registerForActivityResult(
@@ -64,7 +78,6 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
                 if (::frontProxyPreference.isInitialized) {
                     frontProxyPreference.value = OutboundPreference.VALUE_SELECT_PROFILE
                 }
-                refreshChainProxyUiFn?.invoke(OutboundPreference.VALUE_SELECT_PROFILE)
                 refreshMatchSummaryFn?.invoke(PreviewOverrides())
             }
         }
@@ -166,6 +179,7 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         DataStore.balancerLandingProxyTmp = if (landingProxy > 0L) OutboundPreference.VALUE_SELECT_PROFILE.toInt() else 0
         DataStore.balancerNameExclude = nameExclude ?: ""
         DataStore.balancerNameInclude = nameInclude ?: ""
+        DataStore.balancerTiers = BalancerBean.tiersToJson(tiers)
         DataStore.serverProtocol = proxies.joinToString(",")
     }
 
@@ -192,33 +206,33 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         balanceIntervalSec = DataStore.balancerBalanceIntervalSec
 
         countryFilter = DataStore.balancerCountryFilter.trim()
-        runTopN = DataStore.balancerRunTopN
-        rankTopN = DataStore.balancerRunTopN
-        resultTrustMinutes = DataStore.balancerResultTrustMinutes
-        skipFailedWithinTrust = DataStore.balancerSkipFailedWithinTrust
+        runTopN = FIXED_RUN_TOP_N
+        rankTopN = FIXED_RANK_TOP_N
+        resultTrustMinutes = FIXED_RESULT_TRUST_MIN
+        skipFailedWithinTrust = false
 
-        standbySize = DataStore.balancerStandbySize
-        intensiveCheckCount = DataStore.balancerIntensiveCheckCount
+        standbySize = 3
+        intensiveCheckCount = 8
         interval = DataStore.balancerInterval
-        fullScanIntervalSec = DataStore.balancerFullScanIntervalSec
-        watchIntervalSec = DataStore.balancerWatchIntervalSec
-        sampleCount = DataStore.balancerSampleCount
+        fullScanIntervalSec = 600
+        watchIntervalSec = 15
+        sampleCount = 10
 
         tolerance = DataStore.balancerTolerance
         toleranceUnit = "ms"
-        maxRttMs = DataStore.balancerMaxRttMs
-        dialRetries = DataStore.balancerDialRetries
+        maxRttMs = 0
+        dialRetries = 2
         interruptOnSwitch = DataStore.balancerInterruptOnSwitch
-        failbackChecks = DataStore.balancerFailbackChecks
-        failbackDelaySec = DataStore.balancerFailbackDelaySec
-        interruptOnFailback = DataStore.balancerInterruptOnFailback
+        failbackChecks = 3
+        failbackDelaySec = 60
+        interruptOnFailback = false
         learnFromConnections = DataStore.balancerLearnFromConnections
-        siteStickyMinutes = DataStore.balancerSiteStickyMinutes
+        siteStickyMinutes = 60
 
         testUrl = DataStore.balancerTestUrl.trim()
-        connectivityUrl = DataStore.balancerConnectivityUrl.trim()
-        useFrontProxy = DataStore.balancerUseFrontProxy
-        useLandingProxy = DataStore.balancerUseLandingProxy
+        connectivityUrl = ""
+        useFrontProxy = false
+        useLandingProxy = false
         frontProxy = if (DataStore.balancerFrontProxyTmp == OutboundPreference.VALUE_SELECT_PROFILE.toInt()) {
             DataStore.balancerFrontProxy
         } else {
@@ -231,6 +245,7 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         }
         nameExclude = DataStore.balancerNameExclude
         nameInclude = DataStore.balancerNameInclude
+        tiers = BalancerBean.parseTiersJson(DataStore.balancerTiers)
         proxies = proxyList.map { it.id }
         initializeDefaultValues()
     }
@@ -263,7 +278,6 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
                     )
                     false
                 } else {
-                    refreshChainProxyUiFn?.invoke(newValue.toString())
                     runOnMainDispatcher { refreshMatchSummaryFn?.invoke(PreviewOverrides()) }
                     true
                 }
@@ -358,12 +372,227 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
             true
         }
 
-        val useFrontProxyPref = findPreference<Preference>("balancerUseFrontProxy")
-        val useLandingProxyPref = findPreference<Preference>("balancerUseLandingProxy")
         val nameIncludePref = findPreference<EditTextPreference>("balancerNameInclude")
         val nameExcludePref = findPreference<EditTextPreference>("balancerNameExclude")
         val countryPref = findPreference<EditTextPreference>("balancerCountryFilter")
         val matchSummaryPref = findPreference<Preference>("balancerMatchSummary")
+        val addTierPref = findPreference<Preference>("balancerAddTier")
+
+        tiersList.clear()
+        tiersList.addAll(BalancerBean.parseTiersJson(DataStore.balancerTiers))
+
+        fun syncTiersDataStore() {
+            DataStore.balancerTiers = BalancerBean.tiersToJson(tiersList)
+        }
+
+        fun formatTierSummary(tier: BalancerBean.PriorityTier, matchedCount: Int): String {
+            val groupLabel = if (tier.groupId > 0L) {
+                groupNameMap[tier.groupId] ?: getString(R.string.balancer_tier_missing_group, tier.groupId)
+            } else {
+                ""
+            }
+            val filterLabel = tier.nameFilter.orEmpty().trim()
+            return when {
+                groupLabel.isNotEmpty() && filterLabel.isNotEmpty() ->
+                    getString(R.string.balancer_tier_sum_both, groupLabel, filterLabel, matchedCount)
+                groupLabel.isNotEmpty() ->
+                    getString(R.string.balancer_tier_sum_group_only, groupLabel, matchedCount)
+                filterLabel.isNotEmpty() ->
+                    getString(R.string.balancer_tier_sum_regex_only, filterLabel, matchedCount)
+                else -> getString(R.string.balancer_tier_sum_all, matchedCount)
+            }
+        }
+
+        fun updateAddTierSummary() {
+            addTierPref?.summary = when {
+                tiersList.isEmpty() -> getString(R.string.balancer_add_tier_empty_hint)
+                else -> {
+                    val base = getString(R.string.balancer_add_tier_sum)
+                    val fallbackCount = lastTierCounts.getOrNull(tiersList.size) ?: 0
+                    if (fallbackCount > 0) {
+                        base + "\n" + getString(R.string.balancer_tier_fallback_note, fallbackCount)
+                    } else {
+                        base
+                    }
+                }
+            }
+        }
+
+        var showTierDialog: ((Int?) -> Unit)? = null
+
+        fun rebuildTierPreferences() {
+            val screen = preferenceScreen ?: return
+            screen.isOrderingAsAdded = false
+            tierPrefs.forEach { screen.removePreference(it) }
+            tierPrefs.clear()
+            val isPriority = DataStore.balancerSelectionMode == BalancerBean.SELECTION_PRIORITY
+            addTierPref?.isVisible = isPriority
+            if (!isPriority) return
+
+            tiersList.forEachIndexed { index, tier ->
+                val pref = Preference(this@BalancerSettingsActivity).apply {
+                    key = "balancerTier_$index"
+                    order = ORDER_TIER_BASE + index
+                    title = getString(R.string.balancer_tier_title, index + 1)
+                    setIcon(R.drawable.ic_baseline_layers_24)
+                    summary = formatTierSummary(tier, lastTierCounts.getOrNull(index) ?: 0)
+                    isVisible = true
+                    setOnPreferenceClickListener {
+                        showTierDialog?.invoke(index)
+                        true
+                    }
+                }
+                screen.addPreference(pref)
+                tierPrefs.add(pref)
+            }
+            updateAddTierSummary()
+        }
+        rebuildTierPrefsFn = { rebuildTierPreferences() }
+
+        showTierDialog = { editIndex ->
+            val existing = editIndex?.let { tiersList.getOrNull(it) }
+            val dialogView = LayoutInflater.from(this@BalancerSettingsActivity)
+                .inflate(R.layout.layout_balancer_tier_dialog, null)
+            val groupLabel = dialogView.findViewById<TextView>(R.id.tier_group_label)
+            val groupSpinner = dialogView.findViewById<AppCompatSpinner>(R.id.tier_group_spinner)
+            val filterLayout = dialogView.findViewById<TextInputLayout>(R.id.tier_filter_layout)
+            val filterEdit = dialogView.findViewById<TextInputEditText>(R.id.tier_filter_edit)
+            val moveActions = dialogView.findViewById<View>(R.id.tier_move_actions)
+            val moveUpBtn = dialogView.findViewById<MaterialButton>(R.id.tier_move_up)
+            val moveDownBtn = dialogView.findViewById<MaterialButton>(R.id.tier_move_down)
+
+            val selectedGids = parseGroupIds(DataStore.balancerTargetGroups).ifEmpty {
+                if (DataStore.balancerTargetGroup > 0L) listOf(DataStore.balancerTargetGroup) else emptyList()
+            }.toSet()
+            val selectedGroups = allGroups.filter { selectedGids.contains(it.id) }
+            val spinnerItems = ArrayList<Pair<Long, String>>().apply {
+                add(-1L to getString(R.string.balancer_tier_any_group))
+                selectedGroups.forEach { add(it.id to it.displayName()) }
+                val existingGid = existing?.groupId ?: -1L
+                if (existingGid > 0L && none { it.first == existingGid }) {
+                    add(existingGid to (groupNameMap[existingGid] ?: getString(R.string.balancer_tier_missing_group, existingGid)))
+                }
+            }
+            val showGroupSelector = spinnerItems.size > 1
+            groupLabel.visibility = if (showGroupSelector) View.VISIBLE else View.GONE
+            groupSpinner.visibility = if (showGroupSelector) View.VISIBLE else View.GONE
+            if (showGroupSelector) {
+                val adapter = ArrayAdapter(
+                    this@BalancerSettingsActivity,
+                    android.R.layout.simple_spinner_item,
+                    spinnerItems.map { it.second }
+                ).apply {
+                    setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+                }
+                groupSpinner.adapter = adapter
+                val initialPos = spinnerItems.indexOfFirst { it.first == (existing?.groupId ?: -1L) }
+                groupSpinner.setSelection(if (initialPos >= 0) initialPos else 0)
+            }
+
+            filterEdit.setText(existing?.nameFilter.orEmpty())
+            filterEdit.addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+                override fun afterTextChanged(s: Editable?) {
+                    filterLayout.error = null
+                }
+            })
+
+            fun buildValidatedTier(): BalancerBean.PriorityTier? {
+                val pattern = filterEdit.text?.toString()?.trim().orEmpty()
+                if (pattern.isNotEmpty() && runCatching { Regex(pattern) }.isFailure) {
+                    filterLayout.error = getString(R.string.balancer_tier_regex_invalid)
+                    return null
+                }
+                val chosenGid = if (showGroupSelector) {
+                    spinnerItems.getOrNull(groupSpinner.selectedItemPosition)?.first ?: -1L
+                } else {
+                    -1L
+                }
+                return BalancerBean.PriorityTier(chosenGid, pattern)
+            }
+
+            val builder = MaterialAlertDialogBuilder(this@BalancerSettingsActivity)
+                .setTitle(
+                    if (editIndex == null) getString(R.string.balancer_tier_dialog_add)
+                    else getString(R.string.balancer_tier_dialog_edit, editIndex + 1)
+                )
+                .setView(dialogView)
+                .setPositiveButton(android.R.string.ok, null)
+                .setNegativeButton(android.R.string.cancel, null)
+
+            if (editIndex != null) {
+                builder.setNeutralButton(R.string.delete) { _, _ ->
+                    if (editIndex in tiersList.indices) {
+                        tiersList.removeAt(editIndex)
+                        syncTiersDataStore()
+                        DataStore.dirty = true
+                        rebuildTierPreferences()
+                        refreshMatchSummaryFn?.invoke(PreviewOverrides())
+                    }
+                }
+            }
+
+            val dialog = builder.create()
+            dialog.setOnShowListener {
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setOnClickListener {
+                    val updated = buildValidatedTier() ?: return@setOnClickListener
+                    if (editIndex == null) {
+                        tiersList.add(updated)
+                    } else if (editIndex in tiersList.indices) {
+                        tiersList[editIndex] = updated
+                    }
+                    syncTiersDataStore()
+                    DataStore.dirty = true
+                    rebuildTierPreferences()
+                    refreshMatchSummaryFn?.invoke(PreviewOverrides())
+                    dialog.dismiss()
+                }
+            }
+
+            if (editIndex != null && tiersList.size > 1) {
+                moveActions.visibility = View.VISIBLE
+                moveUpBtn.isEnabled = editIndex > 0
+                moveDownBtn.isEnabled = editIndex < tiersList.lastIndex
+                moveUpBtn.setOnClickListener {
+                    val updated = buildValidatedTier() ?: return@setOnClickListener
+                    if (editIndex in 1 until tiersList.size) {
+                        tiersList[editIndex] = updated
+                        val swapped = tiersList[editIndex - 1]
+                        tiersList[editIndex - 1] = tiersList[editIndex]
+                        tiersList[editIndex] = swapped
+                        syncTiersDataStore()
+                        DataStore.dirty = true
+                        rebuildTierPreferences()
+                        refreshMatchSummaryFn?.invoke(PreviewOverrides())
+                        dialog.dismiss()
+                    }
+                }
+                moveDownBtn.setOnClickListener {
+                    val updated = buildValidatedTier() ?: return@setOnClickListener
+                    if (editIndex in 0 until tiersList.lastIndex) {
+                        tiersList[editIndex] = updated
+                        val swapped = tiersList[editIndex + 1]
+                        tiersList[editIndex + 1] = tiersList[editIndex]
+                        tiersList[editIndex] = swapped
+                        syncTiersDataStore()
+                        DataStore.dirty = true
+                        rebuildTierPreferences()
+                        refreshMatchSummaryFn?.invoke(PreviewOverrides())
+                        dialog.dismiss()
+                    }
+                }
+            } else {
+                moveActions.visibility = View.GONE
+            }
+
+            dialog.show()
+        }
+
+        addTierPref?.setOnPreferenceClickListener {
+            showTierDialog?.invoke(null)
+            true
+        }
 
         fun refreshMatchSummary(overrides: PreviewOverrides = PreviewOverrides()) {
             val type = DataStore.balancerType
@@ -375,9 +604,7 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
             val excludePattern = overrides.exclude ?: DataStore.balancerNameExclude
             val includePattern = overrides.include ?: DataStore.balancerNameInclude
             val selectionMode = overrides.selectionMode ?: DataStore.balancerSelectionMode
-            val runTopN = overrides.runTopN ?: DataStore.balancerRunTopN
-            val trustMin = overrides.resultTrustMinutes ?: DataStore.balancerResultTrustMinutes
-            val skipFailed = overrides.skipFailedWithinTrust ?: DataStore.balancerSkipFailedWithinTrust
+            val tiersSnapshot = tiersList.map { it.copy() }
             val selfId = DataStore.editingId
             val frontId = if (DataStore.balancerFrontProxyTmp == OutboundPreference.VALUE_SELECT_PROFILE.toInt()) {
                 DataStore.balancerFrontProxy
@@ -403,23 +630,33 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
                         landingProxyId = landingId,
                         countryFilter = countryPattern,
                         selectionMode = selectionMode,
-                        runTopN = runTopN,
-                        rankTopN = runTopN,
-                        resultTrustMinutes = trustMin,
-                        skipFailedWithinTrust = skipFailed,
+                        tiers = tiersSnapshot,
+                        runTopN = FIXED_RUN_TOP_N,
+                        rankTopN = FIXED_RUN_TOP_N,
+                        resultTrustMinutes = FIXED_RESULT_TRUST_MIN,
+                        skipFailedWithinTrust = false,
                     )
                 )
                 val summaryText = formatPreviewSummary(res, type)
                 onMainDispatcher {
+                    lastTierCounts = res.tierCounts
+                    tierPrefs.forEachIndexed { idx, pref ->
+                        tiersList.getOrNull(idx)?.let { tier ->
+                            pref.summary = formatTierSummary(tier, lastTierCounts.getOrNull(idx) ?: 0)
+                        }
+                    }
+                    updateAddTierSummary()
                     matchSummaryPref?.summary = summaryText
                 }
             }
         }
         refreshMatchSummaryFn = { ov -> refreshMatchSummary(ov) }
 
-        fun syncNodeListUi(type: Int = DataStore.balancerType) {
-            val hasList = hasExplicitListType(type)
-            localNodeListPref?.isVisible = hasList && proxyList.isNotEmpty()
+        fun syncNodeListUi(
+            type: Int = DataStore.balancerType,
+            selectionMode: String = DataStore.balancerSelectionMode,
+        ) {
+            localNodeListPref?.isVisible = shouldShowNodeList(type, selectionMode)
             localNodeListPref?.submitList(proxyList, groupNameMap)
         }
         refreshNodeListFn = { syncNodeListUi() }
@@ -440,7 +677,7 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
                     syncServerProtocol()
                     DataStore.dirty = true
                     localNodeListPref.notifyItemRemovedAt(position)
-                    localNodeListPref.isVisible = hasExplicitListType(DataStore.balancerType) && proxyList.isNotEmpty()
+                    localNodeListPref.isVisible = shouldShowNodeList()
                     updateExplicitNodesSummary()
                     refreshMatchSummary()
                 }
@@ -466,7 +703,7 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
             nameIncludePref?.isVisible = hasGroup
             nameExcludePref?.isVisible = hasGroup
             explicitNodesPref?.isVisible = hasList
-            localNodeListPref?.isVisible = hasList && proxyList.isNotEmpty()
+            syncNodeListUi(type, DataStore.balancerSelectionMode)
             refreshMatchSummary()
         }
 
@@ -503,19 +740,30 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         }
 
         // Advanced collapsible section
-        val advancedCategories = listOfNotNull(
-            findPreference<PreferenceCategory>("balancerCatUseWhich"),
-            findPreference<PreferenceCategory>("balancerCatHealth"),
-            findPreference<PreferenceCategory>("balancerCatSwitching"),
-            findPreference<PreferenceCategory>("balancerCatLoadBalance"),
-            findPreference<PreferenceCategory>("balancerCatEndpoints"),
-            findPreference<PreferenceCategory>("balancerCatChain"),
-        )
+        val catUseWhich = findPreference<PreferenceCategory>("balancerCatUseWhich")
+        val catHealth = findPreference<PreferenceCategory>("balancerCatHealth")
+        val catLoadBalance = findPreference<PreferenceCategory>("balancerCatLoadBalance")
+        val catChain = findPreference<PreferenceCategory>("balancerCatChain")
         val advancedTogglePref = findPreference<Preference>("balancerAdvancedToggle")
 
-        fun applyAdvancedExpanded(expanded: Boolean) {
+        bindIntPref("balancerInterval", 300, 5, R.string.balancer_unit_seconds)
+        bindIntPref("balancerTolerance", 30, 0, R.string.balancer_unit_ms)
+
+        val balanceSwitchPref = findPreference<SwitchPreferenceCompat>("balancerBalanceEnabled")
+        val balanceModePref = findPreference<SimpleMenuPreference>("balancerBalanceMode")
+        val balanceIntervalPref = bindIntPref("balancerBalanceIntervalSec", 30, 1, R.string.balancer_unit_seconds)
+        val selectionModePref = findPreference<SimpleMenuPreference>("balancerSelectionMode")
+
+        fun applyCategoryVisibility(balanceOn: Boolean) {
+            catUseWhich?.isVisible = advancedExpanded
+            catHealth?.isVisible = advancedExpanded
+            catChain?.isVisible = advancedExpanded
+            catLoadBalance?.isVisible = advancedExpanded && balanceOn
+        }
+
+        fun applyAdvancedExpanded(expanded: Boolean, balanceEnabledOverride: Boolean? = null) {
             advancedExpanded = expanded
-            advancedCategories.forEach { it.isVisible = expanded }
+            applyCategoryVisibility(balanceEnabledOverride ?: DataStore.balancerBalanceEnabled)
             advancedTogglePref?.setSummary(if (expanded) R.string.balancer_advanced_hide else R.string.balancer_advanced_show)
             advancedTogglePref?.setIcon(
                 if (expanded) R.drawable.ic_baseline_keyboard_arrow_up_24 else R.drawable.ic_baseline_keyboard_arrow_down_24
@@ -527,45 +775,10 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
             true
         }
 
-        // Numeric advanced fields (bound cleanly via one shared helper)
-        bindIntPref("balancerRunTopN", 300, 0, R.string.balancer_unit_profiles, zeroAsUnlimited = true) { v ->
-            refreshMatchSummary(PreviewOverrides(runTopN = v))
-        }
-        bindIntPref("balancerResultTrustMinutes", 1440, 0, R.string.balancer_unit_minutes) { v ->
-            refreshMatchSummary(PreviewOverrides(resultTrustMinutes = v))
-        }
-        findPreference<SwitchPreferenceCompat>("balancerSkipFailedWithinTrust")?.setOnPreferenceChangeListener { _, newValue ->
-            refreshMatchSummary(PreviewOverrides(skipFailedWithinTrust = newValue as? Boolean ?: false))
-            true
-        }
-
-        bindIntPref("balancerStandbySize", 3, 0, R.string.balancer_unit_profiles)
-        bindIntPref("balancerIntensiveCheckCount", 8, 1, R.string.balancer_unit_profiles)
-        bindIntPref("balancerInterval", 300, 5, R.string.balancer_unit_seconds)
-        bindIntPref("balancerFullScanIntervalSec", 600, 10, R.string.balancer_unit_seconds)
-        bindIntPref("balancerWatchIntervalSec", 15, 0, R.string.balancer_unit_seconds)
-        bindIntPref("balancerSampleCount", 10, 1, null)
-        bindIntPref("balancerTolerance", 30, 0, R.string.balancer_unit_ms)
-
-        bindIntPref("balancerMaxRttMs", 0, 0, R.string.balancer_unit_ms, zeroAsUnlimited = true)
-        bindIntPref("balancerDialRetries", 2, 0, null)
-
-        val failbackChecksPref = bindIntPref("balancerFailbackChecks", 3, 1, R.string.balancer_unit_checks)
-        val failbackDelayPref = bindIntPref("balancerFailbackDelaySec", 60, 0, R.string.balancer_unit_seconds)
-        val interruptFailbackPref = findPreference<SwitchPreferenceCompat>("balancerInterruptOnFailback")
-        val learnPref = findPreference<SwitchPreferenceCompat>("balancerLearnFromConnections")
-        val siteStickyPref = bindIntPref("balancerSiteStickyMinutes", 60, 1, R.string.balancer_unit_minutes)
-
-        val balanceSwitchPref = findPreference<SwitchPreferenceCompat>("balancerBalanceEnabled")
-        val balanceModePref = findPreference<SimpleMenuPreference>("balancerBalanceMode")
-        val balanceIntervalPref = bindIntPref("balancerBalanceIntervalSec", 30, 1, R.string.balancer_unit_seconds)
-        val selectionModePref = findPreference<SimpleMenuPreference>("balancerSelectionMode")
-
         fun updateSelectionAndBalanceUi(
             selectionOverride: String? = null,
             balanceEnabledOverride: Boolean? = null,
             balanceModeOverride: String? = null,
-            learnOverride: Boolean? = null,
         ) {
             val mode = selectionOverride ?: DataStore.balancerSelectionMode
             val isPriority = mode == BalancerBean.SELECTION_PRIORITY
@@ -574,12 +787,8 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
                 if (isPriority) R.string.balancer_selection_priority_sum else R.string.balancer_selection_latency_sum
             )
 
-            failbackChecksPref?.isEnabled = isPriority
-            failbackDelayPref?.isEnabled = isPriority
-            interruptFailbackPref?.isEnabled = isPriority
-
-            val learnOn = learnOverride ?: DataStore.balancerLearnFromConnections
-            siteStickyPref?.isEnabled = learnOn
+            rebuildTierPreferences()
+            syncNodeListUi(DataStore.balancerType, mode)
 
             val balanceOn = balanceEnabledOverride ?: DataStore.balancerBalanceEnabled
             val balMode = balanceModeOverride ?: DataStore.balancerBalanceMode
@@ -597,22 +806,10 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
                 getString(R.string.balancer_balance_enabled_off_sum)
             }
 
+            applyCategoryVisibility(balanceOn)
             balanceModePref?.isEnabled = balanceOn
-            balanceIntervalPref?.isEnabled = balanceOn && balMode != BalancerBean.BALANCE_PER_CONNECTION
+            balanceIntervalPref?.isVisible = balanceOn && balMode != BalancerBean.BALANCE_PER_CONNECTION
         }
-
-        fun updateChainProxyUi(frontTmpOverride: String? = null) {
-            val frontTmp = frontTmpOverride ?: DataStore.balancerFrontProxyTmp.toString()
-            val customFrontSelected = frontTmp == OutboundPreference.VALUE_SELECT_PROFILE
-            useFrontProxyPref?.isEnabled = !customFrontSelected
-            useFrontProxyPref?.setSummary(
-                if (customFrontSelected) R.string.balancer_use_front_proxy_overridden_sum
-                else R.string.balancer_use_front_proxy_sum
-            )
-            useLandingProxyPref?.setSummary(R.string.balancer_use_landing_proxy_sum)
-        }
-        refreshChainProxyUiFn = { ov -> updateChainProxyUi(ov) }
-        updateChainProxyUi()
 
         selectionModePref?.setOnPreferenceChangeListener { _, newValue ->
             val mode = (newValue as? String) ?: BalancerBean.SELECTION_LATENCY
@@ -620,12 +817,6 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
             DataStore.balancerStrategy = mode
             updateSelectionAndBalanceUi(selectionOverride = mode)
             refreshMatchSummary(PreviewOverrides(selectionMode = mode))
-            true
-        }
-
-        learnPref?.setOnPreferenceChangeListener { _, newValue ->
-            val enabled = newValue as? Boolean ?: true
-            updateSelectionAndBalanceUi(learnOverride = enabled)
             true
         }
 
@@ -646,16 +837,6 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
             val custom = pref.text?.trim().orEmpty()
             if (custom.isBlank()) {
                 getString(R.string.balancer_test_url_default, DataStore.connectionTestURL)
-            } else {
-                custom
-            }
-        }
-
-        val connectivityUrlPref = findPreference<EditTextPreference>("balancerConnectivityUrl")
-        connectivityUrlPref?.summaryProvider = Preference.SummaryProvider<EditTextPreference> { pref ->
-            val custom = pref.text?.trim().orEmpty()
-            if (custom.isBlank()) {
-                getString(R.string.balancer_connectivity_url_unset)
             } else {
                 custom
             }
@@ -701,6 +882,14 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
             .mapNotNull { it.trim().toLongOrNull() }
             .filter { it > 0L }
     }
+
+    private fun shouldShowNodeList(
+        type: Int = DataStore.balancerType,
+        selectionMode: String = DataStore.balancerSelectionMode,
+    ): Boolean =
+        selectionMode == BalancerBean.SELECTION_PRIORITY &&
+            hasExplicitListType(type) &&
+            proxyList.isNotEmpty()
 
     private fun hasExplicitListType(type: Int): Boolean =
         type == BalancerBean.TYPE_LIST || type == BalancerBean.TYPE_MIXED

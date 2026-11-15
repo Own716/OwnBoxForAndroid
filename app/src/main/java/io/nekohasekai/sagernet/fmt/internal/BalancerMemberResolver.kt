@@ -21,6 +21,7 @@ object BalancerMemberResolver {
         val landingProxyId: Long = 0L,
         val countryFilter: String = "",
         val selectionMode: String = BalancerBean.SELECTION_LATENCY,
+        val tiers: List<BalancerBean.PriorityTier> = emptyList(),
         val runTopN: Int = 300,
         val rankTopN: Int = 0,
         val resultTrustMinutes: Int = 1440,
@@ -33,13 +34,120 @@ object BalancerMemberResolver {
         val extraAddedCount: Int = 0,
         val excludeRegexInvalid: Boolean = false,
         val includeRegexInvalid: Boolean = false,
+        val tierRegexInvalid: Boolean = false,
+        val tierCounts: List<Int> = emptyList(),
+        val memberTierIndices: Map<Long, Int> = emptyMap(),
         val matchedCandidateCount: Int = members.size,
         val availableCount: Int = members.count { it.status != 2 && it.status != 3 },
         val skippedFailedCount: Int = 0,
         val reusableRecentCount: Int = 0,
     ) {
         val totalCount: Int get() = members.size
-        val hasRegexError: Boolean get() = excludeRegexInvalid || includeRegexInvalid
+        val hasRegexError: Boolean get() = excludeRegexInvalid || includeRegexInvalid || tierRegexInvalid
+    }
+
+    private data class CompiledTier(
+        val groupId: Long,
+        val hasRegexText: Boolean,
+        val regex: Regex?,
+    )
+
+    fun assignTierIndices(
+        entities: List<ProxyEntity>,
+        tiers: List<BalancerBean.PriorityTier>,
+    ): Pair<Map<Long, Int>, Boolean> {
+        if (tiers.isEmpty() || entities.isEmpty()) {
+            return emptyMap<Long, Int>() to false
+        }
+        var anyInvalid = false
+        val compiled = tiers.map { t ->
+            val filter = t.nameFilter.orEmpty()
+            val hasText = filter.isNotBlank()
+            val regex = if (hasText) {
+                runCatching { Regex(filter) }.getOrNull().also {
+                    if (it == null) anyInvalid = true
+                }
+            } else {
+                null
+            }
+            CompiledTier(groupId = t.groupId, hasRegexText = hasText, regex = regex)
+        }
+        val fallbackTier = tiers.size
+        val map = LinkedHashMap<Long, Int>(entities.size)
+        for (entity in entities) {
+            val name = entity.displayName()
+            var matched = fallbackTier
+            for (i in compiled.indices) {
+                val ct = compiled[i]
+                if (ct.groupId > 0L && entity.groupId != ct.groupId) continue
+                if (ct.hasRegexText && (ct.regex == null || !ct.regex.containsMatchIn(name))) continue
+                matched = i
+                break
+            }
+            map[entity.id] = matched
+        }
+        return map to anyInvalid
+    }
+
+    private fun capByTier(
+        buckets: List<List<ProxyEntity>>,
+        limit: Int,
+    ): List<ProxyEntity> {
+        if (limit <= 0) return buckets.flatten()
+        val total = buckets.sumOf { it.size }
+        if (total <= limit) return buckets.flatten()
+
+        val counts = IntArray(buckets.size)
+        var assigned = 0
+        val nonEmptyIndices = buckets.indices.filter { buckets[it].isNotEmpty() }
+        for (i in nonEmptyIndices) {
+            val quota = ((buckets[i].size.toLong() * limit) / total).toInt().coerceAtLeast(1)
+            val take = minOf(buckets[i].size, quota)
+            counts[i] = take
+            assigned += take
+        }
+        while (assigned > limit) {
+            var trimmed = false
+            for (i in nonEmptyIndices.reversed()) {
+                if (assigned <= limit) break
+                if (counts[i] > 1) {
+                    counts[i]--
+                    assigned--
+                    trimmed = true
+                }
+            }
+            if (!trimmed) {
+                for (i in nonEmptyIndices.reversed()) {
+                    if (assigned <= limit) break
+                    if (counts[i] > 0) {
+                        counts[i]--
+                        assigned--
+                        trimmed = true
+                    }
+                }
+            }
+            if (!trimmed) break
+        }
+        while (assigned < limit) {
+            var added = false
+            for (i in nonEmptyIndices) {
+                if (assigned >= limit) break
+                if (counts[i] < buckets[i].size) {
+                    counts[i]++
+                    assigned++
+                    added = true
+                }
+            }
+            if (!added) break
+        }
+        val out = ArrayList<ProxyEntity>(limit)
+        for (i in buckets.indices) {
+            val take = counts[i]
+            if (take > 0) {
+                out.addAll(buckets[i].take(take))
+            }
+        }
+        return out
     }
 
     fun resolve(
@@ -70,6 +178,7 @@ object BalancerMemberResolver {
                 landingProxyId = landingProxyId,
                 countryFilter = balancer.countryFilter.orEmpty(),
                 selectionMode = if (balancer.isPriorityMode()) BalancerBean.SELECTION_PRIORITY else BalancerBean.SELECTION_LATENCY,
+                tiers = balancer.tiers?.mapNotNull { it?.copy() } ?: emptyList(),
                 runTopN = balancer.effectiveRunTopN,
                 rankTopN = balancer.effectiveRunTopN,
                 resultTrustMinutes = balancer.resultTrustMinutes,
@@ -216,10 +325,43 @@ object BalancerMemberResolver {
             spec.rankTopN > 0 -> minOf(spec.runTopN, spec.rankTopN)
             else -> spec.runTopN
         }
-        val finalMembers = if (effectiveTopN > 0 && ordered.size > effectiveTopN) {
-            ordered.take(effectiveTopN)
+
+        val activeTiers = if (spec.selectionMode == BalancerBean.SELECTION_PRIORITY) spec.tiers else emptyList()
+        var tierRegexInvalid = false
+        val memberTierIndices: Map<Long, Int>
+        val finalMembers: List<ProxyEntity>
+        val tierCounts: List<Int>
+        if (activeTiers.isNotEmpty()) {
+            val (tierMap, hasInvalid) = assignTierIndices(ordered, activeTiers)
+            tierRegexInvalid = hasInvalid
+            val bucketCount = activeTiers.size + 1
+            val buckets = List(bucketCount) { ArrayList<ProxyEntity>() }
+            for (entity in ordered) {
+                val tIdx = (tierMap[entity.id] ?: activeTiers.size).coerceIn(0, bucketCount - 1)
+                buckets[tIdx].add(entity)
+            }
+            finalMembers = if (effectiveTopN > 0 && ordered.size > effectiveTopN) {
+                capByTier(buckets, effectiveTopN)
+            } else {
+                buckets.flatten()
+            }
+            val finalCounts = IntArray(bucketCount)
+            val finalTierMap = LinkedHashMap<Long, Int>(finalMembers.size)
+            for (entity in finalMembers) {
+                val tIdx = (tierMap[entity.id] ?: activeTiers.size).coerceIn(0, bucketCount - 1)
+                finalCounts[tIdx]++
+                finalTierMap[entity.id] = tIdx
+            }
+            tierCounts = finalCounts.toList()
+            memberTierIndices = finalTierMap
         } else {
-            ordered
+            finalMembers = if (effectiveTopN > 0 && ordered.size > effectiveTopN) {
+                ordered.take(effectiveTopN)
+            } else {
+                ordered
+            }
+            tierCounts = emptyList()
+            memberTierIndices = emptyMap()
         }
 
         val groupMatchedCount = finalMembers.count { it.id in fromGroupIds }
@@ -234,6 +376,9 @@ object BalancerMemberResolver {
             extraAddedCount = extraAddedCount,
             excludeRegexInvalid = excludeInvalid,
             includeRegexInvalid = includeInvalid,
+            tierRegexInvalid = tierRegexInvalid,
+            tierCounts = tierCounts,
+            memberTierIndices = memberTierIndices,
             matchedCandidateCount = matchedCandidateCount,
             availableCount = availableCount,
             skippedFailedCount = skippedFailedCount,

@@ -318,4 +318,79 @@ class BalancerMemberResolverTest {
         )
         assertEquals(listOf(1L, 2L, 3L, 4L, 5L), unlimitedResult.members.map { it.id })
     }
+
+    @Test
+    fun priorityTiersAssignOrderTrackCountsValidateRegexAndCapProportionally() {
+        val g1Iepl = socksEntity(1L, 10L, "HK IEPL 01")
+        val g1Normal = socksEntity(2L, 10L, "HK Normal 01")
+        val g2Fast = socksEntity(3L, 20L, "JP BGP 01")
+        val explicitSg = socksEntity(4L, 30L, "SG Fallback 01")
+        val byId = listOf(g1Iepl, g1Normal, g2Fast, explicitSg).associateBy { it.id }
+
+        val tiers = listOf(
+            BalancerBean.PriorityTier(10L, "IEPL"),
+            BalancerBean.PriorityTier(20L, ""),
+            BalancerBean.PriorityTier(10L, "HK"),
+        )
+        val res = BalancerMemberResolver.resolve(
+            spec = BalancerMemberResolver.FilterSpec(
+                balancerType = BalancerBean.TYPE_MIXED,
+                targetGroupIds = listOf(10L, 20L),
+                explicitProxyIds = listOf(4L),
+                selectionMode = BalancerBean.SELECTION_PRIORITY,
+                tiers = tiers,
+            ),
+            groupProfilesProvider = { gid ->
+                when (gid) {
+                    10L -> listOf(g1Normal, g1Iepl)
+                    20L -> listOf(g2Fast)
+                    else -> emptyList()
+                }
+            },
+            entitiesByIdsProvider = { ids -> ids.mapNotNull { byId[it] } },
+            isGroupDisabled = { false },
+        )
+
+        // Expected bucket order: Tier0=[g1Iepl], Tier1=[g2Fast], Tier2=[g1Normal], Fallback=[explicitSg]
+        assertEquals(listOf(1L, 3L, 2L, 4L), res.members.map { it.id })
+        assertEquals(listOf(1, 1, 1, 1), res.tierCounts)
+        assertFalse(res.hasRegexError)
+
+        // Invalid regex in tier must flag tierRegexInvalid and match nothing for that tier
+        val invalidRes = BalancerMemberResolver.resolve(
+            spec = BalancerMemberResolver.FilterSpec(
+                balancerType = BalancerBean.TYPE_GROUP,
+                targetGroupIds = listOf(10L),
+                explicitProxyIds = emptyList(),
+                selectionMode = BalancerBean.SELECTION_PRIORITY,
+                tiers = listOf(BalancerBean.PriorityTier(-1L, "[unclosed")),
+            ),
+            groupProfilesProvider = { listOf(g1Normal, g1Iepl) },
+            isGroupDisabled = { false },
+        )
+        assertTrue(invalidRes.tierRegexInvalid)
+        assertTrue(invalidRes.hasRegexError)
+        assertEquals(listOf(0, 2), invalidRes.tierCounts)
+
+        // Proportional cap when runTopN limits across non-empty tiers
+        val tier1Nodes = (1L..4L).map { socksEntity(it, 10L, "T1-$it") }
+        val tier2Nodes = (10L..13L).map { socksEntity(it, 20L, "T2-$it") }
+        val capped = BalancerMemberResolver.resolve(
+            spec = BalancerMemberResolver.FilterSpec(
+                balancerType = BalancerBean.TYPE_GROUP,
+                targetGroupIds = listOf(10L, 20L),
+                explicitProxyIds = emptyList(),
+                selectionMode = BalancerBean.SELECTION_PRIORITY,
+                tiers = listOf(
+                    BalancerBean.PriorityTier(10L, ""),
+                    BalancerBean.PriorityTier(20L, ""),
+                ),
+                runTopN = 4,
+            ),
+            groupProfilesProvider = { gid -> if (gid == 10L) tier1Nodes else tier2Nodes },
+            isGroupDisabled = { false },
+        )
+        assertEquals(4, capped.members.size)
+        assertEquals(listOf(2, 2, 0), capped.tierCounts)
+    }
 }

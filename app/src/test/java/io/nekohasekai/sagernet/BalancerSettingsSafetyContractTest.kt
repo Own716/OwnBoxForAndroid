@@ -69,45 +69,51 @@ class BalancerSettingsSafetyContractTest {
             "balancerRankTopN",
             "balancerToleranceUnit",
             "balancerBalanceHint",
+            "balancerRunTopN",
+            "balancerResultTrustMinutes",
+            "balancerSkipFailedWithinTrust",
+            "balancerStandbySize",
+            "balancerIntensiveCheckCount",
+            "balancerFullScanIntervalSec",
+            "balancerWatchIntervalSec",
+            "balancerSampleCount",
+            "balancerMaxRttMs",
+            "balancerDialRetries",
+            "balancerFailbackChecks",
+            "balancerFailbackDelaySec",
+            "balancerInterruptOnFailback",
+            "balancerSiteStickyMinutes",
+            "balancerConnectivityUrl",
+            "balancerUseFrontProxy",
+            "balancerUseLandingProxy",
         ).forEach { removed ->
             assertFalse("removed key $removed must not remain in balancer_preferences.xml", prefXml.contains("app:key=\"$removed\""))
         }
         listOf(
+            "balancerAddTier",
             "balancerNodeList",
             "balancerSelectionMode",
             "balancerBalanceEnabled",
             "balancerMatchSummary",
             "balancerAdvancedToggle",
             "balancerCountryFilter",
-            "balancerRunTopN",
-            "balancerResultTrustMinutes",
-            "balancerSkipFailedWithinTrust",
-            "balancerStandbySize",
-            "balancerIntensiveCheckCount",
+            "balancerNameExclude",
             "balancerInterval",
-            "balancerFullScanIntervalSec",
-            "balancerWatchIntervalSec",
-            "balancerSampleCount",
             "balancerTolerance",
-            "balancerMaxRttMs",
-            "balancerDialRetries",
             "balancerInterruptOnSwitch",
-            "balancerFailbackChecks",
-            "balancerFailbackDelaySec",
-            "balancerInterruptOnFailback",
             "balancerLearnFromConnections",
-            "balancerSiteStickyMinutes",
             "balancerBalanceMode",
             "balancerBalanceIntervalSec",
             "balancerTestUrl",
-            "balancerConnectivityUrl",
-            "balancerUseFrontProxy",
             "balancerFrontProxy",
-            "balancerUseLandingProxy",
             "balancerLandingProxy",
         ).forEach { key ->
             assertTrue("balancer_preferences.xml must declare key=$key", prefXml.contains("app:key=\"$key\""))
         }
+
+        val addTierIdx = prefXml.indexOf("app:key=\"balancerAddTier\"")
+        val nodeListIdx = prefXml.indexOf("app:key=\"balancerNodeList\"")
+        assertTrue("balancerAddTier must precede balancerNodeList", addTierIdx in 0 until nodeListIdx)
 
         assertTrue(arraysXml.contains("name=\"balancer_selection_mode_values\""))
         assertTrue(arraysXml.contains("name=\"balancer_balance_mode_values\""))
@@ -116,6 +122,8 @@ class BalancerSettingsSafetyContractTest {
 
         // Defaults and dependency toggles in activity
         assertTrue(activityText.contains("balancerSelectionMode"))
+        assertTrue(activityText.contains("shouldShowNodeList"))
+        assertTrue(activityText.contains("balancerAddTier"))
         assertTrue(activityText.contains("balancerAdvancedToggle"))
         assertTrue(activityText.contains("BalancerMemberResolver.ResolutionResult") || activityText.contains("reusableRecentCount"))
     }

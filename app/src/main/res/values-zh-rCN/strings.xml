@@ -1377,7 +1377,7 @@
     <string name="balancer_selection_latency">最快最稳</string>
     <string name="balancer_selection_priority">按优先级顺序</string>
     <string name="balancer_selection_latency_sum">最快最稳：始终使用所有配置中测量结果最佳的那个。</string>
-    <string name="balancer_selection_priority_sum">按优先级顺序：始终优先使用列表中排名最靠前的可用配置。</string>
+    <string name="balancer_selection_priority_sum">按优先级顺序：优先使用最高顺位层级中的最优可用配置，层内不可用时自动逐层回退。</string>
     <string name="balancer_balance_enabled">在最佳配置之间分配流量</string>
     <string name="balancer_balance_enabled_off_sum">默认关闭：一个配置承载全部流量，其余待命。开启后可将流量分散到已确认可用的配置上。</string>
     <string name="balancer_balance_enabled_on_sum">已开启：%s。流量将分散到已确认可用的配置上。</string>
@@ -1410,7 +1410,7 @@
     <string name="balancer_max_rtt">最大延迟</string>
     <string name="balancer_dial_retries">故障转移重试</string>
     <string name="balancer_interrupt_on_switch">切换时断开连接</string>
-    <string name="balancer_interrupt_on_switch_sum">因延迟更佳、失效或降级而切换时生效（按优先级移回高顺位由下方单独开关控制）。开：立即中断现有活跃连接使其重建到新配置；关：已建立的连接保持运行，新连接切换到新配置。</string>
+    <string name="balancer_interrupt_on_switch_sum">因延迟更佳、失效或层间切换时生效。开：立即断开已有活跃连接使其重建到新配置；关：已建立的连接保持运行，新连接切换到新配置。</string>
     <string name="balancer_failback_checks">移回前需通过</string>
     <string name="balancer_failback_delay">无失败持续</string>
     <string name="balancer_interrupt_on_failback">移回时断开连接</string>
@@ -1451,4 +1451,24 @@
     <string name="strategy_member_time_fail">失败%s</string>
     <string name="strategy_clear_learned">清除网站选择记忆</string>
     <string name="strategy_learned_cleared">已清除网站选择记忆</string>
+    <string name="balancer_cat_health_and_switch">检查与切换</string>
+    <string name="balancer_add_tier">添加层级</string>
+    <string name="balancer_add_tier_empty_hint">暂未设置层级：当前按列表顺位择优；可点击此处按分组或名称规则划分层级。</string>
+    <string name="balancer_add_tier_sum">优先使用第 1 层级中延迟最佳的可用配置；当前层级全部不可用时依次回退，其余配置作为保底备选。</string>
+    <string name="balancer_tier_title">层级 %d</string>
+    <string name="balancer_tier_dialog_add">添加层级</string>
+    <string name="balancer_tier_dialog_edit">编辑层级 %d</string>
+    <string name="balancer_tier_group_label">限定服务器分组</string>
+    <string name="balancer_tier_any_group">不限分组 (所有已选来源)</string>
+    <string name="balancer_tier_missing_group">已删除分组 (#%d)</string>
+    <string name="balancer_tier_filter_hint">节点名称匹配 (正则，可选)</string>
+    <string name="balancer_tier_filter_helper">留空则匹配所选范围内的全部节点（如 IEPL|IPLC|专线）</string>
+    <string name="balancer_tier_regex_invalid">正则表达式格式无效</string>
+    <string name="balancer_tier_move_up">上移一层</string>
+    <string name="balancer_tier_move_down">下移一层</string>
+    <string name="balancer_tier_sum_group_only">分组：%1$s（命中 %2$d 个）</string>
+    <string name="balancer_tier_sum_regex_only">名称：%1$s（命中 %2$d 个）</string>
+    <string name="balancer_tier_sum_both">%1$s · %2$s（命中 %3$d 个）</string>
+    <string name="balancer_tier_sum_all">匹配全部已选配置（%d 个）</string>
+    <string name="balancer_tier_fallback_note">保底备选：%d 个未分层配置</string>
 </resources>

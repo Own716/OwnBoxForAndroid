@@ -3,12 +3,14 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <EditTextPreference
+        android:order="0"
         app:icon="@drawable/ic_social_emoji_symbols"
         app:key="profileName"
         app:title="@string/profile_name"
         app:useSimpleSummaryProvider="true" />
 
     <moe.matsuri.nb4a.ui.SimpleMenuPreference
+        android:order="1000"
         app:defaultValue="2"
         app:entries="@array/balancer_type_entries"
         app:entryValues="@array/balancer_type_values"
@@ -18,27 +20,27 @@
         app:useSimpleSummaryProvider="true" />
 
     <Preference
+        android:order="2000"
         app:icon="@drawable/ic_baseline_layers_24"
         app:key="balancerTargetGroup"
         app:summary="@string/balancer_no_group_selected"
         app:title="@string/balancer_server_source" />
 
     <Preference
+        android:order="3000"
         app:icon="@drawable/ic_baseline_view_list_24"
         app:key="balancerExplicitNodes"
         app:summary="@string/balancer_explicit_nodes_empty"
         app:title="@string/balancer_explicit_nodes" />
 
-    <io.nekohasekai.sagernet.widget.BalancerNodeListPreference
-        app:isPreferenceVisible="false"
-        app:key="balancerNodeList" />
-
     <EditTextPreference
+        android:order="4000"
         app:icon="@drawable/ic_baseline_filter_list_24"
         app:key="balancerNameInclude"
         app:title="@string/balancer_name_include" />
 
     <moe.matsuri.nb4a.ui.SimpleMenuPreference
+        android:order="5000"
         app:defaultValue="latency"
         app:entries="@array/balancer_selection_mode_entries"
         app:entryValues="@array/balancer_selection_mode_values"
@@ -46,7 +48,21 @@
         app:key="balancerSelectionMode"
         app:title="@string/balancer_selection_mode" />
 
+    <Preference
+        android:order="6000"
+        app:icon="@drawable/ic_av_playlist_add"
+        app:isPreferenceVisible="false"
+        app:key="balancerAddTier"
+        app:summary="@string/balancer_add_tier_empty_hint"
+        app:title="@string/balancer_add_tier" />
+
+    <io.nekohasekai.sagernet.widget.BalancerNodeListPreference
+        android:order="7000"
+        app:isPreferenceVisible="false"
+        app:key="balancerNodeList" />
+
     <SwitchPreferenceCompat
+        android:order="8000"
         app:defaultValue="false"
         app:icon="@drawable/ic_baseline_shuffle_24"
         app:key="balancerBalanceEnabled"
@@ -54,6 +70,7 @@
         app:title="@string/balancer_balance_enabled" />
 
     <Preference
+        android:order="9000"
         app:icon="@drawable/ic_baseline_info_24"
         app:key="balancerMatchSummary"
         app:selectable="false"
@@ -61,12 +78,14 @@
         app:title="@string/balancer_preview_title" />
 
     <Preference
+        android:order="10000"
         app:icon="@drawable/ic_baseline_keyboard_arrow_down_24"
         app:key="balancerAdvancedToggle"
         app:summary="@string/balancer_advanced_show"
         app:title="@string/balancer_advanced_title" />
 
     <PreferenceCategory
+        android:order="11000"
         app:iconSpaceReserved="false"
         app:isPreferenceVisible="false"
         app:key="balancerCatUseWhich"
@@ -82,44 +101,14 @@
             app:key="balancerNameExclude"
             app:title="@string/balancer_name_exclude" />
 
-        <EditTextPreference
-            app:defaultValue="300"
-            app:iconSpaceReserved="false"
-            app:key="balancerRunTopN"
-            app:title="@string/balancer_run_top_n" />
-
-        <EditTextPreference
-            app:defaultValue="1440"
-            app:iconSpaceReserved="false"
-            app:key="balancerResultTrustMinutes"
-            app:title="@string/balancer_result_trust_minutes" />
-
-        <SwitchPreferenceCompat
-            app:defaultValue="false"
-            app:iconSpaceReserved="false"
-            app:key="balancerSkipFailedWithinTrust"
-            app:summary="@string/balancer_skip_failed_within_trust_sum"
-            app:title="@string/balancer_skip_failed_within_trust" />
-
     </PreferenceCategory>
 
     <PreferenceCategory
+        android:order="12000"
         app:iconSpaceReserved="false"
         app:isPreferenceVisible="false"
         app:key="balancerCatHealth"
-        app:title="@string/balancer_cat_health">
-
-        <EditTextPreference
-            app:defaultValue="3"
-            app:iconSpaceReserved="false"
-            app:key="balancerStandbySize"
-            app:title="@string/balancer_standby_size" />
-
-        <EditTextPreference
-            app:defaultValue="8"
-            app:iconSpaceReserved="false"
-            app:key="balancerIntensiveCheckCount"
-            app:title="@string/balancer_intensive_check_count" />
+        app:title="@string/balancer_cat_health_and_switch">
 
         <EditTextPreference
             app:defaultValue="300"
@@ -128,48 +117,10 @@
             app:title="@string/balancer_interval_title" />
 
         <EditTextPreference
-            app:defaultValue="600"
-            app:iconSpaceReserved="false"
-            app:key="balancerFullScanIntervalSec"
-            app:title="@string/balancer_full_scan_interval" />
-
-        <EditTextPreference
-            app:defaultValue="15"
-            app:iconSpaceReserved="false"
-            app:key="balancerWatchIntervalSec"
-            app:title="@string/balancer_watch_interval" />
-
-        <EditTextPreference
-            app:defaultValue="10"
-            app:iconSpaceReserved="false"
-            app:key="balancerSampleCount"
-            app:title="@string/balancer_sample_count" />
-
-    </PreferenceCategory>
-
-    <PreferenceCategory
-        app:iconSpaceReserved="false"
-        app:isPreferenceVisible="false"
-        app:key="balancerCatSwitching"
-        app:title="@string/balancer_cat_switching">
-
-        <EditTextPreference
             app:defaultValue="30"
             app:iconSpaceReserved="false"
             app:key="balancerTolerance"
             app:title="@string/balancer_tolerance_title" />
-
-        <EditTextPreference
-            app:defaultValue="0"
-            app:iconSpaceReserved="false"
-            app:key="balancerMaxRttMs"
-            app:title="@string/balancer_max_rtt" />
-
-        <EditTextPreference
-            app:defaultValue="2"
-            app:iconSpaceReserved="false"
-            app:key="balancerDialRetries"
-            app:title="@string/balancer_dial_retries" />
 
         <SwitchPreferenceCompat
             app:defaultValue="false"
@@ -177,25 +128,6 @@
             app:key="balancerInterruptOnSwitch"
             app:summary="@string/balancer_interrupt_on_switch_sum"
             app:title="@string/balancer_interrupt_on_switch" />
-
-        <EditTextPreference
-            app:defaultValue="3"
-            app:iconSpaceReserved="false"
-            app:key="balancerFailbackChecks"
-            app:title="@string/balancer_failback_checks" />
-
-        <EditTextPreference
-            app:defaultValue="60"
-            app:iconSpaceReserved="false"
-            app:key="balancerFailbackDelaySec"
-            app:title="@string/balancer_failback_delay" />
-
-        <SwitchPreferenceCompat
-            app:defaultValue="false"
-            app:iconSpaceReserved="false"
-            app:key="balancerInterruptOnFailback"
-            app:summary="@string/balancer_interrupt_on_failback_sum"
-            app:title="@string/balancer_interrupt_on_failback" />
 
         <SwitchPreferenceCompat
             app:defaultValue="true"
@@ -205,14 +137,14 @@
             app:title="@string/balancer_learn_from_connections" />
 
         <EditTextPreference
-            app:defaultValue="60"
             app:iconSpaceReserved="false"
-            app:key="balancerSiteStickyMinutes"
-            app:title="@string/balancer_site_sticky_minutes" />
+            app:key="balancerTestUrl"
+            app:title="@string/balancer_test_url_title" />
 
     </PreferenceCategory>
 
     <PreferenceCategory
+        android:order="13000"
         app:iconSpaceReserved="false"
         app:isPreferenceVisible="false"
         app:key="balancerCatLoadBalance"
@@ -236,46 +168,17 @@
     </PreferenceCategory>
 
     <PreferenceCategory
-        app:iconSpaceReserved="false"
-        app:isPreferenceVisible="false"
-        app:key="balancerCatEndpoints"
-        app:title="@string/balancer_cat_endpoints">
-
-        <EditTextPreference
-            app:iconSpaceReserved="false"
-            app:key="balancerTestUrl"
-            app:title="@string/balancer_test_url_title" />
-
-        <EditTextPreference
-            app:iconSpaceReserved="false"
-            app:key="balancerConnectivityUrl"
-            app:title="@string/balancer_connectivity_url" />
-
-    </PreferenceCategory>
-
-    <PreferenceCategory
+        android:order="14000"
         app:iconSpaceReserved="false"
         app:isPreferenceVisible="false"
         app:key="balancerCatChain"
         app:title="@string/balancer_cat_chain">
-
-        <SwitchPreferenceCompat
-            app:defaultValue="false"
-            app:iconSpaceReserved="false"
-            app:key="balancerUseFrontProxy"
-            app:title="@string/balancer_use_front_proxy" />
 
         <io.nekohasekai.sagernet.widget.OutboundPreference
             app:iconSpaceReserved="false"
             app:key="balancerFrontProxy"
             app:title="@string/front_proxy"
             app:useSimpleSummaryProvider="true" />
-
-        <SwitchPreferenceCompat
-            app:defaultValue="false"
-            app:iconSpaceReserved="false"
-            app:key="balancerUseLandingProxy"
-            app:title="@string/balancer_use_landing_proxy" />
 
         <io.nekohasekai.sagernet.widget.OutboundPreference
             app:iconSpaceReserved="false"
