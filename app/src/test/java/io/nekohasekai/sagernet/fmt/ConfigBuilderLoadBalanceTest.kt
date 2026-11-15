@@ -46,10 +46,10 @@ class ConfigBuilderLoadBalanceTest {
     }
 
     @Test
-    fun balancerBeanDefaultToleranceIs50() {
+    fun balancerBeanDefaultToleranceIs30() {
         val bean = io.nekohasekai.sagernet.fmt.internal.BalancerBean()
-        assertEquals(50, bean.tolerance)
-        assertEquals(50L, bean.calculateToleranceMs())
+        assertEquals(30, bean.tolerance)
+        assertEquals(30L, bean.calculateToleranceMs())
     }
 
     @Test
@@ -85,28 +85,21 @@ class ConfigBuilderLoadBalanceTest {
     }
 
     @Test
-    fun testAllFourStrategiesInBalancerBean() {
+    fun testUnifiedModesInBalancerBean() {
         val bean = io.nekohasekai.sagernet.fmt.internal.BalancerBean()
         bean.proxies = listOf(1L, 2L, 3L)
 
-        bean.strategy = io.nekohasekai.sagernet.fmt.internal.BalancerBean.STRATEGY_LEAST_PING
-        assertEquals("节点 3 · 最低延迟", bean.displayAddress())
+        bean.selectionMode = io.nekohasekai.sagernet.fmt.internal.BalancerBean.SELECTION_LATENCY
+        bean.balanceEnabled = false
+        assertEquals("节点 3 · 最快最稳", bean.displayAddress())
         assertEquals("节点 3 · 日本 02", bean.displayWithNodeName("日本 02"))
 
-        bean.strategy = io.nekohasekai.sagernet.fmt.internal.BalancerBean.STRATEGY_LEAST_LOAD
-        assertEquals("节点 3 · 最低负载", bean.displayAddress())
+        bean.selectionMode = io.nekohasekai.sagernet.fmt.internal.BalancerBean.SELECTION_PRIORITY
+        assertEquals("节点 3 · 按优先级", bean.displayAddress())
 
-        bean.strategy = io.nekohasekai.sagernet.fmt.internal.BalancerBean.STRATEGY_RANDOM
-        assertEquals("节点 3 · 随机选择", bean.displayAddress())
-
-        bean.strategy = io.nekohasekai.sagernet.fmt.internal.BalancerBean.STRATEGY_ROUND_ROBIN
-        assertEquals("节点 3 · 轮询", bean.displayAddress())
-
-        bean.strategy = io.nekohasekai.sagernet.fmt.internal.BalancerBean.STRATEGY_CONSISTENT_HASH
-        assertEquals("节点 3 · 一致性哈希", bean.displayAddress())
-
-        bean.strategy = io.nekohasekai.sagernet.fmt.internal.BalancerBean.STRATEGY_CONSISTENT_HASH_CAMEL
-        assertEquals("节点 3 · 一致性哈希", bean.displayAddress())
+        bean.selectionMode = io.nekohasekai.sagernet.fmt.internal.BalancerBean.SELECTION_LATENCY
+        bean.balanceEnabled = true
+        assertEquals("节点 3 · 最快最稳 · 流量分配", bean.displayAddress())
     }
 
     @Test

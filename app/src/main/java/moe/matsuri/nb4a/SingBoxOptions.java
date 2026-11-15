@@ -4636,6 +4636,58 @@ public class SingBoxOptions {
 
     }
 
+    public static class Outbound_AutoSelectOptions extends Outbound {
+
+        public List<String> outbounds;
+
+        public String url;
+
+        public String selection_mode;
+
+        public Boolean balance_enabled;
+
+        public String balance_mode;
+
+        public String balance_interval;
+
+        public Integer rank_top_n;
+
+        public Integer standby_size;
+
+        public Integer intensive_check_count;
+
+        public String check_interval;
+
+        public String full_scan_interval;
+
+        public String watch_interval;
+
+        public Integer sample_count;
+
+        public Integer tolerance;
+
+        public String max_rtt;
+
+        public Integer dial_retries;
+
+        public Boolean interrupt_exist_connections;
+
+        public Integer failback_checks;
+
+        public String failback_delay;
+
+        public Boolean interrupt_on_failback;
+
+        public Boolean learn_from_connections;
+
+        public String site_sticky_ttl;
+
+        public String connectivity_url;
+
+        public Map<String, Integer> initial_delays_ms;
+
+    }
+
     public static class Rule_DefaultOptions extends Rule {
 
         // Generate note: Listable

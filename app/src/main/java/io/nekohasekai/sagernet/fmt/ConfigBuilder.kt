@@ -206,6 +206,704 @@ internal fun buildUrlTestOutbound(
         interrupt_exist_connections = false
     }
 
+internal fun buildAutoSelectOutbound(
+    balancer: BalancerBean,
+    memberEntities: List<ProxyEntity>,
+    memberTags: List<String>,
+    customTag: String? = null,
+    defaultTestUrl: String? = null,
+    nowMs: Long = System.currentTimeMillis(),
+    testTimestampProvider: (Long) -> Long = { id ->
+        if (SagerNet.isInitialized()) DataStore.getProfileTestTimestampMs(id) else 0L
+    },
+): Outbound_AutoSelectOptions = Outbound_AutoSelectOptions().apply {
+    type = "autoselect"
+    tag = customTag?.takeIf { it.isNotBlank() } ?: TAG_PROXY
+    val uniqueTags = memberTags.distinct()
+    outbounds = uniqueTags
+    val fallbackUrl = defaultTestUrl?.takeIf { it.isNotBlank() }
+        ?: (if (SagerNet.isInitialized()) runCatching { DataStore.connectionTestURL }.getOrNull()?.takeIf { it.isNotBlank() } else null)
+        ?: "https://cp.cloudflare.com/generate_204"
+    url = balancer.testUrl?.takeIf { it.isNotBlank() } ?: fallbackUrl
+    selection_mode = if (balancer.isPriorityMode()) BalancerBean.SELECTION_PRIORITY else BalancerBean.SELECTION_LATENCY
+    balance_enabled = balancer.balanceEnabled
+    balance_mode = balancer.balanceMode?.takeIf { it == BalancerBean.BALANCE_PER_CONNECTION }
+        ?: BalancerBean.BALANCE_TIMED_ROTATION
+    balance_interval = "${balancer.balanceIntervalSec.coerceAtLeast(1)}s"
+    rank_top_n = balancer.rankTopN.takeIf { it > 0 } ?: 1000
+    standby_size = balancer.standbySize.coerceAtLeast(0)
+    intensive_check_count = balancer.intensiveCheckCount.coerceAtLeast(1)
+    check_interval = "${balancer.interval.coerceAtLeast(5)}s"
+    full_scan_interval = "${balancer.fullScanIntervalSec.coerceAtLeast(5)}s"
+    watch_interval = "${balancer.watchIntervalSec.coerceAtLeast(0)}s"
+    sample_count = balancer.sampleCount.coerceAtLeast(1)
+    tolerance = balancer.calculateToleranceMs().coerceIn(0L, 65535L).toInt()
+    max_rtt = balancer.maxRttMs.takeIf { it > 0 }?.let { "${it}ms" }
+    dial_retries = balancer.dialRetries.coerceAtLeast(0)
+    interrupt_exist_connections = balancer.interruptOnSwitch
+    failback_checks = balancer.failbackChecks.coerceAtLeast(1)
+    failback_delay = "${balancer.failbackDelaySec.coerceAtLeast(0)}s"
+    interrupt_on_failback = balancer.interruptOnFailback
+    learn_from_connections = balancer.learnFromConnections
+    site_sticky_ttl = "${balancer.siteStickyMinutes.coerceAtLeast(0)}m"
+    connectivity_url = balancer.connectivityUrl?.takeIf { it.isNotBlank() }
+
+    val trustWindowMs = balancer.resultTrustMinutes.toLong() * 60_000L
+    if (trustWindowMs > 0L && memberEntities.size == memberTags.size) {
+        val delays = LinkedHashMap<String, Int>()
+        memberEntities.forEachIndexed { idx, member ->
+            val mTag = memberTags[idx]
+            if (mTag in uniqueTags && !delays.containsKey(mTag) && member.status == 1 && member.ping > 0) {
+                val ts = testTimestampProvider(member.id)
+                if (ts > 0L && (nowMs - ts) in 0L..trustWindowMs) {
+                    delays[mTag] = member.ping.coerceAtMost(65535)
+                }
+            }
+        }
+        if (delays.isNotEmpty()) {
+            initial_delays_ms = delays
+        }
+    }
+}
+
+internal data class ChainGraphTestResult(
+    val mainProxyTag: String,
+    val outbounds: List<Map<String, Any?>>,
+    val balancerMemberMap: Map<Long, List<Long>>,
+    val balancerTagMap: Map<Long, String>,
+    val outboundTagProfileMap: Map<String, Long>,
+    val activeStrategyTag: String,
+    val activeStrategyId: Long,
+)
+
+internal fun assembleChainGraphForTest(
+    root: ProxyEntity,
+    entitiesById: Map<Long, ProxyEntity>,
+    groupProfiles: Map<Long, List<ProxyEntity>> = emptyMap(),
+    groupsById: Map<Long, ProxyGroup> = emptyMap(),
+    nowMs: Long = System.currentTimeMillis(),
+    testTimestampProvider: (Long) -> Long = { 0L },
+): ChainGraphTestResult {
+    val ctx = ChainGraphContext(
+        forTest = false,
+        ipv6Mode = IPv6Mode.ENABLE,
+        defaultServerDomainStrategy = "",
+        outbounds = mutableListOf(),
+        inbounds = mutableListOf(),
+        route = RouteOptions().apply { rules = mutableListOf() },
+        trafficMap = HashMap(),
+        tagMap = HashMap(),
+        customChainTagMap = HashMap(),
+        balancerMemberMap = HashMap(),
+        balancerTagMap = HashMap(),
+        outboundTagProfileMap = HashMap(),
+        globalOutbounds = HashMap(),
+        readableNames = mutableSetOf(TAG_DIRECT, TAG_BYPASS, TAG_BLOCK, TAG_FRAGMENT, TAG_MIXED, TAG_PROXY),
+        bypassDNSBeans = hashSetOf(),
+        perGroupResolver = HashMap(),
+        perGroupServerHosts = HashMap(),
+        hostResolvers = HashMap(),
+        nonCustomFinalHosts = hashSetOf(),
+        groupCache = HashMap(),
+        externalIndexMap = ArrayList(),
+        domainListDNSDirectForce = mutableListOf(),
+        getById = { id -> entitiesById[id] },
+        getEntities = { ids -> ids.mapNotNull { entitiesById[it] } },
+        getByGroup = { gid -> groupProfiles[gid].orEmpty() },
+        getGroup = { gid -> groupsById[gid] },
+        isGroupDisabled = { false },
+        testTimestampProvider = testTimestampProvider,
+        nowMs = nowMs,
+    )
+    val mainProxyTag = ctx.buildChain(0L, root)
+    val activeStrategyId = when {
+        root.type == ProxyEntity.TYPE_BALANCER -> root.id
+        root.type == ProxyEntity.TYPE_CHAIN && ctx.mainChainBalancerId > 0L -> ctx.mainChainBalancerId
+        else -> 0L
+    }
+    return ChainGraphTestResult(
+        mainProxyTag = mainProxyTag,
+        outbounds = ctx.outbounds.map { it.asMap() },
+        balancerMemberMap = ctx.balancerMemberMap,
+        balancerTagMap = ctx.balancerTagMap,
+        outboundTagProfileMap = ctx.outboundTagProfileMap,
+        activeStrategyTag = ctx.balancerTagMap[activeStrategyId].orEmpty(),
+        activeStrategyId = if (ctx.balancerTagMap.containsKey(activeStrategyId)) activeStrategyId else 0L,
+    )
+}
+
+internal class ChainGraphContext(
+    private val forTest: Boolean,
+    private val ipv6Mode: Int,
+    private val defaultServerDomainStrategy: String,
+    val outbounds: MutableList<SingBoxOption>,
+    val inbounds: MutableList<Inbound>,
+    val route: RouteOptions,
+    val trafficMap: HashMap<String, List<ProxyEntity>>,
+    val tagMap: HashMap<Long, String>,
+    val customChainTagMap: HashMap<BalancerMemberChainKey, String>,
+    val balancerMemberMap: HashMap<Long, List<Long>>,
+    val balancerTagMap: HashMap<Long, String>,
+    val outboundTagProfileMap: HashMap<String, Long>,
+    val globalOutbounds: HashMap<Long, String>,
+    val readableNames: MutableSet<String>,
+    val bypassDNSBeans: HashSet<AbstractBean>,
+    val perGroupResolver: HashMap<Long, String>,
+    val perGroupServerHosts: HashMap<Long, MutableSet<String>>,
+    val hostResolvers: HashMap<String, MutableSet<String>>,
+    val nonCustomFinalHosts: HashSet<String>,
+    val groupCache: HashMap<Long, ProxyGroup?>,
+    val externalIndexMap: ArrayList<IndexEntity>,
+    val domainListDNSDirectForce: MutableList<String>,
+    private val getById: (Long) -> ProxyEntity? = { id -> SagerDatabase.proxyDao.getById(id) },
+    private val getEntities: (List<Long>) -> List<ProxyEntity> = { ids -> SagerDatabase.proxyDao.getEntities(ids) },
+    private val getByGroup: (Long) -> List<ProxyEntity> = { gid -> SagerDatabase.proxyDao.getByGroup(gid) },
+    private val getGroup: (Long) -> ProxyGroup? = { gid -> SagerDatabase.groupDao.getById(gid) },
+    private val isGroupDisabled: (Long) -> Boolean = { gid ->
+        if (SagerNet.isInitialized()) DataStore.isGroupDisabled(gid) else false
+    },
+    private val testTimestampProvider: (Long) -> Long = { id ->
+        if (SagerNet.isInitialized()) DataStore.getProfileTestTimestampMs(id) else 0L
+    },
+    private val nowMs: Long = System.currentTimeMillis(),
+) {
+    var nextCustomChainId: Long = -1L
+    var mainChainBalancerId: Long = 0L
+
+    fun readableTag(name_: String): String {
+        var name = name_
+        var count = 0
+        while (!readableNames.add(name)) {
+            count++
+            name = "$name_-$count"
+        }
+        return name
+    }
+
+    private fun resolveChainInternal(
+        entity: ProxyEntity,
+        visitedChainIds: MutableSet<Long> = HashSet(),
+    ): MutableList<ProxyEntity> {
+        val bean = entity.requireBean()
+        if (bean is ChainBean) {
+            if (entity.id > 0L && !visitedChainIds.add(entity.id)) {
+                return mutableListOf()
+            }
+            val beans = getEntities(bean.proxies)
+            val beansMap = beans.associateBy { it.id }
+            val beanList = ArrayList<ProxyEntity>()
+            for (proxyId in bean.proxies) {
+                val item = beansMap[proxyId] ?: continue
+                beanList.addAll(resolveChainInternal(item, visitedChainIds))
+            }
+            return beanList.asReversed()
+        }
+        return mutableListOf(entity)
+    }
+
+    fun resolveChain(
+        entity: ProxyEntity,
+        useGroupFront: Boolean = true,
+        useGroupLanding: Boolean = true,
+    ): MutableList<ProxyEntity> {
+        val thisGroup = getGroup(entity.groupId)
+        val frontProxy = if (useGroupFront) thisGroup?.frontProxy?.let { getById(it) } else null
+        val landingProxy = if (useGroupLanding) thisGroup?.landingProxy?.let { getById(it) } else null
+        val list = resolveChainInternal(entity)
+        if (frontProxy != null) {
+            list.add(frontProxy)
+        }
+        if (landingProxy != null) {
+            list.add(0, landingProxy)
+        }
+        return list
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    fun buildChain(
+        chainId: Long,
+        entity: ProxyEntity,
+        useGroupFront: Boolean = true,
+        useGroupLanding: Boolean = true,
+        externalDetour: String? = null,
+        visitedBalancerIds: Set<Long> = emptySet(),
+        isMainChain: Boolean = (chainId == 0L),
+    ): String {
+        if (entity.type == ProxyEntity.TYPE_BALANCER) {
+            if (entity.id > 0L && entity.id in visitedBalancerIds) {
+                return TAG_DIRECT
+            }
+            val nextVisited = if (entity.id > 0L) visitedBalancerIds + entity.id else visitedBalancerIds
+            if (isMainChain && mainChainBalancerId == 0L) {
+                mainChainBalancerId = entity.id
+            }
+
+            val balancerBean = entity.balancerBean ?: (entity.requireBean() as? BalancerBean) ?: BalancerBean()
+            val balancerFrontEntity = if (balancerBean.frontProxy > 0L && balancerBean.frontProxy != entity.id) {
+                getById(balancerBean.frontProxy)
+            } else null
+            val balancerLandingEntity = if (balancerBean.landingProxy > 0L && balancerBean.landingProxy != entity.id) {
+                getById(balancerBean.landingProxy)
+            } else null
+
+            val balancerFrontTag = balancerFrontEntity?.let { front ->
+                if (!externalDetour.isNullOrBlank()) {
+                    buildChain(
+                        chainId = nextCustomChainId--,
+                        entity = front,
+                        useGroupFront = false,
+                        useGroupLanding = false,
+                        externalDetour = externalDetour,
+                        visitedBalancerIds = nextVisited,
+                        isMainChain = false,
+                    )
+                } else {
+                    tagMap[front.id] ?: buildChain(
+                        chainId = front.id,
+                        entity = front,
+                        visitedBalancerIds = nextVisited,
+                        isMainChain = false,
+                    ).also { tagMap[front.id] = it }
+                }
+            }
+
+            val resolvedResult = BalancerMemberResolver.resolve(
+                balancer = balancerBean,
+                selfId = entity.id,
+                frontProxyId = balancerFrontEntity?.id ?: 0L,
+                landingProxyId = balancerLandingEntity?.id ?: 0L,
+                groupProfilesProvider = getByGroup,
+                entitiesByIdsProvider = getEntities,
+                isGroupDisabled = isGroupDisabled,
+                nowMsProvider = { nowMs },
+                testTimestampProvider = testTimestampProvider,
+            )
+            val memberEntities = if (!balancerBean.isPriorityMode()) {
+                BalancerMemberResolver.sortForColdStart(resolvedResult.members)
+            } else {
+                resolvedResult.members
+            }
+
+            val hasGroupMode = balancerBean.balancerType == BalancerBean.TYPE_GROUP ||
+                balancerBean.balancerType == BalancerBean.TYPE_MIXED
+            val useFront = if (hasGroupMode) balancerBean.useFrontProxy else true
+            val useLanding = if (hasGroupMode) balancerBean.useLandingProxy else true
+            val memberEffectiveDetour = balancerFrontTag ?: externalDetour
+
+            val memberTags = memberEntities.map { member ->
+                val effectiveUseGroupFront = if (memberEffectiveDetour != null) false else useFront
+                val isCustomMemberChain = memberEffectiveDetour != null || !effectiveUseGroupFront || !useLanding
+                val memberTag = if (isCustomMemberChain) {
+                    val chainKey = BalancerMemberChainKey(
+                        profileId = member.id,
+                        useGroupFront = effectiveUseGroupFront,
+                        useGroupLanding = useLanding,
+                        externalDetour = memberEffectiveDetour,
+                    )
+                    customChainTagMap.getOrPut(chainKey) {
+                        buildChain(
+                            chainId = nextCustomChainId--,
+                            entity = member,
+                            useGroupFront = effectiveUseGroupFront,
+                            useGroupLanding = useLanding,
+                            externalDetour = memberEffectiveDetour,
+                            visitedBalancerIds = nextVisited,
+                            isMainChain = false,
+                        )
+                    }
+                } else {
+                    tagMap.getOrPut(member.id) {
+                        buildChain(
+                            chainId = member.id,
+                            entity = member,
+                            visitedBalancerIds = nextVisited,
+                            isMainChain = false,
+                        )
+                    }
+                }
+                outboundTagProfileMap[memberTag] = member.id
+                memberTag
+            }.ifEmpty { listOf(TAG_DIRECT) }
+
+            val balancerTag = readableTag(entity.displayName())
+            val balancerOutbound = buildAutoSelectOutbound(
+                balancer = balancerBean,
+                memberEntities = memberEntities,
+                memberTags = memberTags,
+                customTag = balancerTag,
+                nowMs = nowMs,
+                testTimestampProvider = testTimestampProvider,
+            )
+            outbounds.add(balancerOutbound)
+            trafficMap[balancerTag] = listOf(entity)
+            balancerMemberMap[entity.id] = memberEntities.map { it.id }
+            balancerTagMap[entity.id] = balancerTag
+
+            return if (balancerLandingEntity != null) {
+                buildChain(
+                    chainId = nextCustomChainId--,
+                    entity = balancerLandingEntity,
+                    useGroupFront = false,
+                    useGroupLanding = false,
+                    externalDetour = balancerTag,
+                    visitedBalancerIds = nextVisited,
+                    isMainChain = false,
+                )
+            } else {
+                balancerTag
+            }
+        }
+
+        val profileList = resolveChain(entity, useGroupFront, useGroupLanding)
+        return buildHopSequence(
+            seqId = chainId,
+            rootEntity = entity,
+            profileList = profileList,
+            useGroupFront = useGroupFront,
+            useGroupLanding = useGroupLanding,
+            externalDetour = externalDetour,
+            visitedBalancerIds = visitedBalancerIds,
+            isMainChain = isMainChain,
+        )
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun buildHopSequence(
+        seqId: Long,
+        rootEntity: ProxyEntity,
+        profileList: List<ProxyEntity>,
+        useGroupFront: Boolean,
+        useGroupLanding: Boolean,
+        externalDetour: String?,
+        visitedBalancerIds: Set<Long>,
+        isMainChain: Boolean,
+    ): String {
+        if (profileList.isEmpty()) return TAG_DIRECT
+
+        // profileList 的顺序即应用流量经过各 outbound 的顺序：前一跳通过
+        // detour 交给后一跳拨号，最后一项直接连接物理网络。
+        if (SagerNet.isInitialized()) {
+            Logs.d(
+                "Outbound chain id=$seqId forTest=$forTest appToEgress=" +
+                    profileList.joinToString(" -> ") { hop ->
+                        val hopBean = hop.requireBean()
+                        val host = serverHostOf(hopBean) ?: "<unknown>"
+                        val endpoint = hopBean.displayAddress().takeIf { it.isNotBlank() }
+                            ?: "$host:${hopBean.serverPort}"
+                        "${hop.id}:${hop.displayType()}@$endpoint"
+                    }
+            )
+        }
+        val chainTrafficSet = HashSet<ProxyEntity>().apply {
+            plusAssign(profileList)
+            add(rootEntity)
+        }
+
+        var currentOutbound: SingBoxOption
+        lateinit var pastOutbound: SingBoxOption
+        lateinit var pastInboundTag: String
+        var pastEntity: ProxyEntity? = null
+        val externalChainMap = LinkedHashMap<Int, ProxyEntity>()
+        externalIndexMap.add(IndexEntity(externalChainMap))
+        val chainOutbounds = ArrayList<SingBoxOption>()
+
+        var chainTagOut = ""
+        val chainTag = if (seqId < 0) "c-m${-seqId}" else "c-$seqId"
+        var muxApplied = false
+        val isCustomChainContext = !externalDetour.isNullOrBlank() || !useGroupFront || !useGroupLanding
+
+        for (index in profileList.indices) {
+            val proxyEntity = profileList[index]
+
+            // Nested strategy group inside a ChainBean: build suffix hops first so members detour via tail,
+            // then connect any prefix landing hop(s) -> balancerTag.
+            if (proxyEntity.type == ProxyEntity.TYPE_BALANCER) {
+                val tailHops = if (index < profileList.lastIndex) {
+                    profileList.subList(index + 1, profileList.size)
+                } else {
+                    emptyList()
+                }
+                val tailEntryTag = if (tailHops.isNotEmpty()) {
+                    buildHopSequence(
+                        seqId = nextCustomChainId--,
+                        rootEntity = rootEntity,
+                        profileList = tailHops,
+                        useGroupFront = !isCustomChainContext,
+                        useGroupLanding = !isCustomChainContext,
+                        externalDetour = externalDetour,
+                        visitedBalancerIds = visitedBalancerIds,
+                        isMainChain = false,
+                    )
+                } else {
+                    externalDetour
+                }
+                val balancerEffectiveTag = buildChain(
+                    chainId = nextCustomChainId--,
+                    entity = proxyEntity,
+                    useGroupFront = false,
+                    useGroupLanding = false,
+                    externalDetour = tailEntryTag,
+                    visitedBalancerIds = visitedBalancerIds,
+                    isMainChain = isMainChain,
+                )
+                chainTrafficSet.add(proxyEntity)
+                chainTrafficSet.addAll(tailHops)
+                if (index == 0) {
+                    trafficMap[balancerEffectiveTag] =
+                        (trafficMap[balancerEffectiveTag].orEmpty() + chainTrafficSet).distinct()
+                    return balancerEffectiveTag
+                }
+                if (pastEntity?.needExternal() == true) {
+                    route.rules.add(Rule_DefaultOptions().apply {
+                        inbound = listOf(pastInboundTag)
+                        outbound = balancerEffectiveTag
+                    })
+                } else {
+                    pastOutbound.detourTo(balancerEffectiveTag)
+                }
+                trafficMap[chainTagOut] = chainTrafficSet.toList()
+                return chainTagOut
+            }
+
+            val bean = proxyEntity.requireBean()
+            bypassDNSBeans += bean
+
+            var tagOut = "$chainTag-${proxyEntity.id}"
+            var needGlobal = false
+
+            if (index == profileList.lastIndex) {
+                if (!isCustomChainContext) {
+                    needGlobal = true
+                    tagOut = "g-" + proxyEntity.id
+                }
+
+                val ownerGid = rootEntity.groupId
+                val ownerGroup = groupCache.getOrPut(ownerGid) {
+                    getGroup(ownerGid)
+                }
+                val resolver = ownerGroup
+                    ?.takeIf { it.type == GroupType.SUBSCRIPTION }
+                    ?.subscription?.serverDnsResolver
+                    ?.let { sanitizeDnsEntry(it) }
+                    ?.takeIf { it.isNotBlank() }
+
+                if (resolver != null) {
+                    profileList.filter { it.type != ProxyEntity.TYPE_BALANCER }.forEach { hop ->
+                        val host = serverHostOf(hop.requireBean())
+                        if (host != null && !host.isIpAddress()) {
+                            if (hop.groupId == ownerGid) {
+                                perGroupResolver[ownerGid] = resolver
+                                perGroupServerHosts.getOrPut(ownerGid) { mutableSetOf() }
+                                    .add(host)
+                                hostResolvers.getOrPut(host) { mutableSetOf() }.add(resolver)
+                            } else {
+                                nonCustomFinalHosts.add(host)
+                            }
+                        }
+                    }
+                } else {
+                    profileList.filter { it.type != ProxyEntity.TYPE_BALANCER }.forEach { hop ->
+                        val host = serverHostOf(hop.requireBean())
+                        if (host != null && !host.isIpAddress()) {
+                            nonCustomFinalHosts.add(host)
+                        }
+                    }
+                }
+            }
+
+            if (index == 0) {
+                tagOut = readableTag(bean.displayName())
+            }
+
+            val resolvedTag = resolveChainHopTag(
+                proxyEntity.id,
+                tagOut,
+                needGlobal,
+                globalOutbounds,
+            )
+            tagOut = resolvedTag.tag
+
+            if (index > 0) {
+                if (pastEntity!!.needExternal()) {
+                    route.rules.add(Rule_DefaultOptions().apply {
+                        inbound = listOf(pastInboundTag)
+                        outbound = tagOut
+                    })
+                } else {
+                    pastOutbound.detourTo(tagOut)
+                }
+            } else {
+                chainTagOut = tagOut
+            }
+
+            if (resolvedTag.reused) continue
+
+            if (proxyEntity.needExternal()) {
+                val localPort = mkPort()
+                externalChainMap[localPort] = proxyEntity
+                currentOutbound = Outbound_SocksOptions().apply {
+                    type = "socks"
+                    server = LOCALHOST
+                    server_port = localPort
+                }
+            } else {
+                currentOutbound = when (bean) {
+                    is ConfigBean -> CustomSingBoxOption(sanitizeSingBoxConfig(bean.config)) as SingBoxOption
+                    is ShadowTLSBean -> buildSingBoxOutboundShadowTLSBean(bean)
+                    is StandardV2RayBean -> buildSingBoxOutboundStandardV2RayBean(bean)
+                    is HysteriaBean -> buildSingBoxOutboundHysteriaBean(bean)
+                    is TuicBean -> buildSingBoxOutboundTuicBean(bean)
+                    is JuicityBean -> buildSingBoxOutboundJuicityBean(bean)
+                    is SOCKSBean -> buildSingBoxOutboundSocksBean(bean)
+                    is ShadowsocksBean -> buildSingBoxOutboundShadowsocksBean(bean)
+                    is ShadowsocksRBean -> buildSingBoxOutboundShadowsocksRBean(bean)
+                    is WireGuardBean -> {
+                        val endpointMtu = bean.mtu?.takeIf { it > 0 }
+                        val peerAddressFamily = when {
+                            bean.serverAddress?.contains(':') == true -> "ipv6"
+                            bean.serverAddress?.isNotBlank() == true -> "ipv4-or-domain"
+                            else -> "missing"
+                        }
+                        Logs.i(
+                            "WireGuardEndpointTrace profileId=${proxyEntity.id} forTest=$forTest " +
+                                "endpointMtu=${endpointMtu ?: "default(1408)"} " +
+                                "tunMtu=${if (SagerNet.isInitialized()) DataStore.mtu else 9000} peerAddressFamily=$peerAddressFamily " +
+                                "peerPort=${bean.serverPort}"
+                        )
+                        buildSingBoxEndpointWireGuardBean(bean)
+                    }
+                    is SSHBean -> buildSingBoxOutboundSSHBean(bean)
+                    is AnyTLSBean -> buildSingBoxOutboundAnyTLSBean(bean)
+                    is SnellBean -> buildSingBoxOutboundSnellBean(bean)
+                    else -> throw IllegalStateException("can't reach")
+                }
+
+                if (!muxApplied) {
+                    val muxObj = proxyEntity.singMux()
+                    if (muxObj != null && muxObj.enabled) {
+                        muxApplied = true
+                        currentOutbound._hack_config_map["multiplex"] = muxObj.asMap()
+                    }
+                }
+
+                if (needGlobal && SagerNet.isInitialized() && DataStore.enableTLSFragment) {
+                    val outboundMap = currentOutbound.asMap()
+                    val tlsOptions = outboundMap["tls"] as? Map<*, *>
+                    if (tlsOptions?.get("enabled") == true) {
+                        val delay = DataStore.fragmentInterval.let {
+                            val first = it.split("-").firstOrNull()?.trim()
+                            val num = first?.toLongOrNull() ?: 20L
+                            "${num}ms"
+                        }
+                        currentOutbound._hack_config_map["tls"] = mapOf(
+                            "fragment" to true,
+                            "record_fragment" to true,
+                            "fragment_fallback_delay" to delay
+                        )
+                    }
+                }
+            }
+
+            currentOutbound.apply {
+                try {
+                    val sUoT = bean.javaClass.getField("sUoT").get(bean)
+                    if (sUoT is Boolean && sUoT) {
+                        _hack_config_map["udp_over_tcp"] = true
+                    }
+                } catch (_: Exception) {
+                }
+
+                pastEntity?.requireBean()?.apply {
+                    if (defaultServerDomainStrategy != "" && !serverAddress.isIpAddress()) {
+                        domainListDNSDirectForce.add("full:$serverAddress")
+                    }
+                }
+                _hack_config_map["domain_strategy"] = defaultServerDomainStrategy
+                _hack_config_map["fallback_delay"] = "100ms"
+                _hack_config_map["tcp_keep_alive"] = "45s"
+                _hack_config_map["tcp_keep_alive_interval"] = "30s"
+                _hack_config_map["connect_timeout"] = "5s"
+
+                val outboundResolver = if (perGroupResolver.containsKey(proxyEntity.groupId)) {
+                    "dns-sub-${proxyEntity.groupId}"
+                } else {
+                    "dns-direct"
+                }
+                _hack_config_map["domain_resolver"] = outboundResolver
+
+                _hack_config_map["tag"] = tagOut
+                _hack_config_map["tcp_multi_path"] = false
+                val supportsTFO = when (bean) {
+                    is ShadowsocksBean, is ShadowsocksRBean, is SOCKSBean -> true
+                    is ShadowTLSBean -> false
+                    is StandardV2RayBean -> bean.type != "quic" && bean.type != "splithttp" && bean.type != "xhttp"
+                    else -> false
+                }
+                if (supportsTFO) {
+                    _hack_config_map["tcp_fast_open"] = true
+                } else {
+                    _hack_config_map.remove("tcp_fast_open")
+                }
+
+                _hack_custom_config = bean.customOutboundJson
+            }
+
+            bean.finalAddress = bean.serverAddress
+            bean.finalPort = bean.serverPort
+            if (bean.canMapping() && proxyEntity.needExternal()) {
+                var needExternal = true
+                if (index == profileList.lastIndex) {
+                    val pluginId = when (bean) {
+                        is HysteriaBean -> if (bean.protocolVersion == 1) "hysteria-plugin" else "hysteria2-plugin"
+                        else -> ""
+                    }
+                    if (Plugins.isUsingMatsuriExe(pluginId)) {
+                        needExternal = false
+                    } else if (Plugins.getPluginExternal(pluginId) != null) {
+                        throw Exception("You are using an unsupported $pluginId, please download the correct plugin.")
+                    }
+                }
+                if (needExternal) {
+                    val mappingPort = mkPort()
+                    bean.finalAddress = LOCALHOST
+                    bean.finalPort = mappingPort
+
+                    inbounds.add(Inbound_DirectOptions().apply {
+                        type = "direct"
+                        listen = LOCALHOST
+                        listen_port = mappingPort
+                        tag = "$chainTag-mapping-${proxyEntity.id}"
+
+                        override_address = bean.serverAddress
+                        override_port = bean.serverPort
+
+                        pastInboundTag = tag
+
+                        if (index == profileList.lastIndex) {
+                            route.rules.add(Rule_DefaultOptions().apply {
+                                inbound = listOf(tag)
+                                outbound = TAG_DIRECT
+                            })
+                        }
+                    })
+                }
+            }
+
+            outbounds.add(currentOutbound)
+            chainOutbounds.add(currentOutbound)
+            pastOutbound = currentOutbound
+            pastEntity = proxyEntity
+        }
+
+        if (!externalDetour.isNullOrBlank() && chainOutbounds.isNotEmpty()) {
+            chainOutbounds.last().detourTo(externalDetour)
+        }
+
+        trafficMap[chainTagOut] = chainTrafficSet.toList()
+        return chainTagOut
+    }
+}
+
 private fun endpointTag(value: Any?): String? {
     return (value as? Map<*, *>)?.get("tag")?.toString()?.takeIf { it.isNotBlank() }
 }
@@ -283,7 +981,7 @@ internal fun finalizeRootConfig(
     return configMap
 }
 
-private data class BalancerMemberChainKey(
+internal data class BalancerMemberChainKey(
     val profileId: Long,
     val useGroupFront: Boolean,
     val useGroupLanding: Boolean,
@@ -381,54 +1079,15 @@ fun buildConfig(
     val trafficMap = HashMap<String, List<ProxyEntity>>()
     val tagMap = HashMap<Long, String>()
     val customChainTagMap = HashMap<BalancerMemberChainKey, String>()
-    var nextCustomChainId = -1L
     val balancerMemberMap = HashMap<Long, List<Long>>()
     val balancerTagMap = HashMap<Long, String>()
+    var mainChainBalancerId = 0L
     val outboundTagProfileMap = HashMap<String, Long>()
     val globalOutbounds = HashMap<Long, String>()
     val readableNames = mutableSetOf(TAG_DIRECT, TAG_BYPASS, TAG_BLOCK, TAG_FRAGMENT, TAG_MIXED, TAG_PROXY)
     val group = SagerDatabase.groupDao.getById(proxy.groupId)
     val groupTag = group?.name?.trim()?.takeIf { it.isNotBlank() } ?: TAG_PROXY
     readableNames.add(groupTag)
-
-    fun ProxyEntity.resolveChainInternal(): MutableList<ProxyEntity> {
-        val bean = requireBean()
-        if (bean is ChainBean) {
-            val beans = SagerDatabase.proxyDao.getEntities(bean.proxies)
-            val beansMap = beans.associateBy { it.id }
-            val beanList = ArrayList<ProxyEntity>()
-            for (proxyId in bean.proxies) {
-                val item = beansMap[proxyId] ?: continue
-                beanList.addAll(item.resolveChainInternal())
-            }
-            return beanList.asReversed()
-        }
-        return mutableListOf(this)
-    }
-
-    fun readableTag(name_: String): String {
-        var name = name_
-        var count = 0
-        while (!readableNames.add(name)) {
-            count++
-            name = "$name_-$count"
-        }
-        return name
-    }
-
-    fun ProxyEntity.resolveChain(useGroupFront: Boolean = true, useGroupLanding: Boolean = true): MutableList<ProxyEntity> {
-        val thisGroup = SagerDatabase.groupDao.getById(groupId)
-        val frontProxy = if (useGroupFront) thisGroup?.frontProxy?.let { SagerDatabase.proxyDao.getById(it) } else null
-        val landingProxy = if (useGroupLanding) thisGroup?.landingProxy?.let { SagerDatabase.proxyDao.getById(it) } else null
-        val list = resolveChainInternal()
-        if (frontProxy != null) {
-            list.add(frontProxy)
-        }
-        if (landingProxy != null) {
-            list.add(0, landingProxy)
-        }
-        return list
-    }
 
     val isSmartRouting = !forTest && DataStore.smartMode && !DataStore.globalMode
     val extraRules = when {
@@ -863,466 +1522,54 @@ fun buildConfig(
             }
         }
 
-        // returns outbound tag
-        @Suppress("UNCHECKED_CAST")
+        val defaultServerDomainStrategy = when (ipv6Mode) {
+            IPv6Mode.DISABLE -> "ipv4_only"
+            IPv6Mode.ONLY -> "ipv6_only"
+            else -> SingBoxOptionsUtil.domainStrategy("server")
+        }
+        val chainCtx = ChainGraphContext(
+            forTest = forTest,
+            ipv6Mode = ipv6Mode,
+            defaultServerDomainStrategy = defaultServerDomainStrategy,
+            outbounds = outbounds,
+            inbounds = inbounds,
+            route = route,
+            trafficMap = trafficMap,
+            tagMap = tagMap,
+            customChainTagMap = customChainTagMap,
+            balancerMemberMap = balancerMemberMap,
+            balancerTagMap = balancerTagMap,
+            outboundTagProfileMap = outboundTagProfileMap,
+            globalOutbounds = globalOutbounds,
+            readableNames = readableNames,
+            bypassDNSBeans = bypassDNSBeans,
+            perGroupResolver = perGroupResolver,
+            perGroupServerHosts = perGroupServerHosts,
+            hostResolvers = hostResolvers,
+            nonCustomFinalHosts = nonCustomFinalHosts,
+            groupCache = groupCache,
+            externalIndexMap = externalIndexMap,
+            domainListDNSDirectForce = domainListDNSDirectForce,
+        )
+
         fun buildChain(
             chainId: Long,
             entity: ProxyEntity,
             useGroupFront: Boolean = true,
             useGroupLanding: Boolean = true,
-            externalDetour: String? = null
+            externalDetour: String? = null,
         ): String {
-            if (entity.type == ProxyEntity.TYPE_BALANCER) {
-                val balancerBean = entity.balancerBean ?: (entity.requireBean() as? BalancerBean) ?: BalancerBean()
-                val balancerFrontEntity = if (balancerBean.frontProxy > 0L && balancerBean.frontProxy != entity.id) {
-                    SagerDatabase.proxyDao.getById(balancerBean.frontProxy)
-                } else null
-                val balancerLandingEntity = if (balancerBean.landingProxy > 0L && balancerBean.landingProxy != entity.id) {
-                    SagerDatabase.proxyDao.getById(balancerBean.landingProxy)
-                } else null
-
-                val balancerFrontTag = balancerFrontEntity?.let { front ->
-                    tagMap[front.id] ?: buildChain(front.id, front).also { tagMap[front.id] = it }
-                }
-
-                val resolvedMembers = BalancerMemberResolver.resolve(
-                    balancer = balancerBean,
-                    selfId = entity.id,
-                    frontProxyId = balancerFrontEntity?.id ?: 0L,
-                    landingProxyId = balancerLandingEntity?.id ?: 0L,
-                ).members
-                val memberEntities = if (balancerBean.strategy.isNullOrBlank() ||
-                    balancerBean.strategy == BalancerBean.STRATEGY_LEAST_PING ||
-                    balancerBean.strategy == "least_ping"
-                ) {
-                    BalancerMemberResolver.sortForColdStart(resolvedMembers)
-                } else {
-                    resolvedMembers
-                }
-
-                val hasGroupMode = balancerBean.balancerType == BalancerBean.TYPE_GROUP ||
-                    balancerBean.balancerType == BalancerBean.TYPE_MIXED
-                val useFront = if (hasGroupMode) balancerBean.useFrontProxy else true
-                val useLanding = if (hasGroupMode) balancerBean.useLandingProxy else true
-
-                val memberEffectiveDetour = balancerFrontTag ?: externalDetour
-
-                val memberTags = memberEntities.mapNotNull { member ->
-                    val effectiveUseGroupFront = if (memberEffectiveDetour != null) false else useFront
-                    val isCustomMemberChain = memberEffectiveDetour != null || !effectiveUseGroupFront || !useLanding
-                    val memberTag = if (isCustomMemberChain) {
-                        val chainKey = BalancerMemberChainKey(
-                            profileId = member.id,
-                            useGroupFront = effectiveUseGroupFront,
-                            useGroupLanding = useLanding,
-                            externalDetour = memberEffectiveDetour,
-                        )
-                        customChainTagMap.getOrPut(chainKey) {
-                            buildChain(
-                                nextCustomChainId--,
-                                member,
-                                useGroupFront = effectiveUseGroupFront,
-                                useGroupLanding = useLanding,
-                                externalDetour = memberEffectiveDetour,
-                            )
-                        }
-                    } else {
-                        tagMap.getOrPut(member.id) {
-                            buildChain(member.id, member)
-                        }
-                    }
-                    outboundTagProfileMap[memberTag] = member.id
-                    memberTag
-                }.ifEmpty { listOf(TAG_DIRECT) }
-
-                val balancerTag = readableTag(entity.displayName())
-
-                val balancerOutbound: SingBoxOption = if (balancerBean.strategy == "leastPing") {
-                    val iv = balancerBean.interval.toLong().coerceAtLeast(10L)
-                    val toleranceMs = balancerBean.calculateToleranceMs().coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
-                    buildUrlTestOutbound(
-                        memberTags = memberTags,
-                        testUrl = balancerBean.testUrl,
-                        intervalSec = iv,
-                        toleranceMs = toleranceMs,
-                        idleTimeoutStr = "${iv}s",
-                        interruptExist = false,
-                        customTag = balancerTag
-                    )
-                } else {
-                    val iv = balancerBean.interval.toLong().coerceAtLeast(10L)
-                    val toleranceMs = balancerBean.calculateToleranceMs().coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
-                    val strat = when (balancerBean.strategy) {
-                        "failover" -> "failover"
-                        "stable" -> "stable"
-                        "consistent_hash", "consistentHash" -> "consistent_hash"
-                        "leastLoad" -> "leastLoad"
-                        "round_robin", "roundRobin" -> "round_robin"
-                        "random" -> "random"
-                        else -> balancerBean.strategy?.takeIf { it.isNotBlank() } ?: "round_robin"
-                    }
-                    buildLoadBalanceOutbound(
-                        memberTags = memberTags,
-                        strategy = strat,
-                        testUrl = balancerBean.testUrl,
-                        intervalSec = iv,
-                        toleranceMs = toleranceMs,
-                        idleTimeoutStr = "${iv}s",
-                        interruptExist = false,
-                        customTag = balancerTag
-                    )
-                }
-
-                outbounds.add(balancerOutbound)
-                trafficMap[balancerTag] = listOf(entity)
-                balancerMemberMap[entity.id] = memberEntities.map { it.id }
-                balancerTagMap[entity.id] = balancerTag
-
-                val finalBalancerTag = if (balancerLandingEntity != null) {
-                    val landingTag = buildChain(
-                        chainId = nextCustomChainId--,
-                        entity = balancerLandingEntity,
-                        useGroupFront = false,
-                        useGroupLanding = false,
-                        externalDetour = balancerTag
-                    )
-                    landingTag
-                } else {
-                    balancerTag
-                }
-
-                return finalBalancerTag
-            }
-
-            val profileList = entity.resolveChain(useGroupFront, useGroupLanding)
-            // profileList 的顺序即应用流量经过各 outbound 的顺序：前一跳通过
-            // detour 交给后一跳拨号，最后一项直接连接物理网络。
-            Logs.d(
-                "Outbound chain id=$chainId forTest=$forTest appToEgress=" +
-                    profileList.joinToString(" -> ") { hop ->
-                        val hopBean = hop.requireBean()
-                        val host = serverHostOf(hopBean) ?: "<unknown>"
-                        val endpoint = hopBean.displayAddress().takeIf { it.isNotBlank() }
-                            ?: "$host:${hopBean.serverPort}"
-                        "${hop.id}:${hop.displayType()}@$endpoint"
-                    }
+            val tag = chainCtx.buildChain(
+                chainId = chainId,
+                entity = entity,
+                useGroupFront = useGroupFront,
+                useGroupLanding = useGroupLanding,
+                externalDetour = externalDetour,
             )
-            val chainTrafficSet = HashSet<ProxyEntity>().apply {
-                plusAssign(profileList)
-                add(entity)
+            if (mainChainBalancerId == 0L && chainCtx.mainChainBalancerId > 0L) {
+                mainChainBalancerId = chainCtx.mainChainBalancerId
             }
-
-            var currentOutbound: SingBoxOption
-            lateinit var pastOutbound: SingBoxOption
-            lateinit var pastInboundTag: String
-            var pastEntity: ProxyEntity? = null
-            val externalChainMap = LinkedHashMap<Int, ProxyEntity>()
-            externalIndexMap.add(IndexEntity(externalChainMap))
-            val chainOutbounds = ArrayList<SingBoxOption>()
-
-            // chainTagOut: v2ray outbound tag for this chain
-            var chainTagOut = ""
-            val chainTag = if (chainId < 0) "c-m${-chainId}" else "c-$chainId"
-            var muxApplied = false
-
-            val defaultServerDomainStrategy = if (ipv6Mode == IPv6Mode.DISABLE) "ipv4_only" else if (ipv6Mode == IPv6Mode.ONLY) "ipv6_only" else SingBoxOptionsUtil.domainStrategy("server")
-
-            profileList.forEachIndexed { index, proxyEntity ->
-                val bean = proxyEntity.requireBean()
-                bypassDNSBeans += bean
-
-                // tagOut: v2ray outbound tag for a profile
-                // profile2 (in) (global)   tag g-(id)
-                // profile1                 tag (chainTag)-(id)
-                // profile0 (out)           tag (chainTag)-(id) / single: "proxy"
-                var tagOut = "$chainTag-${proxyEntity.id}"
-
-                // needGlobal: can only contain one?
-                var needGlobal = false
-                val isCustomChainContext = !externalDetour.isNullOrBlank() || !useGroupFront || !useGroupLanding
-
-                // first profile set as global (unless isolated for custom balancer front/landing chains)
-                if (index == profileList.lastIndex) {
-                    if (!isCustomChainContext) {
-                        needGlobal = true
-                        tagOut = "g-" + proxyEntity.id
-                    }
-
-                    val ownerGid = entity.groupId
-                    val ownerGroup = groupCache.getOrPut(ownerGid) {
-                        SagerDatabase.groupDao.getById(ownerGid)
-                    }
-                    val resolver = ownerGroup
-                        ?.takeIf { it.type == GroupType.SUBSCRIPTION }
-                        ?.subscription?.serverDnsResolver
-                        ?.let { sanitizeDnsEntry(it) }
-                        ?.takeIf { it.isNotBlank() }
-
-                    if (resolver != null) {
-                        profileList.forEach { hop ->
-                            val host = serverHostOf(hop.requireBean())
-                            if (host != null && !host.isIpAddress()) {
-                                if (hop.groupId == ownerGid) {
-                                    perGroupResolver[ownerGid] = resolver
-                                    perGroupServerHosts.getOrPut(ownerGid) { mutableSetOf() }
-                                        .add(host)
-                                    hostResolvers.getOrPut(host) { mutableSetOf() }.add(resolver)
-                                } else {
-                                    nonCustomFinalHosts.add(host)
-                                }
-                            }
-                        }
-                    } else {
-                        profileList.forEach { hop ->
-                            val host = serverHostOf(hop.requireBean())
-                            if (host != null && !host.isIpAddress()) {
-                                nonCustomFinalHosts.add(host)
-                            }
-                        }
-                    }
-                }
-
-                if (index == 0) {
-                    tagOut = readableTag(bean.displayName())
-                }
-
-                // Resolve a globally shared hop before writing the edge that references it.
-                // A hop built by an earlier rule may use a readable or endpoint tag instead of
-                // this chain's proposed g-<id> tag; the global map is the source of truth.
-                val resolvedTag = resolveChainHopTag(
-                    proxyEntity.id,
-                    tagOut,
-                    needGlobal,
-                    globalOutbounds,
-                )
-                tagOut = resolvedTag.tag
-
-                // chain rules
-                if (index > 0) {
-                    // chain route/proxy rules
-                    if (pastEntity!!.needExternal()) {
-                        route.rules.add(Rule_DefaultOptions().apply {
-                            inbound = listOf(pastInboundTag)
-                            outbound = tagOut
-                        })
-                    } else {
-                        pastOutbound.detourTo(tagOut)
-                    }
-                } else {
-                    // index == 0 means last profile in chain / not chain
-                    chainTagOut = tagOut
-                }
-
-                // The edge now points at the previously generated final tag, so the duplicate
-                // object can be skipped without leaving a dangling detour.
-                if (resolvedTag.reused) return@forEachIndexed
-
-                if (proxyEntity.needExternal()) { // externel outbound
-                    val localPort = mkPort()
-                    externalChainMap[localPort] = proxyEntity
-                    currentOutbound = Outbound_SocksOptions().apply {
-                        type = "socks"
-                        server = LOCALHOST
-                        server_port = localPort
-                    }
-                } else {
-                    // internal outbound
-
-                    currentOutbound = when (bean) {
-                        is ConfigBean -> CustomSingBoxOption(sanitizeSingBoxConfig(bean.config)) as SingBoxOption
-
-                        is ShadowTLSBean -> // before StandardV2RayBean
-                            buildSingBoxOutboundShadowTLSBean(bean)
-
-                        is StandardV2RayBean -> // http/trojan/vmess/vless
-                            buildSingBoxOutboundStandardV2RayBean(bean)
-
-                        is HysteriaBean ->
-                            buildSingBoxOutboundHysteriaBean(bean)
-
-                        is TuicBean ->
-                            buildSingBoxOutboundTuicBean(bean)
-
-                        is JuicityBean ->
-                            buildSingBoxOutboundJuicityBean(bean)
-
-                        is SOCKSBean ->
-                            buildSingBoxOutboundSocksBean(bean)
-
-                        is ShadowsocksBean ->
-                            buildSingBoxOutboundShadowsocksBean(bean)
-
-                        is ShadowsocksRBean ->
-                            buildSingBoxOutboundShadowsocksRBean(bean)
-
-                        is WireGuardBean -> {
-                            val endpointMtu = bean.mtu?.takeIf { it > 0 }
-                            val peerAddressFamily = when {
-                                bean.serverAddress?.contains(':') == true -> "ipv6"
-                                bean.serverAddress?.isNotBlank() == true -> "ipv4-or-domain"
-                                else -> "missing"
-                            }
-                            Logs.i(
-                                "WireGuardEndpointTrace profileId=${proxyEntity.id} forTest=$forTest " +
-                                    "endpointMtu=${endpointMtu ?: "default(1408)"} " +
-                                    "tunMtu=${DataStore.mtu} peerAddressFamily=$peerAddressFamily " +
-                                    "peerPort=${bean.serverPort}"
-                            )
-                            buildSingBoxEndpointWireGuardBean(bean)
-                        }
-
-                        is SSHBean ->
-                            buildSingBoxOutboundSSHBean(bean)
-
-                        is AnyTLSBean ->
-                            buildSingBoxOutboundAnyTLSBean(bean)
-
-                        is SnellBean ->
-                            buildSingBoxOutboundSnellBean(bean)
-
-                        else -> throw IllegalStateException("can't reach")
-                    }
-
-                    // internal mux
-                    if (!muxApplied) {
-                        val muxObj = proxyEntity.singMux()
-                        if (muxObj != null && muxObj.enabled) {
-                            muxApplied = true
-                            currentOutbound._hack_config_map["multiplex"] = muxObj.asMap()
-                        }
-                    }
-
-                    if (needGlobal && DataStore.enableTLSFragment) {
-                        val outboundMap = currentOutbound.asMap()
-                        val tlsOptions = outboundMap["tls"] as? Map<*, *>
-                        if (tlsOptions?.get("enabled") == true) {
-                            val delay = DataStore.fragmentInterval.let {
-                                val first = it.split("-").firstOrNull()?.trim()
-                                val num = first?.toLongOrNull() ?: 20L
-                                "${num}ms"
-                            }
-                            currentOutbound._hack_config_map["tls"] = mapOf(
-                                "fragment" to true,
-                                "record_fragment" to true,
-                                "fragment_fallback_delay" to delay
-                            )
-                        }
-                    }
-                }
-
-                // internal & external
-                currentOutbound.apply {
-                    // udp over tcp
-                    try {
-                        val sUoT = bean.javaClass.getField("sUoT").get(bean)
-                        if (sUoT is Boolean && sUoT) {
-                            _hack_config_map["udp_over_tcp"] = true
-                        }
-                    } catch (_: Exception) {
-                    }
-
-                    // domain_strategy
-                    pastEntity?.requireBean()?.apply {
-                        // don't loopback
-                        if (defaultServerDomainStrategy != "" && !serverAddress.isIpAddress()) {
-                            domainListDNSDirectForce.add("full:$serverAddress")
-                        }
-                    }
-                    // 测速配置必须与正式连接一致（对齐 husi）：沿用统一的服务器
-                    // 域名解析策略。曾强制空——测速解析出的 IP/协议族与真实路径不同。
-                    _hack_config_map["domain_strategy"] = defaultServerDomainStrategy
-                    _hack_config_map["fallback_delay"] = "100ms"
-                    _hack_config_map["tcp_keep_alive"] = "45s"
-                    _hack_config_map["tcp_keep_alive_interval"] = "30s"
-                    _hack_config_map["connect_timeout"] = "5s"
-
-                    // 确保所有出站代理节点服务器域名强制使用直连/独立 DNS 解析器（抗运营商污染的加密阿里 DoH 或订阅专属 DNS）解析，
-                    // 彻底绕过 FakeIP 与路由分流规则，杜绝内核解析自身节点服务器域名时陷入 FakeIP 闭环回环死锁与国内移动基站 DNS 污染阻断
-                    val outboundResolver = if (perGroupResolver.containsKey(proxyEntity.groupId)) {
-                        "dns-sub-${proxyEntity.groupId}"
-                    } else {
-                        "dns-direct"
-                    }
-                    _hack_config_map["domain_resolver"] = outboundResolver
-
-                    _hack_config_map["tag"] = tagOut
-                    _hack_config_map["tcp_multi_path"] = false
-                    // 全协议出站 TFO 注入安全策略：
-                    // 仅针对标准原生支持 TFO 的 TCP 协议（Shadowsocks, ShadowsocksR, Trojan, SOCKS, HTTP, VMess/VLESS 非 QUIC/SplitHTTP）安全注入 TFO；
-                    // AnyTLS、Naive、WireGuard、Hysteria、Hysteria2、TUIC、Juicity、Snell、SSH 以及任何自定义 ConfigBean 严禁强制注入 TFO，
-                    // 彻底杜绝内核因协议不支持抛出致命异常（如 "tcp_fast_open is not supported with anytls outbound"）导致所有节点无法连接！
-                    val supportsTFO = when (bean) {
-                        is ShadowsocksBean, is ShadowsocksRBean, is SOCKSBean -> true
-                        is ShadowTLSBean -> false
-                        is StandardV2RayBean -> bean.type != "quic" && bean.type != "splithttp" && bean.type != "xhttp"
-                        else -> false
-                    }
-                    if (supportsTFO) {
-                        _hack_config_map["tcp_fast_open"] = true
-                    } else {
-                        _hack_config_map.remove("tcp_fast_open")
-                    }
-
-                    _hack_custom_config = bean.customOutboundJson
-                }
-
-                // External proxy need a dokodemo-door inbound to forward the traffic
-                // For external proxy software, their traffic must goes to v2ray-core to use protected fd.
-                bean.finalAddress = bean.serverAddress
-                bean.finalPort = bean.serverPort
-                if (bean.canMapping() && proxyEntity.needExternal()) {
-                    // With ss protect, don't use mapping
-                    var needExternal = true
-                    if (index == profileList.lastIndex) {
-                        val pluginId = when (bean) {
-                            is HysteriaBean -> if (bean.protocolVersion == 1) "hysteria-plugin" else "hysteria2-plugin"
-                            else -> ""
-                        }
-                        if (Plugins.isUsingMatsuriExe(pluginId)) {
-                            needExternal = false
-                        } else if (Plugins.getPluginExternal(pluginId) != null) {
-                            throw Exception("You are using an unsupported $pluginId, please download the correct plugin.")
-                        }
-                    }
-                    if (needExternal) {
-                        val mappingPort = mkPort()
-                        bean.finalAddress = LOCALHOST
-                        bean.finalPort = mappingPort
-
-                        inbounds.add(Inbound_DirectOptions().apply {
-                            type = "direct"
-                            listen = LOCALHOST
-                            listen_port = mappingPort
-                            tag = "$chainTag-mapping-${proxyEntity.id}"
-
-                            override_address = bean.serverAddress
-                            override_port = bean.serverPort
-
-                            pastInboundTag = tag
-
-                            // no chain rule and not outbound, so need to set to direct
-                            if (index == profileList.lastIndex) {
-                                route.rules.add(Rule_DefaultOptions().apply {
-                                    inbound = listOf(tag)
-                                    outbound = TAG_DIRECT
-                                })
-                            }
-                        })
-                    }
-                }
-
-                outbounds.add(currentOutbound)
-                chainOutbounds.add(currentOutbound)
-                pastOutbound = currentOutbound
-                pastEntity = proxyEntity
-            }
-
-            if (!externalDetour.isNullOrBlank() && chainOutbounds.isNotEmpty()) {
-                chainOutbounds.last().detourTo(externalDetour)
-            }
-
-            trafficMap[chainTagOut] = chainTrafficSet.toList()
-            return chainTagOut
+            return tag
         }
 
         // build outbounds
@@ -2248,9 +2495,14 @@ fun buildConfig(
                 "endpoints=$endpointTags outbounds=$outboundTags " +
                 "references=$references unresolved=$unresolvedTargets"
         )
+        val effectiveStrategyBalancerId = when {
+            proxy.type == ProxyEntity.TYPE_BALANCER -> proxy.id
+            proxy.type == ProxyEntity.TYPE_CHAIN && mainChainBalancerId > 0L -> mainChainBalancerId
+            else -> 0L
+        }
         val (activeStrategyTag, activeStrategyKind, activeStrategyId) = when {
-            !forTest && !forExport && proxy.type == ProxyEntity.TYPE_BALANCER && balancerTagMap[proxy.id] != null ->
-                Triple(balancerTagMap[proxy.id].orEmpty(), "balancer", proxy.id)
+            !forTest && !forExport && effectiveStrategyBalancerId > 0L && balancerTagMap[effectiveStrategyBalancerId] != null ->
+                Triple(balancerTagMap[effectiveStrategyBalancerId].orEmpty(), "balancer", effectiveStrategyBalancerId)
             else -> Triple("", "", 0L)
         }
 

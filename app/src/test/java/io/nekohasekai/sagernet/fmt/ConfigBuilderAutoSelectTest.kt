@@ -1,0 +1,273 @@
+package io.nekohasekai.sagernet.fmt
+
+import io.nekohasekai.sagernet.database.ProxyEntity
+import io.nekohasekai.sagernet.fmt.internal.BalancerBean
+import io.nekohasekai.sagernet.fmt.internal.ChainBean
+import io.nekohasekai.sagernet.fmt.socks.SOCKSBean
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class ConfigBuilderAutoSelectTest {
+
+    private fun socksEntity(
+        id: Long,
+        name: String,
+        status: Int = 0,
+        ping: Int = 0,
+    ): ProxyEntity {
+        return ProxyEntity(
+            id = id,
+            groupId = 10L,
+            type = ProxyEntity.TYPE_SOCKS,
+            status = status,
+            ping = ping,
+            socksBean = SOCKSBean().apply {
+                initializeDefaultValues()
+                this.name = name
+                serverAddress = "198.51.100.$id"
+                serverPort = 1080
+            },
+        )
+    }
+
+    @Test
+    fun buildAutoSelectOutboundSerializesAllFieldsAndTrustedInitialDelays() {
+        val nowMs = 1_700_000_000_000L
+        val m1 = socksEntity(1L, "SG 01", status = 1, ping = 42)
+        val m2 = socksEntity(2L, "SG 02", status = 1, ping = 88)
+        val m3 = socksEntity(3L, "SG 03", status = 3, ping = 15)
+        val timestamps = mapOf(
+            1L to nowMs - 10 * 60_000L, // within 60m trust
+            2L to nowMs - 90 * 60_000L, // expired
+            3L to nowMs - 5 * 60_000L,  // failed status must be ignored
+        )
+
+        val balancer = BalancerBean().apply {
+            selectionMode = BalancerBean.SELECTION_PRIORITY
+            balanceEnabled = true
+            balanceMode = BalancerBean.BALANCE_PER_CONNECTION
+            balanceIntervalSec = 45
+            rankTopN = 500
+            standbySize = 5
+            intensiveCheckCount = 12
+            interval = 180
+            fullScanIntervalSec = 900
+            watchIntervalSec = 20
+            sampleCount = 8
+            tolerance = 40
+            maxRttMs = 1500
+            dialRetries = 3
+            interruptOnSwitch = true
+            failbackChecks = 4
+            failbackDelaySec = 90
+            interruptOnFailback = true
+            learnFromConnections = false
+            siteStickyMinutes = 120
+            testUrl = "https://cp.cloudflare.com/generate_204"
+            connectivityUrl = "http://connectivitycheck.gstatic.com/generate_204"
+            resultTrustMinutes = 60
+        }
+
+        val option = buildAutoSelectOutbound(
+            balancer = balancer,
+            memberEntities = listOf(m1, m2, m3),
+            memberTags = listOf("tag-sg-1", "tag-sg-2", "tag-sg-3"),
+            customTag = "SG-Auto",
+            nowMs = nowMs,
+            testTimestampProvider = { id -> timestamps[id] ?: 0L },
+        )
+
+        val map = option.asMap()
+        assertEquals("autoselect", map["type"])
+        assertEquals("SG-Auto", map["tag"])
+        assertEquals(listOf("tag-sg-1", "tag-sg-2", "tag-sg-3"), map["outbounds"])
+        assertEquals("priority", map["selection_mode"])
+        assertEquals(true, map["balance_enabled"])
+        assertEquals("per_connection", map["balance_mode"])
+        assertEquals("45s", map["balance_interval"])
+        assertEquals(500, (map["rank_top_n"] as Number).toInt())
+        assertEquals(5, (map["standby_size"] as Number).toInt())
+        assertEquals(12, (map["intensive_check_count"] as Number).toInt())
+        assertEquals("180s", map["check_interval"])
+        assertEquals("900s", map["full_scan_interval"])
+        assertEquals("20s", map["watch_interval"])
+        assertEquals(8, (map["sample_count"] as Number).toInt())
+        assertEquals(40, (map["tolerance"] as Number).toInt())
+        assertEquals("1500ms", map["max_rtt"])
+        assertEquals(3, (map["dial_retries"] as Number).toInt())
+        assertEquals(true, map["interrupt_exist_connections"])
+        assertEquals(4, (map["failback_checks"] as Number).toInt())
+        assertEquals("90s", map["failback_delay"])
+        assertEquals(true, map["interrupt_on_failback"])
+        assertEquals(false, map["learn_from_connections"])
+        assertEquals("120m", map["site_sticky_ttl"])
+        assertEquals("http://connectivitycheck.gstatic.com/generate_204", map["connectivity_url"])
+
+        @Suppress("UNCHECKED_CAST")
+        val initialDelays = map["initial_delays_ms"] as Map<String, Number>
+        assertEquals(1, initialDelays.size)
+        assertEquals(42, initialDelays["tag-sg-1"]?.toInt())
+        assertFalse(initialDelays.containsKey("tag-sg-2"))
+        assertFalse(initialDelays.containsKey("tag-sg-3"))
+    }
+
+    @Test
+    fun buildAutoSelectOutboundOmitsOptionalEmptyFields() {
+        val m1 = socksEntity(1L, "SG 01", status = 0, ping = 0)
+        val balancer = BalancerBean().apply {
+            initializeDefaultValues()
+            maxRttMs = 0
+            connectivityUrl = ""
+            testUrl = "https://cp.cloudflare.com/generate_204"
+        }
+
+        val option = buildAutoSelectOutbound(
+            balancer = balancer,
+            memberEntities = listOf(m1),
+            memberTags = listOf("tag-sg-1"),
+            customTag = "SG-Auto",
+            nowMs = 1_700_000_000_000L,
+            testTimestampProvider = { 0L },
+        )
+
+        val map = option.asMap()
+        assertEquals("autoselect", map["type"])
+        assertEquals("latency", map["selection_mode"])
+        assertEquals(false, map["balance_enabled"])
+        assertEquals(false, map["interrupt_exist_connections"])
+        assertEquals(false, map["interrupt_on_failback"])
+        assertEquals(true, map["learn_from_connections"])
+        assertFalse(map.containsKey("max_rtt"))
+        assertFalse(map.containsKey("connectivity_url"))
+        assertFalse(map.containsKey("initial_delays_ms"))
+    }
+
+    @Test
+    fun chainWithMiddleBalancerBuildsValidDetourTopologyAndPreservesPriorityOrder() {
+        val front = socksEntity(1L, "Front-Relay")
+        val b1 = socksEntity(10L, "Mid-Slow", status = 1, ping = 200)
+        val b2 = socksEntity(11L, "Mid-Fast", status = 1, ping = 20)
+        val balancer = ProxyEntity(
+            id = 2L,
+            groupId = 10L,
+            type = ProxyEntity.TYPE_BALANCER,
+            balancerBean = BalancerBean().apply {
+                name = "Mid-Balancer"
+                balancerType = BalancerBean.TYPE_LIST
+                proxies = mutableListOf(10L, 11L)
+                selectionMode = BalancerBean.SELECTION_PRIORITY
+                testUrl = "https://cp.cloudflare.com/generate_204"
+            },
+        )
+        val landing = socksEntity(3L, "Landing-Exit")
+        val chain = ProxyEntity(
+            id = 100L,
+            groupId = 10L,
+            type = ProxyEntity.TYPE_CHAIN,
+            chainBean = ChainBean().apply {
+                name = "My-Chain"
+                proxies = mutableListOf(front.id, balancer.id, landing.id)
+            },
+        )
+        val store = mapOf(
+            front.id to front,
+            balancer.id to balancer,
+            b1.id to b1,
+            b2.id to b2,
+            landing.id to landing,
+            chain.id to chain,
+        )
+
+        val assembled = assembleChainGraphForTest(
+            root = chain,
+            entitiesById = store,
+        )
+
+        val byTag = assembled.outbounds.associateBy { it["tag"] as String }
+        val landingMap = byTag["Landing-Exit"]!!
+        val balancerMap = byTag["Mid-Balancer"]!!
+        val frontTag = byTag.keys.first { it.endsWith("-1") || it == "Front-Relay" || it == "g-1" }
+        val frontMap = byTag[frontTag]!!
+
+        assertEquals("Mid-Balancer", landingMap["detour"])
+        assertEquals("autoselect", balancerMap["type"])
+        assertEquals("priority", balancerMap["selection_mode"])
+
+        @Suppress("UNCHECKED_CAST")
+        val memberTags = balancerMap["outbounds"] as List<String>
+        assertEquals(2, memberTags.size)
+        // Priority mode preserves exact order [10 (200ms), 11 (20ms)]
+        assertEquals(10L, assembled.outboundTagProfileMap[memberTags[0]])
+        assertEquals(11L, assembled.outboundTagProfileMap[memberTags[1]])
+        assertEquals(frontTag, byTag[memberTags[0]]!!["detour"])
+        assertEquals(frontTag, byTag[memberTags[1]]!!["detour"])
+        assertNull(frontMap["detour"])
+
+        assertEquals("Landing-Exit", assembled.mainProxyTag)
+        assertEquals("Mid-Balancer", assembled.activeStrategyTag)
+        assertEquals(2L, assembled.activeStrategyId)
+        assertEquals(listOf(10L, 11L), assembled.balancerMemberMap[2L])
+    }
+
+    @Test
+    fun chainWithLeadingOrTrailingBalancerBuildsValidDetoursAndLatencyColdStart() {
+        val front = socksEntity(1L, "Front-Relay")
+        val slow = socksEntity(10L, "Slow-Member", status = 1, ping = 150)
+        val fast = socksEntity(11L, "Fast-Member", status = 1, ping = 30)
+        val balancer = ProxyEntity(
+            id = 2L,
+            groupId = 10L,
+            type = ProxyEntity.TYPE_BALANCER,
+            balancerBean = BalancerBean().apply {
+                name = "Auto-Pool"
+                balancerType = BalancerBean.TYPE_LIST
+                proxies = mutableListOf(10L, 11L)
+                selectionMode = BalancerBean.SELECTION_LATENCY
+                testUrl = "https://cp.cloudflare.com/generate_204"
+            },
+        )
+        val landing = socksEntity(3L, "Landing-Exit")
+
+        // Case A: [Balancer, Landing]
+        val balancerThenLanding = ProxyEntity(
+            id = 101L,
+            groupId = 10L,
+            type = ProxyEntity.TYPE_CHAIN,
+            chainBean = ChainBean().apply {
+                proxies = mutableListOf(balancer.id, landing.id)
+            },
+        )
+        val storeA = mapOf(balancer.id to balancer, slow.id to slow, fast.id to fast, landing.id to landing, balancerThenLanding.id to balancerThenLanding)
+        val resA = assembleChainGraphForTest(balancerThenLanding, storeA)
+        val mapA = resA.outbounds.associateBy { it["tag"] as String }
+        assertEquals("Landing-Exit", resA.mainProxyTag)
+        assertEquals("Auto-Pool", mapA["Landing-Exit"]!!["detour"])
+        @Suppress("UNCHECKED_CAST")
+        val aMembers = mapA["Auto-Pool"]!!["outbounds"] as List<String>
+        assertEquals(11L, resA.outboundTagProfileMap[aMembers[0]]) // Fast first in latency mode
+        assertEquals(10L, resA.outboundTagProfileMap[aMembers[1]])
+        assertNull(mapA[aMembers[0]]!!["detour"])
+
+        // Case B: [Front, Balancer]
+        val frontThenBalancer = ProxyEntity(
+            id = 102L,
+            groupId = 10L,
+            type = ProxyEntity.TYPE_CHAIN,
+            chainBean = ChainBean().apply {
+                proxies = mutableListOf(front.id, balancer.id)
+            },
+        )
+        val storeB = mapOf(front.id to front, balancer.id to balancer, slow.id to slow, fast.id to fast, frontThenBalancer.id to frontThenBalancer)
+        val resB = assembleChainGraphForTest(frontThenBalancer, storeB)
+        val mapB = resB.outbounds.associateBy { it["tag"] as String }
+        assertEquals("Auto-Pool", resB.mainProxyTag)
+        @Suppress("UNCHECKED_CAST")
+        val bMembers = mapB["Auto-Pool"]!!["outbounds"] as List<String>
+        val frontTagB = bMembers.map { mapB[it]!!["detour"] as String }.distinct().single()
+        assertTrue(mapB.containsKey(frontTagB))
+        assertNull(mapB[frontTagB]!!["detour"])
+    }
+}
