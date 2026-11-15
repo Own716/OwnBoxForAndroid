@@ -23,21 +23,36 @@ type ProbeMeta struct {
 
 // MemberSnapshot represents one member inside a strategy group for UI inspection.
 type MemberSnapshot struct {
-	Tag         string `json:"tag"`
-	Delay       int    `json:"delay"`
-	Error       string `json:"error,omitempty"`
-	LastCheckMs int64  `json:"lastCheckMs"`
+	Tag                 string `json:"tag"`
+	Delay               int    `json:"delay"`
+	Error               string `json:"error,omitempty"`
+	LastCheckMs         int64  `json:"lastCheckMs"`
+	Role                string `json:"role,omitempty"`
+	CheckCount          int    `json:"checkCount,omitempty"`
+	FailCount           int    `json:"failCount,omitempty"`
+	SuspectUntilMs      int64  `json:"suspectUntilMs,omitempty"`
+	SuspectRemainingSec int    `json:"suspectRemainingSec,omitempty"`
 }
 
 // GroupSnapshot represents the live state of a strategy group inside the Go core.
 type GroupSnapshot struct {
-	GroupTag     string           `json:"groupTag"`
-	StrategyType string           `json:"strategyType"`
-	ActiveTag    string           `json:"activeTag"`
-	PinnedTag    string           `json:"pinnedTag"`
-	Checking     bool             `json:"checking"`
-	LastCheckMs  int64            `json:"lastCheckMs"`
-	Members      []MemberSnapshot `json:"members"`
+	GroupTag         string           `json:"groupTag"`
+	StrategyType     string           `json:"strategyType"`
+	ActiveTag        string           `json:"activeTag"`
+	PinnedTag        string           `json:"pinnedTag"`
+	Checking         bool             `json:"checking"`
+	LastCheckMs      int64            `json:"lastCheckMs"`
+	SelectionMode    string           `json:"selectionMode,omitempty"`
+	BalanceEnabled   bool             `json:"balanceEnabled,omitempty"`
+	AvailableCount   int              `json:"availableCount,omitempty"`
+	TotalCount       int              `json:"totalCount,omitempty"`
+	LastSwitchMs     int64            `json:"lastSwitchMs,omitempty"`
+	SwitchReason     string           `json:"switchReason,omitempty"`
+	NextCheckSec     int              `json:"nextCheckSec,omitempty"`
+	LearnedSiteCount int              `json:"learnedSiteCount,omitempty"`
+	LearnEnabled     bool             `json:"learnEnabled,omitempty"`
+	LocalOffline     bool             `json:"localOffline,omitempty"`
+	Members          []MemberSnapshot `json:"members"`
 }
 
 // StrategyGroupController is implemented by runtime strategy groups (URLTest / LoadBalance)
