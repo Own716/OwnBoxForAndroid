@@ -1,5 +1,13 @@
 # OwnBox for Android 更新日志 (Changelog)
 
+# OwnBox for Android v26.11.8.19 预览版
+
+## 【修复】IPv6 优先模式下无法走代理
+- 移除代理出站强制开启的 TCP Fast Open：它会关闭 Happy Eyeballs 并行竞速，导致 IPv6 不通时无法回退 IPv4，也会掩盖连接失败、影响自动选择的故障切换。
+- IPv6 优先模式下，经代理解析的目标地址默认优先 IPv4（若用户在 DNS 设置中显式指定了远程 DNS 策略，则遵循用户设置），避免仅 IPv4 的落地节点被锁定到 IPv6 目标。
+- 开启 FakeDNS 时，Google Play 相关域名在 TUN 入站同样走 FakeDNS，由落地节点按域名自行选择 IPv4/IPv6。
+- 节点连接与直连仍保持 IPv6 优先，FakeDNS 双栈保持不变，IPv6 优先设置依然有效。
+
 # OwnBox for Android v26.11.8.18 预览版
 
 ### 【严格调度执行、快速故障切换与全栈配置精简】（纯正 `sing-box v1.15.0-alpha.13` 内核）
