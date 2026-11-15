@@ -1,5 +1,9 @@
 # OwnBox for Android 更新日志 (Changelog)
 
+# OwnBox for Android v26.11.8.19 预览版
+
+- 代码与 v26.11.8.18 预览版一致，不包含任何功能改动；用于覆盖此前已撤回的 v26.11.8.19 预览版。
+
 # OwnBox for Android v26.11.8.18 预览版
 
 ### 【严格调度执行、快速故障切换与全栈配置精简】（纯正 `sing-box v1.15.0-alpha.13` 内核）
