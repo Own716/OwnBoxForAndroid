@@ -1,5 +1,6 @@
 package io.nekohasekai.sagernet.fmt.internal
 
+import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.database.SagerDatabase
@@ -18,6 +19,12 @@ object BalancerMemberResolver {
         val selfId: Long = 0L,
         val frontProxyId: Long = 0L,
         val landingProxyId: Long = 0L,
+        val countryFilter: String = "",
+        val selectionMode: String = BalancerBean.SELECTION_LATENCY,
+        val runTopN: Int = 300,
+        val rankTopN: Int = 1000,
+        val resultTrustMinutes: Int = 1440,
+        val skipFailedWithinTrust: Boolean = false,
     )
 
     data class ResolutionResult(
@@ -26,6 +33,10 @@ object BalancerMemberResolver {
         val extraAddedCount: Int = 0,
         val excludeRegexInvalid: Boolean = false,
         val includeRegexInvalid: Boolean = false,
+        val matchedCandidateCount: Int = members.size,
+        val availableCount: Int = members.count { it.status != 2 && it.status != 3 },
+        val skippedFailedCount: Int = 0,
+        val reusableRecentCount: Int = 0,
     ) {
         val totalCount: Int get() = members.size
         val hasRegexError: Boolean get() = excludeRegexInvalid || includeRegexInvalid
@@ -38,7 +49,9 @@ object BalancerMemberResolver {
         landingProxyId: Long = balancer.landingProxy,
         groupProfilesProvider: (Long) -> List<ProxyEntity> = { gid -> SagerDatabase.proxyDao.getByGroup(gid) },
         entitiesByIdsProvider: (List<Long>) -> List<ProxyEntity> = { ids -> SagerDatabase.proxyDao.getEntities(ids) },
-        isGroupDisabled: (Long) -> Boolean = { gid -> DataStore.isGroupDisabled(gid) },
+        isGroupDisabled: (Long) -> Boolean = { gid -> if (SagerNet.isInitialized()) DataStore.isGroupDisabled(gid) else false },
+        nowMsProvider: () -> Long = { System.currentTimeMillis() },
+        testTimestampProvider: (Long) -> Long = { id -> if (SagerNet.isInitialized()) DataStore.getProfileTestTimestampMs(id) else 0L },
     ): ResolutionResult {
         val targetGids = when {
             !balancer.targetGroupIds.isNullOrEmpty() -> balancer.targetGroupIds.filter { it > 0L }
@@ -55,10 +68,18 @@ object BalancerMemberResolver {
                 selfId = selfId,
                 frontProxyId = frontProxyId,
                 landingProxyId = landingProxyId,
+                countryFilter = balancer.countryFilter.orEmpty(),
+                selectionMode = if (balancer.isPriorityMode()) BalancerBean.SELECTION_PRIORITY else BalancerBean.SELECTION_LATENCY,
+                runTopN = balancer.runTopN,
+                rankTopN = balancer.rankTopN,
+                resultTrustMinutes = balancer.resultTrustMinutes,
+                skipFailedWithinTrust = balancer.skipFailedWithinTrust,
             ),
             groupProfilesProvider = groupProfilesProvider,
             entitiesByIdsProvider = entitiesByIdsProvider,
             isGroupDisabled = isGroupDisabled,
+            nowMsProvider = nowMsProvider,
+            testTimestampProvider = testTimestampProvider,
         )
     }
 
@@ -66,7 +87,9 @@ object BalancerMemberResolver {
         spec: FilterSpec,
         groupProfilesProvider: (Long) -> List<ProxyEntity> = { gid -> SagerDatabase.proxyDao.getByGroup(gid) },
         entitiesByIdsProvider: (List<Long>) -> List<ProxyEntity> = { ids -> SagerDatabase.proxyDao.getEntities(ids) },
-        isGroupDisabled: (Long) -> Boolean = { gid -> DataStore.isGroupDisabled(gid) },
+        isGroupDisabled: (Long) -> Boolean = { gid -> if (SagerNet.isInitialized()) DataStore.isGroupDisabled(gid) else false },
+        nowMsProvider: () -> Long = { System.currentTimeMillis() },
+        testTimestampProvider: (Long) -> Long = { id -> if (SagerNet.isInitialized()) DataStore.getProfileTestTimestampMs(id) else 0L },
     ): ResolutionResult {
         var includeRegex: Regex? = null
         var includeInvalid = false
@@ -99,10 +122,10 @@ object BalancerMemberResolver {
             return true
         }
 
-        val resolved = ArrayList<ProxyEntity>()
+        val countryTokens = parseCountryTokens(spec.countryFilter)
+        val candidates = ArrayList<ProxyEntity>()
         val seenIds = HashSet<Long>()
-        var groupMatchedCount = 0
-        var extraAddedCount = 0
+        val fromGroupIds = HashSet<Long>()
 
         val usesGroup = spec.balancerType == BalancerBean.TYPE_GROUP || spec.balancerType == BalancerBean.TYPE_MIXED
         val usesExplicitList = spec.balancerType == BalancerBean.TYPE_LIST || spec.balancerType == BalancerBean.TYPE_MIXED
@@ -126,8 +149,12 @@ object BalancerMemberResolver {
                     seenIds.remove(entity.id)
                     continue
                 }
-                resolved.add(entity)
-                groupMatchedCount++
+                if (countryTokens.isNotEmpty() && !matchesCountryTokens(name, countryTokens)) {
+                    seenIds.remove(entity.id)
+                    continue
+                }
+                candidates.add(entity)
+                fromGroupIds.add(entity.id)
             }
         }
 
@@ -142,19 +169,196 @@ object BalancerMemberResolver {
                         seenIds.remove(entity.id)
                         continue
                     }
-                    resolved.add(entity)
-                    extraAddedCount++
+                    if (countryTokens.isNotEmpty() && !matchesCountryTokens(entity.displayName(), countryTokens)) {
+                        seenIds.remove(entity.id)
+                        continue
+                    }
+                    candidates.add(entity)
                 }
             }
         }
 
+        val matchedCandidateCount = candidates.size
+        val availableCount = candidates.count { it.status != 2 && it.status != 3 }
+        val nowMs = nowMsProvider()
+
+        fun isWithinTrust(entity: ProxyEntity): Boolean {
+            if (spec.resultTrustMinutes <= 0) return false
+            val ts = testTimestampProvider(entity.id)
+            if (ts <= 0L) return false
+            val ageMs = nowMs - ts
+            return ageMs in 0L..(spec.resultTrustMinutes.toLong() * 60_000L)
+        }
+
+        var skippedFailedCount = 0
+        val runnable = if (spec.skipFailedWithinTrust) {
+            candidates.filter { entity ->
+                val isFailed = entity.status == 2 || entity.status == 3
+                if (isFailed && isWithinTrust(entity)) {
+                    skippedFailedCount++
+                    false
+                } else {
+                    true
+                }
+            }
+        } else {
+            candidates
+        }
+
+        val ordered = if (spec.selectionMode == BalancerBean.SELECTION_PRIORITY) {
+            runnable
+        } else {
+            sortForColdStart(runnable)
+        }
+
+        val ranked = if (spec.rankTopN > 0 && ordered.size > spec.rankTopN) {
+            ordered.take(spec.rankTopN)
+        } else {
+            ordered
+        }
+        val finalMembers = if (spec.runTopN > 0 && ranked.size > spec.runTopN) {
+            ranked.take(spec.runTopN)
+        } else {
+            ranked
+        }
+
+        val groupMatchedCount = finalMembers.count { it.id in fromGroupIds }
+        val extraAddedCount = finalMembers.size - groupMatchedCount
+        val reusableRecentCount = finalMembers.count { entity ->
+            entity.status == 1 && entity.ping > 0 && isWithinTrust(entity)
+        }
+
         return ResolutionResult(
-            members = resolved,
+            members = finalMembers,
             groupMatchedCount = groupMatchedCount,
             extraAddedCount = extraAddedCount,
             excludeRegexInvalid = excludeInvalid,
             includeRegexInvalid = includeInvalid,
+            matchedCandidateCount = matchedCandidateCount,
+            availableCount = availableCount,
+            skippedFailedCount = skippedFailedCount,
+            reusableRecentCount = reusableRecentCount,
         )
+    }
+
+    private data class CountryDef(
+        val iso: String,
+        val keywords: List<String>,
+    )
+
+    private val COUNTRY_DEFS = listOf(
+        CountryDef("HK", listOf("香港", "HK", "HONG KONG", "HONGKONG")),
+        CountryDef("TW", listOf("台湾", "TW", "TAIWAN", "台北")),
+        CountryDef("JP", listOf("日本", "JP", "JAPAN", "TOKYO", "OSAKA", "东京", "大阪")),
+        CountryDef("SG", listOf("新加坡", "SG", "SINGAPORE", "狮城")),
+        CountryDef("US", listOf("美国", "US", "USA", "UNITED STATES", "AMERICA", "洛杉矶", "硅谷", "西雅图", "纽约", "芝加哥", "达拉斯")),
+        CountryDef("KR", listOf("韩国", "KR", "KOREA", "SEOUL", "首尔")),
+        CountryDef("GB", listOf("英国", "UK", "GB", "GREAT BRITAIN", "UNITED KINGDOM", "LONDON", "伦敦")),
+        CountryDef("DE", listOf("德国", "DE", "GERMANY", "FRANKFURT", "法兰克福")),
+        CountryDef("FR", listOf("法国", "FR", "FRANCE", "PARIS", "巴黎")),
+        CountryDef("CA", listOf("加拿大", "CA", "CANADA", "多伦多", "温哥华")),
+        CountryDef("AU", listOf("澳大利亚", "澳洲", "AU", "AUSTRALIA", "SYDNEY", "悉尼", "墨尔本")),
+        CountryDef("RU", listOf("俄罗斯", "RU", "RUSSIA", "MOSCOW", "莫斯科")),
+        CountryDef("NL", listOf("荷兰", "NL", "NETHERLANDS", "AMSTERDAM")),
+        CountryDef("IN", listOf("印度", "IN", "INDIA", "MUMBAI")),
+        CountryDef("TR", listOf("土耳其", "TR", "TURKEY", "ISTANBUL", "伊斯坦布尔")),
+        CountryDef("AR", listOf("阿根廷", "AR", "ARGENTINA")),
+        CountryDef("MY", listOf("马来西亚", "MY", "MALAYSIA", "大马")),
+        CountryDef("TH", listOf("泰国", "TH", "THAILAND", "BANGKOK", "曼谷")),
+        CountryDef("PH", listOf("菲律宾", "PH", "PHILIPPINES")),
+        CountryDef("VN", listOf("越南", "VN", "VIETNAM", "胡志明")),
+        CountryDef("ID", listOf("印度尼西亚", "印尼", "ID", "INDONESIA", "雅加达")),
+        CountryDef("BR", listOf("巴西", "BR", "BRAZIL")),
+        CountryDef("IT", listOf("意大利", "IT", "ITALY", "MILAN", "米兰", "罗马")),
+        CountryDef("ES", listOf("西班牙", "ES", "SPAIN", "MADRID", "马德里")),
+        CountryDef("CH", listOf("瑞士", "CH", "SWITZERLAND", "ZURICH", "苏黎世")),
+        CountryDef("SE", listOf("瑞典", "SE", "SWEDEN", "STOCKHOLM")),
+        CountryDef("NO", listOf("挪威", "NO", "NORWAY")),
+        CountryDef("IE", listOf("爱尔兰", "IE", "IRELAND")),
+        CountryDef("PL", listOf("波兰", "PL", "POLAND", "WARSAW")),
+        CountryDef("FI", listOf("芬兰", "FI", "FINLAND", "HELSINKI")),
+        CountryDef("AT", listOf("奥地利", "AT", "AUSTRIA", "VIENNA")),
+        CountryDef("BE", listOf("比利时", "BE", "BELGIUM")),
+        CountryDef("DK", listOf("丹麦", "DK", "DENMARK")),
+        CountryDef("PT", listOf("葡萄牙", "PT", "PORTUGAL")),
+        CountryDef("ZA", listOf("南非", "ZA", "SOUTH AFRICA")),
+        CountryDef("MX", listOf("墨西哥", "MX", "MEXICO")),
+        CountryDef("AE", listOf("阿联酋", "迪拜", "AE", "UAE", "UNITED ARAB EMIRATES", "DUBAI")),
+    )
+
+    private val ASCII_BOUNDARY_CACHE = HashMap<String, Regex>()
+
+    private fun asciiBoundaryRegex(code: String): Regex = ASCII_BOUNDARY_CACHE.getOrPut(code) {
+        Regex("(?i)(^|[^A-Z])${Regex.escape(code)}([^A-Z]|$)")
+    }
+
+    private fun extractFlagIsoCodes(text: String): Set<String> {
+        val result = HashSet<String>()
+        var i = 0
+        while (i + 3 < text.length) {
+            val cp1 = Character.codePointAt(text, i)
+            val c1 = Character.charCount(cp1)
+            if (cp1 in 0x1F1E6..0x1F1FF && i + c1 < text.length) {
+                val cp2 = Character.codePointAt(text, i + c1)
+                val c2 = Character.charCount(cp2)
+                if (cp2 in 0x1F1E6..0x1F1FF) {
+                    val iso = "${('A'.code + (cp1 - 0x1F1E6)).toChar()}${('A'.code + (cp2 - 0x1F1E6)).toChar()}"
+                    result.add(if (iso == "UK") "GB" else iso)
+                    i += c1 + c2
+                    continue
+                }
+            }
+            i += c1
+        }
+        return result
+    }
+
+    private fun normalizeTokenIso(rawToken: String): String? {
+        val flagIsos = extractFlagIsoCodes(rawToken)
+        if (flagIsos.isNotEmpty()) return flagIsos.first()
+        val upper = rawToken.trim().uppercase()
+        if (upper.isEmpty()) return null
+        if (upper == "UK") return "GB"
+        for (def in COUNTRY_DEFS) {
+            if (def.iso == upper || def.keywords.any { it.equals(upper, ignoreCase = true) }) {
+                return def.iso
+            }
+        }
+        if (upper.length == 2 && upper.all { it in 'A'..'Z' }) {
+            return upper
+        }
+        return null
+    }
+
+    private fun parseCountryTokens(filter: String): List<String> {
+        if (filter.isBlank()) return emptyList()
+        return filter.split(Regex("[,;\\s|]+"))
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+    }
+
+    private fun matchesCountryTokens(name: String, tokens: List<String>): Boolean {
+        val flagIsos = extractFlagIsoCodes(name)
+        return tokens.any { rawToken ->
+            val targetIso = normalizeTokenIso(rawToken)
+            if (targetIso != null) {
+                if (targetIso in flagIsos) return@any true
+                val def = COUNTRY_DEFS.firstOrNull { it.iso == targetIso }
+                if (def != null) {
+                    def.keywords.any { kw ->
+                        if (kw.length <= 3 && kw.all { it in 'A'..'Z' }) {
+                            asciiBoundaryRegex(kw).containsMatchIn(name)
+                        } else {
+                            name.contains(kw, ignoreCase = true)
+                        }
+                    }
+                } else {
+                    asciiBoundaryRegex(targetIso).containsMatchIn(name)
+                }
+            } else {
+                name.contains(rawToken, ignoreCase = true)
+            }
+        }
     }
 
     /**

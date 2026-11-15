@@ -90,20 +90,20 @@ class BalancerMemberResolverTest {
     }
 
     @Test
-    fun balancerBeanDefaultsToleranceTo50AndFormatsMixedDisplay() {
+    fun balancerBeanDefaultsToleranceTo30AndFormatsMixedDisplay() {
         val bean = BalancerBean().apply {
             tolerance = -1
             initializeDefaultValues()
             balancerType = BalancerBean.TYPE_MIXED
             targetGroupIds = mutableListOf(10L)
             proxies = mutableListOf(1L, 2L, 3L)
-            strategy = BalancerBean.STRATEGY_LEAST_PING
+            selectionMode = BalancerBean.SELECTION_LATENCY
         }
 
-        assertEquals(50, bean.tolerance)
-        assertEquals(50L, bean.calculateToleranceMs())
+        assertEquals(30, bean.tolerance)
+        assertEquals(30L, bean.calculateToleranceMs())
         assertEquals("混合 1+3", bean.displayNodeOnly())
-        assertEquals("混合 1+3 · 最低延迟", bean.displayAddress())
+        assertEquals("混合 1+3 · 最快最稳", bean.displayAddress())
         assertEquals("混合 1+3 · Tokyo 01", bean.displayWithNodeName("Tokyo 01"))
     }
 
@@ -161,5 +161,144 @@ class BalancerMemberResolverTest {
             listOf(fastHealthy.id, slowHealthy.id, legacyCached.id, untested.id, failedWithStalePing.id),
             sorted.map { it.id },
         )
+    }
+
+    @Test
+    fun countryFilterMatchesIsoCodesFlagsAndKeywordsWithoutFalsePositives() {
+        val nodes = listOf(
+            socksEntity(1L, 10L, "🇩🇪 Frankfurt 01"),
+            socksEntity(2L, 10L, "Amsterdam-NL-02"),
+            socksEntity(3L, 10L, "🇯🇵 Tokyo Premium"),
+            socksEntity(4L, 10L, "Australia 01"), // contains "us" as substring, must not match US
+            socksEntity(5L, 10L, "London UK 01"),
+            socksEntity(6L, 10L, "🇵🇱 Warsaw 01"),
+            socksEntity(7L, 10L, "🇺🇸 Los Angeles 01"),
+        )
+        val result = BalancerMemberResolver.resolve(
+            spec = BalancerMemberResolver.FilterSpec(
+                balancerType = BalancerBean.TYPE_GROUP,
+                targetGroupIds = listOf(10L),
+                explicitProxyIds = emptyList(),
+                countryFilter = "DE, nl; 日本 GB PL",
+            ),
+            groupProfilesProvider = { nodes },
+            entitiesByIdsProvider = { emptyList() },
+            isGroupDisabled = { false },
+        )
+        assertEquals(listOf(1L, 2L, 3L, 5L, 6L), result.members.map { it.id })
+        assertEquals(5, result.matchedCandidateCount)
+
+        val usOnly = BalancerMemberResolver.resolve(
+            spec = BalancerMemberResolver.FilterSpec(
+                balancerType = BalancerBean.TYPE_GROUP,
+                targetGroupIds = listOf(10L),
+                explicitProxyIds = emptyList(),
+                countryFilter = "US",
+            ),
+            groupProfilesProvider = { nodes },
+            entitiesByIdsProvider = { emptyList() },
+            isGroupDisabled = { false },
+        )
+        assertEquals(listOf(7L), usOnly.members.map { it.id })
+    }
+
+    @Test
+    fun skipFailedWithinTrustRespectsTrustWindowAndComputesPreviewCounts() {
+        val nowMs = 1_700_000_000_000L
+        val trustMinutes = 60
+        val recentHealthy = socksEntity(1L, 10L, "SG 01").apply { status = 1; ping = 40 }
+        val expiredHealthy = socksEntity(2L, 10L, "SG 02").apply { status = 1; ping = 55 }
+        val recentFailed = socksEntity(3L, 10L, "SG 03").apply { status = 3; ping = 0 }
+        val expiredFailed = socksEntity(4L, 10L, "SG 04").apply { status = 2; ping = 0 }
+        val untested = socksEntity(5L, 10L, "SG 05").apply { status = 0; ping = 0 }
+
+        val timestamps = mapOf(
+            1L to nowMs - 10 * 60_000L, // recent (10m)
+            2L to nowMs - 120 * 60_000L, // expired (120m > 60m)
+            3L to nowMs - 15 * 60_000L, // recent failure
+            4L to nowMs - 180 * 60_000L, // expired failure
+        )
+        val allNodes = listOf(recentHealthy, expiredHealthy, recentFailed, expiredFailed, untested)
+
+        val skippedResult = BalancerMemberResolver.resolve(
+            spec = BalancerMemberResolver.FilterSpec(
+                balancerType = BalancerBean.TYPE_GROUP,
+                targetGroupIds = listOf(10L),
+                explicitProxyIds = emptyList(),
+                resultTrustMinutes = trustMinutes,
+                skipFailedWithinTrust = true,
+            ),
+            groupProfilesProvider = { allNodes },
+            entitiesByIdsProvider = { emptyList() },
+            isGroupDisabled = { false },
+            nowMsProvider = { nowMs },
+            testTimestampProvider = { id -> timestamps[id] ?: 0L },
+        )
+
+        assertEquals(5, skippedResult.matchedCandidateCount)
+        assertEquals(3, skippedResult.availableCount)
+        assertEquals(1, skippedResult.skippedFailedCount)
+        assertEquals(1, skippedResult.reusableRecentCount)
+        assertEquals(listOf(1L, 2L, 5L, 4L), skippedResult.members.map { it.id })
+
+        val keptResult = BalancerMemberResolver.resolve(
+            spec = BalancerMemberResolver.FilterSpec(
+                balancerType = BalancerBean.TYPE_GROUP,
+                targetGroupIds = listOf(10L),
+                explicitProxyIds = emptyList(),
+                resultTrustMinutes = trustMinutes,
+                skipFailedWithinTrust = false,
+            ),
+            groupProfilesProvider = { allNodes },
+            entitiesByIdsProvider = { emptyList() },
+            isGroupDisabled = { false },
+            nowMsProvider = { nowMs },
+            testTimestampProvider = { id -> timestamps[id] ?: 0L },
+        )
+        assertEquals(0, keptResult.skippedFailedCount)
+        assertEquals(5, keptResult.totalCount)
+    }
+
+    @Test
+    fun rankAndRunTopNAreAppliedInLatencyWhilePriorityPreservesManualOrder() {
+        val slowFirst = socksEntity(1L, 10L, "Node 1").apply { status = 1; ping = 220 }
+        val fastSecond = socksEntity(2L, 10L, "Node 2").apply { status = 1; ping = 25 }
+        val midThird = socksEntity(3L, 10L, "Node 3").apply { status = 1; ping = 80 }
+        val failedFourth = socksEntity(4L, 10L, "Node 4").apply { status = 3; ping = 0 }
+        val explicitFifth = socksEntity(5L, 10L, "Node 5").apply { status = 1; ping = 15 }
+        val byId = listOf(slowFirst, fastSecond, midThird, failedFourth, explicitFifth).associateBy { it.id }
+
+        val latencyResult = BalancerMemberResolver.resolve(
+            spec = BalancerMemberResolver.FilterSpec(
+                balancerType = BalancerBean.TYPE_MIXED,
+                targetGroupIds = listOf(10L),
+                explicitProxyIds = listOf(5L),
+                selectionMode = BalancerBean.SELECTION_LATENCY,
+                rankTopN = 4,
+                runTopN = 3,
+            ),
+            groupProfilesProvider = { listOf(slowFirst, fastSecond, midThird, failedFourth) },
+            entitiesByIdsProvider = { ids -> ids.mapNotNull { byId[it] } },
+            isGroupDisabled = { false },
+        )
+        // Cold-start sorts by healthy latency: 5(15ms), 2(25ms), 3(80ms), 1(220ms), 4(failed); capped to 3
+        assertEquals(5, latencyResult.matchedCandidateCount)
+        assertEquals(listOf(5L, 2L, 3L), latencyResult.members.map { it.id })
+
+        val priorityResult = BalancerMemberResolver.resolve(
+            spec = BalancerMemberResolver.FilterSpec(
+                balancerType = BalancerBean.TYPE_MIXED,
+                targetGroupIds = listOf(10L),
+                explicitProxyIds = listOf(5L),
+                selectionMode = BalancerBean.SELECTION_PRIORITY,
+                rankTopN = 4,
+                runTopN = 3,
+            ),
+            groupProfilesProvider = { listOf(slowFirst, fastSecond, midThird, failedFourth) },
+            entitiesByIdsProvider = { ids -> ids.mapNotNull { byId[it] } },
+            isGroupDisabled = { false },
+        )
+        // Priority preserves exact order [1, 2, 3, 4, 5], capped to first 3
+        assertEquals(listOf(1L, 2L, 3L), priorityResult.members.map { it.id })
     }
 }

@@ -184,6 +184,8 @@ class SagerNet : Application(),
 
         lateinit var application: SagerNet
 
+        fun isInitialized(): Boolean = ::application.isInitialized
+
         val isTv by lazy {
             uiMode.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION
         }
