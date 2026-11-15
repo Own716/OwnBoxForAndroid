@@ -29,14 +29,19 @@ public class BalancerBean extends InternalBean {
     public static final String STRATEGY_CONSISTENT_HASH = "consistent_hash";
     public static final String STRATEGY_CONSISTENT_HASH_CAMEL = "consistentHash";
 
+    public static final String SELECTION_LATENCY = "latency";
+    public static final String SELECTION_PRIORITY = "priority";
+    public static final String BALANCE_TIMED_ROTATION = "timed_rotation";
+    public static final String BALANCE_PER_CONNECTION = "per_connection";
+
     public int balancerType = TYPE_LIST; // 0 = list, 1 = group
     public long targetGroupId = 0L;
     public List<Long> targetGroupIds = new ArrayList<>();
     public List<Long> proxies = new ArrayList<>();
-    public String strategy = STRATEGY_LEAST_PING;
+    public String strategy = SELECTION_LATENCY;
     public String testUrl = "";
     public int interval = 300;
-    public int tolerance = 50;
+    public int tolerance = 30;
     public String toleranceUnit = "ms";
     // v4 fields
     public boolean useFrontProxy = false;
@@ -46,6 +51,34 @@ public class BalancerBean extends InternalBean {
     // v5 fields
     public long frontProxy = -1L;
     public long landingProxy = -1L;
+    // v6 unified auto-select fields
+    public String selectionMode = SELECTION_LATENCY;
+    public boolean balanceEnabled = false;
+    public String balanceMode = BALANCE_TIMED_ROTATION;
+    public int balanceIntervalSec = 30;
+    public String countryFilter = "";
+    public int runTopN = 300;
+    public int rankTopN = 1000;
+    public int resultTrustMinutes = 1440;
+    public boolean skipFailedWithinTrust = false;
+    public int standbySize = 3;
+    public int intensiveCheckCount = 8;
+    public int fullScanIntervalSec = 600;
+    public int watchIntervalSec = 15;
+    public int sampleCount = 10;
+    public int maxRttMs = 0;
+    public int dialRetries = 2;
+    public boolean interruptOnSwitch = false;
+    public int failbackChecks = 3;
+    public int failbackDelaySec = 60;
+    public boolean interruptOnFailback = false;
+    public boolean learnFromConnections = true;
+    public int siteStickyMinutes = 60;
+    public String connectivityUrl = "";
+
+    public boolean isPriorityMode() {
+        return SELECTION_PRIORITY.equals(selectionMode);
+    }
 
     public long calculateToleranceMs() {
         long value = tolerance;
@@ -69,34 +102,22 @@ public class BalancerBean extends InternalBean {
 
     @Override
     public String displayAddress() {
-        String stratName;
-        if (STRATEGY_LEAST_PING.equals(strategy)) {
-            stratName = "最低延迟";
-        } else if (STRATEGY_LEAST_LOAD.equals(strategy)) {
-            stratName = "最低负载";
-        } else if (STRATEGY_RANDOM.equals(strategy)) {
-            stratName = "随机选择";
-        } else if (STRATEGY_ROUND_ROBIN.equals(strategy) || STRATEGY_ROUND_ROBIN_LEGACY.equals(strategy)) {
-            stratName = "轮询";
-        } else if (STRATEGY_FAILOVER.equals(strategy)) {
-            stratName = "故障转移";
-        } else if (STRATEGY_STABLE.equals(strategy)) {
-            stratName = "最稳定";
-        } else if (STRATEGY_CONSISTENT_HASH.equals(strategy) || STRATEGY_CONSISTENT_HASH_CAMEL.equals(strategy)) {
-            stratName = "一致性哈希";
-        } else {
-            stratName = strategy != null ? strategy : STRATEGY_LEAST_PING;
+        StringBuilder stratBuilder = new StringBuilder();
+        stratBuilder.append(isPriorityMode() ? "按优先级" : "最快最稳");
+        if (balanceEnabled) {
+            stratBuilder.append(" · 流量分配");
         }
+        String stratName = stratBuilder.toString();
         if (balancerType == TYPE_GROUP) {
             int gCount = targetGroupIds != null && !targetGroupIds.isEmpty() ? targetGroupIds.size() : (targetGroupId > 0 ? 1 : 0);
-            return "分组 " + gCount + (stratName != null && !stratName.isEmpty() ? " · " + stratName : "");
+            return "分组 " + gCount + " · " + stratName;
         } else if (balancerType == TYPE_MIXED) {
             int gCount = targetGroupIds != null && !targetGroupIds.isEmpty() ? targetGroupIds.size() : (targetGroupId > 0 ? 1 : 0);
             int pCount = proxies != null ? proxies.size() : 0;
-            return "混合 " + gCount + "+" + pCount + (stratName != null && !stratName.isEmpty() ? " · " + stratName : "");
+            return "混合 " + gCount + "+" + pCount + " · " + stratName;
         } else {
             int count = proxies != null ? proxies.size() : 0;
-            return "节点 " + count + (stratName != null && !stratName.isEmpty() ? " · " + stratName : "");
+            return "节点 " + count + " · " + stratName;
         }
     }
 
@@ -133,16 +154,97 @@ public class BalancerBean extends InternalBean {
         return prefix;
     }
 
+    private void resetV6Defaults() {
+        selectionMode = SELECTION_LATENCY;
+        balanceEnabled = false;
+        balanceMode = BALANCE_TIMED_ROTATION;
+        balanceIntervalSec = 30;
+        countryFilter = "";
+        runTopN = 300;
+        rankTopN = 1000;
+        resultTrustMinutes = 1440;
+        skipFailedWithinTrust = false;
+        standbySize = 3;
+        intensiveCheckCount = 8;
+        fullScanIntervalSec = 600;
+        watchIntervalSec = 15;
+        sampleCount = 10;
+        maxRttMs = 0;
+        dialRetries = 2;
+        interruptOnSwitch = false;
+        failbackChecks = 3;
+        failbackDelaySec = 60;
+        interruptOnFailback = false;
+        learnFromConnections = true;
+        siteStickyMinutes = 60;
+        connectivityUrl = "";
+    }
+
+    private void migrateLegacyStrategy(String rawStrategy) {
+        resetV6Defaults();
+        String norm = rawStrategy != null ? rawStrategy.trim() : "";
+        if (STRATEGY_FAILOVER.equals(norm) || SELECTION_PRIORITY.equals(norm)) {
+            selectionMode = SELECTION_PRIORITY;
+            balanceEnabled = false;
+            balanceMode = BALANCE_TIMED_ROTATION;
+        } else if (STRATEGY_ROUND_ROBIN.equals(norm)
+                || STRATEGY_ROUND_ROBIN_LEGACY.equals(norm)
+                || STRATEGY_RANDOM.equals(norm)
+                || STRATEGY_LEAST_LOAD.equals(norm)) {
+            selectionMode = SELECTION_LATENCY;
+            balanceEnabled = true;
+            balanceMode = BALANCE_PER_CONNECTION;
+        } else if (STRATEGY_CONSISTENT_HASH.equals(norm)
+                || STRATEGY_CONSISTENT_HASH_CAMEL.equals(norm)) {
+            selectionMode = SELECTION_LATENCY;
+            balanceEnabled = true;
+            balanceMode = BALANCE_TIMED_ROTATION;
+            learnFromConnections = true;
+            siteStickyMinutes = 60;
+        } else {
+            selectionMode = SELECTION_LATENCY;
+            balanceEnabled = false;
+            balanceMode = BALANCE_TIMED_ROTATION;
+        }
+        strategy = selectionMode;
+    }
+
     @Override
     public void initializeDefaultValues() {
         super.initializeDefaultValues();
         if (name == null) name = "";
         if (proxies == null) proxies = new ArrayList<>();
         if (targetGroupIds == null) targetGroupIds = new ArrayList<>();
-        if (strategy == null || strategy.isEmpty()) strategy = STRATEGY_LEAST_PING;
+        if (selectionMode == null || selectionMode.isEmpty()) {
+            selectionMode = SELECTION_PRIORITY.equals(strategy) || STRATEGY_FAILOVER.equals(strategy)
+                    ? SELECTION_PRIORITY
+                    : SELECTION_LATENCY;
+        } else if (!SELECTION_LATENCY.equals(selectionMode) && !SELECTION_PRIORITY.equals(selectionMode)) {
+            selectionMode = SELECTION_LATENCY;
+        }
+        strategy = selectionMode;
+        if (balanceMode == null || (!BALANCE_TIMED_ROTATION.equals(balanceMode) && !BALANCE_PER_CONNECTION.equals(balanceMode))) {
+            balanceMode = BALANCE_TIMED_ROTATION;
+        }
+        if (balanceIntervalSec <= 0) balanceIntervalSec = 30;
+        if (countryFilter == null) countryFilter = "";
+        if (runTopN <= 0) runTopN = 300;
+        if (rankTopN <= 0) rankTopN = 1000;
+        if (resultTrustMinutes < 0) resultTrustMinutes = 1440;
+        if (standbySize < 0) standbySize = 3;
+        if (intensiveCheckCount <= 0) intensiveCheckCount = 8;
+        if (fullScanIntervalSec <= 0) fullScanIntervalSec = 600;
+        if (watchIntervalSec < 0) watchIntervalSec = 15;
+        if (sampleCount <= 0) sampleCount = 10;
+        if (maxRttMs < 0) maxRttMs = 0;
+        if (dialRetries < 0) dialRetries = 2;
+        if (failbackChecks <= 0) failbackChecks = 3;
+        if (failbackDelaySec < 0) failbackDelaySec = 60;
+        if (siteStickyMinutes < 0) siteStickyMinutes = 60;
+        if (connectivityUrl == null) connectivityUrl = "";
         if (testUrl == null) testUrl = "";
         if (interval <= 0) interval = 300;
-        if (tolerance < 0) tolerance = 50;
+        if (tolerance < 0) tolerance = 30;
         if (toleranceUnit == null || toleranceUnit.isEmpty()) toleranceUnit = "ms";
         if (nameExclude == null) nameExclude = "";
         if (nameInclude == null) nameInclude = "";
@@ -152,7 +254,10 @@ public class BalancerBean extends InternalBean {
 
     @Override
     public void serialize(ByteBufferOutput output) {
-        output.writeInt(5); // version
+        String effectiveSelection = SELECTION_PRIORITY.equals(selectionMode) ? SELECTION_PRIORITY : SELECTION_LATENCY;
+        strategy = effectiveSelection;
+
+        output.writeInt(6); // version
         output.writeInt(balancerType);
         output.writeLong(targetGroupId);
         output.writeString(strategy);
@@ -181,6 +286,30 @@ public class BalancerBean extends InternalBean {
         // v5 fields
         output.writeLong(frontProxy);
         output.writeLong(landingProxy);
+        // v6 fields
+        output.writeString(effectiveSelection);
+        output.writeBoolean(balanceEnabled);
+        output.writeString(balanceMode != null ? balanceMode : BALANCE_TIMED_ROTATION);
+        output.writeInt(balanceIntervalSec);
+        output.writeString(countryFilter != null ? countryFilter : "");
+        output.writeInt(runTopN);
+        output.writeInt(rankTopN);
+        output.writeInt(resultTrustMinutes);
+        output.writeBoolean(skipFailedWithinTrust);
+        output.writeInt(standbySize);
+        output.writeInt(intensiveCheckCount);
+        output.writeInt(fullScanIntervalSec);
+        output.writeInt(watchIntervalSec);
+        output.writeInt(sampleCount);
+        output.writeInt(maxRttMs);
+        output.writeInt(dialRetries);
+        output.writeBoolean(interruptOnSwitch);
+        output.writeInt(failbackChecks);
+        output.writeInt(failbackDelaySec);
+        output.writeBoolean(interruptOnFailback);
+        output.writeBoolean(learnFromConnections);
+        output.writeInt(siteStickyMinutes);
+        output.writeString(connectivityUrl != null ? connectivityUrl : "");
     }
 
     @Override
@@ -235,6 +364,38 @@ public class BalancerBean extends InternalBean {
             } else {
                 frontProxy = -1L;
                 landingProxy = -1L;
+            }
+
+            if (version >= 6) {
+                selectionMode = input.readString();
+                balanceEnabled = input.readBoolean();
+                balanceMode = input.readString();
+                balanceIntervalSec = input.readInt();
+                countryFilter = input.readString();
+                runTopN = input.readInt();
+                rankTopN = input.readInt();
+                resultTrustMinutes = input.readInt();
+                skipFailedWithinTrust = input.readBoolean();
+                standbySize = input.readInt();
+                intensiveCheckCount = input.readInt();
+                fullScanIntervalSec = input.readInt();
+                watchIntervalSec = input.readInt();
+                sampleCount = input.readInt();
+                maxRttMs = input.readInt();
+                dialRetries = input.readInt();
+                interruptOnSwitch = input.readBoolean();
+                failbackChecks = input.readInt();
+                failbackDelaySec = input.readInt();
+                interruptOnFailback = input.readBoolean();
+                learnFromConnections = input.readBoolean();
+                siteStickyMinutes = input.readInt();
+                connectivityUrl = input.readString();
+                if (!SELECTION_PRIORITY.equals(selectionMode)) {
+                    selectionMode = SELECTION_LATENCY;
+                }
+                strategy = selectionMode;
+            } else {
+                migrateLegacyStrategy(strategy);
             }
         }
     }

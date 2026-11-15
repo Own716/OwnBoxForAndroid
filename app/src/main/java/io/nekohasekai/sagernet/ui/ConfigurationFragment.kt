@@ -3197,6 +3197,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
             try {
                 SagerDatabase.proxyDao.updatePingResult(profile.id, profile.status, profile.ping, profile.error)
+                DataStore.recordProfileTestTimestamp(profile.id)
                 ProfileManager.postUpdate(profile, false)
             } catch (e: Exception) {
                 Logs.w(e)
@@ -3263,6 +3264,7 @@ class ConfigurationFragment @JvmOverloads constructor(
 
                         try {
                             SagerDatabase.proxyDao.updatePingResult(profile.id, profile.status, profile.ping, profile.error)
+                            DataStore.recordProfileTestTimestamp(profile.id)
                             ProfileManager.postUpdate(profile, false)
                         } catch (e: Exception) {
                             Logs.w(e)
@@ -3347,6 +3349,7 @@ class ConfigurationFragment @JvmOverloads constructor(
 
                         try {
                             SagerDatabase.proxyDao.updatePingResult(profile.id, profile.status, profile.ping, profile.error)
+                            DataStore.recordProfileTestTimestamp(profile.id)
                             ProfileManager.postUpdate(profile, false)
                         } catch (e: Exception) {
                             Logs.w(e)
