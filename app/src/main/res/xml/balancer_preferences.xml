@@ -2,109 +2,304 @@
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <PreferenceCategory app:title="@string/balancer_settings">
+    <EditTextPreference
+        app:icon="@drawable/ic_social_emoji_symbols"
+        app:key="profileName"
+        app:title="@string/profile_name"
+        app:useSimpleSummaryProvider="true" />
+
+    <moe.matsuri.nb4a.ui.SimpleMenuPreference
+        app:defaultValue="2"
+        app:entries="@array/balancer_type_entries"
+        app:entryValues="@array/balancer_type_values"
+        app:icon="@drawable/ic_baseline_tune_24"
+        app:key="balancerType"
+        app:title="@string/balancer_source_type"
+        app:useSimpleSummaryProvider="true" />
+
+    <Preference
+        app:icon="@drawable/ic_baseline_layers_24"
+        app:key="balancerTargetGroup"
+        app:summary="@string/balancer_no_group_selected"
+        app:title="@string/balancer_server_source" />
+
+    <Preference
+        app:icon="@drawable/ic_baseline_view_list_24"
+        app:key="balancerExplicitNodes"
+        app:summary="@string/balancer_explicit_nodes_empty"
+        app:title="@string/balancer_explicit_nodes" />
+
+    <EditTextPreference
+        app:icon="@drawable/ic_baseline_filter_list_24"
+        app:key="balancerNameInclude"
+        app:title="@string/balancer_name_include" />
+
+    <moe.matsuri.nb4a.ui.SimpleMenuPreference
+        app:defaultValue="latency"
+        app:entries="@array/balancer_selection_mode_entries"
+        app:entryValues="@array/balancer_selection_mode_values"
+        app:icon="@drawable/ic_baseline_low_priority_24"
+        app:key="balancerSelectionMode"
+        app:title="@string/balancer_selection_mode" />
+
+    <SwitchPreferenceCompat
+        app:defaultValue="false"
+        app:icon="@drawable/ic_baseline_shuffle_24"
+        app:key="balancerBalanceEnabled"
+        app:summary="@string/balancer_balance_enabled_off_sum"
+        app:title="@string/balancer_balance_enabled" />
+
+    <Preference
+        app:icon="@drawable/ic_baseline_info_24"
+        app:key="balancerMatchSummary"
+        app:selectable="false"
+        app:summary="@string/balancer_match_summary_empty"
+        app:title="@string/balancer_preview_title" />
+
+    <Preference
+        app:icon="@drawable/ic_baseline_keyboard_arrow_down_24"
+        app:key="balancerAdvancedToggle"
+        app:summary="@string/balancer_advanced_show"
+        app:title="@string/balancer_advanced_title" />
+
+    <PreferenceCategory
+        app:iconSpaceReserved="false"
+        app:isPreferenceVisible="false"
+        app:key="balancerCatUseWhich"
+        app:title="@string/balancer_cat_use_which">
 
         <EditTextPreference
-            app:icon="@drawable/ic_social_emoji_symbols"
-            app:key="profileName"
-            app:title="@string/profile_name"
-            app:useSimpleSummaryProvider="true" />
-
-        <moe.matsuri.nb4a.ui.SimpleMenuPreference
-            app:defaultValue="0"
-            app:entries="@array/balancer_type_entries"
-            app:entryValues="@array/balancer_type_values"
-            app:icon="@drawable/ic_device_developer_mode"
-            app:key="balancerType"
-            app:title="@string/balancer_type"
-            app:useSimpleSummaryProvider="true" />
-
-        <moe.matsuri.nb4a.ui.SimpleMenuPreference
-            app:defaultValue="random"
-            app:entries="@array/balancer_strategy_entries"
-            app:entryValues="@array/balancer_strategy_values"
-            app:icon="@drawable/ic_baseline_compare_arrows_24"
-            app:key="balancerStrategy"
-            app:title="@string/balancer_strategy"
-            app:useSimpleSummaryProvider="true" />
-
-        <Preference
-            app:icon="@drawable/ic_baseline_view_list_24"
-            app:key="balancerTargetGroup"
-            app:title="@string/balancer_select_group" />
-
-        <io.nekohasekai.sagernet.widget.OutboundPreference
-            app:icon="@drawable/ic_hardware_router"
-            app:key="balancerFrontProxy"
-            app:title="@string/front_proxy"
-            app:useSimpleSummaryProvider="true" />
-
-        <io.nekohasekai.sagernet.widget.OutboundPreference
-            app:icon="@drawable/baseline_public_24"
-            app:key="balancerLandingProxy"
-            app:title="@string/landing_proxy"
-            app:useSimpleSummaryProvider="true" />
-
-        <SwitchPreferenceCompat
-            app:defaultValue="false"
-            app:icon="@drawable/ic_hardware_router"
-            app:key="balancerUseFrontProxy"
-            app:title="@string/balancer_use_front_proxy" />
-
-        <SwitchPreferenceCompat
-            app:defaultValue="false"
-            app:icon="@drawable/baseline_public_24"
-            app:key="balancerUseLandingProxy"
-            app:title="@string/balancer_use_landing_proxy" />
+            app:iconSpaceReserved="false"
+            app:key="balancerCountryFilter"
+            app:title="@string/balancer_country_filter" />
 
         <EditTextPreference
-            app:icon="@drawable/ic_baseline_delete_24"
+            app:iconSpaceReserved="false"
             app:key="balancerNameExclude"
-            app:title="@string/balancer_name_exclude"
-            app:useSimpleSummaryProvider="false" />
-
-        <EditTextPreference
-            app:icon="@drawable/ic_baseline_manage_search_24"
-            app:key="balancerNameInclude"
-            app:title="@string/balancer_name_include"
-            app:useSimpleSummaryProvider="false" />
-
-        <Preference
-            app:icon="@drawable/ic_baseline_info_24"
-            app:key="balancerMatchSummary"
-            app:selectable="false"
-            app:title="@string/balancer_match_summary_title" />
-
-        <EditTextPreference
-            app:icon="@drawable/ic_baseline_cast_connected_24"
-            app:key="balancerTestUrl"
-            app:title="@string/balancer_custom_url"
-            app:useSimpleSummaryProvider="false" />
+            app:title="@string/balancer_name_exclude" />
 
         <EditTextPreference
             app:defaultValue="300"
-            app:icon="@drawable/ic_baseline_local_bar_24"
-            app:key="balancerInterval"
-            app:title="@string/balancer_interval"
-            app:useSimpleSummaryProvider="false" />
+            app:iconSpaceReserved="false"
+            app:key="balancerRunTopN"
+            app:title="@string/balancer_run_top_n" />
 
         <EditTextPreference
-            app:defaultValue="50"
-            app:icon="@drawable/ic_baseline_speed_24"
+            app:defaultValue="1000"
+            app:iconSpaceReserved="false"
+            app:key="balancerRankTopN"
+            app:title="@string/balancer_rank_top_n" />
+
+        <EditTextPreference
+            app:defaultValue="1440"
+            app:iconSpaceReserved="false"
+            app:key="balancerResultTrustMinutes"
+            app:title="@string/balancer_result_trust_minutes" />
+
+        <SwitchPreferenceCompat
+            app:defaultValue="false"
+            app:iconSpaceReserved="false"
+            app:key="balancerSkipFailedWithinTrust"
+            app:summary="@string/balancer_skip_failed_within_trust_sum"
+            app:title="@string/balancer_skip_failed_within_trust" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:iconSpaceReserved="false"
+        app:isPreferenceVisible="false"
+        app:key="balancerCatHealth"
+        app:title="@string/balancer_cat_health">
+
+        <EditTextPreference
+            app:defaultValue="3"
+            app:iconSpaceReserved="false"
+            app:key="balancerStandbySize"
+            app:title="@string/balancer_standby_size" />
+
+        <EditTextPreference
+            app:defaultValue="8"
+            app:iconSpaceReserved="false"
+            app:key="balancerIntensiveCheckCount"
+            app:title="@string/balancer_intensive_check_count" />
+
+        <EditTextPreference
+            app:defaultValue="300"
+            app:iconSpaceReserved="false"
+            app:key="balancerInterval"
+            app:title="@string/balancer_interval_title" />
+
+        <EditTextPreference
+            app:defaultValue="600"
+            app:iconSpaceReserved="false"
+            app:key="balancerFullScanIntervalSec"
+            app:title="@string/balancer_full_scan_interval" />
+
+        <EditTextPreference
+            app:defaultValue="15"
+            app:iconSpaceReserved="false"
+            app:key="balancerWatchIntervalSec"
+            app:title="@string/balancer_watch_interval" />
+
+        <EditTextPreference
+            app:defaultValue="10"
+            app:iconSpaceReserved="false"
+            app:key="balancerSampleCount"
+            app:title="@string/balancer_sample_count" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:iconSpaceReserved="false"
+        app:isPreferenceVisible="false"
+        app:key="balancerCatSwitching"
+        app:title="@string/balancer_cat_switching">
+
+        <EditTextPreference
+            app:defaultValue="30"
+            app:iconSpaceReserved="false"
             app:key="balancerTolerance"
-            app:title="@string/balancer_tolerance"
-            app:useSimpleSummaryProvider="false" />
+            app:title="@string/balancer_tolerance_title" />
 
         <moe.matsuri.nb4a.ui.SimpleMenuPreference
             app:defaultValue="ms"
             app:entries="@array/tolerance_unit_entries"
             app:entryValues="@array/tolerance_unit_values"
-            app:icon="@drawable/ic_baseline_shutter_speed_24"
+            app:iconSpaceReserved="false"
             app:key="balancerToleranceUnit"
             app:title="@string/balancer_tolerance_unit"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:defaultValue="0"
+            app:iconSpaceReserved="false"
+            app:key="balancerMaxRttMs"
+            app:title="@string/balancer_max_rtt" />
+
+        <EditTextPreference
+            app:defaultValue="2"
+            app:iconSpaceReserved="false"
+            app:key="balancerDialRetries"
+            app:title="@string/balancer_dial_retries" />
+
+        <SwitchPreferenceCompat
+            app:defaultValue="false"
+            app:iconSpaceReserved="false"
+            app:key="balancerInterruptOnSwitch"
+            app:summary="@string/balancer_interrupt_on_switch_sum"
+            app:title="@string/balancer_interrupt_on_switch" />
+
+        <EditTextPreference
+            app:defaultValue="3"
+            app:iconSpaceReserved="false"
+            app:key="balancerFailbackChecks"
+            app:title="@string/balancer_failback_checks" />
+
+        <EditTextPreference
+            app:defaultValue="60"
+            app:iconSpaceReserved="false"
+            app:key="balancerFailbackDelaySec"
+            app:title="@string/balancer_failback_delay" />
+
+        <SwitchPreferenceCompat
+            app:defaultValue="false"
+            app:iconSpaceReserved="false"
+            app:key="balancerInterruptOnFailback"
+            app:summary="@string/balancer_interrupt_on_failback_sum"
+            app:title="@string/balancer_interrupt_on_failback" />
+
+        <SwitchPreferenceCompat
+            app:defaultValue="true"
+            app:iconSpaceReserved="false"
+            app:key="balancerLearnFromConnections"
+            app:summary="@string/balancer_learn_from_connections_sum"
+            app:title="@string/balancer_learn_from_connections" />
+
+        <EditTextPreference
+            app:defaultValue="60"
+            app:iconSpaceReserved="false"
+            app:key="balancerSiteStickyMinutes"
+            app:title="@string/balancer_site_sticky_minutes" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:iconSpaceReserved="false"
+        app:isPreferenceVisible="false"
+        app:key="balancerCatLoadBalance"
+        app:title="@string/balancer_cat_load_balance">
+
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:defaultValue="timed_rotation"
+            app:entries="@array/balancer_balance_mode_entries"
+            app:entryValues="@array/balancer_balance_mode_values"
+            app:iconSpaceReserved="false"
+            app:key="balancerBalanceMode"
+            app:title="@string/balancer_balance_mode_title"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:defaultValue="30"
+            app:iconSpaceReserved="false"
+            app:key="balancerBalanceIntervalSec"
+            app:title="@string/balancer_balance_interval" />
+
+        <Preference
+            app:iconSpaceReserved="false"
+            app:key="balancerBalanceHint"
+            app:selectable="false"
+            app:summary="@string/balancer_balance_hint_off" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:iconSpaceReserved="false"
+        app:isPreferenceVisible="false"
+        app:key="balancerCatEndpoints"
+        app:title="@string/balancer_cat_endpoints">
+
+        <EditTextPreference
+            app:iconSpaceReserved="false"
+            app:key="balancerTestUrl"
+            app:title="@string/balancer_test_url_title" />
+
+        <EditTextPreference
+            app:iconSpaceReserved="false"
+            app:key="balancerConnectivityUrl"
+            app:title="@string/balancer_connectivity_url" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:iconSpaceReserved="false"
+        app:isPreferenceVisible="false"
+        app:key="balancerCatChain"
+        app:title="@string/balancer_cat_chain">
+
+        <SwitchPreferenceCompat
+            app:defaultValue="false"
+            app:icon="@drawable/ic_baseline_link_24"
+            app:key="balancerUseFrontProxy"
+            app:title="@string/balancer_use_front_proxy" />
+
+        <io.nekohasekai.sagernet.widget.OutboundPreference
+            app:icon="@drawable/ic_baseline_low_priority_24"
+            app:key="balancerFrontProxy"
+            app:title="@string/front_proxy"
+            app:useSimpleSummaryProvider="true" />
+
+        <SwitchPreferenceCompat
+            app:defaultValue="false"
+            app:icon="@drawable/ic_baseline_link_24"
+            app:key="balancerUseLandingProxy"
+            app:title="@string/balancer_use_landing_proxy" />
+
+        <io.nekohasekai.sagernet.widget.OutboundPreference
+            app:icon="@drawable/baseline_flight_takeoff_24"
+            app:key="balancerLandingProxy"
+            app:title="@string/landing_proxy"
             app:useSimpleSummaryProvider="true" />
 
     </PreferenceCategory>
 
 </PreferenceScreen>
-

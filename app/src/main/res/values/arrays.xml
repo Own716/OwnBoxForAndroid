@@ -525,21 +525,6 @@
         <item>@string/custom_rules_provider</item>
     </string-array>
 
-    <string-array name="balancer_type">
-        <item>@string/list</item>
-        <item>@string/menu_group</item>
-    </string-array>
-
-    <string-array name="balancer_strategy_entry">
-        <item>@string/random</item>
-        <item>@string/leastPing</item>
-    </string-array>
-    <string-array name="balancer_strategy_value">
-        <item />
-        <item>leastPing</item>
-    </string-array>
-
-
     <string-array name="group_types">
         <item>@string/group_basic</item>
         <item>@string/subscription</item>
@@ -774,19 +759,22 @@
         <item>2</item>
     </string-array>
 
-    <string-array name="balancer_strategy_entries">
-        <item>@string/balancer_strategy_least_ping</item>
-        <item>@string/balancer_strategy_least_load</item>
-        <item>@string/balancer_strategy_random</item>
-        <item>@string/balancer_strategy_round_robin</item>
-        <item>@string/balancer_strategy_consistent_hash</item>
+    <string-array name="balancer_selection_mode_entries">
+        <item>@string/balancer_selection_latency</item>
+        <item>@string/balancer_selection_priority</item>
     </string-array>
-    <string-array name="balancer_strategy_values" translatable="false">
-        <item>leastPing</item>
-        <item>leastLoad</item>
-        <item>random</item>
-        <item>roundRobin</item>
-        <item>consistentHash</item>
+    <string-array name="balancer_selection_mode_values" translatable="false">
+        <item>latency</item>
+        <item>priority</item>
+    </string-array>
+
+    <string-array name="balancer_balance_mode_entries">
+        <item>@string/balancer_balance_mode_timed</item>
+        <item>@string/balancer_balance_mode_per_conn</item>
+    </string-array>
+    <string-array name="balancer_balance_mode_values" translatable="false">
+        <item>timed_rotation</item>
+        <item>per_connection</item>
     </string-array>
 
     <string-array name="tolerance_unit_entries">

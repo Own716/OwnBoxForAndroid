@@ -37,12 +37,8 @@ class BalancerSettingsSafetyContractTest {
     fun balancerSettingsGuardsLateinitAndAvoidsForcedUnwraps() {
         val text = sourceFile("src/main/java/io/nekohasekai/sagernet/ui/profile/BalancerSettingsActivity.kt").readText()
         assertFalse(
-            "frontProxyPreference must not be force-unwrapped with !!",
-            text.contains("findPreference(\"balancerFrontProxy\")!!")
-        )
-        assertFalse(
-            "landingProxyPreference must not be force-unwrapped with !!",
-            text.contains("findPreference(\"balancerLandingProxy\")!!")
+            "BalancerSettingsActivity must not use any force-unwrap !! operators",
+            text.contains("!!"),
         )
         assertTrue(
             "updateTypeVisibility must guard configurationList with isInitialized",
@@ -56,6 +52,64 @@ class BalancerSettingsSafetyContractTest {
             "viewCreated must guard configurationAdapter with isInitialized",
             text.contains("::configurationAdapter.isInitialized")
         )
+    }
+
+    @Test
+    fun balancerPreferencesExposeOnlyUnifiedAutoSelectControlsAndCollapsibleAdvanced() {
+        val prefXml = sourceFile("src/main/res/xml/balancer_preferences.xml").readText()
+        val arraysXml = sourceFile("src/main/res/values/arrays.xml").readText()
+        val activityText = sourceFile("src/main/java/io/nekohasekai/sagernet/ui/profile/BalancerSettingsActivity.kt").readText()
+
+        assertFalse(
+            "legacy balancerStrategy preference key must not remain in balancer_preferences.xml",
+            prefXml.contains("balancerStrategy"),
+        )
+        listOf(
+            "balancerSelectionMode",
+            "balancerBalanceEnabled",
+            "balancerMatchSummary",
+            "balancerAdvancedToggle",
+            "balancerCountryFilter",
+            "balancerRunTopN",
+            "balancerRankTopN",
+            "balancerResultTrustMinutes",
+            "balancerSkipFailedWithinTrust",
+            "balancerStandbySize",
+            "balancerIntensiveCheckCount",
+            "balancerInterval",
+            "balancerFullScanIntervalSec",
+            "balancerWatchIntervalSec",
+            "balancerSampleCount",
+            "balancerTolerance",
+            "balancerMaxRttMs",
+            "balancerDialRetries",
+            "balancerInterruptOnSwitch",
+            "balancerFailbackChecks",
+            "balancerFailbackDelaySec",
+            "balancerInterruptOnFailback",
+            "balancerLearnFromConnections",
+            "balancerSiteStickyMinutes",
+            "balancerBalanceMode",
+            "balancerBalanceIntervalSec",
+            "balancerTestUrl",
+            "balancerConnectivityUrl",
+            "balancerUseFrontProxy",
+            "balancerFrontProxy",
+            "balancerUseLandingProxy",
+            "balancerLandingProxy",
+        ).forEach { key ->
+            assertTrue("balancer_preferences.xml must declare key=$key", prefXml.contains("app:key=\"$key\""))
+        }
+
+        assertTrue(arraysXml.contains("name=\"balancer_selection_mode_values\""))
+        assertTrue(arraysXml.contains("name=\"balancer_balance_mode_values\""))
+        assertFalse(arraysXml.contains("name=\"balancer_strategy_entries\""))
+        assertFalse(arraysXml.contains("name=\"balancer_strategy_values\""))
+
+        // Defaults and dependency toggles in activity
+        assertTrue(activityText.contains("balancerSelectionMode"))
+        assertTrue(activityText.contains("balancerAdvancedToggle"))
+        assertTrue(activityText.contains("BalancerMemberResolver.ResolutionResult") || activityText.contains("reusableRecentCount"))
     }
 
     @Test
