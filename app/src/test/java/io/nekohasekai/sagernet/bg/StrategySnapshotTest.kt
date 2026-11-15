@@ -135,4 +135,131 @@ class StrategySnapshotTest {
         assertEquals(TimeBucket.DAYS, day7.bucket)
         assertEquals(7, day7.amount)
     }
+
+    @Test
+    fun parseExtractsAutoSelectMetadataRolesAndStats() {
+        val json = """
+            {
+              "active": true,
+              "strategyKey": "balancer_9",
+              "strategyKind": "balancer",
+              "strategyId": 9,
+              "editProfileId": 9,
+              "editGroupId": 0,
+              "groupName": "SG Auto",
+              "groupTag": "balancer-9",
+              "strategyType": "autoselect",
+              "selectionMode": "latency",
+              "balanceEnabled": true,
+              "availableCount": 3,
+              "totalCount": 5,
+              "lastSwitchMs": 1700000100000,
+              "switchReason": "best_available",
+              "nextCheckSec": 205,
+              "learnedSiteCount": 18,
+              "learnEnabled": true,
+              "localOffline": false,
+              "activeTag": "out-1",
+              "activeProfileId": 101,
+              "activeName": "SG 01",
+              "activeDelay": 320,
+              "pinnedTag": "",
+              "pinnedProfileId": 0,
+              "pinnedName": "",
+              "checking": false,
+              "lastCheckMs": 1700000200000,
+              "members": [
+                {
+                  "tag": "out-1",
+                  "profileId": 101,
+                  "name": "SG 01",
+                  "delay": 320,
+                  "error": "",
+                  "lastCheckMs": 1700000200000,
+                  "active": true,
+                  "pinned": false,
+                  "role": "active",
+                  "checkCount": 8,
+                  "failCount": 0
+                },
+                {
+                  "tag": "out-2",
+                  "profileId": 102,
+                  "name": "SG 02",
+                  "delay": 506,
+                  "error": "",
+                  "lastCheckMs": 1700000190000,
+                  "active": false,
+                  "pinned": false,
+                  "role": "standby",
+                  "checkCount": 8,
+                  "failCount": 0
+                },
+                {
+                  "tag": "out-3",
+                  "profileId": 103,
+                  "name": "SG 03",
+                  "delay": 523,
+                  "error": "",
+                  "lastCheckMs": 1700000180000,
+                  "active": false,
+                  "pinned": false,
+                  "role": "reserve",
+                  "checkCount": 8,
+                  "failCount": 1
+                },
+                {
+                  "tag": "out-4",
+                  "profileId": 104,
+                  "name": "SG 04",
+                  "delay": 490,
+                  "error": "",
+                  "lastCheckMs": 1700000170000,
+                  "active": false,
+                  "pinned": false,
+                  "role": "reserve",
+                  "checkCount": 8,
+                  "failCount": 0
+                },
+                {
+                  "tag": "out-5",
+                  "profileId": 105,
+                  "name": "SG 05",
+                  "delay": 0,
+                  "error": "passive suspect cooldown",
+                  "lastCheckMs": 1700000160000,
+                  "active": false,
+                  "pinned": false,
+                  "role": "suspect",
+                  "checkCount": 4,
+                  "failCount": 3,
+                  "suspectUntilMs": 1700000260000,
+                  "suspectRemainingSec": 45
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val snap = StrategySnapshot.parse(json)!!
+        assertEquals("autoselect", snap.strategyType)
+        assertEquals("latency", snap.selectionMode)
+        assertTrue(snap.balanceEnabled)
+        assertEquals(3, snap.availableCount)
+        assertEquals(5, snap.totalCount)
+        assertEquals(1700000100000L, snap.lastSwitchMs)
+        assertEquals("best_available", snap.switchReason)
+        assertEquals(205, snap.nextCheckSec)
+        assertEquals(18, snap.learnedSiteCount)
+        assertTrue(snap.learnEnabled)
+        assertFalse(snap.localOffline)
+
+        assertEquals(StrategySnapshot.MemberSubtitleKind.CARRYING_TRAFFIC, StrategySnapshot.resolveMemberSubtitleKind(snap.members[0]))
+        assertEquals(StrategySnapshot.MemberSubtitleKind.STANDBY, StrategySnapshot.resolveMemberSubtitleKind(snap.members[1]))
+        assertEquals(StrategySnapshot.MemberSubtitleKind.PARTIAL_FAILURES, StrategySnapshot.resolveMemberSubtitleKind(snap.members[2]))
+        assertEquals(StrategySnapshot.MemberSubtitleKind.NONE, StrategySnapshot.resolveMemberSubtitleKind(snap.members[3]))
+        assertEquals(StrategySnapshot.MemberSubtitleKind.SUSPECT, StrategySnapshot.resolveMemberSubtitleKind(snap.members[4]))
+        assertEquals(45, snap.members[4].suspectRemainingSec)
+        assertEquals(-2L, StrategySnapshotHelper.ACTION_CLEAR_LEARNED)
+        assertEquals(":clear_learned", StrategySnapshot.CLEAR_LEARNED_TAG)
+    }
 }

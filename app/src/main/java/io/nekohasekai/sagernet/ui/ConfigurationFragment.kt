@@ -1856,7 +1856,12 @@ class ConfigurationFragment @JvmOverloads constructor(
             setColorFilter(iconTint)
         }
 
-        val modeLabel = StrategySnapshot.formatStrategyLabel(context, snap.strategyType)
+        val modeLabel = StrategySnapshot.formatStrategyLabel(
+            context,
+            snap.strategyType,
+            snap.selectionMode,
+            snap.balanceEnabled,
+        )
         val activeDisplay = snap.pinnedName.takeIf { snap.isPinned && it.isNotBlank() } ?: snap.activeName
         strategyStatusText?.text = when {
             snap.isPinned -> getString(R.string.strategy_status_pinned, activeDisplay.ifBlank { snap.pinnedTag })

@@ -46,16 +46,29 @@
             android:textColor="?android:attr/textColorPrimary"
             android:textSize="18sp"
             android:textStyle="bold"
-            tools:text="正在运行：最低延迟 (leastPing)" />
+            tools:text="自动选择使用 新加坡·经济0.3x (8个中8个可用), 已切换 33分钟前" />
+
+        <TextView
+            android:id="@+id/text_strategy_counts"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:fontFamily="sans-serif-medium"
+            android:textColor="?android:attr/textColorPrimary"
+            android:textSize="14sp"
+            android:visibility="gone"
+            tools:text="8个配置: 8个可用"
+            tools:visibility="visible" />
 
         <TextView
             android:id="@+id/text_strategy_subtitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
+            android:lineSpacingMultiplier="1.15"
             android:textColor="?android:attr/textColorSecondary"
             android:textSize="13.5sp"
-            tools:text="上次检查 5 分钟前，共 7 个配置 · 当前：日本 01" />
+            tools:text="上次检查轮次1分钟前。205秒后下次检查。正在从真实连接中学习: 18个网站记住了配置。上次切换33分钟前(best available)。" />
 
         <LinearLayout
             android:layout_width="match_parent"

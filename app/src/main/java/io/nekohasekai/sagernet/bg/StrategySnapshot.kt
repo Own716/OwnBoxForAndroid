@@ -15,8 +15,14 @@ data class StrategyMemberSnapshot(
     val lastCheckMs: Long,
     val active: Boolean,
     val pinned: Boolean,
+    val role: String = "",
+    val checkCount: Int = 0,
+    val failCount: Int = 0,
+    val suspectUntilMs: Long = 0L,
+    val suspectRemainingSec: Int = 0,
 ) {
-    val isUnavailable: Boolean get() = error.isNotBlank()
+    val isUnavailable: Boolean
+        get() = error.isNotBlank() || role == "failed" || role == "suspect"
 }
 
 data class StrategyGroupSnapshot(
@@ -39,6 +45,16 @@ data class StrategyGroupSnapshot(
     val checking: Boolean,
     val lastCheckMs: Long,
     val members: List<StrategyMemberSnapshot>,
+    val selectionMode: String = "",
+    val balanceEnabled: Boolean = false,
+    val availableCount: Int = members.count { !it.isUnavailable && it.delay > 0 },
+    val totalCount: Int = members.size,
+    val lastSwitchMs: Long = 0L,
+    val switchReason: String = "",
+    val nextCheckSec: Int = 0,
+    val learnedSiteCount: Int = 0,
+    val learnEnabled: Boolean = false,
+    val localOffline: Boolean = false,
 ) {
     val isPinned: Boolean get() = pinnedProfileId > 0L || pinnedTag.isNotBlank()
     val canEdit: Boolean get() = editProfileId > 0L || editGroupId > 0L
@@ -46,8 +62,19 @@ data class StrategyGroupSnapshot(
 
 object StrategySnapshot {
 
+    const val CLEAR_LEARNED_TAG = ":clear_learned"
+
     enum class TimeBucket { NEVER, JUST_NOW, SECONDS, MINUTES, HOURS, DAYS }
     data class RelativeTime(val bucket: TimeBucket, val amount: Int = 0)
+
+    enum class MemberSubtitleKind {
+        CARRYING_TRAFFIC,
+        STANDBY,
+        SUSPECT,
+        FAILED,
+        PARTIAL_FAILURES,
+        NONE,
+    }
 
     fun parse(json: String?): StrategyGroupSnapshot? {
         if (json.isNullOrBlank()) return null
@@ -59,6 +86,8 @@ object StrategySnapshot {
         if (membersArr != null) {
             for (i in 0 until membersArr.length()) {
                 val item = membersArr.optJSONObject(i) ?: continue
+                val role = item.optString("role", "")
+                val activeFlag = item.optBoolean("active", false) || role == "active"
                 members.add(
                     StrategyMemberSnapshot(
                         tag = item.optString("tag"),
@@ -67,12 +96,22 @@ object StrategySnapshot {
                         delay = item.optInt("delay", 0),
                         error = item.optString("error", ""),
                         lastCheckMs = item.optLong("lastCheckMs", 0L),
-                        active = item.optBoolean("active", false),
+                        active = activeFlag,
                         pinned = item.optBoolean("pinned", false),
+                        role = role,
+                        checkCount = item.optInt("checkCount", 0),
+                        failCount = item.optInt("failCount", 0),
+                        suspectUntilMs = item.optLong("suspectUntilMs", 0L),
+                        suspectRemainingSec = item.optInt("suspectRemainingSec", 0),
                     )
                 )
             }
         }
+
+        val parsedAvail = root.optInt("availableCount", -1)
+        val parsedTotal = root.optInt("totalCount", -1)
+        val effectiveAvail = if (parsedAvail >= 0) parsedAvail else members.count { !it.isUnavailable && it.delay > 0 }
+        val effectiveTotal = if (parsedTotal >= 0) parsedTotal else members.size
 
         return StrategyGroupSnapshot(
             active = true,
@@ -94,11 +133,49 @@ object StrategySnapshot {
             checking = root.optBoolean("checking", false),
             lastCheckMs = root.optLong("lastCheckMs", 0L),
             members = members,
+            selectionMode = root.optString("selectionMode", ""),
+            balanceEnabled = root.optBoolean("balanceEnabled", false),
+            availableCount = effectiveAvail,
+            totalCount = effectiveTotal,
+            lastSwitchMs = root.optLong("lastSwitchMs", 0L),
+            switchReason = root.optString("switchReason", ""),
+            nextCheckSec = root.optInt("nextCheckSec", 0),
+            learnedSiteCount = root.optInt("learnedSiteCount", 0),
+            learnEnabled = root.optBoolean("learnEnabled", false),
+            localOffline = root.optBoolean("localOffline", false),
         )
     }
 
-    fun formatStrategyLabel(context: Context, strategyType: String): String {
-        val resId = when (strategyType.trim()) {
+    fun resolveMemberSubtitleKind(member: StrategyMemberSnapshot): MemberSubtitleKind {
+        return when {
+            member.role == "suspect" -> MemberSubtitleKind.SUSPECT
+            member.role == "failed" || member.error.isNotBlank() -> MemberSubtitleKind.FAILED
+            member.role == "active" || member.active -> MemberSubtitleKind.CARRYING_TRAFFIC
+            member.role == "standby" -> MemberSubtitleKind.STANDBY
+            member.failCount > 0 && member.checkCount > 0 -> MemberSubtitleKind.PARTIAL_FAILURES
+            else -> MemberSubtitleKind.NONE
+        }
+    }
+
+    fun formatStrategyLabel(
+        context: Context,
+        strategyType: String,
+        selectionMode: String = "",
+        balanceEnabled: Boolean = false,
+    ): String {
+        val typeTrim = strategyType.trim()
+        val selTrim = selectionMode.trim()
+        if (typeTrim == "autoselect" || selTrim.isNotEmpty()) {
+            val base = context.getString(
+                if (selTrim == "priority") R.string.balancer_selection_priority else R.string.balancer_selection_latency
+            )
+            return if (balanceEnabled) {
+                "$base · ${context.getString(R.string.balancer_cat_load_balance)}"
+            } else {
+                base
+            }
+        }
+        val resId = when (typeTrim) {
             "leastPing", "least_ping" -> R.string.strategy_mode_least_ping
             "leastLoad", "least_load" -> R.string.strategy_mode_least_load
             "round_robin", "roundRobin" -> R.string.strategy_mode_round_robin
@@ -108,7 +185,7 @@ object StrategySnapshot {
             "stable" -> R.string.strategy_mode_stable
             else -> 0
         }
-        return if (resId != 0) context.getString(resId) else strategyType.ifBlank { context.getString(R.string.strategy_mode_least_ping) }
+        return if (resId != 0) context.getString(resId) else typeTrim.ifBlank { context.getString(R.string.balancer_selection_latency) }
     }
 
     fun computeRelativeTime(timestampMs: Long, nowMs: Long = System.currentTimeMillis()): RelativeTime {

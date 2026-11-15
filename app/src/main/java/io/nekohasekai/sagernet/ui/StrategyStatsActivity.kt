@@ -25,11 +25,13 @@ import io.nekohasekai.sagernet.bg.SagerConnection
 import io.nekohasekai.sagernet.bg.StrategyGroupSnapshot
 import io.nekohasekai.sagernet.bg.StrategyMemberSnapshot
 import io.nekohasekai.sagernet.bg.StrategySnapshot
+import io.nekohasekai.sagernet.bg.StrategySnapshotHelper
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.databinding.ActivityStrategyStatsBinding
 import io.nekohasekai.sagernet.databinding.ItemStrategyMemberBinding
 import io.nekohasekai.sagernet.ktx.dp2px
 import io.nekohasekai.sagernet.ktx.getColorAttr
+import io.nekohasekai.sagernet.ktx.getColour
 import io.nekohasekai.sagernet.ui.profile.BalancerSettingsActivity
 import io.nekohasekai.sagernet.ui.profile.ProfileSettingsActivity
 import kotlinx.coroutines.Dispatchers
@@ -52,6 +54,7 @@ class StrategyStatsActivity : ThemedActivity(), SagerConnection.Callback {
     private lateinit var memberAdapter: StrategyMemberAdapter
 
     private var currentSnapshot: StrategyGroupSnapshot? = null
+    private var snapshotReceivedAtMs: Long = 0L
     private var tickerJob: Job? = null
     private var checkingNow = false
     private var pinUpdating = false
@@ -101,15 +104,26 @@ class StrategyStatsActivity : ThemedActivity(), SagerConnection.Callback {
         val canEdit = (snap?.canEdit == true) || fallbackEditProfileId > 0L || fallbackEditGroupId > 0L
         editItem?.isVisible = canEdit
         editItem?.isEnabled = canEdit
+
+        val clearItem = menu.findItem(R.id.action_clear_learned)
+        val learnEnabled = snap?.learnEnabled == true
+        clearItem?.isVisible = learnEnabled
+        clearItem?.isEnabled = learnEnabled && (snap?.learnedSiteCount ?: 0) > 0
         return super.onPrepareOptionsMenu(menu)
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        if (item.itemId == R.id.action_edit_strategy) {
-            openStrategyEditor()
-            return true
+        return when (item.itemId) {
+            R.id.action_edit_strategy -> {
+                openStrategyEditor()
+                true
+            }
+            R.id.action_clear_learned -> {
+                triggerClearLearned()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
         }
-        return super.onOptionsItemSelected(item)
     }
 
     private fun openStrategyEditor() {
@@ -153,10 +167,20 @@ class StrategyStatsActivity : ThemedActivity(), SagerConnection.Callback {
     private fun startTicker() {
         tickerJob?.cancel()
         tickerJob = lifecycleScope.launch {
+            var tickCount = 0
             while (isActive && activityVisible) {
-                delay(3000L)
-                if (!checkingNow && !pinUpdating) {
+                delay(1000L)
+                tickCount++
+                if (checkingNow || pinUpdating) continue
+                val snap = currentSnapshot
+                val countdownHitZero = snap != null && snap.nextCheckSec > 0 && remainingNextCheckSec(snap) <= 0
+                if (tickCount % 3 == 0 || countdownHitZero) {
                     refreshSnapshot()
+                } else if (snap != null) {
+                    renderHeader(snap)
+                    if (snap.members.isNotEmpty()) {
+                        memberAdapter.notifyItemRangeChanged(0, snap.members.size, PAYLOAD_TIME)
+                    }
                 }
             }
         }
@@ -196,6 +220,7 @@ class StrategyStatsActivity : ThemedActivity(), SagerConnection.Callback {
             if (snap == null) {
                 renderEmpty()
             } else {
+                snapshotReceivedAtMs = System.currentTimeMillis()
                 renderSnapshot(snap)
             }
         }
@@ -213,6 +238,7 @@ class StrategyStatsActivity : ThemedActivity(), SagerConnection.Callback {
                 }
                 val snap = StrategySnapshot.parse(raw)
                 if (snap != null) {
+                    snapshotReceivedAtMs = System.currentTimeMillis()
                     renderSnapshot(snap)
                 } else {
                     refreshSnapshot()
@@ -239,6 +265,7 @@ class StrategyStatsActivity : ThemedActivity(), SagerConnection.Callback {
                 }
                 val snap = StrategySnapshot.parse(raw)
                 if (snap != null && snap.pinnedProfileId == member.profileId) {
+                    snapshotReceivedAtMs = System.currentTimeMillis()
                     renderSnapshot(snap)
                     Toast.makeText(
                         this@StrategyStatsActivity,
@@ -247,6 +274,7 @@ class StrategyStatsActivity : ThemedActivity(), SagerConnection.Callback {
                     ).show()
                 } else {
                     if (snap != null) {
+                        snapshotReceivedAtMs = System.currentTimeMillis()
                         renderSnapshot(snap)
                     }
                     Toast.makeText(
@@ -272,6 +300,7 @@ class StrategyStatsActivity : ThemedActivity(), SagerConnection.Callback {
                 }
                 val snap = StrategySnapshot.parse(raw)
                 if (snap != null) {
+                    snapshotReceivedAtMs = System.currentTimeMillis()
                     renderSnapshot(snap)
                 } else {
                     refreshSnapshot()
@@ -287,10 +316,41 @@ class StrategyStatsActivity : ThemedActivity(), SagerConnection.Callback {
         }
     }
 
+    private fun triggerClearLearned() {
+        val service = connection.service ?: return
+        if (pinUpdating || !DataStore.serviceState.started) return
+        pinUpdating = true
+        lifecycleScope.launch {
+            try {
+                val raw = withContext(Dispatchers.IO) {
+                    runCatching {
+                        service.pinActiveStrategyMember(StrategySnapshotHelper.ACTION_CLEAR_LEARNED)
+                    }.getOrNull().orEmpty()
+                }
+                val snap = StrategySnapshot.parse(raw)
+                if (snap != null) {
+                    snapshotReceivedAtMs = System.currentTimeMillis()
+                    renderSnapshot(snap)
+                } else {
+                    refreshSnapshot()
+                }
+                Toast.makeText(
+                    this@StrategyStatsActivity,
+                    R.string.strategy_learned_cleared,
+                    Toast.LENGTH_SHORT,
+                ).show()
+            } finally {
+                pinUpdating = false
+            }
+        }
+    }
+
     private fun renderEmpty() {
         currentSnapshot = null
         supportActionBar?.subtitle = null
         binding.textStrategyHeadline.setText(R.string.strategy_not_running)
+        binding.textStrategyCounts.text = ""
+        binding.textStrategyCounts.visibility = View.GONE
         binding.textStrategySubtitle.text = ""
         binding.textStrategySubtitle.visibility = View.GONE
         binding.btnRestoreAuto.visibility = View.GONE
@@ -302,27 +362,72 @@ class StrategyStatsActivity : ThemedActivity(), SagerConnection.Callback {
         invalidateOptionsMenu()
     }
 
+    private fun remainingNextCheckSec(snap: StrategyGroupSnapshot): Int {
+        if (snap.nextCheckSec <= 0 || snapshotReceivedAtMs <= 0L) return snap.nextCheckSec
+        val elapsedSec = ((System.currentTimeMillis() - snapshotReceivedAtMs) / 1000L).toInt().coerceAtLeast(0)
+        return (snap.nextCheckSec - elapsedSec).coerceAtLeast(0)
+    }
+
+    private fun renderHeader(snap: StrategyGroupSnapshot) {
+        val nowMs = System.currentTimeMillis()
+        val total = snap.totalCount.coerceAtLeast(snap.members.size)
+        val avail = snap.availableCount.coerceIn(0, total)
+        val activeDisplay = (snap.pinnedName.takeIf { snap.isPinned && it.isNotBlank() } ?: snap.activeName)
+            .ifBlank { snap.pinnedTag.takeIf { snap.isPinned && it.isNotBlank() } ?: snap.activeTag }
+
+        val headlineBase = when {
+            snap.isPinned && activeDisplay.isNotBlank() ->
+                getString(R.string.strategy_header_pinned_use, activeDisplay, total, avail)
+            activeDisplay.isNotBlank() ->
+                getString(R.string.strategy_header_auto_use, activeDisplay, total, avail)
+            else -> {
+                val modeCode = snap.strategyType.ifBlank { "autoselect" }
+                val modeLabel = StrategySnapshot.formatStrategyLabel(this, modeCode, snap.selectionMode, snap.balanceEnabled)
+                getString(R.string.strategy_overview_running, modeLabel, modeCode)
+            }
+        }
+        val switchSuffix = if (snap.lastSwitchMs > 0L) {
+            getString(R.string.strategy_header_switched_suffix, StrategySnapshot.formatRelativeTime(this, snap.lastSwitchMs, nowMs))
+        } else {
+            ""
+        }
+        val offlineSuffix = if (snap.localOffline) getString(R.string.strategy_header_offline_suffix) else ""
+        binding.textStrategyHeadline.text = headlineBase + switchSuffix + offlineSuffix
+
+        binding.textStrategyCounts.visibility = View.VISIBLE
+        binding.textStrategyCounts.text = getString(R.string.strategy_header_counts, total, avail)
+
+        val parts = ArrayList<String>(4)
+        parts.add(getString(R.string.strategy_meta_last_check, StrategySnapshot.formatRelativeTime(this, snap.lastCheckMs, nowMs)))
+        val nextSec = remainingNextCheckSec(snap)
+        if (nextSec > 0) {
+            parts.add(getString(R.string.strategy_meta_next_check, nextSec))
+        }
+        if (snap.learnEnabled) {
+            parts.add(getString(R.string.strategy_meta_learned_sites, snap.learnedSiteCount))
+        }
+        if (snap.lastSwitchMs > 0L) {
+            val switchRel = StrategySnapshot.formatRelativeTime(this, snap.lastSwitchMs, nowMs)
+            val reasonText = snap.switchReason.trim()
+            parts.add(
+                if (reasonText.isNotBlank()) {
+                    getString(R.string.strategy_meta_last_switch, switchRel, reasonText)
+                } else {
+                    getString(R.string.strategy_meta_last_switch_no_reason, switchRel)
+                }
+            )
+        }
+        binding.textStrategySubtitle.visibility = View.VISIBLE
+        binding.textStrategySubtitle.text = parts.joinToString(" ")
+    }
+
     private fun renderSnapshot(snap: StrategyGroupSnapshot) {
         currentSnapshot = snap
-        supportActionBar?.subtitle = snap.groupName.ifBlank { null }
-
-        val modeCode = snap.strategyType.ifBlank { "leastPing" }
-        val modeLabel = StrategySnapshot.formatStrategyLabel(this, modeCode)
-        val activeDisplay = snap.pinnedName.takeIf { snap.isPinned && it.isNotBlank() } ?: snap.activeName
-
-        binding.textStrategyHeadline.text = if (snap.isPinned) {
-            getString(R.string.strategy_overview_pinned, activeDisplay.ifBlank { snap.pinnedTag })
-        } else {
-            getString(R.string.strategy_overview_running, modeLabel, modeCode)
+        supportActionBar?.subtitle = snap.groupName.takeIf { it.isNotBlank() }?.let {
+            getString(R.string.strategy_toolbar_subtitle_group, it)
         }
 
-        val lastCheckText = StrategySnapshot.formatRelativeTime(this, snap.lastCheckMs)
-        binding.textStrategySubtitle.visibility = View.VISIBLE
-        binding.textStrategySubtitle.text = if (activeDisplay.isNotBlank()) {
-            getString(R.string.strategy_overview_meta_active, lastCheckText, snap.members.size, activeDisplay)
-        } else {
-            getString(R.string.strategy_overview_meta, lastCheckText, snap.members.size)
-        }
+        renderHeader(snap)
 
         binding.btnRestoreAuto.visibility = if (snap.isPinned) View.VISIBLE else View.GONE
         updateCheckButtonState(coreChecking = snap.checking)
@@ -372,6 +477,7 @@ class StrategyStatsActivity : ThemedActivity(), SagerConnection.Callback {
                 val primaryColor = context.getColorAttr(R.attr.colorPrimary)
                 val textPrimaryColor = context.getColorAttr(android.R.attr.textColorPrimary)
                 val textSecondaryColor = context.getColorAttr(android.R.attr.textColorSecondary)
+                val redColor = context.getColour(R.color.material_red_500)
 
                 binding.textMemberIndex.text = (position + 1).toString()
                 binding.textMemberName.text = item.name
@@ -381,27 +487,53 @@ class StrategyStatsActivity : ThemedActivity(), SagerConnection.Callback {
 
                 binding.imgMemberPin.visibility = if (item.pinned) View.VISIBLE else View.GONE
 
-                when {
-                    item.pinned -> {
-                        binding.textMemberBadge.visibility = View.VISIBLE
-                        binding.textMemberBadge.setText(R.string.strategy_badge_pinned)
-                        applyBadgeBackground(binding.textMemberBadge, primaryColor)
-                    }
-
-                    item.active -> {
-                        binding.textMemberBadge.visibility = View.VISIBLE
-                        binding.textMemberBadge.setText(R.string.strategy_badge_active)
-                        applyBadgeBackground(binding.textMemberBadge, primaryColor)
-                    }
-
-                    else -> {
-                        binding.textMemberBadge.visibility = View.GONE
-                    }
+                if (item.pinned) {
+                    binding.textMemberBadge.visibility = View.VISIBLE
+                    binding.textMemberBadge.setText(R.string.strategy_badge_pinned)
+                    applyBadgeBackground(binding.textMemberBadge, primaryColor)
+                } else {
+                    binding.textMemberBadge.visibility = View.GONE
                 }
 
-                if (item.error.isNotBlank()) {
+                val subtitleKind = StrategySnapshot.resolveMemberSubtitleKind(item)
+                val failRatioText = if (item.failCount > 0 && item.checkCount > 0) {
+                    context.getString(R.string.strategy_role_partial_failures, item.checkCount, item.failCount)
+                } else {
+                    ""
+                }
+                val subtitleText = when (subtitleKind) {
+                    StrategySnapshot.MemberSubtitleKind.CARRYING_TRAFFIC -> {
+                        val base = context.getString(R.string.strategy_role_carrying_traffic)
+                        if (failRatioText.isNotEmpty()) "$base · $failRatioText" else base
+                    }
+                    StrategySnapshot.MemberSubtitleKind.STANDBY -> {
+                        val base = context.getString(R.string.strategy_role_standby)
+                        if (failRatioText.isNotEmpty()) "$base · $failRatioText" else base
+                    }
+                    StrategySnapshot.MemberSubtitleKind.SUSPECT -> {
+                        if (item.suspectRemainingSec > 0) {
+                            context.getString(R.string.strategy_role_suspect_cooldown, item.suspectRemainingSec)
+                        } else {
+                            item.error.ifBlank { context.getString(R.string.unavailable) }
+                        }
+                    }
+                    StrategySnapshot.MemberSubtitleKind.FAILED -> {
+                        val err = item.error.ifBlank { context.getString(R.string.unavailable) }
+                        if (failRatioText.isNotEmpty()) "$failRatioText · $err" else err
+                    }
+                    StrategySnapshot.MemberSubtitleKind.PARTIAL_FAILURES -> failRatioText
+                    StrategySnapshot.MemberSubtitleKind.NONE -> ""
+                }
+                if (subtitleText.isNotBlank()) {
                     binding.textMemberError.visibility = View.VISIBLE
-                    binding.textMemberError.text = item.error
+                    binding.textMemberError.text = subtitleText
+                    binding.textMemberError.setTextColor(
+                        if (subtitleKind == StrategySnapshot.MemberSubtitleKind.SUSPECT || subtitleKind == StrategySnapshot.MemberSubtitleKind.FAILED) {
+                            redColor
+                        } else {
+                            textSecondaryColor
+                        }
+                    )
                 } else {
                     binding.textMemberError.visibility = View.GONE
                 }
@@ -409,7 +541,7 @@ class StrategyStatsActivity : ThemedActivity(), SagerConnection.Callback {
                 when {
                     item.isUnavailable -> {
                         binding.textMemberDelay.setText(R.string.unavailable)
-                        binding.textMemberDelay.setTextColor(textSecondaryColor)
+                        binding.textMemberDelay.setTextColor(redColor)
                     }
 
                     item.delay > 0 -> {
@@ -431,7 +563,17 @@ class StrategyStatsActivity : ThemedActivity(), SagerConnection.Callback {
 
             fun bindTimeOnly(item: StrategyMemberSnapshot) {
                 val context = binding.root.context
-                binding.textMemberTime.text = StrategySnapshot.formatRelativeTime(context, item.lastCheckMs)
+                binding.textMemberTime.text = when {
+                    item.lastCheckMs <= 0L -> context.getString(R.string.strategy_time_never)
+                    !item.isUnavailable && item.delay > 0 -> context.getString(
+                        R.string.strategy_member_time_ok,
+                        StrategySnapshot.formatRelativeTime(context, item.lastCheckMs),
+                    )
+                    else -> context.getString(
+                        R.string.strategy_member_time_fail,
+                        StrategySnapshot.formatRelativeTime(context, item.lastCheckMs),
+                    )
+                }
             }
 
             private fun applyBadgeBackground(view: View, primaryColor: Int) {

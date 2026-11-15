@@ -12,10 +12,12 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Coordinates live strategy-group snapshots, manual checks, and strict pinning
- * between Go BoxInstance and Android :bg service without requiring Clash API.
+ * Coordinates live strategy-group snapshots, manual checks, strict pinning,
+ * and learned-site resets between Go BoxInstance and Android :bg service.
  */
 object StrategySnapshotHelper {
+
+    const val ACTION_CLEAR_LEARNED = -2L
 
     data class ActiveStrategyContext(
         val strategyTag: String,
@@ -44,18 +46,30 @@ object StrategySnapshotHelper {
             )
         }
         val curProfile = proxy.profile
-        if (curProfile.type == ProxyEntity.TYPE_BALANCER) {
-            val tag = config.balancerTagMap[curProfile.id]
+        val balancerId = when {
+            curProfile.type == ProxyEntity.TYPE_BALANCER -> curProfile.id
+            config.activeStrategyKind == "balancer" && config.activeStrategyId > 0L -> config.activeStrategyId
+            else -> 0L
+        }
+        if (balancerId > 0L) {
+            val tag = (config.activeStrategyTag.takeIf { it.isNotBlank() }
+                ?: config.balancerTagMap[balancerId])
                 ?.takeIf { it.isNotBlank() }
                 ?: return null
+            val displayName = if (curProfile.type == ProxyEntity.TYPE_BALANCER) {
+                curProfile.displayName()
+            } else {
+                val balancerName = runCatching { SagerDatabase.proxyDao.getById(balancerId)?.displayName() }.getOrNull()
+                balancerName?.takeIf { it.isNotBlank() } ?: curProfile.displayName()
+            }
             return ActiveStrategyContext(
                 strategyTag = tag,
-                strategyKey = "balancer_${curProfile.id}",
+                strategyKey = "balancer_$balancerId",
                 kind = "balancer",
-                strategyId = curProfile.id,
-                editProfileId = curProfile.id,
+                strategyId = balancerId,
+                editProfileId = balancerId,
                 editGroupId = 0L,
-                displayGroupName = curProfile.displayName(),
+                displayGroupName = displayName,
             )
         }
         return null
@@ -106,17 +120,27 @@ object StrategySnapshotHelper {
     fun pinMemberAndSnapshotJson(data: BaseService.Data, memberProfileId: Long): String {
         val proxy = data.proxy ?: return ""
         val ctx = resolveActiveStrategy(proxy) ?: return ""
-        if (memberProfileId <= 0L) {
-            runCatching { proxy.box.pinGroupOutbound(ctx.strategyTag, "") }
-            DataStore.setStrategyPinnedProfileId(ctx.strategyKey, 0L)
-        } else {
-            val rawBefore = runCatching { proxy.box.getGroupSnapshotJSON(ctx.strategyTag) }.getOrNull().orEmpty()
-            val targetTag = findMemberTagInRawSnapshot(rawBefore, proxy, memberProfileId) ?: return enrichSnapshotJson(rawBefore, proxy, ctx)
-            val ok = runCatching { proxy.box.pinGroupOutbound(ctx.strategyTag, targetTag) }.getOrDefault(false)
-            if (!ok) {
-                return if (rawBefore.isBlank()) "" else enrichSnapshotJson(rawBefore, proxy, ctx)
+        when {
+            memberProfileId == ACTION_CLEAR_LEARNED -> {
+                runCatching { proxy.box.pinGroupOutbound(ctx.strategyTag, StrategySnapshot.CLEAR_LEARNED_TAG) }
+                return getOrCheckSnapshotJson(proxy, forceCheck = false)
             }
-            DataStore.setStrategyPinnedProfileId(ctx.strategyKey, memberProfileId)
+
+            memberProfileId <= 0L -> {
+                runCatching { proxy.box.pinGroupOutbound(ctx.strategyTag, "") }
+                DataStore.setStrategyPinnedProfileId(ctx.strategyKey, 0L)
+            }
+
+            else -> {
+                val rawBefore = runCatching { proxy.box.getGroupSnapshotJSON(ctx.strategyTag) }.getOrNull().orEmpty()
+                val targetTag = findMemberTagInRawSnapshot(rawBefore, proxy, memberProfileId)
+                    ?: return enrichSnapshotJson(rawBefore, proxy, ctx)
+                val ok = runCatching { proxy.box.pinGroupOutbound(ctx.strategyTag, targetTag) }.getOrDefault(false)
+                if (!ok) {
+                    return if (rawBefore.isBlank()) "" else enrichSnapshotJson(rawBefore, proxy, ctx)
+                }
+                DataStore.setStrategyPinnedProfileId(ctx.strategyKey, memberProfileId)
+            }
         }
 
         val updated = ActiveOutboundTracker.checkAndUpdate(data)
@@ -200,6 +224,7 @@ object StrategySnapshotHelper {
         var activeDelay = 0
         var pinnedProfileId = 0L
         var pinnedName = ""
+        var computedAvailable = 0
 
         val enrichedMembers = JSONArray()
         for (i in 0 until rawMembers.length()) {
@@ -210,8 +235,18 @@ object StrategySnapshotHelper {
             val delay = m.optInt("delay", 0)
             val error = m.optString("error", "")
             val lastCheckMs = m.optLong("lastCheckMs", 0L)
-            val isActive = activeTag.isNotBlank() && tag == activeTag
+            val role = m.optString("role", "")
+            val isActive = (activeTag.isNotBlank() && tag == activeTag) || role == "active"
             val isPinned = pinnedTag.isNotBlank() && tag == pinnedTag
+            val checkCount = m.optInt("checkCount", 0)
+            val failCount = m.optInt("failCount", 0)
+            val suspectUntilMs = m.optLong("suspectUntilMs", 0L)
+            val suspectRemainingSec = m.optInt("suspectRemainingSec", 0)
+
+            val memberAvailable = role != "failed" && role != "suspect" && error.isBlank() && delay > 0
+            if (memberAvailable) {
+                computedAvailable++
+            }
 
             if (isActive) {
                 activeProfileId = pid
@@ -232,6 +267,11 @@ object StrategySnapshotHelper {
                 put("lastCheckMs", lastCheckMs)
                 put("active", isActive)
                 put("pinned", isPinned)
+                put("role", role)
+                put("checkCount", checkCount)
+                put("failCount", failCount)
+                put("suspectUntilMs", suspectUntilMs)
+                put("suspectRemainingSec", suspectRemainingSec)
             })
         }
 
@@ -244,6 +284,9 @@ object StrategySnapshotHelper {
             pinnedName = entities[pinnedProfileId]?.displayName() ?: pinnedTag
         }
 
+        val availCount = raw.optInt("availableCount", -1).takeIf { it >= 0 } ?: computedAvailable
+        val totalCount = raw.optInt("totalCount", -1).takeIf { it >= 0 } ?: enrichedMembers.length()
+
         return JSONObject().apply {
             put("active", true)
             put("strategyKey", ctx.strategyKey)
@@ -254,6 +297,16 @@ object StrategySnapshotHelper {
             put("groupName", ctx.displayGroupName)
             put("groupTag", raw.optString("groupTag", ctx.strategyTag))
             put("strategyType", raw.optString("strategyType", ""))
+            put("selectionMode", raw.optString("selectionMode", ""))
+            put("balanceEnabled", raw.optBoolean("balanceEnabled", false))
+            put("availableCount", availCount)
+            put("totalCount", totalCount)
+            put("lastSwitchMs", raw.optLong("lastSwitchMs", 0L))
+            put("switchReason", raw.optString("switchReason", ""))
+            put("nextCheckSec", raw.optInt("nextCheckSec", 0))
+            put("learnedSiteCount", raw.optInt("learnedSiteCount", 0))
+            put("learnEnabled", raw.optBoolean("learnEnabled", false))
+            put("localOffline", raw.optBoolean("localOffline", false))
             put("activeTag", activeTag)
             put("activeProfileId", activeProfileId)
             put("activeName", activeName)

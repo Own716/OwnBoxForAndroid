@@ -1430,4 +1430,23 @@
     <string name="balancer_unit_checks">%d 次检查</string>
     <string name="balancer_unit_ms">%d 毫秒</string>
     <string name="balancer_unlimited">不限</string>
+    <string name="strategy_toolbar_subtitle_group">(%s)策略组</string>
+    <string name="strategy_header_auto_use">自动选择使用 %1$s (%2$d个中%3$d个可用)</string>
+    <string name="strategy_header_pinned_use">已手动锁定 %1$s (%2$d个中%3$d个可用)</string>
+    <string name="strategy_header_switched_suffix">，已切换%s</string>
+    <string name="strategy_header_offline_suffix">（当前网络离线）</string>
+    <string name="strategy_header_counts">%1$d个配置: %2$d个可用</string>
+    <string name="strategy_meta_last_check">上次检查轮次%s。</string>
+    <string name="strategy_meta_next_check">%d秒后下次检查。</string>
+    <string name="strategy_meta_learned_sites">正在从真实连接中学习: %d个网站记住了配置。</string>
+    <string name="strategy_meta_last_switch">上次切换%1$s(%2$s)。</string>
+    <string name="strategy_meta_last_switch_no_reason">上次切换%s。</string>
+    <string name="strategy_role_carrying_traffic">正在承载流量</string>
+    <string name="strategy_role_standby">可随时接管</string>
+    <string name="strategy_role_suspect_cooldown">疑似异常，冷却中 (剩余 %d 秒)</string>
+    <string name="strategy_role_partial_failures">%1$d次检查中%2$d次失败</string>
+    <string name="strategy_member_time_ok">正常%s</string>
+    <string name="strategy_member_time_fail">失败%s</string>
+    <string name="strategy_clear_learned">清除网站选择记忆</string>
+    <string name="strategy_learned_cleared">已清除网站选择记忆</string>
 </resources>

@@ -1512,4 +1512,23 @@
     <string name="balancer_unit_checks">%d checks</string>
     <string name="balancer_unit_ms">%d ms</string>
     <string name="balancer_unlimited">Unlimited</string>
+    <string name="strategy_toolbar_subtitle_group">(%s)</string>
+    <string name="strategy_header_auto_use">Auto-Select using %1$s (%3$d of %2$d available)</string>
+    <string name="strategy_header_pinned_use">Locked to %1$s (%3$d of %2$d available)</string>
+    <string name="strategy_header_switched_suffix">, switched %s</string>
+    <string name="strategy_header_offline_suffix"> (offline)</string>
+    <string name="strategy_header_counts">%1$d profiles: %2$d available</string>
+    <string name="strategy_meta_last_check">Last check %s.</string>
+    <string name="strategy_meta_next_check">Next check in %ds.</string>
+    <string name="strategy_meta_learned_sites">Learning from real connections: %d sites remembered.</string>
+    <string name="strategy_meta_last_switch">Last switch %1$s (%2$s).</string>
+    <string name="strategy_meta_last_switch_no_reason">Last switch %s.</string>
+    <string name="strategy_role_carrying_traffic">Carrying traffic</string>
+    <string name="strategy_role_standby">Ready on standby</string>
+    <string name="strategy_role_suspect_cooldown">Suspect cooldown (%ds left)</string>
+    <string name="strategy_role_partial_failures">%2$d of %1$d checks failed</string>
+    <string name="strategy_member_time_ok">OK %s</string>
+    <string name="strategy_member_time_fail">Failed %s</string>
+    <string name="strategy_clear_learned">Clear Learned Sites</string>
+    <string name="strategy_learned_cleared">Cleared learned site memories</string>
 </resources>

@@ -6,4 +6,8 @@
         android:icon="@drawable/ic_image_edit"
         android:title="@string/edit"
         app:showAsAction="always" />
+    <item
+        android:id="@+id/action_clear_learned"
+        android:title="@string/strategy_clear_learned"
+        app:showAsAction="never" />
 </menu>
