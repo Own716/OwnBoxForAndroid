@@ -3,37 +3,157 @@ package autoselect
 import (
 	"context"
 	"errors"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/sagernet/sing-box/common/urltest"
+	"github.com/sagernet/sing/common/json/badoption"
 )
 
 var errTestFail = errors.New("probe failed")
 
-func TestProbeTierSelection(t *testing.T) {
+func TestProberPreservesExactTestURLAndProbesAllMembers(t *testing.T) {
+	customURL := "https://www.gstatic.com/generate_204"
 	opts := AutoSelectOptions{
-		Outbounds:           []string{"n0", "n1", "n2", "n3", "n4", "n5"},
-		StandbySize:         intPtr(2),
-		IntensiveCheckCount: intPtr(3),
-		RankTopN:            5, // handled on Android mostly, Go tests full list order
+		Outbounds:     []string{"n0", "n1", "n2", "n3", "n4", "n5", "n6", "n7", "n8", "n9"},
+		URL:           customURL,
+		CheckInterval: badoption.Duration(300 * time.Second),
 	}.normalized()
 
-	all := []string{"n0", "n1", "n2", "n3", "n4", "n5"}
-	scorer := newScorer(all, opts)
+	s := newScorer([]string{"n0", "n1", "n2", "n3", "n4", "n5", "n6", "n7", "n8", "n9"}, opts)
+	p := newProber(opts, s, nil, urltest.NewHistoryStorage(), nil, nil, nil)
+	if p.link != customURL {
+		t.Fatalf("expected prober link to strictly match user testUrl %q, got %q", customURL, p.link)
+	}
+
+	var mu sync.Mutex
+	probed := map[string]bool{}
+	p.probeFn = func(ctx context.Context, tag string) (uint16, error) {
+		mu.Lock()
+		probed[tag] = true
+		mu.Unlock()
+		return 50, nil
+	}
+
 	now := time.Unix(1700000000, 0)
-	for i, tag := range all {
-		scorer.recordSample(tag, uint16(100-i*10), nil, now)
-	}
-	scorer.evaluate(now, nil) // n5=50ms active
+	p.nowFn = func() time.Time { return now }
+	p.CheckAllNow(context.Background())
 
-	watch := selectWatchTargets(all, scorer, nil, now)
-	if len(watch) == 0 || watch[0] != scorer.activeTagSnapshot() {
-		t.Fatalf("expected active node first in watch targets, got %v", watch)
+	if len(probed) != 10 {
+		t.Fatalf("expected all 10 members probed with no standby/topN cap, got %d (%v)", len(probed), probed)
+	}
+	if rem := p.NextCheckRemainingSec(now); rem != 300 {
+		t.Fatalf("expected NextCheckRemainingSec to reset to full 300s after CheckAllNow, got %d", rem)
+	}
+}
+
+func TestProberSingleFailureMarksUnavailableImmediatelyAndClearsHistory(t *testing.T) {
+	now := time.Unix(1700000000, 0)
+	opts := AutoSelectOptions{
+		Outbounds: []string{"n1", "n2"},
+	}.normalized()
+	hist := urltest.NewHistoryStorage()
+	s := newScorer([]string{"n1", "n2"}, opts)
+	p := newProber(opts, s, nil, hist, nil, nil, nil)
+
+	p.probeFn = func(ctx context.Context, tag string) (uint16, error) {
+		if tag == "n1" {
+			return 35, nil
+		}
+		return 80, nil
+	}
+	p.runProbeBatch(context.Background(), []string{"n1", "n2"}, now)
+	if active := s.activeTagSnapshot(); active != "n1" {
+		t.Fatalf("expected n1 active initially, got %s", active)
+	}
+	if hist.LoadURLTestHistory("n1") == nil {
+		t.Fatalf("expected history stored for n1")
 	}
 
-	intensive := selectIntensiveTargets(all, scorer, nil, opts, now)
-	if len(intensive) < 3 {
-		t.Fatalf("expected at least intensiveCheckCount=3 targets, got %v", intensive)
+	// One single probe failure immediately switches away and clears history for n1.
+	p.probeFn = func(ctx context.Context, tag string) (uint16, error) {
+		if tag == "n1" {
+			return 0, errTestFail
+		}
+		return 80, nil
+	}
+	p.runProbeBatch(context.Background(), []string{"n1", "n2"}, now.Add(10*time.Second))
+	if active := s.activeTagSnapshot(); active != "n2" {
+		t.Fatalf("expected immediate switch to n2 after 1 probe failure, got %s", active)
+	}
+	if hist.LoadURLTestHistory("n1") != nil {
+		t.Fatalf("expected URLTest history deleted after single probe failure")
+	}
+}
+
+func TestProberInterfaceUpdatedDebouncesStartupThenResetsCheckSchedule(t *testing.T) {
+	cur := time.Unix(1700000000, 0)
+	var mu sync.Mutex
+	getNow := func() time.Time {
+		mu.Lock()
+		defer mu.Unlock()
+		return cur
+	}
+	advance := func(d time.Duration) {
+		mu.Lock()
+		cur = cur.Add(d)
+		mu.Unlock()
+	}
+
+	opts := AutoSelectOptions{
+		Outbounds:     []string{"n1", "n2"},
+		CheckInterval: badoption.Duration(300 * time.Second),
+	}.normalized()
+	s := newScorer([]string{"n1", "n2"}, opts)
+	p := newProber(opts, s, nil, nil, nil, nil, nil)
+	p.nowFn = getNow
+
+	var probeRounds atomic.Int64
+	doneCh := make(chan struct{}, 10)
+	p.probeFn = func(ctx context.Context, tag string) (uint16, error) {
+		if tag == "n1" {
+			probeRounds.Add(1)
+			select {
+			case doneCh <- struct{}{}:
+			default:
+			}
+		}
+		return 40, nil
+	}
+
+	p.Start(context.Background())
+	defer p.Close()
+
+	// Wait for the 1 cold-start warm-up probe batch
+	select {
+	case <-doneCh:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("timed out waiting for initial cold-start probe")
+	}
+
+	// Immediate InterfaceUpdated within 15s startup debounce MUST NOT trigger a second probe batch
+	p.InterfaceUpdated(context.Background())
+	time.Sleep(80 * time.Millisecond)
+	if rounds := probeRounds.Load(); rounds != 1 {
+		t.Fatalf("expected startup InterfaceUpdated inside 15s debounce to be ignored, got %d rounds", rounds)
+	}
+
+	// Advance past 15s debounce (e.g. genuine Wi-Fi <-> 5G switch at +120s) -> triggers 1 recheck and resets 300s countdown!
+	advance(120 * time.Second)
+	p.InterfaceUpdated(context.Background())
+	select {
+	case <-doneCh:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("timed out waiting for real InterfaceUpdated probe batch")
+	}
+	time.Sleep(50 * time.Millisecond)
+	if rounds := probeRounds.Load(); rounds != 2 {
+		t.Fatalf("expected exactly 1 recheck after real network switch, got %d rounds", rounds)
+	}
+	if rem := p.NextCheckRemainingSec(getNow()); rem != 300 {
+		t.Fatalf("expected NextCheckRemainingSec reset to full 300s after network switch check, got %d", rem)
 	}
 }
 
@@ -55,12 +175,12 @@ func TestProbeConnectivityGuardRollsBackMassOutage(t *testing.T) {
 	var offlineFlag atomic.Bool
 	offlineFlag.Store(true)
 
-	prober := newProber(opts, scorer, newPassiveTracker(60*time.Minute), nil, nil, nil, nil)
+	prober := newProber(opts, scorer, newPassiveTracker(defaultSiteStickyTTL), nil, nil, nil, nil)
 	prober.probeFn = func(ctx context.Context, tag string) (uint16, error) {
 		return 0, errTestFail // 100% failure (e.g. airplane mode / tunnel outage)
 	}
 	prober.connectivityCheckFn = func(ctx context.Context) bool {
-		return !offlineFlag.Load() // direct internet check says offline!
+		return !offlineFlag.Load()
 	}
 
 	prober.runProbeBatch(context.Background(), []string{"n1", "n2", "n3"}, now.Add(10*time.Second))
@@ -68,7 +188,6 @@ func TestProbeConnectivityGuardRollsBackMassOutage(t *testing.T) {
 	if !prober.IsLocalOffline() {
 		t.Fatalf("expected prober to mark localOffline=true when all probes fail and connectivity fails")
 	}
-	// Crucial guarantee: n1 MUST NOT accumulate probe failures due to local internet outage!
 	if _, fails, _ := scorer.sampleCounts("n1"); fails != 0 {
 		t.Fatalf("expected 0 recorded failures during local outage immunity, got %d", fails)
 	}

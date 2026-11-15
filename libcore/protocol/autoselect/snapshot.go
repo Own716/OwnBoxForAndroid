@@ -2,7 +2,6 @@ package autoselect
 
 import (
 	"context"
-	"sort"
 	"time"
 
 	customUrltest "libcore/protocol/urltest"
@@ -29,13 +28,11 @@ func (g *AutoSelect) GroupSnapshot() customUrltest.GroupSnapshot {
 	type memberView struct {
 		tag           string
 		delay         uint16
-		score         float64
 		checkCount    int
 		failCount     int
 		available     bool
 		err           string
 		lastCheckedAt time.Time
-		index         int
 		tier          int
 	}
 
@@ -47,59 +44,25 @@ func (g *AutoSelect) GroupSnapshot() customUrltest.GroupSnapshot {
 		if hasTiers && tag == activeTag {
 			activeTier = st.tier + 1
 		}
-		score, delay, checks, fails, avail := g.scorer.memberScoreLocked(st, g.passive, now)
-		if avail {
+		if st.available {
 			availCount++
 		}
 		errMsg := st.lastError
-		if avail {
+		if st.available {
 			errMsg = ""
 		}
 		views = append(views, memberView{
 			tag:           tag,
-			delay:         delay,
-			score:         score,
-			checkCount:    checks,
-			failCount:     fails,
-			available:     avail,
+			delay:         st.lastDelay,
+			checkCount:    st.checkCount,
+			failCount:     st.failCount,
+			available:     st.available,
 			err:           errMsg,
 			lastCheckedAt: st.lastCheckedAt,
-			index:         st.index,
 			tier:          st.tier,
 		})
 	}
 	g.scorer.mu.RUnlock()
-
-	// Identify up to standbySize best non-active available members
-	standbySet := make(map[string]bool)
-	if g.cfg.standbySize > 0 {
-		var candidates []memberView
-		for _, v := range views {
-			if v.available && v.tag != activeTag {
-				candidates = append(candidates, v)
-			}
-		}
-		sort.SliceStable(candidates, func(i, j int) bool {
-			if g.cfg.selectionMode == SelectionModePriority {
-				if hasTiers {
-					if candidates[i].tier != candidates[j].tier {
-						return candidates[i].tier < candidates[j].tier
-					}
-					if candidates[i].score != candidates[j].score {
-						return candidates[i].score < candidates[j].score
-					}
-				}
-				return candidates[i].index < candidates[j].index
-			}
-			if candidates[i].score != candidates[j].score {
-				return candidates[i].score < candidates[j].score
-			}
-			return candidates[i].index < candidates[j].index
-		})
-		for i := 0; i < len(candidates) && i < g.cfg.standbySize; i++ {
-			standbySet[candidates[i].tag] = true
-		}
-	}
 
 	members := make([]customUrltest.MemberSnapshot, 0, len(views))
 	for _, v := range views {
@@ -107,8 +70,10 @@ func (g *AutoSelect) GroupSnapshot() customUrltest.GroupSnapshot {
 		if v.tag == activeTag {
 			role = RoleActive
 		} else if !v.available {
-			role = RoleFailed
-		} else if standbySet[v.tag] {
+			if v.checkCount > 0 || v.err != "" {
+				role = RoleFailed
+			}
+		} else {
 			role = RoleStandby
 		}
 
@@ -118,7 +83,7 @@ func (g *AutoSelect) GroupSnapshot() customUrltest.GroupSnapshot {
 		}
 
 		displayDelay := int(v.delay)
-		if !v.available && v.err != "" && v.checkCount > 0 && v.delay == 0 {
+		if !v.available && v.err != "" && v.checkCount > 0 {
 			displayDelay = 0
 		}
 

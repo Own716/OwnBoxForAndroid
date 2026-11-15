@@ -163,59 +163,12 @@ internal fun buildLoadBalanceOutbound(
         interrupt_exist_connections = interruptExist ?: false
     }
 
-internal fun buildUrlTestOutbound(
-    memberTags: List<String>,
-    testUrl: String? = null,
-    intervalSec: Long? = null,
-    toleranceMs: Int? = null,
-    idleTimeoutStr: String? = null,
-    interruptExist: Boolean? = null,
-    customTag: String? = null
-) =
-    Outbound_URLTestOptions().apply {
-        type = "urltest"
-        tag = customTag?.takeIf { it.isNotBlank() } ?: TAG_PROXY
-        outbounds = memberTags.distinct()
-        url = testUrl?.takeIf { it.isNotBlank() }
-            ?: runCatching { DataStore.connectionTestURL }.getOrNull()?.takeIf { it.isNotBlank() }
-            ?: "https://cp.cloudflare.com/generate_204"
-        val iv = (intervalSec?.takeIf { it > 0 } ?: 60L).coerceAtLeast(10L)
-        interval = "${iv}s"
-        tolerance = toleranceMs?.takeIf { it >= 0 } ?: 50
-        // Enforce minimum 10-minute idle_timeout regardless of memory mode.
-        // This guarantees Telegram file uploads (which can take many minutes) are never
-        // interrupted by the kernel reclaiming an "idle" leastPing connection pool.
-        // DO NOT lower this threshold for any memory optimization — violates stability contract.
-        val rawIdleTimeout = idleTimeoutStr?.takeIf { it.isNotBlank() }
-        if (rawIdleTimeout != null) {
-            val parsed = if (rawIdleTimeout.all { c -> c.isDigit() }) "${rawIdleTimeout}s" else rawIdleTimeout
-            // Parse minutes from string like "3m", "5m", "10m", "30m"; enforce minimum 30m
-            val minSecs = 30 * 60
-            val parsedSecs = when {
-                parsed.endsWith("m") -> (parsed.dropLast(1).toLongOrNull() ?: 0L) * 60
-                parsed.endsWith("s") -> parsed.dropLast(1).toLongOrNull() ?: 0L
-                else -> 0L
-            }
-            idle_timeout = if (parsedSecs < minSecs) "30m" else parsed
-        } else {
-            idle_timeout = "30m"
-        }
-        // CRITICAL: Never interrupt active connections on node switch.
-        // interrupt_exist_connections=true would instantly kill Telegram upload streams on any
-        // 5ms latency fluctuation. This must always be false — it is NOT overridden by memory mode.
-        interrupt_exist_connections = false
-    }
-
 internal fun buildAutoSelectOutbound(
     balancer: BalancerBean,
     memberEntities: List<ProxyEntity>,
     memberTags: List<String>,
     customTag: String? = null,
     defaultTestUrl: String? = null,
-    nowMs: Long = System.currentTimeMillis(),
-    testTimestampProvider: (Long) -> Long = { id ->
-        if (SagerNet.isInitialized()) DataStore.getProfileTestTimestampMs(id) else 0L
-    },
 ): Outbound_AutoSelectOptions = Outbound_AutoSelectOptions().apply {
     type = "autoselect"
     tag = customTag?.takeIf { it.isNotBlank() } ?: TAG_PROXY
@@ -230,40 +183,10 @@ internal fun buildAutoSelectOutbound(
     balance_mode = balancer.balanceMode?.takeIf { it == BalancerBean.BALANCE_PER_CONNECTION }
         ?: BalancerBean.BALANCE_TIMED_ROTATION
     balance_interval = "${balancer.balanceIntervalSec.coerceAtLeast(1)}s"
-    rank_top_n = balancer.effectiveRunTopN
-    standby_size = balancer.standbySize.coerceAtLeast(0)
-    intensive_check_count = balancer.intensiveCheckCount.coerceAtLeast(1)
     check_interval = "${balancer.interval.coerceAtLeast(5)}s"
-    full_scan_interval = "${balancer.fullScanIntervalSec.coerceAtLeast(5)}s"
-    watch_interval = "${balancer.watchIntervalSec.coerceAtLeast(0)}s"
-    sample_count = balancer.sampleCount.coerceAtLeast(1)
     tolerance = balancer.calculateToleranceMs().coerceIn(0L, 65535L).toInt()
-    max_rtt = balancer.maxRttMs.takeIf { it > 0 }?.let { "${it}ms" }
-    dial_retries = balancer.dialRetries.coerceAtLeast(0)
     interrupt_exist_connections = balancer.interruptOnSwitch
-    failback_checks = balancer.failbackChecks.coerceAtLeast(1)
-    failback_delay = "${balancer.failbackDelaySec.coerceAtLeast(0)}s"
-    interrupt_on_failback = balancer.interruptOnFailback
     learn_from_connections = balancer.learnFromConnections
-    site_sticky_ttl = "${balancer.siteStickyMinutes.coerceAtLeast(0)}m"
-    connectivity_url = balancer.connectivityUrl?.takeIf { it.isNotBlank() }
-
-    val trustWindowMs = balancer.resultTrustMinutes.toLong() * 60_000L
-    if (trustWindowMs > 0L && memberEntities.size == memberTags.size) {
-        val delays = LinkedHashMap<String, Int>()
-        memberEntities.forEachIndexed { idx, member ->
-            val mTag = memberTags[idx]
-            if (mTag in uniqueTags && !delays.containsKey(mTag) && member.status == 1 && member.ping > 0) {
-                val ts = testTimestampProvider(member.id)
-                if (ts > 0L && (nowMs - ts) in 0L..trustWindowMs) {
-                    delays[mTag] = member.ping.coerceAtMost(65535)
-                }
-            }
-        }
-        if (delays.isNotEmpty()) {
-            initial_delays_ms = delays
-        }
-    }
 
     if (balancer.isPriorityMode() && !balancer.tiers.isNullOrEmpty() && memberEntities.size == memberTags.size) {
         val (tierMap, _) = BalancerMemberResolver.assignTierIndices(memberEntities, balancer.tiers)
@@ -296,8 +219,6 @@ internal fun assembleChainGraphForTest(
     entitiesById: Map<Long, ProxyEntity>,
     groupProfiles: Map<Long, List<ProxyEntity>> = emptyMap(),
     groupsById: Map<Long, ProxyGroup> = emptyMap(),
-    nowMs: Long = System.currentTimeMillis(),
-    testTimestampProvider: (Long) -> Long = { 0L },
 ): ChainGraphTestResult {
     val ctx = ChainGraphContext(
         forTest = false,
@@ -327,8 +248,6 @@ internal fun assembleChainGraphForTest(
         getByGroup = { gid -> groupProfiles[gid].orEmpty() },
         getGroup = { gid -> groupsById[gid] },
         isGroupDisabled = { false },
-        testTimestampProvider = testTimestampProvider,
-        nowMs = nowMs,
     )
     val mainProxyTag = ctx.buildChain(0L, root)
     val activeStrategyId = when {
@@ -377,10 +296,6 @@ internal class ChainGraphContext(
     private val isGroupDisabled: (Long) -> Boolean = { gid ->
         if (SagerNet.isInitialized()) DataStore.isGroupDisabled(gid) else false
     },
-    private val testTimestampProvider: (Long) -> Long = { id ->
-        if (SagerNet.isInitialized()) DataStore.getProfileTestTimestampMs(id) else 0L
-    },
-    private val nowMs: Long = System.currentTimeMillis(),
 ) {
     var nextCustomChainId: Long = -1L
     var mainChainBalancerId: Long = 0L
@@ -490,8 +405,6 @@ internal class ChainGraphContext(
                 groupProfilesProvider = getByGroup,
                 entitiesByIdsProvider = getEntities,
                 isGroupDisabled = isGroupDisabled,
-                nowMsProvider = { nowMs },
-                testTimestampProvider = testTimestampProvider,
             )
             val memberEntities = if (!balancerBean.isPriorityMode()) {
                 BalancerMemberResolver.sortForColdStart(resolvedResult.members)
@@ -499,40 +412,25 @@ internal class ChainGraphContext(
                 resolvedResult.members
             }
 
-            val useFront = balancerBean.useFrontProxy
-            val useLanding = balancerBean.useLandingProxy
             val memberEffectiveDetour = balancerFrontTag ?: externalDetour
 
             val memberTags = memberEntities.map { member ->
-                val effectiveUseGroupFront = if (memberEffectiveDetour != null) false else useFront
-                val isCustomMemberChain = memberEffectiveDetour != null || !effectiveUseGroupFront || !useLanding
-                val memberTag = if (isCustomMemberChain) {
-                    val chainKey = BalancerMemberChainKey(
-                        profileId = member.id,
-                        useGroupFront = effectiveUseGroupFront,
-                        useGroupLanding = useLanding,
+                val chainKey = BalancerMemberChainKey(
+                    profileId = member.id,
+                    useGroupFront = false,
+                    useGroupLanding = false,
+                    externalDetour = memberEffectiveDetour,
+                )
+                val memberTag = customChainTagMap.getOrPut(chainKey) {
+                    buildChain(
+                        chainId = nextCustomChainId--,
+                        entity = member,
+                        useGroupFront = false,
+                        useGroupLanding = false,
                         externalDetour = memberEffectiveDetour,
+                        visitedBalancerIds = nextVisited,
+                        isMainChain = false,
                     )
-                    customChainTagMap.getOrPut(chainKey) {
-                        buildChain(
-                            chainId = nextCustomChainId--,
-                            entity = member,
-                            useGroupFront = effectiveUseGroupFront,
-                            useGroupLanding = useLanding,
-                            externalDetour = memberEffectiveDetour,
-                            visitedBalancerIds = nextVisited,
-                            isMainChain = false,
-                        )
-                    }
-                } else {
-                    tagMap.getOrPut(member.id) {
-                        buildChain(
-                            chainId = member.id,
-                            entity = member,
-                            visitedBalancerIds = nextVisited,
-                            isMainChain = false,
-                        )
-                    }
                 }
                 outboundTagProfileMap[memberTag] = member.id
                 memberTag
@@ -544,8 +442,6 @@ internal class ChainGraphContext(
                 memberEntities = memberEntities,
                 memberTags = memberTags,
                 customTag = balancerTag,
-                nowMs = nowMs,
-                testTimestampProvider = testTimestampProvider,
             )
             outbounds.add(balancerOutbound)
             trafficMap[balancerTag] = listOf(entity)

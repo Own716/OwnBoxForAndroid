@@ -203,124 +203,74 @@ class BalancerMemberResolverTest {
     }
 
     @Test
-    fun skipFailedWithinTrustRespectsTrustWindowAndComputesPreviewCounts() {
-        val nowMs = 1_700_000_000_000L
-        val trustMinutes = 60
-        val recentHealthy = socksEntity(1L, 10L, "SG 01").apply { status = 1; ping = 40 }
-        val expiredHealthy = socksEntity(2L, 10L, "SG 02").apply { status = 1; ping = 55 }
-        val recentFailed = socksEntity(3L, 10L, "SG 03").apply { status = 3; ping = 0 }
-        val expiredFailed = socksEntity(4L, 10L, "SG 04").apply { status = 2; ping = 0 }
+    fun resolveIncludesAllCandidatesAndComputesPreviewCountsWithoutSkippingFailed() {
+        val healthyA = socksEntity(1L, 10L, "SG 01").apply { status = 1; ping = 40 }
+        val healthyB = socksEntity(2L, 10L, "SG 02").apply { status = 1; ping = 55 }
+        val failedA = socksEntity(3L, 10L, "SG 03").apply { status = 3; ping = 0 }
+        val failedB = socksEntity(4L, 10L, "SG 04").apply { status = 2; ping = 0 }
         val untested = socksEntity(5L, 10L, "SG 05").apply { status = 0; ping = 0 }
+        val allNodes = listOf(healthyA, healthyB, failedA, failedB, untested)
 
-        val timestamps = mapOf(
-            1L to nowMs - 10 * 60_000L, // recent (10m)
-            2L to nowMs - 120 * 60_000L, // expired (120m > 60m)
-            3L to nowMs - 15 * 60_000L, // recent failure
-            4L to nowMs - 180 * 60_000L, // expired failure
-        )
-        val allNodes = listOf(recentHealthy, expiredHealthy, recentFailed, expiredFailed, untested)
-
-        val skippedResult = BalancerMemberResolver.resolve(
+        val result = BalancerMemberResolver.resolve(
             spec = BalancerMemberResolver.FilterSpec(
                 balancerType = BalancerBean.TYPE_GROUP,
                 targetGroupIds = listOf(10L),
                 explicitProxyIds = emptyList(),
-                resultTrustMinutes = trustMinutes,
-                skipFailedWithinTrust = true,
             ),
             groupProfilesProvider = { allNodes },
             entitiesByIdsProvider = { emptyList() },
             isGroupDisabled = { false },
-            nowMsProvider = { nowMs },
-            testTimestampProvider = { id -> timestamps[id] ?: 0L },
         )
 
-        assertEquals(5, skippedResult.matchedCandidateCount)
-        assertEquals(3, skippedResult.availableCount)
-        assertEquals(1, skippedResult.skippedFailedCount)
-        assertEquals(1, skippedResult.reusableRecentCount)
-        assertEquals(listOf(1L, 2L, 5L, 4L), skippedResult.members.map { it.id })
-
-        val keptResult = BalancerMemberResolver.resolve(
-            spec = BalancerMemberResolver.FilterSpec(
-                balancerType = BalancerBean.TYPE_GROUP,
-                targetGroupIds = listOf(10L),
-                explicitProxyIds = emptyList(),
-                resultTrustMinutes = trustMinutes,
-                skipFailedWithinTrust = false,
-            ),
-            groupProfilesProvider = { allNodes },
-            entitiesByIdsProvider = { emptyList() },
-            isGroupDisabled = { false },
-            nowMsProvider = { nowMs },
-            testTimestampProvider = { id -> timestamps[id] ?: 0L },
-        )
-        assertEquals(0, keptResult.skippedFailedCount)
-        assertEquals(5, keptResult.totalCount)
+        assertEquals(5, result.matchedCandidateCount)
+        assertEquals(3, result.availableCount)
+        assertEquals(5, result.totalCount)
+        assertEquals(listOf(1L, 2L, 5L, 3L, 4L), result.members.map { it.id })
     }
 
     @Test
-    fun runTopNAreAppliedInLatencyWhilePriorityPreservesManualOrderAndZeroMeansUnlimited() {
-        val slowFirst = socksEntity(1L, 10L, "Node 1").apply { status = 1; ping = 220 }
-        val fastSecond = socksEntity(2L, 10L, "Node 2").apply { status = 1; ping = 25 }
-        val midThird = socksEntity(3L, 10L, "Node 3").apply { status = 1; ping = 80 }
-        val failedFourth = socksEntity(4L, 10L, "Node 4").apply { status = 3; ping = 0 }
-        val explicitFifth = socksEntity(5L, 10L, "Node 5").apply { status = 1; ping = 15 }
-        val byId = listOf(slowFirst, fastSecond, midThird, failedFourth, explicitFifth).associateBy { it.id }
+    fun latencySortsColdStartWhilePriorityPreservesManualOrderWithoutHiddenTopNCap() {
+        val manyNodes = (1L..320L).map { id ->
+            socksEntity(id, 10L, "Node $id").apply {
+                status = if (id == 4L) 3 else 1
+                ping = if (id == 4L) 0 else (330 - id).toInt()
+            }
+        }
+        val explicitExtra = socksEntity(321L, 20L, "Node 321").apply { status = 1; ping = 5 }
+        val byId = (manyNodes + explicitExtra).associateBy { it.id }
 
         val latencyResult = BalancerMemberResolver.resolve(
             spec = BalancerMemberResolver.FilterSpec(
                 balancerType = BalancerBean.TYPE_MIXED,
                 targetGroupIds = listOf(10L),
-                explicitProxyIds = listOf(5L),
+                explicitProxyIds = listOf(321L),
                 selectionMode = BalancerBean.SELECTION_LATENCY,
-                runTopN = 3,
             ),
-            groupProfilesProvider = { listOf(slowFirst, fastSecond, midThird, failedFourth) },
+            groupProfilesProvider = { manyNodes },
             entitiesByIdsProvider = { ids -> ids.mapNotNull { byId[it] } },
             isGroupDisabled = { false },
         )
-        // Cold-start sorts by healthy latency: 5(15ms), 2(25ms), 3(80ms), 1(220ms), 4(failed); capped to 3
-        assertEquals(5, latencyResult.matchedCandidateCount)
-        assertEquals(listOf(5L, 2L, 3L), latencyResult.members.map { it.id })
+        assertEquals(321, latencyResult.matchedCandidateCount)
+        assertEquals(321, latencyResult.members.size)
+        assertEquals(321L, latencyResult.members.first().id)
+        assertEquals(4L, latencyResult.members.last().id)
 
         val priorityResult = BalancerMemberResolver.resolve(
             spec = BalancerMemberResolver.FilterSpec(
                 balancerType = BalancerBean.TYPE_MIXED,
                 targetGroupIds = listOf(10L),
-                explicitProxyIds = listOf(5L),
+                explicitProxyIds = listOf(321L),
                 selectionMode = BalancerBean.SELECTION_PRIORITY,
-                runTopN = 3,
             ),
-            groupProfilesProvider = { listOf(slowFirst, fastSecond, midThird, failedFourth) },
+            groupProfilesProvider = { manyNodes },
             entitiesByIdsProvider = { ids -> ids.mapNotNull { byId[it] } },
             isGroupDisabled = { false },
         )
-        // Priority preserves exact order [1, 2, 3, 4, 5], capped to first 3
-        assertEquals(listOf(1L, 2L, 3L), priorityResult.members.map { it.id })
-
-        val unlimitedBean = BalancerBean().apply {
-            balancerType = BalancerBean.TYPE_MIXED
-            targetGroupIds = mutableListOf(10L)
-            proxies = mutableListOf(5L)
-            selectionMode = BalancerBean.SELECTION_PRIORITY
-            runTopN = 0
-            rankTopN = 0
-            initializeDefaultValues()
-        }
-        assertEquals(0, unlimitedBean.runTopN)
-        assertEquals(0, unlimitedBean.effectiveRunTopN)
-        val unlimitedResult = BalancerMemberResolver.resolve(
-            balancer = unlimitedBean,
-            groupProfilesProvider = { listOf(slowFirst, fastSecond, midThird, failedFourth) },
-            entitiesByIdsProvider = { ids -> ids.mapNotNull { byId[it] } },
-            isGroupDisabled = { false },
-        )
-        assertEquals(listOf(1L, 2L, 3L, 4L, 5L), unlimitedResult.members.map { it.id })
+        assertEquals((1L..321L).toList(), priorityResult.members.map { it.id })
     }
 
     @Test
-    fun priorityTiersAssignOrderTrackCountsValidateRegexAndCapProportionally() {
+    fun priorityTiersAssignOrderTrackCountsAndValidateRegexWithoutCapping() {
         val g1Iepl = socksEntity(1L, 10L, "HK IEPL 01")
         val g1Normal = socksEntity(2L, 10L, "HK Normal 01")
         val g2Fast = socksEntity(3L, 20L, "JP BGP 01")
@@ -372,10 +322,10 @@ class BalancerMemberResolverTest {
         assertTrue(invalidRes.hasRegexError)
         assertEquals(listOf(0, 2), invalidRes.tierCounts)
 
-        // Proportional cap when runTopN limits across non-empty tiers
+        // All tiered nodes are preserved across tiers without artificial capping
         val tier1Nodes = (1L..4L).map { socksEntity(it, 10L, "T1-$it") }
         val tier2Nodes = (10L..13L).map { socksEntity(it, 20L, "T2-$it") }
-        val capped = BalancerMemberResolver.resolve(
+        val uncapped = BalancerMemberResolver.resolve(
             spec = BalancerMemberResolver.FilterSpec(
                 balancerType = BalancerBean.TYPE_GROUP,
                 targetGroupIds = listOf(10L, 20L),
@@ -385,12 +335,11 @@ class BalancerMemberResolverTest {
                     BalancerBean.PriorityTier(10L, ""),
                     BalancerBean.PriorityTier(20L, ""),
                 ),
-                runTopN = 4,
             ),
             groupProfilesProvider = { gid -> if (gid == 10L) tier1Nodes else tier2Nodes },
             isGroupDisabled = { false },
         )
-        assertEquals(4, capped.members.size)
-        assertEquals(listOf(2, 2, 0), capped.tierCounts)
+        assertEquals(8, uncapped.members.size)
+        assertEquals(listOf(4, 4, 0), uncapped.tierCounts)
     }
 }

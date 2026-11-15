@@ -1474,9 +1474,9 @@
     <string name="balancer_balance_enabled_off_sum">Off by default: one profile carries all traffic while others stand by. Enable to spread traffic across verified available profiles.</string>
     <string name="balancer_balance_enabled_on_sum">Enabled (%s): spreads traffic across verified available profiles.</string>
     <string name="balancer_preview_title">Profiles</string>
-    <string name="balancer_preview_summary">%2$d of %1$d profiles in group available; will include %3$d. %4$d with recent test results will be reused.</string>
-    <string name="balancer_preview_summary_list">%2$d of %1$d selected profiles available; will include %3$d. %4$d with recent test results will be reused.</string>
-    <string name="balancer_preview_summary_mixed">%2$d of %1$d mixed profiles available; will include %3$d. %4$d with recent test results will be reused.</string>
+    <string name="balancer_preview_summary">%2$d of %1$d profiles in group available; all %3$d will be included.</string>
+    <string name="balancer_preview_summary_list">%2$d of %1$d selected profiles available; all %3$d will be included.</string>
+    <string name="balancer_preview_summary_mixed">%2$d of %1$d mixed profiles available; all %3$d will be included.</string>
     <string name="balancer_advanced_title">Advanced</string>
     <string name="balancer_advanced_show">Show advanced options</string>
     <string name="balancer_advanced_hide">Hide advanced options</string>
@@ -1508,7 +1508,7 @@
     <string name="balancer_interrupt_on_failback">Interrupt Connections on Failback</string>
     <string name="balancer_interrupt_on_failback_sum">Priority mode only. Off: open connections remain while new flows move back up. On: all connections move immediately.</string>
     <string name="balancer_learn_from_connections">Learn from Real Connections</string>
-    <string name="balancer_learn_from_connections_sum">Evaluates profiles from real app connections alongside health checks. Remembers the last working profile per site, temporarily avoids ones that failed for it (~10m recovery) without altering user routing rules, and reduces probes during active traffic.</string>
+    <string name="balancer_learn_from_connections_sum">Remembers the last working profile per site, temporarily avoids ones that failed for it (~10m recovery), and switches away when active connections fail repeatedly without altering routing rules, check intervals, or tolerance.</string>
     <string name="balancer_site_sticky_minutes">Site Memory Duration</string>
     <string name="balancer_balance_mode_title">Mode</string>
     <string name="balancer_balance_mode_timed">Timed Rotation (Session Stable)</string>

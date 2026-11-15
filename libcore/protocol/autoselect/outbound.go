@@ -24,11 +24,11 @@ import (
 )
 
 var (
-	_ adapter.Outbound                = (*AutoSelect)(nil)
-	_ adapter.ConnectionHandler       = (*AutoSelect)(nil)
-	_ adapter.PacketConnectionHandler = (*AutoSelect)(nil)
-	_ adapter.InterfaceUpdateListener = (*AutoSelect)(nil)
-	_ adapter.Referrer                = (*AutoSelect)(nil)
+	_ adapter.Outbound                      = (*AutoSelect)(nil)
+	_ adapter.ConnectionHandler             = (*AutoSelect)(nil)
+	_ adapter.PacketConnectionHandler       = (*AutoSelect)(nil)
+	_ adapter.InterfaceUpdateListener       = (*AutoSelect)(nil)
+	_ adapter.Referrer                      = (*AutoSelect)(nil)
 	_ customUrltest.StrategyGroupController = (*AutoSelect)(nil)
 )
 
@@ -76,6 +76,11 @@ func NewAutoSelect(ctx context.Context, router adapter.Router, logger log.Contex
 	}
 
 	cfg := options.normalized()
+	var passive *passiveTracker
+	if cfg.learnFromConnections {
+		passive = newPassiveTracker(defaultSiteStickyTTL)
+	}
+
 	g := &AutoSelect{
 		Adapter:        outbound.NewAdapter(TypeAutoSelect, tag, []string{N.NetworkTCP, N.NetworkUDP}, options.Outbounds),
 		ctx:            ctx,
@@ -86,7 +91,7 @@ func NewAutoSelect(ctx context.Context, router adapter.Router, logger log.Contex
 		tags:           append([]string(nil), options.Outbounds...),
 		outbounds:      make(map[string]adapter.Outbound, len(options.Outbounds)),
 		scorer:         newScorer(options.Outbounds, cfg),
-		passive:        newPassiveTracker(cfg.siteStickyTTL),
+		passive:        passive,
 		history:        history,
 		interruptGroup: interrupt.NewGroup(),
 		dialFails:      make(map[string]int),
@@ -94,9 +99,6 @@ func NewAutoSelect(ctx context.Context, router adapter.Router, logger log.Contex
 	}
 
 	g.resolveOutboundsLocked()
-	if len(options.InitialDelaysMs) > 0 {
-		g.scorer.seedInitialDelays(options.InitialDelaysMs)
-	}
 	g.scorer.evaluate(g.now(), g.passive)
 
 	pauseMgr := service.FromContext[pause.Manager](ctx)
@@ -189,7 +191,7 @@ func (g *AutoSelect) PerformUpdateCheck() {
 }
 
 func (g *AutoSelect) URLTest(ctx context.Context) (map[string]uint16, error) {
-	results := g.prober.runProbeBatch(ctx, selectFullScanTargets(g.tags, g.cfg), g.now())
+	results := g.prober.runProbeBatch(ctx, append([]string(nil), g.tags...), time.Time{})
 	return results, nil
 }
 
@@ -229,23 +231,15 @@ func (g *AutoSelect) PinOutbound(tag string) bool {
 		delete(g.dialFails, tag)
 		g.dialFailMu.Unlock()
 	}
-	if g.cfg.interruptOnSwitch && g.interruptGroup != nil {
-		g.interruptGroup.Interrupt(true)
-	}
+	g.handleSwitchInterrupt()
 	if g.history != nil {
 		g.history.NotifyUpdated()
 	}
 	return true
 }
 
-func (g *AutoSelect) handleSwitchInterrupt(isFailback bool) {
+func (g *AutoSelect) handleSwitchInterrupt() {
 	if g.interruptGroup == nil {
-		return
-	}
-	if isFailback {
-		if g.cfg.interruptOnFailback {
-			g.interruptGroup.Interrupt(true)
-		}
 		return
 	}
 	if g.cfg.interruptOnSwitch {
@@ -276,7 +270,7 @@ func (g *AutoSelect) DialContext(ctx context.Context, network string, destinatio
 	now := g.now()
 	siteHost := g.siteHostFromContext(ctx, destination)
 	candidates := g.scorer.candidateOrder(normalizeSiteKey(siteHost), now, g.passive)
-	maxAttempts := 1 + g.cfg.dialRetries
+	maxAttempts := 1 + defaultMaxDialRetries
 	if g.PinnedOutbound() != "" {
 		maxAttempts = 1
 	}
@@ -348,7 +342,7 @@ func (g *AutoSelect) ListenPacket(ctx context.Context, destination M.Socksaddr) 
 	now := g.now()
 	siteHost := g.siteHostFromContext(ctx, destination)
 	candidates := g.scorer.candidateOrder(normalizeSiteKey(siteHost), now, g.passive)
-	maxAttempts := 1 + g.cfg.dialRetries
+	maxAttempts := 1 + defaultMaxDialRetries
 	if g.PinnedOutbound() != "" {
 		maxAttempts = 1
 	}
@@ -408,16 +402,15 @@ func (g *AutoSelect) resetDialFail(tag string) {
 }
 
 func (g *AutoSelect) onPassiveFailure(tag, siteHost string) {
-	if g.passive == nil {
+	if !g.cfg.learnFromConnections || g.passive == nil {
 		return
 	}
 	now := g.now()
 	g.passive.RecordFailure(tag, siteHost)
 	_, _, consecFails := g.passive.NodeStats(tag, now)
 	if consecFails >= 2 && tag == g.scorer.activeTagSnapshot() {
-		_, _, switched, isFailback := g.scorer.evaluateWithTransition(now, g.passive)
-		if switched {
-			g.handleSwitchInterrupt(isFailback)
+		if g.scorer.switchFromConnectionFailure(tag, "passive failover", now, g.passive) {
+			g.handleSwitchInterrupt()
 		}
 	}
 }
@@ -434,9 +427,8 @@ func (g *AutoSelect) onDialAttemptFailed(tag, siteHost string, now time.Time) {
 	g.dialFailMu.Unlock()
 
 	if count >= 2 || passiveFails >= 2 {
-		_, _, switched, isFailback := g.scorer.evaluateWithTransition(now, g.passive)
-		if switched {
-			g.handleSwitchInterrupt(isFailback)
+		if g.scorer.switchFromConnectionFailure(tag, "dial failover", now, g.passive) {
+			g.handleSwitchInterrupt()
 		}
 	}
 }

@@ -503,30 +503,12 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var balancerBalanceMode by profileCacheStore.string("balancerBalanceMode") { "timed_rotation" }
     var balancerBalanceIntervalSec by profileCacheStore.stringToInt("balancerBalanceIntervalSec") { 30 }
     var balancerCountryFilter by profileCacheStore.string("balancerCountryFilter") { "" }
-    var balancerRunTopN by profileCacheStore.stringToInt("balancerRunTopN") { 300 }
-    var balancerRankTopN by profileCacheStore.stringToInt("balancerRankTopN") { 1000 }
-    var balancerResultTrustMinutes by profileCacheStore.stringToInt("balancerResultTrustMinutes") { 1440 }
-    var balancerSkipFailedWithinTrust by profileCacheStore.boolean("balancerSkipFailedWithinTrust") { false }
-    var balancerStandbySize by profileCacheStore.stringToInt("balancerStandbySize") { 3 }
-    var balancerIntensiveCheckCount by profileCacheStore.stringToInt("balancerIntensiveCheckCount") { 8 }
     var balancerInterval by profileCacheStore.stringToInt("balancerInterval") { 300 }
-    var balancerFullScanIntervalSec by profileCacheStore.stringToInt("balancerFullScanIntervalSec") { 600 }
-    var balancerWatchIntervalSec by profileCacheStore.stringToInt("balancerWatchIntervalSec") { 15 }
-    var balancerSampleCount by profileCacheStore.stringToInt("balancerSampleCount") { 10 }
     var balancerTolerance by profileCacheStore.stringToInt("balancerTolerance") { 30 }
     var balancerToleranceUnit by profileCacheStore.string("balancerToleranceUnit") { "ms" }
-    var balancerMaxRttMs by profileCacheStore.stringToInt("balancerMaxRttMs") { 0 }
-    var balancerDialRetries by profileCacheStore.stringToInt("balancerDialRetries") { 2 }
     var balancerInterruptOnSwitch by profileCacheStore.boolean("balancerInterruptOnSwitch") { false }
-    var balancerFailbackChecks by profileCacheStore.stringToInt("balancerFailbackChecks") { 3 }
-    var balancerFailbackDelaySec by profileCacheStore.stringToInt("balancerFailbackDelaySec") { 60 }
-    var balancerInterruptOnFailback by profileCacheStore.boolean("balancerInterruptOnFailback") { false }
     var balancerLearnFromConnections by profileCacheStore.boolean("balancerLearnFromConnections") { true }
-    var balancerSiteStickyMinutes by profileCacheStore.stringToInt("balancerSiteStickyMinutes") { 60 }
     var balancerTestUrl by profileCacheStore.string("balancerTestUrl") { "" }
-    var balancerConnectivityUrl by profileCacheStore.string("balancerConnectivityUrl") { "" }
-    var balancerUseFrontProxy by profileCacheStore.boolean("balancerUseFrontProxy")
-    var balancerUseLandingProxy by profileCacheStore.boolean("balancerUseLandingProxy")
     var balancerFrontProxy by profileCacheStore.long("balancerFrontProxyLong")
     var balancerLandingProxy by profileCacheStore.long("balancerLandingProxyLong")
     var balancerFrontProxyTmp by profileCacheStore.stringToInt("balancerFrontProxy")

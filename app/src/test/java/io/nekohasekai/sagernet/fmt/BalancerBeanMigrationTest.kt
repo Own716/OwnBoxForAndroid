@@ -27,6 +27,14 @@ class BalancerBeanMigrationTest {
         nameInclude: String = "SG|JP",
         frontProxy: Long = 77L,
         landingProxy: Long = 88L,
+        selectionMode: String = BalancerBean.SELECTION_PRIORITY,
+        balanceEnabled: Boolean = true,
+        balanceMode: String = BalancerBean.BALANCE_PER_CONNECTION,
+        balanceIntervalSec: Int = 45,
+        countryFilter: String = "SG, JP",
+        interruptOnSwitch: Boolean = true,
+        learnFromConnections: Boolean = false,
+        tiers: List<BalancerBean.PriorityTier> = emptyList(),
         name: String = "Test Balancer",
     ): ByteArray {
         val baos = ByteArrayOutputStream()
@@ -57,6 +65,38 @@ class BalancerBeanMigrationTest {
             out.writeLong(frontProxy)
             out.writeLong(landingProxy)
         }
+        if (version >= 6) {
+            out.writeString(selectionMode)
+            out.writeBoolean(balanceEnabled)
+            out.writeString(balanceMode)
+            out.writeInt(balanceIntervalSec)
+            out.writeString(countryFilter)
+            out.writeInt(300) // legacy runTopN
+            out.writeInt(1000) // legacy rankTopN
+            out.writeInt(1440) // legacy resultTrustMinutes
+            out.writeBoolean(false) // legacy skipFailedWithinTrust
+            out.writeInt(3) // legacy standbySize
+            out.writeInt(8) // legacy intensiveCheckCount
+            out.writeInt(600) // legacy fullScanIntervalSec
+            out.writeInt(15) // legacy watchIntervalSec
+            out.writeInt(10) // legacy sampleCount
+            out.writeInt(500) // legacy maxRttMs
+            out.writeInt(2) // legacy dialRetries
+            out.writeBoolean(interruptOnSwitch)
+            out.writeInt(3) // legacy failbackChecks
+            out.writeInt(60) // legacy failbackDelaySec
+            out.writeBoolean(true) // legacy interruptOnFailback
+            out.writeBoolean(learnFromConnections)
+            out.writeInt(60) // legacy siteStickyMinutes
+            out.writeString("https://connectivity.example.com") // legacy connectivityUrl
+        }
+        if (version >= 7) {
+            out.writeInt(tiers.size)
+            tiers.forEach { tier ->
+                out.writeLong(tier.groupId)
+                out.writeString(tier.nameFilter)
+            }
+        }
         // AbstractBean extra section
         out.writeInt(1)
         out.writeString(name)
@@ -76,26 +116,13 @@ class BalancerBeanMigrationTest {
         assertEquals(BalancerBean.BALANCE_TIMED_ROTATION, bean.balanceMode)
         assertEquals(30, bean.balanceIntervalSec)
         assertEquals("", bean.countryFilter)
-        assertEquals(300, bean.runTopN)
-        assertEquals(1000, bean.rankTopN)
-        assertEquals(1440, bean.resultTrustMinutes)
-        assertFalse(bean.skipFailedWithinTrust)
-        assertEquals(3, bean.standbySize)
-        assertEquals(8, bean.intensiveCheckCount)
         assertEquals(300, bean.interval)
-        assertEquals(600, bean.fullScanIntervalSec)
-        assertEquals(15, bean.watchIntervalSec)
-        assertEquals(10, bean.sampleCount)
         assertEquals(30, bean.tolerance)
-        assertEquals(0, bean.maxRttMs)
-        assertEquals(2, bean.dialRetries)
+        assertEquals("ms", bean.toleranceUnit)
         assertFalse(bean.interruptOnSwitch)
-        assertEquals(3, bean.failbackChecks)
-        assertEquals(60, bean.failbackDelaySec)
-        assertFalse(bean.interruptOnFailback)
         assertTrue(bean.learnFromConnections)
-        assertEquals(60, bean.siteStickyMinutes)
-        assertEquals("", bean.connectivityUrl)
+        assertEquals(-1L, bean.frontProxy)
+        assertEquals(-1L, bean.landingProxy)
     }
 
     @Test
@@ -118,7 +145,7 @@ class BalancerBeanMigrationTest {
     }
 
     @Test
-    fun `v4 and v5 distribution strategies migrate accurately preserving all legacy fields`() {
+    fun `v4 and v5 distribution strategies migrate accurately preserving active legacy fields`() {
         val v4RoundRobin = KryoConverters.deserialize(
             BalancerBean(),
             buildLegacyBlob(version = 4, strategy = BalancerBean.STRATEGY_ROUND_ROBIN, tolerance = 80)
@@ -129,7 +156,6 @@ class BalancerBeanMigrationTest {
         assertEquals(80, v4RoundRobin.tolerance)
         assertEquals("Traffic|Expire", v4RoundRobin.nameExclude)
         assertEquals("SG|JP", v4RoundRobin.nameInclude)
-        assertTrue(v4RoundRobin.useFrontProxy)
 
         val v5Consistent = KryoConverters.deserialize(
             BalancerBean(),
@@ -144,7 +170,6 @@ class BalancerBeanMigrationTest {
         assertTrue(v5Consistent.balanceEnabled)
         assertEquals(BalancerBean.BALANCE_TIMED_ROTATION, v5Consistent.balanceMode)
         assertTrue(v5Consistent.learnFromConnections)
-        assertEquals(60, v5Consistent.siteStickyMinutes)
         assertEquals(501L, v5Consistent.frontProxy)
         assertEquals(502L, v5Consistent.landingProxy)
 
@@ -158,7 +183,7 @@ class BalancerBeanMigrationTest {
     }
 
     @Test
-    fun `v6 round trip preserves all fields and formats displayAddress cleanly`() {
+    fun `v8 round trip preserves active fields and formats displayAddress cleanly`() {
         val original = BalancerBean().apply {
             balancerType = BalancerBean.TYPE_MIXED
             targetGroupIds = mutableListOf(1L, 2L)
@@ -168,26 +193,10 @@ class BalancerBeanMigrationTest {
             balanceMode = BalancerBean.BALANCE_PER_CONNECTION
             balanceIntervalSec = 45
             countryFilter = "SG, JP"
-            runTopN = 50
-            rankTopN = 200
-            resultTrustMinutes = 720
-            skipFailedWithinTrust = true
-            standbySize = 4
-            intensiveCheckCount = 12
             interval = 240
-            fullScanIntervalSec = 900
-            watchIntervalSec = 20
-            sampleCount = 15
             tolerance = 40
-            maxRttMs = 500
-            dialRetries = 3
             interruptOnSwitch = true
-            failbackChecks = 4
-            failbackDelaySec = 90
-            interruptOnFailback = true
             learnFromConnections = false
-            siteStickyMinutes = 120
-            connectivityUrl = "https://connectivity.example.com"
             frontProxy = 8L
             landingProxy = 9L
         }
@@ -198,26 +207,10 @@ class BalancerBeanMigrationTest {
         assertEquals(BalancerBean.BALANCE_PER_CONNECTION, cloned.balanceMode)
         assertEquals(45, cloned.balanceIntervalSec)
         assertEquals("SG, JP", cloned.countryFilter)
-        assertEquals(50, cloned.runTopN)
-        assertEquals(200, cloned.rankTopN)
-        assertEquals(720, cloned.resultTrustMinutes)
-        assertTrue(cloned.skipFailedWithinTrust)
-        assertEquals(4, cloned.standbySize)
-        assertEquals(12, cloned.intensiveCheckCount)
         assertEquals(240, cloned.interval)
-        assertEquals(900, cloned.fullScanIntervalSec)
-        assertEquals(20, cloned.watchIntervalSec)
-        assertEquals(15, cloned.sampleCount)
         assertEquals(40, cloned.tolerance)
-        assertEquals(500, cloned.maxRttMs)
-        assertEquals(3, cloned.dialRetries)
         assertTrue(cloned.interruptOnSwitch)
-        assertEquals(4, cloned.failbackChecks)
-        assertEquals(90, cloned.failbackDelaySec)
-        assertTrue(cloned.interruptOnFailback)
         assertFalse(cloned.learnFromConnections)
-        assertEquals(120, cloned.siteStickyMinutes)
-        assertEquals("https://connectivity.example.com", cloned.connectivityUrl)
         assertEquals(8L, cloned.frontProxy)
         assertEquals(9L, cloned.landingProxy)
 
@@ -228,7 +221,7 @@ class BalancerBeanMigrationTest {
     }
 
     @Test
-    fun `v7 round trip preserves priority tiers and json conversion`() {
+    fun `v8 round trip preserves priority tiers and json conversion`() {
         val original = BalancerBean().apply {
             initializeDefaultValues()
             selectionMode = BalancerBean.SELECTION_PRIORITY
@@ -259,13 +252,53 @@ class BalancerBeanMigrationTest {
     }
 
     @Test
-    fun `v6 binary blob upgrades to v7 with empty tiers`() {
-        val v6Blob = buildLegacyBlob(version = 5, strategy = BalancerBean.STRATEGY_FAILOVER).let { prefix ->
-            // Verify v5 and v6-style upgrade compatibility
-            prefix
-        }
-        val upgraded = KryoConverters.deserialize(BalancerBean(), v6Blob)
-        assertEquals(BalancerBean.SELECTION_PRIORITY, upgraded.selectionMode)
-        assertTrue(upgraded.tiers.isEmpty())
+    fun `legacy v6 and v7 binary blobs deserialize safely and upgrade cleanly to v8`() {
+        val v6Blob = buildLegacyBlob(
+            version = 6,
+            selectionMode = BalancerBean.SELECTION_PRIORITY,
+            balanceEnabled = true,
+            balanceMode = BalancerBean.BALANCE_PER_CONNECTION,
+            balanceIntervalSec = 55,
+            countryFilter = "JP",
+            interval = 420,
+            tolerance = 15,
+            interruptOnSwitch = true,
+            learnFromConnections = false,
+            frontProxy = 33L,
+            landingProxy = 44L,
+        )
+        val fromV6 = KryoConverters.deserialize(BalancerBean(), v6Blob)
+        assertEquals(BalancerBean.SELECTION_PRIORITY, fromV6.selectionMode)
+        assertTrue(fromV6.balanceEnabled)
+        assertEquals(BalancerBean.BALANCE_PER_CONNECTION, fromV6.balanceMode)
+        assertEquals(55, fromV6.balanceIntervalSec)
+        assertEquals("JP", fromV6.countryFilter)
+        assertEquals(420, fromV6.interval)
+        assertEquals(15, fromV6.tolerance)
+        assertTrue(fromV6.interruptOnSwitch)
+        assertFalse(fromV6.learnFromConnections)
+        assertEquals(33L, fromV6.frontProxy)
+        assertEquals(44L, fromV6.landingProxy)
+        assertTrue(fromV6.tiers.isEmpty())
+
+        val v7Blob = buildLegacyBlob(
+            version = 7,
+            selectionMode = BalancerBean.SELECTION_PRIORITY,
+            tiers = listOf(
+                BalancerBean.PriorityTier(12L, "IEPL"),
+                BalancerBean.PriorityTier(-1L, "Direct"),
+            ),
+        )
+        val fromV7 = KryoConverters.deserialize(BalancerBean(), v7Blob)
+        assertEquals(2, fromV7.tiers.size)
+        assertEquals(12L, fromV7.tiers[0].groupId)
+        assertEquals("IEPL", fromV7.tiers[0].nameFilter)
+        assertEquals(-1L, fromV7.tiers[1].groupId)
+        assertEquals("Direct", fromV7.tiers[1].nameFilter)
+
+        val reSerialized = fromV7.clone()
+        assertEquals(2, reSerialized.tiers.size)
+        assertEquals("IEPL", reSerialized.tiers[0].nameFilter)
+        assertEquals(15, fromV6.clone().tolerance)
     }
 }

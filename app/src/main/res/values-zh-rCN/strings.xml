@@ -1392,9 +1392,9 @@
     <string name="balancer_balance_enabled_off_sum">默认关闭：一个配置承载全部流量，其余待命。开启后可将流量分散到已确认可用的配置上。</string>
     <string name="balancer_balance_enabled_on_sum">已开启：%s。流量将分散到已确认可用的配置上。</string>
     <string name="balancer_preview_title">配置</string>
-    <string name="balancer_preview_summary">所选分组 %1$d 个配置中有 %2$d 个可用；将纳入 %3$d 个。%4$d 个有近期测试结果将被复用。</string>
-    <string name="balancer_preview_summary_list">已选列表 %1$d 个配置中有 %2$d 个可用；将纳入 %3$d 个。%4$d 个有近期测试结果将被复用。</string>
-    <string name="balancer_preview_summary_mixed">混搭池 %1$d 个配置中有 %2$d 个可用；将纳入 %3$d 个。%4$d 个有近期测试结果将被复用。</string>
+    <string name="balancer_preview_summary">所选分组 %1$d 个配置中有 %2$d 个可用；已全部纳入 %3$d 个。</string>
+    <string name="balancer_preview_summary_list">已选列表 %1$d 个配置中有 %2$d 个可用；已全部纳入 %3$d 个。</string>
+    <string name="balancer_preview_summary_mixed">混搭池 %1$d 个配置中有 %2$d 个可用；已全部纳入 %3$d 个。</string>
     <string name="balancer_advanced_title">高级</string>
     <string name="balancer_advanced_show">显示高级选项</string>
     <string name="balancer_advanced_hide">隐藏高级选项</string>
@@ -1426,7 +1426,7 @@
     <string name="balancer_interrupt_on_failback">移回时断开连接</string>
     <string name="balancer_interrupt_on_failback_sum">仅优先级顺序生效。关：已打开的连接留在原配置上，只有新连接移到更高顺位。开：所有连接立即移动。</string>
     <string name="balancer_learn_from_connections">从真实连接中学习</string>
-    <string name="balancer_learn_from_connections_sum">除健康检查外，还根据应用经由配置建立的真实连接表现动态评估延迟。每个网站也会被记住上次可用的配置，并暂时避开对它失败的配置（约 10 分钟后自动恢复尝试），不影响用户自己配置的分流规则。有真实流量时，会减少定期检查的频率，并延后仅因使用中配置健康检查而造成的切换。</string>
+    <string name="balancer_learn_from_connections_sum">记住每个网站上次可用的配置，并暂时避开对它失败的配置（约 10 分钟后自动恢复尝试）；当当前使用中配置连续建立真实连接失败时也会主动切换备用配置，不影响分流规则、检查间隔或切换容差。</string>
     <string name="balancer_site_sticky_minutes">网站选择记忆时长</string>
     <string name="balancer_balance_mode_title">模式</string>
     <string name="balancer_balance_mode_timed">按时间轮换 (保持会话稳定)</string>

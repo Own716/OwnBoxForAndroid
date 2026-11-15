@@ -48,8 +48,6 @@ public class BalancerBean extends InternalBean {
     public int tolerance = 30;
     public String toleranceUnit = "ms";
     // v4 fields
-    public boolean useFrontProxy = false;
-    public boolean useLandingProxy = false;
     public String nameExclude = "";
     public String nameInclude = "";
     // v5 fields
@@ -61,24 +59,8 @@ public class BalancerBean extends InternalBean {
     public String balanceMode = BALANCE_TIMED_ROTATION;
     public int balanceIntervalSec = 30;
     public String countryFilter = "";
-    public int runTopN = 300;
-    public int rankTopN = 1000;
-    public int resultTrustMinutes = 1440;
-    public boolean skipFailedWithinTrust = false;
-    public int standbySize = 3;
-    public int intensiveCheckCount = 8;
-    public int fullScanIntervalSec = 600;
-    public int watchIntervalSec = 15;
-    public int sampleCount = 10;
-    public int maxRttMs = 0;
-    public int dialRetries = 2;
     public boolean interruptOnSwitch = false;
-    public int failbackChecks = 3;
-    public int failbackDelaySec = 60;
-    public boolean interruptOnFailback = false;
     public boolean learnFromConnections = true;
-    public int siteStickyMinutes = 60;
-    public String connectivityUrl = "";
     // v7 priority tiers
     public List<PriorityTier> tiers = new ArrayList<>();
 
@@ -225,41 +207,23 @@ public class BalancerBean extends InternalBean {
         return prefix;
     }
 
-    public int getEffectiveRunTopN() {
-        if (runTopN <= 0) return 0;
-        if (rankTopN > 0 && rankTopN < runTopN) return rankTopN;
-        return runTopN;
+    private static String nonNullString(String value) {
+        return value != null ? value : "";
     }
 
-    private void resetV6Defaults() {
+    private void resetActiveStrategyDefaults() {
         selectionMode = SELECTION_LATENCY;
         balanceEnabled = false;
         balanceMode = BALANCE_TIMED_ROTATION;
         balanceIntervalSec = 30;
         countryFilter = "";
-        runTopN = 300;
-        rankTopN = 1000;
-        resultTrustMinutes = 1440;
-        skipFailedWithinTrust = false;
-        standbySize = 3;
-        intensiveCheckCount = 8;
-        fullScanIntervalSec = 600;
-        watchIntervalSec = 15;
-        sampleCount = 10;
-        maxRttMs = 0;
-        dialRetries = 2;
         interruptOnSwitch = false;
-        failbackChecks = 3;
-        failbackDelaySec = 60;
-        interruptOnFailback = false;
         learnFromConnections = true;
-        siteStickyMinutes = 60;
-        connectivityUrl = "";
         tiers = new ArrayList<>();
     }
 
     private void migrateLegacyStrategy(String rawStrategy) {
-        resetV6Defaults();
+        resetActiveStrategyDefaults();
         String norm = rawStrategy != null ? rawStrategy.trim() : "";
         if (STRATEGY_FAILOVER.equals(norm) || SELECTION_PRIORITY.equals(norm)) {
             selectionMode = SELECTION_PRIORITY;
@@ -278,7 +242,6 @@ public class BalancerBean extends InternalBean {
             balanceEnabled = true;
             balanceMode = BALANCE_TIMED_ROTATION;
             learnFromConnections = true;
-            siteStickyMinutes = 60;
         } else {
             selectionMode = SELECTION_LATENCY;
             balanceEnabled = false;
@@ -307,20 +270,6 @@ public class BalancerBean extends InternalBean {
         }
         if (balanceIntervalSec <= 0) balanceIntervalSec = 30;
         if (countryFilter == null) countryFilter = "";
-        if (runTopN < 0) runTopN = 300;
-        if (rankTopN < 0) rankTopN = 1000;
-        if (resultTrustMinutes < 0) resultTrustMinutes = 1440;
-        if (standbySize < 0) standbySize = 3;
-        if (intensiveCheckCount <= 0) intensiveCheckCount = 8;
-        if (fullScanIntervalSec <= 0) fullScanIntervalSec = 600;
-        if (watchIntervalSec < 0) watchIntervalSec = 15;
-        if (sampleCount <= 0) sampleCount = 10;
-        if (maxRttMs < 0) maxRttMs = 0;
-        if (dialRetries < 0) dialRetries = 2;
-        if (failbackChecks <= 0) failbackChecks = 3;
-        if (failbackDelaySec < 0) failbackDelaySec = 60;
-        if (siteStickyMinutes < 0) siteStickyMinutes = 60;
-        if (connectivityUrl == null) connectivityUrl = "";
         if (testUrl == null) testUrl = "";
         if (interval <= 0) interval = 300;
         if (tolerance < 0) tolerance = 30;
@@ -336,16 +285,19 @@ public class BalancerBean extends InternalBean {
         String effectiveSelection = SELECTION_PRIORITY.equals(selectionMode) ? SELECTION_PRIORITY : SELECTION_LATENCY;
         strategy = effectiveSelection;
 
-        output.writeInt(7); // version
+        output.writeInt(8); // version
         output.writeInt(balancerType);
         output.writeLong(targetGroupId);
         output.writeString(strategy);
-        output.writeString(testUrl);
+        output.writeString(nonNullString(testUrl));
         output.writeInt(interval);
 
+        if (proxies == null) {
+            proxies = new ArrayList<>();
+        }
         output.writeInt(proxies.size());
         for (Long proxy : proxies) {
-            output.writeLong(proxy);
+            output.writeLong(proxy != null ? proxy : 0L);
         }
 
         if (targetGroupIds == null) {
@@ -353,43 +305,22 @@ public class BalancerBean extends InternalBean {
         }
         output.writeInt(targetGroupIds.size());
         for (Long gid : targetGroupIds) {
-            output.writeLong(gid);
+            output.writeLong(gid != null ? gid : 0L);
         }
         output.writeInt(tolerance);
         output.writeString(toleranceUnit != null ? toleranceUnit : "ms");
-        // v4 fields
-        output.writeBoolean(useFrontProxy);
-        output.writeBoolean(useLandingProxy);
-        output.writeString(nameExclude != null ? nameExclude : "");
-        output.writeString(nameInclude != null ? nameInclude : "");
-        // v5 fields
+        output.writeString(nonNullString(nameExclude));
+        output.writeString(nonNullString(nameInclude));
         output.writeLong(frontProxy);
         output.writeLong(landingProxy);
-        // v6 fields
         output.writeString(effectiveSelection);
         output.writeBoolean(balanceEnabled);
         output.writeString(balanceMode != null ? balanceMode : BALANCE_TIMED_ROTATION);
         output.writeInt(balanceIntervalSec);
-        output.writeString(countryFilter != null ? countryFilter : "");
-        output.writeInt(runTopN);
-        output.writeInt(rankTopN);
-        output.writeInt(resultTrustMinutes);
-        output.writeBoolean(skipFailedWithinTrust);
-        output.writeInt(standbySize);
-        output.writeInt(intensiveCheckCount);
-        output.writeInt(fullScanIntervalSec);
-        output.writeInt(watchIntervalSec);
-        output.writeInt(sampleCount);
-        output.writeInt(maxRttMs);
-        output.writeInt(dialRetries);
+        output.writeString(nonNullString(countryFilter));
         output.writeBoolean(interruptOnSwitch);
-        output.writeInt(failbackChecks);
-        output.writeInt(failbackDelaySec);
-        output.writeBoolean(interruptOnFailback);
         output.writeBoolean(learnFromConnections);
-        output.writeInt(siteStickyMinutes);
-        output.writeString(connectivityUrl != null ? connectivityUrl : "");
-        // v7 fields
+
         if (tiers == null) {
             tiers = new ArrayList<>();
         }
@@ -407,7 +338,7 @@ public class BalancerBean extends InternalBean {
             balancerType = input.readInt();
             targetGroupId = input.readLong();
             strategy = input.readString();
-            testUrl = input.readString();
+            testUrl = nonNullString(input.readString());
             interval = input.readInt();
 
             int length = input.readInt();
@@ -429,19 +360,43 @@ public class BalancerBean extends InternalBean {
             if (version >= 3) {
                 tolerance = input.readInt();
                 toleranceUnit = input.readString();
+                if (toleranceUnit == null || toleranceUnit.isEmpty()) {
+                    toleranceUnit = "ms";
+                }
             } else {
                 tolerance = 50;
                 toleranceUnit = "ms";
             }
 
+            if (version >= 8) {
+                nameExclude = nonNullString(input.readString());
+                nameInclude = nonNullString(input.readString());
+                frontProxy = input.readLong();
+                landingProxy = input.readLong();
+                selectionMode = input.readString();
+                balanceEnabled = input.readBoolean();
+                balanceMode = input.readString();
+                if (!BALANCE_PER_CONNECTION.equals(balanceMode)) {
+                    balanceMode = BALANCE_TIMED_ROTATION;
+                }
+                balanceIntervalSec = input.readInt();
+                countryFilter = nonNullString(input.readString());
+                interruptOnSwitch = input.readBoolean();
+                learnFromConnections = input.readBoolean();
+                if (!SELECTION_PRIORITY.equals(selectionMode)) {
+                    selectionMode = SELECTION_LATENCY;
+                }
+                strategy = selectionMode;
+                readTiers(input);
+                return;
+            }
+
             if (version >= 4) {
-                useFrontProxy = input.readBoolean();
-                useLandingProxy = input.readBoolean();
-                nameExclude = input.readString();
-                nameInclude = input.readString();
+                input.readBoolean(); // legacy useFrontProxy
+                input.readBoolean(); // legacy useLandingProxy
+                nameExclude = nonNullString(input.readString());
+                nameInclude = nonNullString(input.readString());
             } else {
-                useFrontProxy = false;
-                useLandingProxy = false;
                 nameExclude = "";
                 nameInclude = "";
             }
@@ -458,26 +413,29 @@ public class BalancerBean extends InternalBean {
                 selectionMode = input.readString();
                 balanceEnabled = input.readBoolean();
                 balanceMode = input.readString();
+                if (!BALANCE_PER_CONNECTION.equals(balanceMode)) {
+                    balanceMode = BALANCE_TIMED_ROTATION;
+                }
                 balanceIntervalSec = input.readInt();
-                countryFilter = input.readString();
-                runTopN = input.readInt();
-                rankTopN = input.readInt();
-                resultTrustMinutes = input.readInt();
-                skipFailedWithinTrust = input.readBoolean();
-                standbySize = input.readInt();
-                intensiveCheckCount = input.readInt();
-                fullScanIntervalSec = input.readInt();
-                watchIntervalSec = input.readInt();
-                sampleCount = input.readInt();
-                maxRttMs = input.readInt();
-                dialRetries = input.readInt();
+                countryFilter = nonNullString(input.readString());
+                input.readInt(); // legacy runTopN
+                input.readInt(); // legacy rankTopN
+                input.readInt(); // legacy resultTrustMinutes
+                input.readBoolean(); // legacy skipFailedWithinTrust
+                input.readInt(); // legacy standbySize
+                input.readInt(); // legacy intensiveCheckCount
+                input.readInt(); // legacy fullScanIntervalSec
+                input.readInt(); // legacy watchIntervalSec
+                input.readInt(); // legacy sampleCount
+                input.readInt(); // legacy maxRttMs
+                input.readInt(); // legacy dialRetries
                 interruptOnSwitch = input.readBoolean();
-                failbackChecks = input.readInt();
-                failbackDelaySec = input.readInt();
-                interruptOnFailback = input.readBoolean();
+                input.readInt(); // legacy failbackChecks
+                input.readInt(); // legacy failbackDelaySec
+                input.readBoolean(); // legacy interruptOnFailback
                 learnFromConnections = input.readBoolean();
-                siteStickyMinutes = input.readInt();
-                connectivityUrl = input.readString();
+                input.readInt(); // legacy siteStickyMinutes
+                input.readString(); // legacy connectivityUrl
                 if (!SELECTION_PRIORITY.equals(selectionMode)) {
                     selectionMode = SELECTION_LATENCY;
                 }
@@ -488,13 +446,18 @@ public class BalancerBean extends InternalBean {
 
             tiers = new ArrayList<>();
             if (version >= 7) {
-                int tCount = input.readInt();
-                for (int i = 0; i < tCount; i++) {
-                    long gId = input.readLong();
-                    String filter = input.readString();
-                    tiers.add(new PriorityTier(gId, filter));
-                }
+                readTiers(input);
             }
+        }
+    }
+
+    private void readTiers(ByteBufferInput input) {
+        tiers = new ArrayList<>();
+        int tCount = input.readInt();
+        for (int i = 0; i < tCount; i++) {
+            long gId = input.readLong();
+            String filter = nonNullString(input.readString());
+            tiers.add(new PriorityTier(gId, filter));
         }
     }
 

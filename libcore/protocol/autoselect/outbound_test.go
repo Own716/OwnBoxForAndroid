@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -70,7 +71,7 @@ func newAutoSelectTestContext(mgr adapter.OutboundManager) context.Context {
 	return ctx
 }
 
-func TestAutoSelectColdStartPinRetriesAndSnapshot(t *testing.T) {
+func TestAutoSelectPinFailoverSnapshotAndUnifiedInterrupt(t *testing.T) {
 	m1 := newMockMember("sg-1")
 	m2 := newMockMember("sg-2")
 	m1.dialFn = func(ctx context.Context, network string, destination metadata.Socksaddr) (net.Conn, error) {
@@ -90,36 +91,71 @@ func TestAutoSelectColdStartPinRetriesAndSnapshot(t *testing.T) {
 	ctx := newAutoSelectTestContext(mgr)
 
 	opts := AutoSelectOptions{
-		Outbounds:   []string{"sg-1", "sg-2"},
-		DialRetries: intPtr(2),
-		InitialDelaysMs: map[string]uint16{
-			"sg-1": 45,
-			"sg-2": 90,
-		},
+		Outbounds:                 []string{"sg-1", "sg-2"},
+		SelectionMode:             SelectionModePriority,
+		InterruptExistConnections: true,
 	}
 
 	ob, err := NewAutoSelect(ctx, nil, log.NewNOPFactory().Logger(), "strategy-sg", opts)
 	if err != nil {
 		t.Fatalf("NewAutoSelect error: %v", err)
 	}
+	now := time.Now()
+	ob.scorer.recordSample("sg-1", 45, nil, now)
+	ob.scorer.recordSample("sg-2", 90, nil, now)
+	ob.scorer.evaluate(now, ob.passive)
 
-	// Cold start immediately knows active = sg-1 (45ms) before any live probe!
 	snap := ob.GroupSnapshot()
 	if snap.ActiveTag != "sg-1" || snap.StrategyType != TypeAutoSelect {
-		t.Fatalf("unexpected cold start snapshot: active=%q type=%q", snap.ActiveTag, snap.StrategyType)
+		t.Fatalf("unexpected initial snapshot: active=%q type=%q", snap.ActiveTag, snap.StrategyType)
 	}
 	if snap.AvailableCount != 2 || snap.TotalCount != 2 {
-		t.Fatalf("expected 2 available / 2 total on cold start, got %d/%d", snap.AvailableCount, snap.TotalCount)
+		t.Fatalf("expected 2 available / 2 total, got %d/%d", snap.AvailableCount, snap.TotalCount)
+	}
+	// All healthy non-active nodes must appear as standby without hidden standbySize truncation.
+	if snap.Members[1].Role != RoleStandby {
+		t.Fatalf("expected healthy backup role='standby', got %q", snap.Members[1].Role)
 	}
 
-	// DialContext fails on sg-1 and automatically fails over to sg-2 via dialRetries=2
+	// DialContext fails on sg-1 and automatically tries fallback sg-2
 	conn, err := ob.DialContext(ctx, N.NetworkTCP, metadata.ParseSocksaddrHostPort("example.com", 443))
 	if err != nil {
-		t.Fatalf("expected dialRetries failover to sg-2, got err: %v", err)
+		t.Fatalf("expected internal dial failover to sg-2, got err: %v", err)
 	}
+
+	// Track interrupt on priority failback via InterruptExistConnections
+	var interruptCalled atomic.Int64
+	ob.prober.onSwitchFn = func() {
+		interruptCalled.Add(1)
+		ob.handleSwitchInterrupt()
+	}
+	ob.prober.probeFn = func(ctx context.Context, tag string) (uint16, error) {
+		if tag == "sg-1" {
+			return 0, errors.New("probe error")
+		}
+		return 80, nil
+	}
+	ob.prober.runProbeBatch(ctx, []string{"sg-1", "sg-2"}, now.Add(time.Second))
+	if ob.Now() != "sg-2" {
+		t.Fatalf("expected immediate 1-fail switch to sg-2, got %q", ob.Now())
+	}
+
+	// sg-1 passes 1 probe -> immediate priority failback AND unified interrupt!
+	ob.prober.probeFn = func(ctx context.Context, tag string) (uint16, error) {
+		return 40, nil
+	}
+	beforeCount := interruptCalled.Load()
+	ob.prober.runProbeBatch(ctx, []string{"sg-1", "sg-2"}, now.Add(2*time.Second))
+	if ob.Now() != "sg-1" {
+		t.Fatalf("expected immediate priority failback to sg-1, got %q", ob.Now())
+	}
+	if interruptCalled.Load() != beforeCount+1 {
+		t.Fatalf("expected InterruptExistConnections callback on priority failback")
+	}
+	// Connection opened earlier under InterruptGroup should now observe closure if external/managed
 	_ = conn.Close()
 
-	// Strict pin holds sg-2 (or sg-1) regardless of auto scores
+	// Strict pin holds sg-1 regardless of auto scores
 	if !ob.PinOutbound("sg-1") {
 		t.Fatalf("expected PinOutbound('sg-1') to return true")
 	}
@@ -138,15 +174,40 @@ func TestAutoSelectColdStartPinRetriesAndSnapshot(t *testing.T) {
 	if err := json.Unmarshal(raw, &decoded); err != nil {
 		t.Fatalf("json unmarshal error: %v", err)
 	}
-	if decoded["selectionMode"] != SelectionModeLatency || int(decoded["learnedSiteCount"].(float64)) != 1 {
+	if decoded["selectionMode"] != SelectionModePriority || int(decoded["learnedSiteCount"].(float64)) != 1 {
 		t.Fatalf("unexpected decoded snapshot telemetry: %v", decoded)
 	}
 
-	// Control token :clear_learned clears site memory without crashing or pinning
+	// Control token :clear_learned clears site memory without pinning
 	if !ob.PinOutbound(":clear_learned") {
 		t.Fatalf("expected ':clear_learned' control token to succeed")
 	}
 	if ob.GroupSnapshot().LearnedSiteCount != 0 {
 		t.Fatalf("expected LearnedSiteCount == 0 after ':clear_learned'")
+	}
+}
+
+func TestAutoSelectLearnFromConnectionsDisabledDisablesPassiveTracker(t *testing.T) {
+	m1 := newMockMember("sg-1")
+	m2 := newMockMember("sg-2")
+	mgr := &mockOutboundManager{
+		items: map[string]adapter.Outbound{"sg-1": m1, "sg-2": m2},
+	}
+	ctx := newAutoSelectTestContext(mgr)
+	learnFalse := false
+
+	ob, err := NewAutoSelect(ctx, nil, log.NewNOPFactory().Logger(), "strategy-off", AutoSelectOptions{
+		Outbounds:            []string{"sg-1", "sg-2"},
+		LearnFromConnections: &learnFalse,
+	})
+	if err != nil {
+		t.Fatalf("NewAutoSelect error: %v", err)
+	}
+	if ob.passive != nil {
+		t.Fatalf("expected passive tracker to be nil when learn_from_connections=false")
+	}
+	snap := ob.GroupSnapshot()
+	if snap.LearnEnabled || snap.LearnedSiteCount != 0 {
+		t.Fatalf("expected LearnEnabled=false and LearnedSiteCount=0, got %+v", snap)
 	}
 }

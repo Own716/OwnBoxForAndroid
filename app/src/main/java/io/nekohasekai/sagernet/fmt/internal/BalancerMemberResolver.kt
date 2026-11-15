@@ -22,10 +22,6 @@ object BalancerMemberResolver {
         val countryFilter: String = "",
         val selectionMode: String = BalancerBean.SELECTION_LATENCY,
         val tiers: List<BalancerBean.PriorityTier> = emptyList(),
-        val runTopN: Int = 300,
-        val rankTopN: Int = 0,
-        val resultTrustMinutes: Int = 1440,
-        val skipFailedWithinTrust: Boolean = false,
     )
 
     data class ResolutionResult(
@@ -39,8 +35,6 @@ object BalancerMemberResolver {
         val memberTierIndices: Map<Long, Int> = emptyMap(),
         val matchedCandidateCount: Int = members.size,
         val availableCount: Int = members.count { it.status != 2 && it.status != 3 },
-        val skippedFailedCount: Int = 0,
-        val reusableRecentCount: Int = 0,
     ) {
         val totalCount: Int get() = members.size
         val hasRegexError: Boolean get() = excludeRegexInvalid || includeRegexInvalid || tierRegexInvalid
@@ -89,67 +83,6 @@ object BalancerMemberResolver {
         return map to anyInvalid
     }
 
-    private fun capByTier(
-        buckets: List<List<ProxyEntity>>,
-        limit: Int,
-    ): List<ProxyEntity> {
-        if (limit <= 0) return buckets.flatten()
-        val total = buckets.sumOf { it.size }
-        if (total <= limit) return buckets.flatten()
-
-        val counts = IntArray(buckets.size)
-        var assigned = 0
-        val nonEmptyIndices = buckets.indices.filter { buckets[it].isNotEmpty() }
-        for (i in nonEmptyIndices) {
-            val quota = ((buckets[i].size.toLong() * limit) / total).toInt().coerceAtLeast(1)
-            val take = minOf(buckets[i].size, quota)
-            counts[i] = take
-            assigned += take
-        }
-        while (assigned > limit) {
-            var trimmed = false
-            for (i in nonEmptyIndices.reversed()) {
-                if (assigned <= limit) break
-                if (counts[i] > 1) {
-                    counts[i]--
-                    assigned--
-                    trimmed = true
-                }
-            }
-            if (!trimmed) {
-                for (i in nonEmptyIndices.reversed()) {
-                    if (assigned <= limit) break
-                    if (counts[i] > 0) {
-                        counts[i]--
-                        assigned--
-                        trimmed = true
-                    }
-                }
-            }
-            if (!trimmed) break
-        }
-        while (assigned < limit) {
-            var added = false
-            for (i in nonEmptyIndices) {
-                if (assigned >= limit) break
-                if (counts[i] < buckets[i].size) {
-                    counts[i]++
-                    assigned++
-                    added = true
-                }
-            }
-            if (!added) break
-        }
-        val out = ArrayList<ProxyEntity>(limit)
-        for (i in buckets.indices) {
-            val take = counts[i]
-            if (take > 0) {
-                out.addAll(buckets[i].take(take))
-            }
-        }
-        return out
-    }
-
     fun resolve(
         balancer: BalancerBean,
         selfId: Long = 0L,
@@ -158,8 +91,6 @@ object BalancerMemberResolver {
         groupProfilesProvider: (Long) -> List<ProxyEntity> = { gid -> SagerDatabase.proxyDao.getByGroup(gid) },
         entitiesByIdsProvider: (List<Long>) -> List<ProxyEntity> = { ids -> SagerDatabase.proxyDao.getEntities(ids) },
         isGroupDisabled: (Long) -> Boolean = { gid -> if (SagerNet.isInitialized()) DataStore.isGroupDisabled(gid) else false },
-        nowMsProvider: () -> Long = { System.currentTimeMillis() },
-        testTimestampProvider: (Long) -> Long = { id -> if (SagerNet.isInitialized()) DataStore.getProfileTestTimestampMs(id) else 0L },
     ): ResolutionResult {
         val targetGids = when {
             !balancer.targetGroupIds.isNullOrEmpty() -> balancer.targetGroupIds.filter { it > 0L }
@@ -179,16 +110,10 @@ object BalancerMemberResolver {
                 countryFilter = balancer.countryFilter.orEmpty(),
                 selectionMode = if (balancer.isPriorityMode()) BalancerBean.SELECTION_PRIORITY else BalancerBean.SELECTION_LATENCY,
                 tiers = balancer.tiers?.mapNotNull { it?.copy() } ?: emptyList(),
-                runTopN = balancer.effectiveRunTopN,
-                rankTopN = balancer.effectiveRunTopN,
-                resultTrustMinutes = balancer.resultTrustMinutes,
-                skipFailedWithinTrust = balancer.skipFailedWithinTrust,
             ),
             groupProfilesProvider = groupProfilesProvider,
             entitiesByIdsProvider = entitiesByIdsProvider,
             isGroupDisabled = isGroupDisabled,
-            nowMsProvider = nowMsProvider,
-            testTimestampProvider = testTimestampProvider,
         )
     }
 
@@ -197,8 +122,6 @@ object BalancerMemberResolver {
         groupProfilesProvider: (Long) -> List<ProxyEntity> = { gid -> SagerDatabase.proxyDao.getByGroup(gid) },
         entitiesByIdsProvider: (List<Long>) -> List<ProxyEntity> = { ids -> SagerDatabase.proxyDao.getEntities(ids) },
         isGroupDisabled: (Long) -> Boolean = { gid -> if (SagerNet.isInitialized()) DataStore.isGroupDisabled(gid) else false },
-        nowMsProvider: () -> Long = { System.currentTimeMillis() },
-        testTimestampProvider: (Long) -> Long = { id -> if (SagerNet.isInitialized()) DataStore.getProfileTestTimestampMs(id) else 0L },
     ): ResolutionResult {
         var includeRegex: Regex? = null
         var includeInvalid = false
@@ -289,41 +212,11 @@ object BalancerMemberResolver {
 
         val matchedCandidateCount = candidates.size
         val availableCount = candidates.count { it.status != 2 && it.status != 3 }
-        val nowMs = nowMsProvider()
-
-        fun isWithinTrust(entity: ProxyEntity): Boolean {
-            if (spec.resultTrustMinutes <= 0) return false
-            val ts = testTimestampProvider(entity.id)
-            if (ts <= 0L) return false
-            val ageMs = nowMs - ts
-            return ageMs in 0L..(spec.resultTrustMinutes.toLong() * 60_000L)
-        }
-
-        var skippedFailedCount = 0
-        val runnable = if (spec.skipFailedWithinTrust) {
-            candidates.filter { entity ->
-                val isFailed = entity.status == 2 || entity.status == 3
-                if (isFailed && isWithinTrust(entity)) {
-                    skippedFailedCount++
-                    false
-                } else {
-                    true
-                }
-            }
-        } else {
-            candidates
-        }
 
         val ordered = if (spec.selectionMode == BalancerBean.SELECTION_PRIORITY) {
-            runnable
+            candidates
         } else {
-            sortForColdStart(runnable)
-        }
-
-        val effectiveTopN = when {
-            spec.runTopN <= 0 -> 0
-            spec.rankTopN > 0 -> minOf(spec.runTopN, spec.rankTopN)
-            else -> spec.runTopN
+            sortForColdStart(candidates)
         }
 
         val activeTiers = if (spec.selectionMode == BalancerBean.SELECTION_PRIORITY) spec.tiers else emptyList()
@@ -340,11 +233,7 @@ object BalancerMemberResolver {
                 val tIdx = (tierMap[entity.id] ?: activeTiers.size).coerceIn(0, bucketCount - 1)
                 buckets[tIdx].add(entity)
             }
-            finalMembers = if (effectiveTopN > 0 && ordered.size > effectiveTopN) {
-                capByTier(buckets, effectiveTopN)
-            } else {
-                buckets.flatten()
-            }
+            finalMembers = buckets.flatten()
             val finalCounts = IntArray(bucketCount)
             val finalTierMap = LinkedHashMap<Long, Int>(finalMembers.size)
             for (entity in finalMembers) {
@@ -355,20 +244,13 @@ object BalancerMemberResolver {
             tierCounts = finalCounts.toList()
             memberTierIndices = finalTierMap
         } else {
-            finalMembers = if (effectiveTopN > 0 && ordered.size > effectiveTopN) {
-                ordered.take(effectiveTopN)
-            } else {
-                ordered
-            }
+            finalMembers = ordered
             tierCounts = emptyList()
             memberTierIndices = emptyMap()
         }
 
         val groupMatchedCount = finalMembers.count { it.id in fromGroupIds }
         val extraAddedCount = finalMembers.size - groupMatchedCount
-        val reusableRecentCount = finalMembers.count { entity ->
-            entity.status == 1 && entity.ping > 0 && isWithinTrust(entity)
-        }
 
         return ResolutionResult(
             members = finalMembers,
@@ -381,8 +263,6 @@ object BalancerMemberResolver {
             memberTierIndices = memberTierIndices,
             matchedCandidateCount = matchedCandidateCount,
             availableCount = availableCount,
-            skippedFailedCount = skippedFailedCount,
-            reusableRecentCount = reusableRecentCount,
         )
     }
 

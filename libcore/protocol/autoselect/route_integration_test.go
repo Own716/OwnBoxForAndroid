@@ -20,7 +20,6 @@ import (
 	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/route"
 	"github.com/sagernet/sing/common/buf"
-	"github.com/sagernet/sing/common/json/badoption"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
 	"github.com/sagernet/sing/service"
@@ -175,12 +174,12 @@ func TestAutoSelectNotOutboundGroupSoRouterInvokesHandlers(t *testing.T) {
 	nodeB := newRoutePipeOutbound("node-b", []byte("OK-B"))
 	g, mgr := newTestAutoSelectWithRoute(t, AutoSelectOptions{
 		Outbounds: []string{"node-a", "node-b"},
-		InitialDelaysMs: map[string]uint16{
-			"node-a": 40,
-			"node-b": 120,
-		},
 	}, nodeA, nodeB)
 	defer g.Close()
+	now := time.Now()
+	g.scorer.recordSample("node-a", 40, nil, now)
+	g.scorer.recordSample("node-b", 120, nil, now)
+	g.scorer.evaluate(now, g.passive)
 
 	// Critical invariant: sing-box Router.resolveOutbound unwraps adapter.OutboundGroup and bypasses
 	// DialContext / NewConnection / passive learning / dial retries. AutoSelect must NOT implement it.
@@ -200,22 +199,18 @@ func TestRouteNewConnectionPassiveLearningSiteStickyAndDialRetries(t *testing.T)
 	nodeA := newRoutePipeOutbound("node-a", []byte("HTTP/1.1 200 OK\r\n\r\n"))
 	nodeB := newRoutePipeOutbound("node-b", []byte("HTTP/1.1 200 OK\r\n\r\n"))
 	learnTrue := true
-	dialRetries := 1
-	siteTTL := badoption.Duration(30 * time.Minute)
 	tol := uint16(30)
 
 	g, _ := newTestAutoSelectWithRoute(t, AutoSelectOptions{
 		Outbounds:            []string{"node-a", "node-b"},
 		Tolerance:            &tol,
-		DialRetries:          &dialRetries,
 		LearnFromConnections: &learnTrue,
-		SiteStickyTTL:        &siteTTL,
-		InitialDelaysMs: map[string]uint16{
-			"node-a": 40,
-			"node-b": 120,
-		},
 	}, nodeA, nodeB)
 	defer g.Close()
+	initNow := time.Now()
+	g.scorer.recordSample("node-a", 40, nil, initNow)
+	g.scorer.recordSample("node-b", 120, nil, initNow)
+	g.scorer.evaluate(initNow, g.passive)
 
 	// 1. Real routed TCP connection via NewConnection -> ConnectionManager -> AutoSelect.DialContext
 	clientApp, clientRouter := net.Pipe()
@@ -453,18 +448,16 @@ func TestRouteNewPacketConnectionPassiveLearning(t *testing.T) {
 	nodeA := newRoutePipeOutbound("node-a", []byte("UDP-PONG"))
 	nodeB := newRoutePipeOutbound("node-b", []byte("UDP-B"))
 	learnTrue := true
-	siteTTL := badoption.Duration(30 * time.Minute)
 
 	g, _ := newTestAutoSelectWithRoute(t, AutoSelectOptions{
 		Outbounds:            []string{"node-a", "node-b"},
 		LearnFromConnections: &learnTrue,
-		SiteStickyTTL:        &siteTTL,
-		InitialDelaysMs: map[string]uint16{
-			"node-a": 30,
-			"node-b": 100,
-		},
 	}, nodeA, nodeB)
 	defer g.Close()
+	initNow := time.Now()
+	g.scorer.recordSample("node-a", 30, nil, initNow)
+	g.scorer.recordSample("node-b", 100, nil, initNow)
+	g.scorer.evaluate(initNow, g.passive)
 
 	dest := M.ParseSocksaddrHostPort("8.8.8.8", 443)
 	inPkt := newTestInboundPacketConn([]byte("QUIC-PING"), dest)

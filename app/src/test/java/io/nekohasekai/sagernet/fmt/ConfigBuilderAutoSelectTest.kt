@@ -36,42 +36,21 @@ class ConfigBuilderAutoSelectTest {
     }
 
     @Test
-    fun buildAutoSelectOutboundSerializesAllFieldsAndTrustedInitialDelays() {
-        val nowMs = 1_700_000_000_000L
+    fun buildAutoSelectOutboundSerializesOnlyActiveFields() {
         val m1 = socksEntity(1L, "SG 01", status = 1, ping = 42)
         val m2 = socksEntity(2L, "SG 02", status = 1, ping = 88)
         val m3 = socksEntity(3L, "SG 03", status = 3, ping = 15)
-        val timestamps = mapOf(
-            1L to nowMs - 10 * 60_000L, // within 60m trust
-            2L to nowMs - 90 * 60_000L, // expired
-            3L to nowMs - 5 * 60_000L,  // failed status must be ignored
-        )
 
         val balancer = BalancerBean().apply {
             selectionMode = BalancerBean.SELECTION_PRIORITY
             balanceEnabled = true
             balanceMode = BalancerBean.BALANCE_PER_CONNECTION
             balanceIntervalSec = 45
-            runTopN = 500
-            rankTopN = 500
-            standbySize = 5
-            intensiveCheckCount = 12
             interval = 180
-            fullScanIntervalSec = 900
-            watchIntervalSec = 20
-            sampleCount = 8
             tolerance = 40
-            maxRttMs = 1500
-            dialRetries = 3
             interruptOnSwitch = true
-            failbackChecks = 4
-            failbackDelaySec = 90
-            interruptOnFailback = true
             learnFromConnections = false
-            siteStickyMinutes = 120
             testUrl = "https://cp.cloudflare.com/generate_204"
-            connectivityUrl = "http://connectivitycheck.gstatic.com/generate_204"
-            resultTrustMinutes = 60
         }
 
         val option = buildAutoSelectOutbound(
@@ -79,51 +58,48 @@ class ConfigBuilderAutoSelectTest {
             memberEntities = listOf(m1, m2, m3),
             memberTags = listOf("tag-sg-1", "tag-sg-2", "tag-sg-3"),
             customTag = "SG-Auto",
-            nowMs = nowMs,
-            testTimestampProvider = { id -> timestamps[id] ?: 0L },
         )
 
         val map = option.asMap()
         assertEquals("autoselect", map["type"])
         assertEquals("SG-Auto", map["tag"])
         assertEquals(listOf("tag-sg-1", "tag-sg-2", "tag-sg-3"), map["outbounds"])
+        assertEquals("https://cp.cloudflare.com/generate_204", map["url"])
         assertEquals("priority", map["selection_mode"])
         assertEquals(true, map["balance_enabled"])
         assertEquals("per_connection", map["balance_mode"])
         assertEquals("45s", map["balance_interval"])
-        assertEquals(500, (map["rank_top_n"] as Number).toInt())
-        assertEquals(5, (map["standby_size"] as Number).toInt())
-        assertEquals(12, (map["intensive_check_count"] as Number).toInt())
         assertEquals("180s", map["check_interval"])
-        assertEquals("900s", map["full_scan_interval"])
-        assertEquals("20s", map["watch_interval"])
-        assertEquals(8, (map["sample_count"] as Number).toInt())
         assertEquals(40, (map["tolerance"] as Number).toInt())
-        assertEquals("1500ms", map["max_rtt"])
-        assertEquals(3, (map["dial_retries"] as Number).toInt())
         assertEquals(true, map["interrupt_exist_connections"])
-        assertEquals(4, (map["failback_checks"] as Number).toInt())
-        assertEquals("90s", map["failback_delay"])
-        assertEquals(true, map["interrupt_on_failback"])
         assertEquals(false, map["learn_from_connections"])
-        assertEquals("120m", map["site_sticky_ttl"])
-        assertEquals("http://connectivitycheck.gstatic.com/generate_204", map["connectivity_url"])
 
-        @Suppress("UNCHECKED_CAST")
-        val initialDelays = map["initial_delays_ms"] as Map<String, Number>
-        assertEquals(1, initialDelays.size)
-        assertEquals(42, initialDelays["tag-sg-1"]?.toInt())
-        assertFalse(initialDelays.containsKey("tag-sg-2"))
-        assertFalse(initialDelays.containsKey("tag-sg-3"))
+        listOf(
+            "rank_top_n",
+            "standby_size",
+            "intensive_check_count",
+            "full_scan_interval",
+            "watch_interval",
+            "sample_count",
+            "max_rtt",
+            "dial_retries",
+            "failback_checks",
+            "failback_delay",
+            "interrupt_on_failback",
+            "site_sticky_ttl",
+            "connectivity_url",
+            "initial_delays_ms",
+        ).forEach { removed ->
+            assertFalse("Removed field $removed must not be emitted", map.containsKey(removed))
+        }
     }
 
     @Test
-    fun buildAutoSelectOutboundOmitsOptionalEmptyFields() {
+    fun buildAutoSelectOutboundUsesDefaultsAndAllowsZeroTolerance() {
         val m1 = socksEntity(1L, "SG 01", status = 0, ping = 0)
         val balancer = BalancerBean().apply {
             initializeDefaultValues()
-            maxRttMs = 0
-            connectivityUrl = ""
+            tolerance = 0
             testUrl = "https://cp.cloudflare.com/generate_204"
         }
 
@@ -132,18 +108,16 @@ class ConfigBuilderAutoSelectTest {
             memberEntities = listOf(m1),
             memberTags = listOf("tag-sg-1"),
             customTag = "SG-Auto",
-            nowMs = 1_700_000_000_000L,
-            testTimestampProvider = { 0L },
         )
 
         val map = option.asMap()
         assertEquals("autoselect", map["type"])
         assertEquals("latency", map["selection_mode"])
         assertEquals(false, map["balance_enabled"])
+        assertEquals("300s", map["check_interval"])
+        assertEquals(0, (map["tolerance"] as Number).toInt())
         assertEquals(false, map["interrupt_exist_connections"])
-        assertEquals(false, map["interrupt_on_failback"])
         assertEquals(true, map["learn_from_connections"])
-        assertFalse(map.containsKey("max_rtt"))
         assertFalse(map.containsKey("connectivity_url"))
         assertFalse(map.containsKey("initial_delays_ms"))
     }
@@ -275,73 +249,38 @@ class ConfigBuilderAutoSelectTest {
     }
 
     @Test
-    fun buildAutoSelectOutboundPreservesZeroUnlimitedRunTopN() {
-        val balancer = BalancerBean().apply {
-            balancerType = BalancerBean.TYPE_LIST
-            runTopN = 0
-            rankTopN = 0
-            initializeDefaultValues()
-        }
-        assertEquals(0, balancer.runTopN)
-        assertEquals(0, balancer.effectiveRunTopN)
-
-        val out = buildAutoSelectOutbound(
-            balancer = balancer,
-            memberEntities = listOf(socksEntity(10L, "SG-1")),
-            memberTags = listOf("tag-sg-1"),
-            defaultTestUrl = "https://cp.cloudflare.com/generate_204",
-        )
-        assertEquals(0, out.rank_top_n)
-    }
-
-    @Test
-    fun listBalancerRespectsUseFrontAndUseLandingProxyToggles() {
+    fun listBalancerNeverInheritsGroupFrontOrLandingProxies() {
         val groupFront = socksEntity(50L, "Group-Front")
         val groupLanding = socksEntity(60L, "Group-Landing")
         val member = socksEntity(10L, "SG-Member", status = 1, ping = 40)
         val group = ProxyGroup(id = 10L, frontProxy = 50L, landingProxy = 60L)
 
-        fun buildWithToggles(useFront: Boolean, useLanding: Boolean): ChainGraphTestResult {
-            val balancer = ProxyEntity(
-                id = 2L,
-                groupId = 99L,
-                type = ProxyEntity.TYPE_BALANCER,
-                balancerBean = BalancerBean().apply {
-                    name = "List-Balancer"
-                    balancerType = BalancerBean.TYPE_LIST
-                    proxies = mutableListOf(10L)
-                    useFrontProxy = useFront
-                    useLandingProxy = useLanding
-                    testUrl = "https://cp.cloudflare.com/generate_204"
-                },
-            )
-            return assembleChainGraphForTest(
-                root = balancer,
-                entitiesById = mapOf(
-                    balancer.id to balancer,
-                    member.id to member,
-                    groupFront.id to groupFront,
-                    groupLanding.id to groupLanding,
-                ),
-                groupsById = mapOf(10L to group),
-            )
-        }
+        val balancer = ProxyEntity(
+            id = 2L,
+            groupId = 99L,
+            type = ProxyEntity.TYPE_BALANCER,
+            balancerBean = BalancerBean().apply {
+                name = "List-Balancer"
+                balancerType = BalancerBean.TYPE_LIST
+                proxies = mutableListOf(10L)
+                testUrl = "https://cp.cloudflare.com/generate_204"
+            },
+        )
+        val result = assembleChainGraphForTest(
+            root = balancer,
+            entitiesById = mapOf(
+                balancer.id to balancer,
+                member.id to member,
+                groupFront.id to groupFront,
+                groupLanding.id to groupLanding,
+            ),
+            groupsById = mapOf(10L to group),
+        )
 
-        val disabled = buildWithToggles(useFront = false, useLanding = false)
-        assertFalse(disabled.outbounds.any { it["server"] == "198.51.100.50" })
-        assertFalse(disabled.outbounds.any { it["server"] == "198.51.100.60" })
-        val disabledMember = disabled.outbounds.first { it["server"] == "198.51.100.10" }
-        assertNull(disabledMember["detour"])
-
-        val enabled = buildWithToggles(useFront = true, useLanding = true)
-        val frontOut = enabled.outbounds.firstOrNull { it["server"] == "198.51.100.50" }
-        val landingOut = enabled.outbounds.firstOrNull { it["server"] == "198.51.100.60" }
-        val memberOut = enabled.outbounds.firstOrNull { it["server"] == "198.51.100.10" }
-        assertNotNull(frontOut)
-        assertNotNull(landingOut)
-        assertNotNull(memberOut)
-        assertEquals(frontOut?.get("tag"), memberOut?.get("detour"))
-        assertEquals(memberOut?.get("tag"), landingOut?.get("detour"))
+        assertFalse(result.outbounds.any { it["server"] == "198.51.100.50" })
+        assertFalse(result.outbounds.any { it["server"] == "198.51.100.60" })
+        val memberOut = result.outbounds.first { it["server"] == "198.51.100.10" }
+        assertNull(memberOut["detour"])
     }
 
     @Test

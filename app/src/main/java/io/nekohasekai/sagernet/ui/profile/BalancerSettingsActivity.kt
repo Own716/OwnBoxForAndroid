@@ -40,9 +40,6 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
     companion object {
         private const val STATE_ADVANCED_EXPANDED = "balancer_advanced_expanded"
         private const val ORDER_TIER_BASE = 6001
-        private const val FIXED_RUN_TOP_N = 300
-        private const val FIXED_RANK_TOP_N = 1000
-        private const val FIXED_RESULT_TRUST_MIN = 1440
     }
 
     private data class PreviewOverrides(
@@ -138,18 +135,7 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         DataStore.balancerBalanceIntervalSec = balanceIntervalSec.takeIf { it > 0 } ?: 30
 
         DataStore.balancerCountryFilter = countryFilter ?: ""
-        val effectiveTopN = effectiveRunTopN
-        DataStore.balancerRunTopN = effectiveTopN
-        DataStore.balancerRankTopN = effectiveTopN
-        DataStore.balancerResultTrustMinutes = resultTrustMinutes
-        DataStore.balancerSkipFailedWithinTrust = skipFailedWithinTrust
-
-        DataStore.balancerStandbySize = standbySize
-        DataStore.balancerIntensiveCheckCount = intensiveCheckCount
         DataStore.balancerInterval = interval
-        DataStore.balancerFullScanIntervalSec = fullScanIntervalSec
-        DataStore.balancerWatchIntervalSec = watchIntervalSec
-        DataStore.balancerSampleCount = sampleCount
 
         val normalizedTolerance = if (toleranceUnit == "s") {
             tolerance.coerceAtLeast(0) * 1000
@@ -158,19 +144,10 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         }
         DataStore.balancerTolerance = normalizedTolerance
         DataStore.balancerToleranceUnit = "ms"
-        DataStore.balancerMaxRttMs = maxRttMs
-        DataStore.balancerDialRetries = dialRetries
         DataStore.balancerInterruptOnSwitch = interruptOnSwitch
-        DataStore.balancerFailbackChecks = failbackChecks
-        DataStore.balancerFailbackDelaySec = failbackDelaySec
-        DataStore.balancerInterruptOnFailback = interruptOnFailback
         DataStore.balancerLearnFromConnections = learnFromConnections
-        DataStore.balancerSiteStickyMinutes = siteStickyMinutes
 
         DataStore.balancerTestUrl = testUrl ?: ""
-        DataStore.balancerConnectivityUrl = connectivityUrl ?: ""
-        DataStore.balancerUseFrontProxy = useFrontProxy
-        DataStore.balancerUseLandingProxy = useLandingProxy
         DataStore.balancerFrontProxy = frontProxy
         DataStore.balancerFrontProxyTmp = if (frontProxy > 0L) OutboundPreference.VALUE_SELECT_PROFILE.toInt() else 0
         DataStore.balancerLandingProxy = landingProxy
@@ -204,33 +181,13 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         balanceIntervalSec = DataStore.balancerBalanceIntervalSec
 
         countryFilter = DataStore.balancerCountryFilter.trim()
-        runTopN = FIXED_RUN_TOP_N
-        rankTopN = FIXED_RANK_TOP_N
-        resultTrustMinutes = FIXED_RESULT_TRUST_MIN
-        skipFailedWithinTrust = false
-
-        standbySize = 3
-        intensiveCheckCount = 8
         interval = DataStore.balancerInterval
-        fullScanIntervalSec = 600
-        watchIntervalSec = 15
-        sampleCount = 10
-
         tolerance = DataStore.balancerTolerance
         toleranceUnit = "ms"
-        maxRttMs = 0
-        dialRetries = 2
         interruptOnSwitch = DataStore.balancerInterruptOnSwitch
-        failbackChecks = 3
-        failbackDelaySec = 60
-        interruptOnFailback = false
         learnFromConnections = DataStore.balancerLearnFromConnections
-        siteStickyMinutes = 60
 
         testUrl = DataStore.balancerTestUrl.trim()
-        connectivityUrl = ""
-        useFrontProxy = false
-        useLandingProxy = false
         frontProxy = if (DataStore.balancerFrontProxyTmp == OutboundPreference.VALUE_SELECT_PROFILE.toInt()) {
             DataStore.balancerFrontProxy
         } else {
@@ -628,10 +585,6 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
                         countryFilter = countryPattern,
                         selectionMode = selectionMode,
                         tiers = tiersSnapshot,
-                        runTopN = FIXED_RUN_TOP_N,
-                        rankTopN = FIXED_RUN_TOP_N,
-                        resultTrustMinutes = FIXED_RESULT_TRUST_MIN,
-                        skipFailedWithinTrust = false,
                     )
                 )
                 val summaryText = formatPreviewSummary(res, type)
@@ -907,7 +860,6 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
                 res.matchedCandidateCount,
                 res.availableCount,
                 res.totalCount,
-                res.reusableRecentCount,
             )
         }
         return if (res.hasRegexError) {

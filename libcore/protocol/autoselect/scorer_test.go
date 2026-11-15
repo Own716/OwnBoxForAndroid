@@ -7,149 +7,129 @@ import (
 	"github.com/sagernet/sing/common/json/badoption"
 )
 
-func TestScorerLatencyHysteresisAndMaxRTT(t *testing.T) {
+func TestScorerStrictToleranceZeroAndExactBoundaries(t *testing.T) {
 	now := time.Unix(1700000000, 0)
-	opts := AutoSelectOptions{
-		Outbounds:   []string{"node-a", "node-b", "node-c"},
-		Tolerance:   uint16Ptr(30),
-		MaxRTT:      badoption.Duration(200 * time.Millisecond),
-		SampleCount: intPtr(3),
+
+	// 1. Tolerance = 0ms -> ANY lower delay switches immediately; identical delay stays.
+	zeroTol := uint16(0)
+	optsZero := AutoSelectOptions{
+		Outbounds: []string{"node-a", "node-b"},
+		Tolerance: &zeroTol,
 	}.normalized()
-
-	s := newScorer([]string{"node-a", "node-b", "node-c"}, opts)
-	s.recordSample("node-a", 120, nil, now)
-	s.recordSample("node-b", 100, nil, now)
-	s.recordSample("node-c", 250, nil, now) // exceeds maxRtt=200ms
-
-	active, _ := s.evaluate(now, nil)
-	if active != "node-b" {
-		t.Fatalf("expected node-b (100ms), got %s", active)
-	}
-
-	// node-a stabilizes at 80ms: improvement = 100 - 80 = 20ms <= tolerance(30ms) -> keep node-b
-	for i := 0; i < 3; i++ {
-		now = now.Add(5 * time.Second)
-		s.recordSample("node-a", 80, nil, now)
-	}
-	active, _ = s.evaluate(now, nil)
-	if active != "node-b" {
-		t.Fatalf("expected hysteresis to keep node-b for 20ms diff <= 30ms tolerance, got %s", active)
-	}
-
-	// node-a stabilizes at 60ms: improvement = 100 - 60 = 40ms > tolerance(30ms) -> switch to node-a
-	for i := 0; i < 3; i++ {
-		now = now.Add(5 * time.Second)
-		s.recordSample("node-a", 60, nil, now)
-	}
-	active, reason := s.evaluate(now, nil)
+	sZero := newScorer([]string{"node-a", "node-b"}, optsZero)
+	sZero.recordSample("node-a", 100, nil, now)
+	sZero.recordSample("node-b", 100, nil, now)
+	active, _ := sZero.evaluate(now, nil)
 	if active != "node-a" {
-		t.Fatalf("expected switch to node-a for 40ms diff > 30ms tolerance, got %s", active)
-	}
-	if reason == "" {
-		t.Fatalf("expected non-empty switch reason")
+		t.Fatalf("expected tie-break to node-a, got %s", active)
 	}
 
-	// Verify node-c (250ms > maxRtt 200ms) is not picked even if node-a and node-b degrade slightly below 200ms
-	now = now.Add(5 * time.Second)
-	s.recordSample("node-a", 180, nil, now)
-	s.recordSample("node-b", 190, nil, now)
-	s.recordSample("node-c", 250, nil, now)
-	active, _ = s.evaluate(now, nil)
-	if active == "node-c" {
-		t.Fatalf("did not expect node-c above max_rtt to be selected")
+	// node-b improves by 1ms (99ms < 100ms, diff = 1ms > 0ms) -> switches immediately!
+	sZero.recordSample("node-b", 99, nil, now.Add(5*time.Second))
+	active, _ = sZero.evaluate(now.Add(5*time.Second), nil)
+	if active != "node-b" {
+		t.Fatalf("expected 0ms tolerance to switch on 1ms difference, got %s", active)
+	}
+
+	// 2. Tolerance = 10ms -> <=10ms stays, 11ms switches (even when balanceEnabled=true, NO 50ms floor!)
+	tenTol := uint16(10)
+	optsTen := AutoSelectOptions{
+		Outbounds:      []string{"node-a", "node-b", "node-c"},
+		Tolerance:      &tenTol,
+		BalanceEnabled: true,
+	}.normalized()
+	sTen := newScorer([]string{"node-a", "node-b", "node-c"}, optsTen)
+	sTen.recordSample("node-a", 100, nil, now)
+	sTen.recordSample("node-b", 90, nil, now)
+	sTen.recordSample("node-c", 115, nil, now) // 90+10=100 < 115
+	sTen.evaluate(now, nil)
+
+	sTen.mu.RLock()
+	pool := sTen.verifiedPoolLocked(now, nil)
+	sTen.mu.RUnlock()
+	if len(pool) != 2 || pool[0] != "node-b" || pool[1] != "node-a" {
+		t.Fatalf("expected strict 10ms pool [node-b, node-a] excluding 115ms node-c, got %v", pool)
+	}
+
+	// node-c improves to 80ms -> diff from active node-b (90ms) = 10ms <= 10ms -> stay on node-b
+	sTen.recordSample("node-c", 80, nil, now.Add(5*time.Second))
+	active, _ = sTen.evaluate(now.Add(5*time.Second), nil)
+	if active != "node-b" {
+		t.Fatalf("expected 10ms diff to stay within 10ms tolerance, got %s", active)
+	}
+
+	// node-c improves to 79ms -> diff = 11ms > 10ms -> switch to node-c
+	sTen.recordSample("node-c", 79, nil, now.Add(10*time.Second))
+	active, reason := sTen.evaluate(now.Add(10*time.Second), nil)
+	if active != "node-c" || reason != "best available" {
+		t.Fatalf("expected switch to node-c on 11ms > 10ms tolerance, got %s (%s)", active, reason)
 	}
 }
 
-func TestScorerPriorityFailoverAndDualGateFailback(t *testing.T) {
+func TestScorerPassiveTTFBNeverDistortsProbeDelayOrTolerance(t *testing.T) {
+	now := time.Unix(1700000000, 0)
+	tol := uint16(30)
+	learnTrue := true
+	opts := AutoSelectOptions{
+		Outbounds:            []string{"node-a", "node-b"},
+		Tolerance:            &tol,
+		LearnFromConnections: &learnTrue,
+	}.normalized()
+
+	passive := newPassiveTracker(defaultSiteStickyTTL)
+	// Simulate terrible historical TTFB on node-a and fast TTFB on node-b:
+	// MUST NOT distort active probe latency or bypass tolerance!
+	passive.RecordSuccess("node-a", "a.com", 900*time.Millisecond)
+	passive.RecordSuccess("node-b", "b.com", 5*time.Millisecond)
+
+	s := newScorer([]string{"node-a", "node-b"}, opts)
+	s.recordSample("node-a", 100, nil, now)
+	s.recordSample("node-b", 120, nil, now)
+	active, _ := s.evaluate(now, passive)
+	if active != "node-a" {
+		t.Fatalf("expected pure probe winner node-a (100ms < 120ms), got %s", active)
+	}
+
+	// node-b probes at 80ms -> improvement = 20ms <= 30ms tolerance -> MUST stay on node-a!
+	s.recordSample("node-b", 80, nil, now.Add(5*time.Second))
+	active, _ = s.evaluate(now.Add(5*time.Second), passive)
+	if active != "node-a" {
+		t.Fatalf("passive TTFB must not distort tolerance comparison, expected node-a, got %s", active)
+	}
+}
+
+func TestScorerSingleProbeFailureFailsOverAndImmediatePriorityFailback(t *testing.T) {
 	now := time.Unix(1700000000, 0)
 	opts := AutoSelectOptions{
-		Outbounds:      []string{"pri-1", "pri-2", "pri-3"},
-		SelectionMode:  SelectionModePriority,
-		FailbackChecks: intPtr(3),
-		FailbackDelay:  durationPtr(60 * time.Second),
+		Outbounds:     []string{"pri-1", "pri-2", "pri-3"},
+		SelectionMode: SelectionModePriority,
 	}.normalized()
 
 	s := newScorer([]string{"pri-1", "pri-2", "pri-3"}, opts)
 	s.recordSample("pri-1", 180, nil, now)
-	s.recordSample("pri-2", 40, nil, now) // lower ping, but lower priority
+	s.recordSample("pri-2", 40, nil, now)
 	s.recordSample("pri-3", 60, nil, now)
 
-	// Priority mode MUST select pri-1 even though pri-2 is faster
 	active, _ := s.evaluate(now, nil)
 	if active != "pri-1" {
 		t.Fatalf("expected priority mode to pick pri-1 first, got %s", active)
 	}
 
-	// pri-1 fails twice -> failover to pri-2
+	// Single probe failure -> failover immediately to pri-2
 	now = now.Add(5 * time.Second)
-	s.recordSample("pri-1", 0, errTestFail, now)
-	now = now.Add(2 * time.Second)
 	s.recordSample("pri-1", 0, errTestFail, now)
 	active, reason := s.evaluate(now, nil)
-	if active != "pri-2" {
-		t.Fatalf("expected failover to pri-2, got %s", active)
-	}
-	if reason != "priority failover" {
-		t.Fatalf("expected reason 'priority failover', got %q", reason)
+	if active != "pri-2" || reason != "priority failover" {
+		t.Fatalf("expected immediate failover to pri-2 on 1st failure, got %s (%q)", active, reason)
 	}
 
-	// pri-1 recovers immediately: 3 quick checks in 15s (< 60s delay) -> MUST NOT fail back yet!
-	for i := 0; i < 3; i++ {
-		now = now.Add(5 * time.Second)
-		s.recordSample("pri-1", 90, nil, now)
-	}
-	active, _ = s.evaluate(now, nil)
-	if active != "pri-2" {
-		t.Fatalf("must NOT failback before failbackDelay (60s) elapsed, got %s", active)
-	}
-
-	// Even after 60s passes, if pri-1 had only 2 checks after a fail reset -> must satisfy BOTH gates!
-	// Advance past 60s since last fail (already at +15s, advance +50s => +65s total with 3 consecutive checks)
-	now = now.Add(50 * time.Second)
-	active, reason = s.evaluate(now, nil)
-	if active != "pri-1" {
-		t.Fatalf("expected failback to pri-1 after 3 checks AND >=60s fail-free, got %s (reason=%q)", active, reason)
-	}
-	if reason != "priority failback" {
-		t.Fatalf("expected reason 'priority failback', got %q", reason)
-	}
-}
-
-func TestScorerFailbackDelaySatisfiedButChecksInsufficient(t *testing.T) {
-	now := time.Unix(1700000000, 0)
-	opts := AutoSelectOptions{
-		Outbounds:      []string{"pri-1", "pri-2"},
-		SelectionMode:  SelectionModePriority,
-		FailbackChecks: intPtr(3),
-		FailbackDelay:  durationPtr(30 * time.Second),
-	}.normalized()
-
-	s := newScorer([]string{"pri-1", "pri-2"}, opts)
-	s.recordSample("pri-2", 50, nil, now)
-	s.recordSample("pri-1", 0, errTestFail, now)
-	now = now.Add(1 * time.Second)
-	s.recordSample("pri-1", 0, errTestFail, now)
-	active, _ := s.evaluate(now, nil)
-	if active != "pri-2" {
-		t.Fatalf("expected pri-2, got %s", active)
-	}
-
-	// Wait 60s (> 30s delay), run only 2 passing checks (< 3 failbackChecks) -> stay on pri-2
-	now = now.Add(60 * time.Second)
-	s.recordSample("pri-1", 80, nil, now)
+	// Single passing probe -> immediate failback to pri-1 with zero hidden check/delay gate!
 	now = now.Add(5 * time.Second)
-	s.recordSample("pri-1", 80, nil, now)
-	active, _ = s.evaluate(now, nil)
-	if active != "pri-2" {
-		t.Fatalf("must NOT failback with only 2 checks < 3 required, got %s", active)
-	}
-
-	// 3rd check passes -> now failback!
-	now = now.Add(5 * time.Second)
-	s.recordSample("pri-1", 80, nil, now)
-	active, _ = s.evaluate(now, nil)
-	if active != "pri-1" {
-		t.Fatalf("expected failback on 3rd check after delay elapsed, got %s", active)
+	s.recordSample("pri-1", 90, nil, now)
+	active, reason, switched, isFailback := s.evaluateWithTransition(now, nil)
+	if active != "pri-1" || reason != "priority failback" || !switched || !isFailback {
+		t.Fatalf("expected immediate failback to pri-1 on recovery check, got %s reason=%q switched=%v failback=%v",
+			active, reason, switched, isFailback)
 	}
 }
 
@@ -166,24 +146,21 @@ func TestScorerBalanceTimedRotationVsPerConnection(t *testing.T) {
 	s := newScorer([]string{"n1", "n2", "n3"}, optsTimed)
 	s.recordSample("n1", 50, nil, now)
 	s.recordSample("n2", 60, nil, now)
-	s.recordSample("n3", 400, nil, now) // much slower than n1+tolerance
+	s.recordSample("n3", 400, nil, now) // exceeds n1 + 50ms tolerance
 	s.evaluate(now, nil)
 
-	// Multiple connections within same 30s window stay pinned to same rotation slot for session stability
 	first := s.pickConnectionCarrier(now, nil)
 	second := s.pickConnectionCarrier(now.Add(10*time.Second), nil)
 	if first != second {
 		t.Fatalf("expected timed_rotation to keep same carrier within 30s window, got %s then %s", first, second)
 	}
 
-	// Advance past 30s interval -> rotates to second verified healthy node (skipping n3)
 	s.advanceRotation(now.Add(31*time.Second), nil)
 	third := s.pickConnectionCarrier(now.Add(31*time.Second), nil)
 	if third == first || third == "n3" {
 		t.Fatalf("expected timed_rotation to advance to another healthy node (not %s, not slow n3), got %s", first, third)
 	}
 
-	// Now test per_connection mode distributes immediately across n1 and n2
 	optsPerConn := optsTimed
 	optsPerConn.balanceMode = BalanceModePerConnection
 	s2 := newScorer([]string{"n1", "n2", "n3"}, optsPerConn)
@@ -209,9 +186,6 @@ func TestScorerPriorityTiersSelectionFailoverFailbackAndBalance(t *testing.T) {
 		Outbounds:      order,
 		SelectionMode:  SelectionModePriority,
 		Tolerance:      uint16Ptr(30),
-		SampleCount:    intPtr(1),
-		FailbackChecks: intPtr(2),
-		FailbackDelay:  durationPtr(20 * time.Second),
 		BalanceEnabled: true,
 		BalanceMode:    BalanceModePerConnection,
 		Tiers: [][]string{
@@ -228,7 +202,6 @@ func TestScorerPriorityTiersSelectionFailoverFailbackAndBalance(t *testing.T) {
 		t.Fatalf("expected unlisted member to sit in implicit fallback tier 2, got %d", s.members["fallback"].tier)
 	}
 
-	// Tier 2 is much faster, but healthy Tier 1 must win; within Tier 1, lowest latency wins.
 	s.recordSample("t1-slow", 120, nil, now)
 	s.recordSample("t1-fast", 70, nil, now)
 	s.recordSample("t2-ultra", 10, nil, now)
@@ -239,7 +212,7 @@ func TestScorerPriorityTiersSelectionFailoverFailbackAndBalance(t *testing.T) {
 		t.Fatalf("expected tier-1 fastest t1-fast, got %s", active)
 	}
 
-	// Within tolerance (70 -> 50 is 20ms <= 30ms), stay on t1-fast.
+	// Within tolerance (70 - 50 = 20ms <= 30ms), stay on t1-fast.
 	s.recordSample("t1-slow", 50, nil, now.Add(5*time.Second))
 	active, _, switched, _ = s.evaluateWithTransition(now.Add(5*time.Second), nil)
 	if switched || active != "t1-fast" {
@@ -254,7 +227,7 @@ func TestScorerPriorityTiersSelectionFailoverFailbackAndBalance(t *testing.T) {
 		t.Fatalf("expected intra-tier switch to t1-slow, got %s reason=%s switched=%v", active, reason, switched)
 	}
 
-	// Tiered verifiedPool must ONLY include tier-1 healthy nodes within spread (not t2-ultra or fallback).
+	// Tiered verifiedPool includes Tier 1 members within tolerance.
 	s.recordSample("t1-fast", 55, nil, now.Add(11*time.Second))
 	s.mu.RLock()
 	pool := s.verifiedPoolLocked(now.Add(11*time.Second), nil)
@@ -263,7 +236,7 @@ func TestScorerPriorityTiersSelectionFailoverFailbackAndBalance(t *testing.T) {
 		t.Fatalf("expected tiered balance pool to only contain Tier 1 members, got %v", pool)
 	}
 
-	// Fail all Tier 1 members -> immediate failover to Tier 2.
+	// Fail all Tier 1 members once -> immediate failover to Tier 2.
 	tFail := now.Add(15 * time.Second)
 	s.recordSample("t1-slow", 0, errTestFail, tFail)
 	s.recordSample("t1-fast", 0, errTestFail, tFail)
@@ -272,26 +245,19 @@ func TestScorerPriorityTiersSelectionFailoverFailbackAndBalance(t *testing.T) {
 		t.Fatalf("expected failover to t2-ultra, got %s reason=%s", active, reason)
 	}
 
-	// Fail Tier 2 as well -> implicit fallback Tier 3 takes over.
+	// Fail Tier 2 -> implicit fallback Tier 3 takes over immediately.
 	s.recordSample("t2-ultra", 0, errTestFail, tFail.Add(2*time.Second))
 	active, _, switched, _ = s.evaluateWithTransition(tFail.Add(2*time.Second), nil)
 	if !switched || active != "fallback" {
 		t.Fatalf("expected implicit fallback tier member fallback, got %s", active)
 	}
 
-	// Recover t1-fast once -> blocked by failbackChecks=2 and failbackDelay=20s.
-	s.recordSample("t1-fast", 60, nil, tFail.Add(5*time.Second))
-	active, _, switched, _ = s.evaluateWithTransition(tFail.Add(5*time.Second), nil)
-	if switched || active != "fallback" {
-		t.Fatalf("expected failback held by dual-gate, got %s switched=%v", active, switched)
-	}
-
-	// Recover t1-fast second time after failbackDelay -> fails back to Tier 1.
-	tRecover := tFail.Add(25 * time.Second)
+	// Recover t1-fast once -> immediate priority failback to Tier 1!
+	tRecover := tFail.Add(5 * time.Second)
 	s.recordSample("t1-fast", 60, nil, tRecover)
 	active, reason, switched, isFailback := s.evaluateWithTransition(tRecover, nil)
 	if !switched || !isFailback || active != "t1-fast" || reason != "priority failback" {
-		t.Fatalf("expected priority failback to t1-fast, got %s reason=%s isFailback=%v", active, reason, isFailback)
+		t.Fatalf("expected immediate priority failback to t1-fast, got %s reason=%s isFailback=%v", active, reason, isFailback)
 	}
 
 	// Verify candidateOrder ranks healthy Tier 1 before Tier 2 before implicit fallback.

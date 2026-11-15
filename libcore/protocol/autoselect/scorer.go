@@ -1,33 +1,22 @@
 package autoselect
 
 import (
-	"math"
 	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
 )
 
-type memberSample struct {
-	checkedAt time.Time
-	delay     uint16
-	err       string
-	ok        bool
-}
-
 type memberState struct {
-	tag              string
-	index            int
-	tier             int
-	initialDelay     uint16
-	ring             []memberSample
-	consecutiveOK    int
-	consecutiveFail  int
-	lastActiveFailAt time.Time
-	lastCheckedAt    time.Time
-	lastDelay        uint16
-	lastError        string
-	lastSuccessAt    time.Time
+	tag           string
+	index         int
+	tier          int
+	checkCount    int
+	failCount     int
+	available     bool
+	lastCheckedAt time.Time
+	lastDelay     uint16
+	lastError     string
 }
 
 type scorer struct {
@@ -98,19 +87,6 @@ func newScorer(order []string, cfg normalizedConfig) *scorer {
 	}
 }
 
-func (s *scorer) seedInitialDelays(delays map[string]uint16) {
-	if len(delays) == 0 {
-		return
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for tag, d := range delays {
-		if st, ok := s.members[tag]; ok && d > 0 {
-			st.initialDelay = d
-		}
-	}
-}
-
 func (s *scorer) recordSample(tag string, delay uint16, err error, now time.Time) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -123,39 +99,24 @@ func (s *scorer) recordSample(tag string, delay uint16, err error, now time.Time
 		now = time.Now()
 	}
 
-	sample := memberSample{
-		checkedAt: now,
-		delay:     delay,
-		ok:        err == nil && delay > 0,
-	}
-	if err != nil {
-		sample.err = err.Error()
-		sample.delay = 0
-		sample.ok = false
-	}
-
+	okProbe := err == nil && delay > 0
+	st.checkCount++
 	st.lastCheckedAt = now
-	if sample.ok {
-		st.consecutiveOK++
-		st.consecutiveFail = 0
+	if okProbe {
+		st.available = true
 		st.lastDelay = delay
 		st.lastError = ""
-		st.lastSuccessAt = now
-	} else {
-		st.consecutiveFail++
-		st.consecutiveOK = 0
-		st.lastActiveFailAt = now
-		if sample.err != "" {
-			st.lastError = sample.err
-		} else {
-			st.lastError = "probe failed"
-		}
+		return
 	}
 
-	st.ring = append(st.ring, sample)
-	if len(st.ring) > s.cfg.sampleCount {
-		trim := len(st.ring) - s.cfg.sampleCount
-		st.ring = append([]memberSample(nil), st.ring[trim:]...)
+	// Single probe failure marks the node unavailable immediately.
+	st.available = false
+	st.failCount++
+	st.lastDelay = 0
+	if err != nil {
+		st.lastError = err.Error()
+	} else {
+		st.lastError = "probe failed"
 	}
 }
 
@@ -166,16 +127,7 @@ func (s *scorer) sampleCounts(tag string) (total, fails int, lastDelay uint16) {
 	if !ok {
 		return 0, 0, 0
 	}
-	total = len(st.ring)
-	for _, sm := range st.ring {
-		if !sm.ok {
-			fails++
-		}
-	}
-	if total == 0 && st.initialDelay > 0 {
-		return 0, 0, st.initialDelay
-	}
-	return total, fails, st.lastDelay
+	return st.checkCount, st.failCount, st.lastDelay
 }
 
 func (s *scorer) pin(tag string, now time.Time) bool {
@@ -215,107 +167,24 @@ func (s *scorer) activeTagSnapshot() string {
 	return s.activeTag
 }
 
-func (s *scorer) clearActiveSamples() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for _, st := range s.members {
-		st.consecutiveFail = 0
-		st.consecutiveOK = 0
-		st.lastActiveFailAt = time.Time{}
-	}
-}
-
-func (s *scorer) memberScoreLocked(st *memberState, passive *passiveTracker, now time.Time) (score float64, effectiveDelay uint16, checkCount int, failCount int, available bool) {
-	checkCount = len(st.ring)
-	var delays []float64
-	for _, sm := range st.ring {
-		if sm.ok {
-			delays = append(delays, float64(sm.delay))
-		} else {
-			failCount++
-		}
-	}
-
-	if checkCount == 0 {
-		if st.initialDelay > 0 {
-			effectiveDelay = st.initialDelay
-			score = float64(st.initialDelay)
-			if passive != nil && s.cfg.learnFromConnections {
-				_, _, consecFails := passive.NodeStats(st.tag, now)
-				if consecFails >= 2 {
-					score += float64(consecFails) * 80.0
-				}
-			}
-			available = s.cfg.maxRttMs == 0 || effectiveDelay <= s.cfg.maxRttMs
-		} else if passive != nil && s.cfg.learnFromConnections {
-			ttfbMs, recentSucc, consecFails := passive.NodeStats(st.tag, now)
-			if ttfbMs > 0 && recentSucc > 0 && consecFails < 2 {
-				effectiveDelay = uint16(math.Round(ttfbMs))
-				score = ttfbMs
-				available = s.cfg.maxRttMs == 0 || effectiveDelay <= s.cfg.maxRttMs
-			}
-		}
-		return
-	}
-
-	okCount := len(delays)
-	if okCount > 0 {
-		sorted := append([]float64(nil), delays...)
-		sort.Float64s(sorted)
-		mid := len(sorted) / 2
-		median := sorted[mid]
-		if len(sorted)%2 == 0 {
-			median = (sorted[mid-1] + sorted[mid]) / 2.0
-		}
-
-		// Jitter penalty based on mean absolute deviation around median
-		var devSum float64
-		for _, v := range delays {
-			devSum += math.Abs(v - median)
-		}
-		mad := devSum / float64(len(delays))
-		failRatio := float64(failCount) / float64(checkCount)
-		score = median + 0.5*mad + failRatio*120.0
-
-		if st.lastDelay > 0 {
-			effectiveDelay = st.lastDelay
-		} else {
-			effectiveDelay = uint16(math.Round(median))
-		}
-	}
-
-	if passive != nil && s.cfg.learnFromConnections {
-		ttfbMs, _, consecFails := passive.NodeStats(st.tag, now)
-		if ttfbMs > 0 {
-			if score > 0 {
-				score = 0.7*score + 0.3*ttfbMs
-			} else {
-				score = ttfbMs
-			}
-		}
-		if consecFails >= 2 && okCount > 0 {
-			score += float64(consecFails) * 80.0
-		}
-	}
-
-	activelyDead := st.consecutiveFail >= 2 || okCount == 0
-	withinMaxRtt := effectiveDelay > 0 && (s.cfg.maxRttMs == 0 || effectiveDelay <= s.cfg.maxRttMs)
-	available = !activelyDead && withinMaxRtt
-	return
-}
-
 func (s *scorer) evaluate(now time.Time, passive *passiveTracker) (string, string) {
 	active, reason, _, _ := s.evaluateWithTransition(now, passive)
 	return active, reason
 }
 
-func (s *scorer) evaluateWithTransition(now time.Time, passive *passiveTracker) (activeTag string, switchReason string, switched bool, isFailback bool) {
+func (s *scorer) evaluateWithTransition(now time.Time, _ *passiveTracker) (activeTag string, switchReason string, switched bool, isFailback bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.evaluateLocked(now, passive)
+	return s.evaluateLocked(now)
 }
 
-func (s *scorer) evaluateLocked(now time.Time, passive *passiveTracker) (string, string, bool, bool) {
+type scoredEntryRef struct {
+	st        *memberState
+	delay     uint16
+	available bool
+}
+
+func (s *scorer) evaluateLocked(now time.Time) (string, string, bool, bool) {
 	if len(s.order) == 0 {
 		return "", "", false, false
 	}
@@ -339,12 +208,10 @@ func (s *scorer) evaluateLocked(now time.Time, passive *passiveTracker) (string,
 	var current *scoredEntryRef
 	for _, tag := range s.order {
 		st := s.members[tag]
-		score, delay, _, _, avail := s.memberScoreLocked(st, passive, now)
 		item := scoredEntryRef{
 			st:        st,
-			score:     score,
-			delay:     delay,
-			available: avail,
+			delay:     st.lastDelay,
+			available: st.available,
 		}
 		items = append(items, item)
 		if tag == s.activeTag {
@@ -354,21 +221,14 @@ func (s *scorer) evaluateLocked(now time.Time, passive *passiveTracker) (string,
 	}
 
 	if s.cfg.selectionMode == SelectionModePriority {
-		return s.evaluatePriorityLocked(now, passive, items, current)
+		return s.evaluatePriorityLocked(now, items, current)
 	}
 	return s.evaluateLatencyLocked(now, items, current)
 }
 
-type scoredEntryRef struct {
-	st        *memberState
-	score     float64
-	delay     uint16
-	available bool
-}
-
-func (s *scorer) evaluatePriorityLocked(now time.Time, passive *passiveTracker, items []scoredEntryRef, current *scoredEntryRef) (string, string, bool, bool) {
+func (s *scorer) evaluatePriorityLocked(now time.Time, items []scoredEntryRef, current *scoredEntryRef) (string, string, bool, bool) {
 	if s.hasTiers {
-		return s.evaluatePriorityTieredLocked(now, passive, items, current)
+		return s.evaluatePriorityTieredLocked(now, items, current)
 	}
 	var firstHealthy *scoredEntryRef
 	for i := range items {
@@ -378,7 +238,6 @@ func (s *scorer) evaluatePriorityLocked(now time.Time, passive *passiveTracker, 
 		}
 	}
 
-	// Fallback if all unhealthy: priority 0
 	if firstHealthy == nil {
 		firstHealthy = &items[0]
 	}
@@ -390,12 +249,10 @@ func (s *scorer) evaluatePriorityLocked(now time.Time, passive *passiveTracker, 
 		return s.activeTag, s.switchReason, true, false
 	}
 
-	// Same priority candidate
 	if firstHealthy.st.tag == current.st.tag {
 		return s.activeTag, s.switchReason, false, false
 	}
 
-	// Current node became unhealthy -> failover immediately
 	if !current.available {
 		s.activeTag = firstHealthy.st.tag
 		s.lastSwitchAt = now
@@ -403,18 +260,14 @@ func (s *scorer) evaluatePriorityLocked(now time.Time, passive *passiveTracker, 
 		return s.activeTag, s.switchReason, true, false
 	}
 
-	// Current node is still healthy, higher-priority candidate wants to failback
+	// Higher-priority member is healthy: fail back immediately.
 	if firstHealthy.st.index < current.st.index {
-		if s.canFailbackLocked(firstHealthy.st, passive, now) {
-			s.activeTag = firstHealthy.st.tag
-			s.lastSwitchAt = now
-			s.switchReason = "priority failback"
-			return s.activeTag, s.switchReason, true, true
-		}
-		return s.activeTag, s.switchReason, false, false
+		s.activeTag = firstHealthy.st.tag
+		s.lastSwitchAt = now
+		s.switchReason = "priority failback"
+		return s.activeTag, s.switchReason, true, true
 	}
 
-	// Current node is healthy and already higher priority than candidate
 	return s.activeTag, s.switchReason, false, false
 }
 
@@ -422,16 +275,16 @@ func betterTieredFallback(a, b *scoredEntryRef) bool {
 	if a.st.tier != b.st.tier {
 		return a.st.tier < b.st.tier
 	}
-	if (a.score > 0) != (b.score > 0) {
-		return a.score > 0
+	if (a.delay > 0) != (b.delay > 0) {
+		return a.delay > 0
 	}
-	if a.score > 0 && b.score > 0 && a.score != b.score {
-		return a.score < b.score
+	if a.delay > 0 && b.delay > 0 && a.delay != b.delay {
+		return a.delay < b.delay
 	}
 	return a.st.index < b.st.index
 }
 
-func (s *scorer) evaluatePriorityTieredLocked(now time.Time, passive *passiveTracker, items []scoredEntryRef, current *scoredEntryRef) (string, string, bool, bool) {
+func (s *scorer) evaluatePriorityTieredLocked(now time.Time, items []scoredEntryRef, current *scoredEntryRef) (string, string, bool, bool) {
 	bestTier := -1
 	var bestInTier *scoredEntryRef
 	for i := range items {
@@ -441,7 +294,7 @@ func (s *scorer) evaluatePriorityTieredLocked(now time.Time, passive *passiveTra
 		}
 		t := it.st.tier
 		if bestTier == -1 || t < bestTier ||
-			(t == bestTier && (it.score < bestInTier.score || (it.score == bestInTier.score && it.st.index < bestInTier.st.index))) {
+			(t == bestTier && (it.delay < bestInTier.delay || (it.delay == bestInTier.delay && it.st.index < bestInTier.st.index))) {
 			bestTier = t
 			bestInTier = it
 		}
@@ -491,31 +344,16 @@ func (s *scorer) evaluatePriorityTieredLocked(now time.Time, passive *passiveTra
 		return s.activeTag, s.switchReason, true, false
 	}
 
+	// Higher tier has a healthy node: fail back immediately.
 	if bestTier < current.st.tier {
-		var eligible *scoredEntryRef
-		for i := range items {
-			it := &items[i]
-			if !it.available || it.st.tier != bestTier {
-				continue
-			}
-			if !s.canFailbackLocked(it.st, passive, now) {
-				continue
-			}
-			if eligible == nil || it.score < eligible.score || (it.score == eligible.score && it.st.index < eligible.st.index) {
-				eligible = it
-			}
-		}
-		if eligible != nil {
-			s.activeTag = eligible.st.tag
-			s.lastSwitchAt = now
-			s.switchReason = "priority failback"
-			return s.activeTag, s.switchReason, true, true
-		}
-		return s.activeTag, s.switchReason, false, false
+		s.activeTag = bestInTier.st.tag
+		s.lastSwitchAt = now
+		s.switchReason = "priority failback"
+		return s.activeTag, s.switchReason, true, true
 	}
 
 	if bestTier == current.st.tier {
-		if current.score > 0 && current.score-bestInTier.score <= float64(s.cfg.tolerance) {
+		if current.delay > 0 && int(current.delay)-int(bestInTier.delay) <= int(s.cfg.tolerance) {
 			return s.activeTag, s.switchReason, false, false
 		}
 		s.activeTag = bestInTier.st.tag
@@ -525,23 +363,6 @@ func (s *scorer) evaluatePriorityTieredLocked(now time.Time, passive *passiveTra
 	}
 
 	return s.activeTag, s.switchReason, false, false
-}
-
-func (s *scorer) canFailbackLocked(st *memberState, passive *passiveTracker, now time.Time) bool {
-	if st.consecutiveOK < s.cfg.failbackChecks {
-		return false
-	}
-	lastFail := st.lastActiveFailAt
-	if passive != nil {
-		pf := passive.LastFailureAt(st.tag)
-		if pf.After(lastFail) {
-			lastFail = pf
-		}
-	}
-	if !lastFail.IsZero() && now.Sub(lastFail) < s.cfg.failbackDelay {
-		return false
-	}
-	return true
 }
 
 func (s *scorer) evaluateLatencyLocked(now time.Time, items []scoredEntryRef, current *scoredEntryRef) (string, string, bool, bool) {
@@ -555,21 +376,20 @@ func (s *scorer) evaluateLatencyLocked(now time.Time, items []scoredEntryRef, cu
 	var best scoredEntryRef
 	if len(healthy) > 0 {
 		sort.SliceStable(healthy, func(i, j int) bool {
-			if healthy[i].score != healthy[j].score {
-				return healthy[i].score < healthy[j].score
+			if healthy[i].delay != healthy[j].delay {
+				return healthy[i].delay < healthy[j].delay
 			}
 			return healthy[i].st.index < healthy[j].st.index
 		})
 		best = healthy[0]
 	} else {
-		// Fallback: positive score, else index order
 		fallbacks := append([]scoredEntryRef(nil), items...)
 		sort.SliceStable(fallbacks, func(i, j int) bool {
-			if (fallbacks[i].score > 0) != (fallbacks[j].score > 0) {
-				return fallbacks[i].score > 0
+			if (fallbacks[i].delay > 0) != (fallbacks[j].delay > 0) {
+				return fallbacks[i].delay > 0
 			}
-			if fallbacks[i].score > 0 && fallbacks[j].score > 0 && fallbacks[i].score != fallbacks[j].score {
-				return fallbacks[i].score < fallbacks[j].score
+			if fallbacks[i].delay > 0 && fallbacks[j].delay > 0 && fallbacks[i].delay != fallbacks[j].delay {
+				return fallbacks[i].delay < fallbacks[j].delay
 			}
 			return fallbacks[i].st.index < fallbacks[j].st.index
 		})
@@ -587,9 +407,9 @@ func (s *scorer) evaluateLatencyLocked(now time.Time, items []scoredEntryRef, cu
 		return s.activeTag, s.switchReason, false, false
 	}
 
-	// If current is healthy AND best is not strictly better beyond tolerance, stay put!
-	if current.available && current.score > 0 && best.available {
-		if current.score-best.score <= float64(s.cfg.tolerance) {
+	// Strictly enforce user tolerance when current node is healthy.
+	if current.available && current.delay > 0 && best.available {
+		if int(current.delay)-int(best.delay) <= int(s.cfg.tolerance) {
 			return s.activeTag, s.switchReason, false, false
 		}
 	}
@@ -604,20 +424,96 @@ func (s *scorer) evaluateLatencyLocked(now time.Time, items []scoredEntryRef, cu
 	return s.activeTag, s.switchReason, true, false
 }
 
-func (s *scorer) verifiedPoolLocked(now time.Time, passive *passiveTracker) []string {
+// switchFromConnectionFailure rotates away from a node experiencing consecutive real connection failures
+// without corrupting its pure active-probe delay or global availability state.
+func (s *scorer) switchFromConnectionFailure(failedTag, reason string, now time.Time, passive *passiveTracker) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if len(s.order) <= 1 || s.pinnedTag != "" || failedTag == "" || s.activeTag != failedTag {
+		return false
+	}
+	if now.IsZero() {
+		now = time.Now()
+	}
+
+	type cand struct {
+		st          *memberState
+		avail       bool
+		consecFails int
+	}
+	candidates := make([]cand, 0, len(s.order)-1)
+	for _, tag := range s.order {
+		if tag == failedTag {
+			continue
+		}
+		st := s.members[tag]
+		consecFails := 0
+		if passive != nil {
+			_, _, consecFails = passive.NodeStats(tag, now)
+		}
+		candidates = append(candidates, cand{
+			st:          st,
+			avail:       st.available,
+			consecFails: consecFails,
+		})
+	}
+	if len(candidates) == 0 {
+		return false
+	}
+
+	sort.SliceStable(candidates, func(i, j int) bool {
+		if candidates[i].avail != candidates[j].avail {
+			return candidates[i].avail
+		}
+		if (candidates[i].consecFails >= 2) != (candidates[j].consecFails >= 2) {
+			return candidates[i].consecFails < 2
+		}
+		if s.cfg.selectionMode == SelectionModePriority {
+			if s.hasTiers {
+				if candidates[i].st.tier != candidates[j].st.tier {
+					return candidates[i].st.tier < candidates[j].st.tier
+				}
+			} else {
+				return candidates[i].st.index < candidates[j].st.index
+			}
+		}
+		if candidates[i].st.lastDelay != candidates[j].st.lastDelay {
+			if (candidates[i].st.lastDelay > 0) != (candidates[j].st.lastDelay > 0) {
+				return candidates[i].st.lastDelay > 0
+			}
+			return candidates[i].st.lastDelay < candidates[j].st.lastDelay
+		}
+		return candidates[i].st.index < candidates[j].st.index
+	})
+
+	chosen := candidates[0].st.tag
+	if chosen == "" || chosen == s.activeTag {
+		return false
+	}
+	s.activeTag = chosen
+	s.lastSwitchAt = now
+	s.switchReason = reason
+	return true
+}
+
+func (s *scorer) verifiedPoolLocked(now time.Time, _ *passiveTracker) []string {
 	type ranked struct {
 		tag   string
 		index int
 		tier  int
-		score float64
-		avail bool
+		delay uint16
 	}
 	var healthy []ranked
 	for _, tag := range s.order {
 		st := s.members[tag]
-		score, _, _, _, avail := s.memberScoreLocked(st, passive, now)
-		if avail {
-			healthy = append(healthy, ranked{tag: tag, index: st.index, tier: st.tier, score: score, avail: avail})
+		if st.available && st.lastDelay > 0 {
+			healthy = append(healthy, ranked{
+				tag:   tag,
+				index: st.index,
+				tier:  st.tier,
+				delay: st.lastDelay,
+			})
 		}
 	}
 	if len(healthy) == 0 {
@@ -632,24 +528,16 @@ func (s *scorer) verifiedPoolLocked(now time.Time, passive *passiveTracker) []st
 
 	filterTopSpread := func(items []ranked) []string {
 		sort.SliceStable(items, func(i, j int) bool {
-			if items[i].score != items[j].score {
-				return items[i].score < items[j].score
+			if items[i].delay != items[j].delay {
+				return items[i].delay < items[j].delay
 			}
 			return items[i].index < items[j].index
 		})
-		bestScore := items[0].score
-		spread := float64(s.cfg.tolerance)
-		if spread < 50 {
-			spread = 50
-		}
-		threshold := bestScore + spread
+		threshold := int(items[0].delay) + int(s.cfg.tolerance)
 		var pool []string
 		for _, h := range items {
-			if h.score <= threshold || len(pool) == 0 {
+			if int(h.delay) <= threshold || len(pool) == 0 {
 				pool = append(pool, h.tag)
-			}
-			if len(pool) >= 8 {
-				break
 			}
 		}
 		return pool
@@ -674,13 +562,6 @@ func (s *scorer) verifiedPoolLocked(now time.Time, passive *passiveTracker) []st
 		sort.SliceStable(healthy, func(i, j int) bool {
 			return healthy[i].index < healthy[j].index
 		})
-		capLimit := s.cfg.standbySize + 1
-		if capLimit < 1 {
-			capLimit = 1
-		}
-		if len(healthy) > capLimit {
-			healthy = healthy[:capLimit]
-		}
 		out := make([]string, len(healthy))
 		for i, h := range healthy {
 			out[i] = h.tag
@@ -724,7 +605,7 @@ func (s *scorer) pickConnectionCarrierLocked(now time.Time, passive *passiveTrac
 	}
 	if !s.cfg.balanceEnabled {
 		if s.activeTag == "" {
-			s.evaluateLocked(now, passive)
+			s.evaluateLocked(now)
 		}
 		return s.activeTag
 	}
@@ -765,7 +646,7 @@ func (s *scorer) candidateOrder(siteKey string, now time.Time, passive *passiveT
 	}
 
 	if s.activeTag == "" {
-		s.evaluateLocked(now, passive)
+		s.evaluateLocked(now)
 	}
 
 	seen := make(map[string]bool, len(s.order))
@@ -779,12 +660,11 @@ func (s *scorer) candidateOrder(siteKey string, now time.Time, passive *passiveT
 		}
 	}
 
-	// Build scored slice for deterministic ordering
 	type ranked struct {
 		tag   string
 		index int
 		tier  int
-		score float64
+		delay uint16
 		avail bool
 		avoid bool
 	}
@@ -792,22 +672,21 @@ func (s *scorer) candidateOrder(siteKey string, now time.Time, passive *passiveT
 	healthyMap := make(map[string]bool, len(s.order))
 	for _, tag := range s.order {
 		st := s.members[tag]
-		score, _, _, _, avail := s.memberScoreLocked(st, passive, now)
 		avoid := passive != nil && siteKey != "" && passive.ShouldAvoidSite(tag, siteKey, now)
-		if avail {
+		if st.available {
 			healthyMap[tag] = true
 		}
 		all = append(all, ranked{
 			tag:   tag,
 			index: st.index,
 			tier:  st.tier,
-			score: score,
-			avail: avail,
+			delay: st.lastDelay,
+			avail: st.available,
 			avoid: avoid,
 		})
 	}
 
-	// 1. Site sticky preferred healthy node (only when load-balancing is disabled so balancing spreads connections)
+	// 1. Site sticky preferred healthy node (only when load-balancing is disabled)
 	if !s.cfg.balanceEnabled && s.cfg.learnFromConnections && passive != nil && siteKey != "" {
 		if pref := passive.PreferredSiteNode(siteKey, now); pref != "" && healthyMap[pref] && !passive.ShouldAvoidSite(pref, siteKey, now) {
 			addUnique(pref)
@@ -821,7 +700,7 @@ func (s *scorer) candidateOrder(siteKey string, now time.Time, passive *passiveT
 		addUnique(carrier)
 	}
 
-	// Sort remaining nodes
+	// Sort remaining candidates deterministically
 	sort.SliceStable(all, func(i, j int) bool {
 		if all[i].avail != all[j].avail {
 			return all[i].avail
@@ -838,11 +717,11 @@ func (s *scorer) candidateOrder(siteKey string, now time.Time, passive *passiveT
 				return all[i].index < all[j].index
 			}
 		}
-		if all[i].score > 0 && all[j].score > 0 && all[i].score != all[j].score {
-			return all[i].score < all[j].score
+		if all[i].delay > 0 && all[j].delay > 0 && all[i].delay != all[j].delay {
+			return all[i].delay < all[j].delay
 		}
-		if (all[i].score > 0) != (all[j].score > 0) {
-			return all[i].score > 0
+		if (all[i].delay > 0) != (all[j].delay > 0) {
+			return all[i].delay > 0
 		}
 		return all[i].index < all[j].index
 	})

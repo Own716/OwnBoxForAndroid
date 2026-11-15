@@ -3,8 +3,6 @@ package autoselect
 import (
 	"context"
 	"errors"
-	"net"
-	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -12,20 +10,17 @@ import (
 	customUrltest "libcore/protocol/urltest"
 
 	"github.com/sagernet/sing-box/adapter"
-	"github.com/sagernet/sing-box/common/dialer"
 	singUrltest "github.com/sagernet/sing-box/common/urltest"
 	"github.com/sagernet/sing-box/log"
-	"github.com/sagernet/sing-box/option"
 	"github.com/sagernet/sing/common/batch"
-	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
 	"github.com/sagernet/sing/common/x/list"
 	"github.com/sagernet/sing/service/pause"
 )
 
 const (
-	probeConcurrency = 8
-	probeTimeout     = 5 * time.Second
+	probeConcurrency     = 8
+	probeTimeout         = 5 * time.Second
 	minInterfaceDebounce = 15 * time.Second
 )
 
@@ -45,7 +40,7 @@ type prober struct {
 	logger     log.Logger
 	link       string
 	getOutFn   func(tag string) adapter.Outbound
-	onSwitchFn func(isFailback bool)
+	onSwitchFn func()
 
 	// Injectable hooks for deterministic unit testing
 	probeFn             func(ctx context.Context, tag string) (uint16, error)
@@ -55,6 +50,7 @@ type prober struct {
 	checking     atomic.Bool
 	localOffline atomic.Bool
 
+	probeMu         sync.Mutex
 	mu              sync.Mutex
 	started         bool
 	closed          bool
@@ -66,9 +62,7 @@ type prober struct {
 	checkDoneMu     sync.Mutex
 	checkDoneCh     chan struct{}
 
-	watchTicker    *time.Ticker
 	checkTicker    *time.Ticker
-	fullScanTicker *time.Ticker
 	rotateTicker   *time.Ticker
 	pauseCallbacks []*list.Element[pause.Callback]
 }
@@ -82,6 +76,10 @@ func newProber(
 	logger log.Logger,
 	getOutFn func(tag string) adapter.Outbound,
 ) *prober {
+	link := cfg.url
+	if link == "" {
+		link = customUrltest.DefaultCFURL
+	}
 	p := &prober{
 		cfg:      cfg,
 		scorer:   s,
@@ -89,7 +87,7 @@ func newProber(
 		history:  history,
 		pauseMgr: pauseMgr,
 		logger:   logger,
-		link:     customUrltest.GetFallbackLink(cfg.url),
+		link:     link,
 		getOutFn: getOutFn,
 		nowFn:    time.Now,
 		closeCh:  make(chan struct{}),
@@ -129,6 +127,20 @@ func (p *prober) NextCheckRemainingSec(now time.Time) int {
 	return rem
 }
 
+func (p *prober) allTargets() []string {
+	if p.scorer == nil {
+		return nil
+	}
+	return append([]string(nil), p.scorer.order...)
+}
+
+func (p *prober) resetCheckScheduleLocked(now time.Time) {
+	p.nextCheckAt = now.Add(p.cfg.checkInterval)
+	if p.checkTicker != nil {
+		p.checkTicker.Reset(p.cfg.checkInterval)
+	}
+}
+
 func (p *prober) Start(parent context.Context) {
 	p.mu.Lock()
 	if p.started || p.closed {
@@ -143,19 +155,16 @@ func (p *prober) Start(parent context.Context) {
 	p.ctx = ctx
 	p.cancelFn = cancel
 	now := p.now()
+	// Suppress immediate startup interface-update echoes so cold start only probes once.
+	p.lastInterfaceAt = now
 	p.nextCheckAt = now.Add(p.cfg.checkInterval)
 	p.mu.Unlock()
 
-	// Trigger immediate initial warm-up check in background
-	go func() {
-		all := append([]string(nil), p.scorer.order...)
-		if p.cfg.rankTopN > 0 && len(all) > p.cfg.rankTopN {
-			all = all[:p.cfg.rankTopN]
-		}
-		p.runProbeBatch(ctx, all, p.now())
-	}()
-
 	p.startSchedulers(ctx)
+
+	go func() {
+		p.runProbeBatch(ctx, p.allTargets(), time.Time{})
+	}()
 }
 
 func (p *prober) Touch() {
@@ -186,18 +195,12 @@ func (p *prober) startSchedulers(ctx context.Context) {
 	}
 
 	p.checkTicker = registerTicker(p.cfg.checkInterval)
-	p.fullScanTicker = registerTicker(p.cfg.fullScanInterval)
-	if p.cfg.watchInterval > 0 {
-		p.watchTicker = registerTicker(p.cfg.watchInterval)
-	}
 	if p.cfg.balanceEnabled && p.cfg.balanceMode == BalanceModeTimedRotation {
 		p.rotateTicker = registerTicker(p.cfg.balanceInterval)
 	}
 	p.nextCheckAt = p.now().Add(p.cfg.checkInterval)
 
-	watchT := p.watchTicker
 	checkT := p.checkTicker
-	fullT := p.fullScanTicker
 	rotT := p.rotateTicker
 	closeCh := p.closeCh
 	p.mu.Unlock()
@@ -209,42 +212,7 @@ func (p *prober) startSchedulers(ctx context.Context) {
 				case <-closeCh:
 					return
 				case <-checkT.C:
-					now := p.now()
-					p.mu.Lock()
-					p.nextCheckAt = now.Add(p.cfg.checkInterval)
-					p.mu.Unlock()
-					targets := selectIntensiveTargets(p.scorer.order, p.scorer, p.passive, p.cfg, now)
-					p.runProbeBatch(ctx, targets, now)
-				}
-			}
-		}()
-	}
-
-	if fullT != nil {
-		go func() {
-			for {
-				select {
-				case <-closeCh:
-					return
-				case <-fullT.C:
-					now := p.now()
-					targets := selectFullScanTargets(p.scorer.order, p.cfg)
-					p.runProbeBatch(ctx, targets, now)
-				}
-			}
-		}()
-	}
-
-	if watchT != nil {
-		go func() {
-			for {
-				select {
-				case <-closeCh:
-					return
-				case <-watchT.C:
-					now := p.now()
-					targets := selectWatchTargets(p.scorer.order, p.scorer, p.passive, now)
-					p.runProbeBatch(ctx, targets, now)
+					p.runProbeBatch(ctx, p.allTargets(), time.Time{})
 				}
 			}
 		}()
@@ -275,7 +243,7 @@ func (p *prober) Close() {
 	if p.cancelFn != nil {
 		p.cancelFn()
 	}
-	for _, t := range []*time.Ticker{p.watchTicker, p.checkTicker, p.fullScanTicker, p.rotateTicker} {
+	for _, t := range []*time.Ticker{p.checkTicker, p.rotateTicker} {
 		if t != nil {
 			t.Stop()
 		}
@@ -286,9 +254,7 @@ func (p *prober) Close() {
 		}
 	}
 	p.pauseCallbacks = nil
-	p.watchTicker = nil
 	p.checkTicker = nil
-	p.fullScanTicker = nil
 	p.rotateTicker = nil
 	p.mu.Unlock()
 }
@@ -312,8 +278,7 @@ func (p *prober) InterfaceUpdated(ctx context.Context) {
 		baseCtx = ctx
 	}
 	go func() {
-		targets := selectIntensiveTargets(p.scorer.order, p.scorer, p.passive, p.cfg, now)
-		p.runProbeBatch(baseCtx, targets, now)
+		p.runProbeBatch(baseCtx, p.allTargets(), time.Time{})
 	}()
 }
 
@@ -324,8 +289,7 @@ func (p *prober) CheckAllNow(ctx context.Context) {
 			ctx = context.Background()
 		}
 	}
-	targets := selectFullScanTargets(p.scorer.order, p.cfg)
-	p.runProbeBatch(ctx, targets, p.now())
+	p.runProbeBatch(ctx, p.allTargets(), time.Time{})
 }
 
 func (p *prober) defaultProbe(ctx context.Context, tag string) (uint16, error) {
@@ -340,37 +304,7 @@ func (p *prober) defaultProbe(ctx context.Context, tag string) (uint16, error) {
 }
 
 func (p *prober) defaultConnectivityCheck(ctx context.Context) bool {
-	if p.pauseMgr != nil && p.pauseMgr.IsPaused() {
-		return false
-	}
-	if p.cfg.connectivityURL == "" {
-		return true
-	}
-	checkCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-
-	d, err := dialer.NewDefault(checkCtx, option.DialerOptions{})
-	if err != nil {
-		return false
-	}
-	tr := &http.Transport{
-		DialContext: func(c context.Context, network, addr string) (net.Conn, error) {
-			return d.DialContext(c, network, M.ParseSocksaddr(addr))
-		},
-		DisableKeepAlives: true,
-	}
-	defer tr.CloseIdleConnections()
-	client := &http.Client{Transport: tr, Timeout: 3 * time.Second}
-	req, err := http.NewRequestWithContext(checkCtx, http.MethodGet, p.cfg.connectivityURL, nil)
-	if err != nil {
-		return false
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return false
-	}
-	_ = resp.Body.Close()
-	return resp.StatusCode < 500
+	return p.pauseMgr == nil || !p.pauseMgr.IsPaused()
 }
 
 func (p *prober) runProbeBatch(ctx context.Context, targets []string, now time.Time) map[string]uint16 {
@@ -380,8 +314,12 @@ func (p *prober) runProbeBatch(ctx context.Context, targets []string, now time.T
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if now.IsZero() {
-		now = p.now()
+
+	p.probeMu.Lock()
+	defer p.probeMu.Unlock()
+
+	if ctx.Err() != nil {
+		return nil
 	}
 
 	// Deduplicate targets while preserving order
@@ -426,6 +364,10 @@ func (p *prober) runProbeBatch(ctx context.Context, targets []string, now time.T
 		return nil
 	}
 
+	if now.IsZero() {
+		now = p.now()
+	}
+
 	outcomes := make([]probeOutcome, 0, len(uniq))
 	successCount := 0
 	delays := make(map[string]uint16, len(uniq))
@@ -440,10 +382,13 @@ func (p *prober) runProbeBatch(ctx context.Context, targets []string, now time.T
 		}
 	}
 
-	// Outage immunity: when >= 2 targets tested and 100% failed, check connectivity guard
+	// Outage immunity: when >= 2 targets tested and 100% failed, roll back only when local device/service is paused/offline.
 	if len(outcomes) >= 2 && successCount == 0 {
 		if p.connectivityCheckFn != nil && !p.connectivityCheckFn(ctx) {
 			p.localOffline.Store(true)
+			p.mu.Lock()
+			p.resetCheckScheduleLocked(now)
+			p.mu.Unlock()
 			return delays
 		}
 	}
@@ -451,9 +396,7 @@ func (p *prober) runProbeBatch(ctx context.Context, targets []string, now time.T
 
 	p.mu.Lock()
 	p.lastCheckAt = now
-	if p.nextCheckAt.IsZero() || !now.Before(p.nextCheckAt) {
-		p.nextCheckAt = now.Add(p.cfg.checkInterval)
-	}
+	p.resetCheckScheduleLocked(now)
 	p.mu.Unlock()
 
 	for _, out := range outcomes {
@@ -465,136 +408,19 @@ func (p *prober) runProbeBatch(ctx context.Context, targets []string, now time.T
 					Delay: out.delay,
 				})
 			} else {
-				_, fails, _ := p.scorer.sampleCounts(out.tag)
-				if fails > 1 {
-					p.history.DeleteURLTestHistory(out.tag)
-				}
+				p.history.DeleteURLTestHistory(out.tag)
 			}
 		}
 	}
 
-	_, _, switched, isFailback := p.scorer.evaluateWithTransition(now, p.passive)
+	_, _, switched, _ := p.scorer.evaluateWithTransition(now, p.passive)
 	if p.history != nil {
 		p.history.NotifyUpdated()
 	}
 	if switched && p.onSwitchFn != nil {
-		p.onSwitchFn(isFailback)
+		p.onSwitchFn()
 	}
 	return delays
 }
 
-func selectWatchTargets(all []string, s *scorer, passive *passiveTracker, now time.Time) []string {
-	if s == nil {
-		return nil
-	}
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	var targets []string
-	seen := make(map[string]bool)
-	add := func(tag string) {
-		if tag != "" && !seen[tag] {
-			seen[tag] = true
-			targets = append(targets, tag)
-		}
-	}
-
-	if s.pinnedTag != "" {
-		add(s.pinnedTag)
-		return targets
-	}
-
-	add(s.activeTag)
-	if s.cfg.balanceEnabled {
-		for _, tag := range s.verifiedPoolLocked(now, passive) {
-			add(tag)
-		}
-	}
-	// Plus top-1 standby healthy candidate
-	for _, tag := range s.order {
-		if tag == s.activeTag {
-			continue
-		}
-		st := s.members[tag]
-		_, _, _, _, avail := s.memberScoreLocked(st, passive, now)
-		if avail {
-			add(tag)
-			break
-		}
-	}
-	if len(targets) == 0 && len(all) > 0 {
-		add(all[0])
-	}
-	return targets
-}
-
-func selectIntensiveTargets(all []string, s *scorer, passive *passiveTracker, cfg normalizedConfig, now time.Time) []string {
-	if s == nil {
-		return append([]string(nil), all...)
-	}
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	limit := cfg.rankTopN
-	if limit <= 0 || limit > len(all) {
-		limit = len(all)
-	}
-
-	seen := make(map[string]bool)
-	var targets []string
-	add := func(tag string) {
-		if tag != "" && !seen[tag] {
-			seen[tag] = true
-			targets = append(targets, tag)
-		}
-	}
-
-	add(s.pinnedTag)
-	add(s.activeTag)
-
-	// Standby layer
-	standbyAdded := 0
-	for i := 0; i < limit; i++ {
-		tag := all[i]
-		if tag == s.activeTag {
-			continue
-		}
-		if st, ok := s.members[tag]; ok {
-			_, _, _, _, avail := s.memberScoreLocked(st, passive, now)
-			if avail && standbyAdded < cfg.standbySize {
-				add(tag)
-				standbyAdded++
-			}
-		}
-	}
-
-	// Head intensiveCheckCount
-	headCap := cfg.intensiveCheckCount
-	if headCap > limit {
-		headCap = limit
-	}
-	for i := 0; i < headCap; i++ {
-		add(all[i])
-	}
-
-	// Give nodes with recent passive failures an intensive probe chance
-	if passive != nil {
-		for i := 0; i < limit; i++ {
-			tag := all[i]
-			if !passive.LastFailureAt(tag).IsZero() {
-				add(tag)
-			}
-		}
-	}
-	return targets
-}
-
-func selectFullScanTargets(all []string, cfg normalizedConfig) []string {
-	if cfg.rankTopN > 0 && cfg.rankTopN < len(all) {
-		return append([]string(nil), all[:cfg.rankTopN]...)
-	}
-	return append([]string(nil), all...)
-}
-
-// Keep unused N import check quiet or check packet dial helpers cleanly
 var _ = N.NetworkTCP
