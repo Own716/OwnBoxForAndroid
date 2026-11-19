@@ -3380,6 +3380,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                         uploadBitsPerSecond = sample.uploadBitsPerSecond,
                     )
                     if (outcome != null) {
+                        DataStore.recordProfileSpeedTestTimestamp(sample.profileId)
                         if (SagerDatabase.proxyDao.updateSpeedTestResult(
                                 proxyId = sample.profileId,
                                 mode = outcome.mode,
@@ -3434,6 +3435,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                     } catch (_: Exception) {}
                     adapter.groupFragments.values.forEach { fragment ->
                         fragment.adapter?.clearSpeedTestLive()
+                        fragment.adapter?.reloadProfiles()
                     }
                 }
                 speedTestNotification?.updateNotification(0, 0, true)
@@ -3533,6 +3535,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                         uploadBitsPerSecond = sample.uploadBitsPerSecond,
                     )
                     if (outcome != null) {
+                        DataStore.recordProfileSpeedTestTimestamp(sample.profileId)
                         if (SagerDatabase.proxyDao.updateSpeedTestResult(
                                 proxyId = sample.profileId,
                                 mode = outcome.mode,
@@ -3591,8 +3594,10 @@ class ConfigurationFragment @JvmOverloads constructor(
                     } catch (_: Exception) {}
                     adapter.groupFragments.values.forEach { fragment ->
                         fragment.adapter?.clearSpeedTestLive()
+                        fragment.adapter?.reloadProfiles()
                     }
-                    if (speedTestDialog === dialog) {
+                }
+                if (speedTestDialog === dialog) {
                         speedTestDialog = null
                     }
                     speedTestNotification?.updateNotification(0, 0, true)
@@ -6104,6 +6109,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
 
             private fun speedTestResultText(proxyEntity: ProxyEntity, isCompactRate: Boolean = false): String? {
+                if (proxyEntity.speedTestDownloadBitsPerSecond <= 0L && proxyEntity.speedTestUploadBitsPerSecond <= 0L) return null
                 val outcome = SpeedTestOutcome(
                     mode = proxyEntity.speedTestMode,
                     downloadBitsPerSecond = proxyEntity.speedTestDownloadBitsPerSecond,
@@ -6130,8 +6136,14 @@ class ConfigurationFragment @JvmOverloads constructor(
                 showTraffic: Boolean,
                 speedTestText: String?,
             ) {
-                if (DataStore.compactProfileRows) {
-                    val secondary = requireContext().getColorAttr(android.R.attr.textColorSecondary)
+                val isCompact = DataStore.compactProfileRows || DataStore.profileViewMode == 1
+                val secondary = requireContext().getColorAttr(android.R.attr.textColorSecondary)
+
+                if (isCompact) {
+                    val pingTs = DataStore.getProfileTestTimestampMs(proxyEntity.id)
+                    val speedTs = DataStore.getProfileSpeedTestTimestampMs(proxyEntity.id)
+                    val showSpeedInCompact = speedTestText != null && (speedTs >= pingTs || proxyEntity.status <= 0)
+
                     val text = SpannableStringBuilder()
                     fun appendPart(value: CharSequence?, color: Int) {
                         if (value.isNullOrEmpty()) return
@@ -6141,7 +6153,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                         text.setSpan(ForegroundColorSpan(color), start, text.length, SPAN_EXCLUSIVE_EXCLUSIVE)
                     }
 
-                    if (speedTestText != null) {
+                    if (showSpeedInCompact) {
                         appendPart(speedTestText, secondary)
                     } else {
                         when (proxyEntity.status) {
@@ -6166,6 +6178,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                     return
                 }
 
+                // Non-compact (detailed) mode: Show all test results simultaneously!
                 val text = SpannableStringBuilder()
                 fun appendPart(value: CharSequence?, color: Int) {
                     if (value.isNullOrEmpty()) return
@@ -6175,7 +6188,6 @@ class ConfigurationFragment @JvmOverloads constructor(
                     text.setSpan(ForegroundColorSpan(color), start, text.length, SPAN_EXCLUSIVE_EXCLUSIVE)
                 }
 
-                val secondary = requireContext().getColorAttr(android.R.attr.textColorSecondary)
                 when (proxyEntity.status) {
                     1 -> appendPart(
                         getString(R.string.available, proxyEntity.ping),
@@ -6201,8 +6213,11 @@ class ConfigurationFragment @JvmOverloads constructor(
                         trafficText.text = ""
                     }
                 }
-                appendPart(speedTestText, secondary)
+                if (speedTestText != null) {
+                    appendPart(speedTestText, secondary)
+                }
                 profileStatus.text = text
+                profileStatus.isVisible = text.isNotEmpty()
             }
 
             fun bind(proxyEntity: ProxyEntity) {
@@ -6285,7 +6300,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                         else -> null
                     }
                 } else null
-                val speedTestText = if (isCompact) null else (liveText ?: speedTestResultText(proxyEntity, isDoubleColumn))
+                val speedTestText = liveText ?: speedTestResultText(proxyEntity, isCompact || isDoubleColumn)
 
                 val showTraffic = !isCompact && (rx + tx != 0L)
                 trafficText.isVisible = showTraffic

@@ -526,6 +526,16 @@ object DataStore : OnPreferenceDataStoreChangeListener {
         runCatching { configurationStore.putLong("profile_test_ts_$profileId", nowMs) }
     }
 
+    fun getProfileSpeedTestTimestampMs(profileId: Long): Long {
+        if (profileId <= 0L) return 0L
+        return runCatching { configurationStore.getLong("profile_speed_test_ts_$profileId", 0L) }.getOrDefault(0L)
+    }
+
+    fun recordProfileSpeedTestTimestamp(profileId: Long, nowMs: Long = System.currentTimeMillis()) {
+        if (profileId <= 0L) return
+        runCatching { configurationStore.putLong("profile_speed_test_ts_$profileId", nowMs) }
+    }
+
     var groupName by profileCacheStore.string(Key.GROUP_NAME)
     var groupType by profileCacheStore.stringToInt(Key.GROUP_TYPE)
     var groupOrder by profileCacheStore.stringToInt(Key.GROUP_ORDER)
