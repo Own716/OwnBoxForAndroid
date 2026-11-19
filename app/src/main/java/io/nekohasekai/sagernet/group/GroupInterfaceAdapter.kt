@@ -38,53 +38,61 @@ class GroupInterfaceAdapter(val context: ThemedActivity) : GroupManager.Interfac
     ) {
         if (!byUser) return
 
-        if (changed == 0 && duplicate.isEmpty() && retained.isEmpty()) {
+        var status = ""
+        if (added.isNotEmpty()) {
+            status += context.getString(
+                    R.string.group_added, added.joinToString("\n", postfix = "\n\n")
+            )
+        }
+        if (updated.isNotEmpty()) {
+            status += context.getString(R.string.group_changed,
+                    updated.map { it }.joinToString("\n", postfix = "\n\n") {
+                        if (it.key == it.value) it.key else "${it.key} => ${it.value}"
+                    })
+        }
+        if (retained.isNotEmpty()) {
+            status += context.getString(
+                    R.string.group_retained, retained.joinToString("\n", postfix = "\n\n")
+            )
+        }
+        if (deleted.isNotEmpty()) {
+            status += context.getString(
+                    R.string.group_deleted, deleted.joinToString("\n", postfix = "\n\n")
+            )
+        }
+        if (duplicate.isNotEmpty()) {
+            status += context.getString(
+                    R.string.group_duplicate, duplicate.joinToString("\n", postfix = "\n\n")
+            )
+        }
+
+        val hasDiff = changed > 0 || status.isNotBlank() || duplicate.isNotEmpty() || retained.isNotEmpty()
+        if (hasDiff) {
+            context.snackbar(context.getString(R.string.group_updated, group.name, changed)).show()
+        } else {
             context.snackbar(
                     context.getString(
                             R.string.group_no_difference, group.displayName()
                     )
             ).show()
+        }
+
+        val dialogMessage = if (status.isNotBlank()) {
+            status.trim()
         } else {
-            context.snackbar(context.getString(R.string.group_updated, group.name, changed)).show()
+            context.getString(R.string.group_no_difference, group.displayName())
+        }
 
-            var status = ""
-            if (added.isNotEmpty()) {
-                status += context.getString(
-                        R.string.group_added, added.joinToString("\n", postfix = "\n\n")
-                )
-            }
-            if (updated.isNotEmpty()) {
-                status += context.getString(R.string.group_changed,
-                        updated.map { it }.joinToString("\n", postfix = "\n\n") {
-                            if (it.key == it.value) it.key else "${it.key} => ${it.value}"
-                        })
-            }
-            if (retained.isNotEmpty()) {
-                status += context.getString(
-                        R.string.group_retained, retained.joinToString("\n", postfix = "\n\n")
-                )
-            }
-            if (deleted.isNotEmpty()) {
-                status += context.getString(
-                        R.string.group_deleted, deleted.joinToString("\n", postfix = "\n\n")
-                )
-            }
-            if (duplicate.isNotEmpty()) {
-                status += context.getString(
-                        R.string.group_duplicate, duplicate.joinToString("\n", postfix = "\n\n")
-                )
-            }
+        onMainDispatcher {
+            if (context.isFinishing || context.isDestroyed) return@onMainDispatcher
+            delay(500L)
+            if (context.isFinishing || context.isDestroyed) return@onMainDispatcher
 
-            onMainDispatcher {
-                delay(1000L)
-
-                MaterialAlertDialogBuilder(context).setTitle(
-                        context.getString(
-                                R.string.group_diff, group.displayName()
-                        )
-                ).setMessage(status.trim()).setPositiveButton(android.R.string.ok, null).show()
-            }
-
+            MaterialAlertDialogBuilder(context).setTitle(
+                    context.getString(
+                            R.string.group_diff, group.displayName()
+                    )
+            ).setMessage(dialogMessage).setPositiveButton(android.R.string.ok, null).show()
         }
 
     }

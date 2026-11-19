@@ -146,28 +146,8 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
                         val subGroups = SagerDatabase.groupDao.allGroups().filter { it.type == GroupType.SUBSCRIPTION }
                         if (subGroups.isEmpty()) return@setPositiveButton
                         runOnDefaultDispatcher {
-                            supervisorScope {
-                                val tasks = subGroups.map { group ->
-                                    async {
-                                        runCatching {
-                                            GroupUpdater.executeUpdate(group, false)
-                                        }.getOrElse { e ->
-                                            Logs.w("Batch update failed for ${group.displayName()}: ${e.readableMessage}")
-                                            false
-                                        }
-                                    }
-                                }
-                                val results = tasks.awaitAll()
-                                val successCount = results.count { it }
-                                val failCount = results.count { !it }
-                                onMainDispatcher {
-                                    val msg = if (failCount == 0) {
-                                        "全部订阅更新完成（共 ${successCount} 个）"
-                                    } else {
-                                        "订阅更新完成：${successCount} 个成功，${failCount} 个失败"
-                                    }
-                                    safeSnackbar(msg)
-                                }
+                            subGroups.forEach { group ->
+                                GroupUpdater.startUpdate(group, true)
                             }
                         }
                     }

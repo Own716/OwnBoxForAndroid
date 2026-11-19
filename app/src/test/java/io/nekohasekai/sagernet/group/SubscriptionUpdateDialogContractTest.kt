@@ -29,9 +29,11 @@ class SubscriptionUpdateDialogContractTest {
             retained: List<String>
         ) {
             successCalls++
-            // GroupInterfaceAdapter contract: If not byUser, do not display dialog or snackbar
+            // GroupInterfaceAdapter contract:
+            // 1. If not byUser (background auto update / app open check), suppress all dialogs completely
             if (!byUser) return
 
+            // 2. If byUser (manual update / update all), always show dialog for each subscription
             dialogShownList.add(group.displayName())
         }
 
@@ -62,15 +64,15 @@ class SubscriptionUpdateDialogContractTest {
     }
 
     @Test
-    fun testUserManualUpdateTriggersDialog() = runBlocking {
+    fun testUserManualUpdateTriggersDialogEvenWithoutChanges() = runBlocking {
         val ui = MockUserInterface()
         val group = ProxyGroup(id = 2L, name = "AirportVIP")
 
-        // Case 2: User manually updates subscription (byUser = true)
+        // Case 2: User manually updates subscription without changes (changed = 0)
         ui.onUpdateSuccess(
             group = group,
-            changed = 5,
-            added = listOf("Node 3"),
+            changed = 0,
+            added = emptyList(),
             updated = emptyMap(),
             deleted = emptyList(),
             duplicate = emptyList(),
@@ -78,8 +80,37 @@ class SubscriptionUpdateDialogContractTest {
         )
 
         assertEquals(1, ui.successCalls)
-        // Manual update preserves original modal diff dialog
+        // Manual update MUST display dialog to confirm result to user
         assertEquals(1, ui.dialogShownList.size)
         assertEquals("AirportVIP", ui.dialogShownList[0])
+    }
+
+    @Test
+    fun testManualUpdateAllTriggersIndividualDialogsForEachSubscription() = runBlocking {
+        val ui = MockUserInterface()
+        val groups = listOf(
+            ProxyGroup(id = 1L, name = "Sub 1"),
+            ProxyGroup(id = 2L, name = "Sub 2"),
+            ProxyGroup(id = 3L, name = "Sub 3")
+        )
+
+        // Case 3: User manually clicks "Update All", every subscription triggers its own dialog
+        groups.forEach { group ->
+            ui.onUpdateSuccess(
+                group = group,
+                changed = 2,
+                added = listOf("NewNode"),
+                updated = emptyMap(),
+                deleted = emptyList(),
+                duplicate = emptyList(),
+                byUser = true
+            )
+        }
+
+        assertEquals(3, ui.successCalls)
+        assertEquals(3, ui.dialogShownList.size)
+        assertEquals("Sub 1", ui.dialogShownList[0])
+        assertEquals("Sub 2", ui.dialogShownList[1])
+        assertEquals("Sub 3", ui.dialogShownList[2])
     }
 }
