@@ -2433,21 +2433,27 @@ class ConfigurationFragment @JvmOverloads constructor(
         restoreToolbarFromBatchMode()
     }
 
-    fun toggleSelectAllInBatchMode() {
+    fun invertSelectionInBatchMode() {
         if (!isBatchMode) return
         val currentFrag = getCurrentGroupFragment() ?: return
         val allIds = currentFrag.adapter?.configurationIdList ?: emptyList()
         if (allIds.isEmpty()) return
 
         synchronized(multiSelectedIds) {
-            if (multiSelectedIds.containsAll(allIds)) {
-                multiSelectedIds.clear()
-            } else {
-                multiSelectedIds.addAll(allIds)
+            val currentlySelected = multiSelectedIds.toSet()
+            multiSelectedIds.clear()
+            for (id in allIds) {
+                if (id !in currentlySelected) {
+                    multiSelectedIds.add(id)
+                }
             }
         }
         currentFrag.adapter?.notifyDataSetChanged()
         updateToolbarForBatchMode()
+    }
+
+    fun toggleSelectAllInBatchMode() {
+        invertSelectionInBatchMode()
     }
 
     fun batchUrlTest() {
@@ -2460,14 +2466,18 @@ class ConfigurationFragment @JvmOverloads constructor(
         urlTest(selected)
     }
 
-    fun batchTcpPing() {
+    fun batchSpeedTest() {
         if (!isBatchMode) return
         val selected = synchronized(multiSelectedIds) { multiSelectedIds.toSet() }
         if (selected.isEmpty()) {
             safeSnackbar(R.string.batch_no_selection_hint)
             return
         }
-        tcpPingTest(selected)
+        confirmSpeedTest(selected)
+    }
+
+    fun batchTcpPing() {
+        batchSpeedTest()
     }
 
     fun batchDelete() {
@@ -2572,13 +2582,15 @@ class ConfigurationFragment @JvmOverloads constructor(
         listOf(
             R.id.action_batch_select_all,
             R.id.action_batch_url_test,
-            R.id.action_batch_tcp_ping,
+            R.id.action_batch_speed_test,
             R.id.action_batch_delete
         ).forEach { id ->
             toolbar.menu.findItem(id)?.let { item ->
                 item.isVisible = true
                 if (id == R.id.action_batch_select_all) {
-                    item.title = getString(if (isAllSelected) R.string.deselect_all else R.string.select_all)
+                    item.title = getString(R.string.invert_selection)
+                } else if (id == R.id.action_batch_speed_test) {
+                    item.title = getString(R.string.speed_test_group)
                 }
                 item.icon?.let { icon ->
                     val tinted = icon.mutate()
@@ -2614,7 +2626,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         listOf(
             R.id.action_batch_select_all,
             R.id.action_batch_url_test,
-            R.id.action_batch_tcp_ping,
+            R.id.action_batch_speed_test,
             R.id.action_batch_delete,
             R.id.action_reorder_save
         ).forEach { id ->
@@ -3228,7 +3240,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
 
             R.id.action_batch_select_all -> {
-                toggleSelectAllInBatchMode()
+                invertSelectionInBatchMode()
                 return true
             }
 
@@ -3237,8 +3249,8 @@ class ConfigurationFragment @JvmOverloads constructor(
                 return true
             }
 
-            R.id.action_batch_tcp_ping -> {
-                batchTcpPing()
+            R.id.action_batch_speed_test, R.id.action_batch_tcp_ping -> {
+                batchSpeedTest()
                 return true
             }
 
@@ -3250,21 +3262,25 @@ class ConfigurationFragment @JvmOverloads constructor(
         return false
     }
 
-    private fun confirmSpeedTest() {
+    fun confirmSpeedTest(targetProfileIds: Set<Long>? = null) {
         if (DataStore.runningTest) return
+        val count = targetProfileIds?.size
+        val title = if (count != null) getString(R.string.batch_speed_test_confirm_title, count) else getString(R.string.speed_test_confirm_title)
+        val msg = if (count != null) getString(R.string.batch_speed_test_confirm_message, count) else getString(R.string.speed_test_confirm_message)
         MaterialAlertDialogBuilder(requireContext())
-            .setTitle(R.string.speed_test_confirm_title)
-            .setMessage(R.string.speed_test_confirm_message)
-            .setPositiveButton(R.string.speed_test_group) { _, _ -> speedTest() }
+            .setTitle(title)
+            .setMessage(msg)
+            .setPositiveButton(R.string.speed_test_group) { _, _ -> speedTest(targetProfileIds) }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
 
-    private fun speedTest() {
+    fun speedTest(targetProfileIds: Set<Long>? = null) {
         if (DataStore.runningTest) return else DataStore.runningTest = true
         val isAll = isCurrentAllGroups()
         val group = DataStore.currentGroup()
-        val displayName = if (isAll) getString(R.string.group_tab_all) else group.displayName()
+        val baseName = if (isAll) getString(R.string.group_tab_all) else group.displayName()
+        val displayName = if (targetProfileIds != null) "$baseName (${targetProfileIds.size})" else baseName
         val binding = LayoutProgressListBinding.inflate(layoutInflater)
         binding.progressCircular.isGone = true
         binding.progressLinear.isVisible = true
@@ -3314,10 +3330,15 @@ class ConfigurationFragment @JvmOverloads constructor(
 
         speedTestJob = runOnDefaultDispatcher {
             try {
-                val profiles = if (isAll) {
+                val allList = if (isAll) {
                     SagerDatabase.proxyDao.getAll().filter { !DataStore.isGroupDisabled(it.groupId) }
                 } else {
                     if (DataStore.isGroupDisabled(group.id)) emptyList() else SagerDatabase.proxyDao.getByGroup(group.id)
+                }
+                val profiles = if (targetProfileIds != null) {
+                    allList.filter { it.id in targetProfileIds }
+                } else {
+                    allList
                 }
                 if (profiles.isEmpty()) {
                     onMainDispatcher {

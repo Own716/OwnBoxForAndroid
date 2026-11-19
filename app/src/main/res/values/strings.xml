@@ -1582,4 +1582,7 @@
     <string name="batch_delete_completed">Deleted %d profile(s)</string>
     <string name="batch_skip_active_profile">Protected and skipped active profile in use</string>
     <string name="batch_no_selection_hint">Please select at least one profile</string>
+    <string name="invert_selection">Invert Selection</string>
+    <string name="batch_speed_test_confirm_title">Run speed test (%d)?</string>
+    <string name="batch_speed_test_confirm_message">Are you sure you want to run speed test on the selected %d profile(s)? Speed testing can use significant data.</string>
 </resources>

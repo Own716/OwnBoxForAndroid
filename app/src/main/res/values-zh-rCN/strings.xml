@@ -1500,4 +1500,7 @@
     <string name="batch_delete_completed">已删除 %d 个节点</string>
     <string name="batch_skip_active_profile">已保护并跳过正在连接中的活动节点</string>
     <string name="batch_no_selection_hint">请先选择至少一个节点</string>
+    <string name="invert_selection">反选</string>
+    <string name="batch_speed_test_confirm_title">运行速度测试 (%d)？</string>
+    <string name="batch_speed_test_confirm_message">确定要对选中的 %d 个节点运行速度测试吗？测试可能消耗较多流量，各节点将依次通过其自身代理进行测试。</string>
 </resources>

@@ -114,7 +114,7 @@
     <item
         android:id="@+id/action_batch_select_all"
         android:icon="@drawable/ic_baseline_check_circle_24"
-        android:title="@string/select_all"
+        android:title="@string/invert_selection"
         android:visible="false"
         app:showAsAction="always" />
 
@@ -126,9 +126,9 @@
         app:showAsAction="always" />
 
     <item
-        android:id="@+id/action_batch_tcp_ping"
+        android:id="@+id/action_batch_speed_test"
         android:icon="@drawable/ic_baseline_speed_24"
-        android:title="@string/connection_test_tcp_ping"
+        android:title="@string/speed_test_group"
         android:visible="false"
         app:showAsAction="always" />
 

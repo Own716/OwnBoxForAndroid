@@ -28,8 +28,8 @@ class BatchMultiSelectContractTest {
             menuContent.contains("action_batch_url_test")
         )
         assertTrue(
-            "Menu must define action_batch_tcp_ping",
-            menuContent.contains("action_batch_tcp_ping")
+            "Menu must define action_batch_speed_test",
+            menuContent.contains("action_batch_speed_test")
         )
         assertTrue(
             "Menu must define action_batch_delete",
@@ -47,11 +47,14 @@ class BatchMultiSelectContractTest {
             "batch_selected_count",
             "select_all",
             "deselect_all",
+            "invert_selection",
             "batch_delete_confirm_title",
             "batch_delete_confirm_message",
             "batch_delete_completed",
             "batch_skip_active_profile",
-            "batch_no_selection_hint"
+            "batch_no_selection_hint",
+            "batch_speed_test_confirm_title",
+            "batch_speed_test_confirm_message"
         )
 
         for (key in requiredKeys) {
@@ -77,6 +80,10 @@ class BatchMultiSelectContractTest {
             content.contains("fun exitBatchMode()")
         )
         assertTrue(
+            "ConfigurationFragment must implement invertSelectionInBatchMode",
+            content.contains("fun invertSelectionInBatchMode()")
+        )
+        assertTrue(
             "ConfigurationFragment must implement toggleSelectAllInBatchMode",
             content.contains("fun toggleSelectAllInBatchMode()")
         )
@@ -85,8 +92,8 @@ class BatchMultiSelectContractTest {
             content.contains("fun batchUrlTest()")
         )
         assertTrue(
-            "ConfigurationFragment must implement batchTcpPing",
-            content.contains("fun batchTcpPing()")
+            "ConfigurationFragment must implement batchSpeedTest",
+            content.contains("fun batchSpeedTest()")
         )
         assertTrue(
             "ConfigurationFragment must implement batchDelete",
@@ -101,8 +108,8 @@ class BatchMultiSelectContractTest {
             content.contains("fun urlTest(targetProfileIds: Set<Long>?")
         )
         assertTrue(
-            "tcpPingTest must support targetProfileIds",
-            content.contains("fun tcpPingTest(targetProfileIds: Set<Long>?")
+            "speedTest must support targetProfileIds",
+            content.contains("fun speedTest(targetProfileIds: Set<Long>?")
         )
     }
 
