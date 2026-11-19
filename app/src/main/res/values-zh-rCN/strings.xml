@@ -1491,4 +1491,13 @@
     <string name="balancer_tier_sum_both">%1$s · %2$s（命中 %3$d 个）</string>
     <string name="balancer_tier_sum_all">匹配全部已选配置（%d 个）</string>
     <string name="balancer_tier_fallback_note">保底备选：%d 个未分层配置</string>
+    <string name="action_batch_multiselect">多选</string>
+    <string name="batch_selected_count">已选择 %d 项</string>
+    <string name="select_all">全选</string>
+    <string name="deselect_all">取消全选</string>
+    <string name="batch_delete_confirm_title">删除 %d 个节点？</string>
+    <string name="batch_delete_confirm_message">确定要删除选中的 %d 个节点吗？此操作无法撤销。</string>
+    <string name="batch_delete_completed">已删除 %d 个节点</string>
+    <string name="batch_skip_active_profile">已保护并跳过正在连接中的活动节点</string>
+    <string name="batch_no_selection_hint">请先选择至少一个节点</string>
 </resources>

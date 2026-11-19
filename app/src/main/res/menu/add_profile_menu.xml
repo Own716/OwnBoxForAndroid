@@ -112,12 +112,44 @@
         app:showAsAction="always" />
 
     <item
+        android:id="@+id/action_batch_select_all"
+        android:icon="@drawable/ic_baseline_check_circle_24"
+        android:title="@string/select_all"
+        android:visible="false"
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/action_batch_url_test"
+        android:icon="@drawable/ic_electric_bolt_24"
+        android:title="@string/connection_test_url_test"
+        android:visible="false"
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/action_batch_tcp_ping"
+        android:icon="@drawable/ic_baseline_speed_24"
+        android:title="@string/connection_test_tcp_ping"
+        android:visible="false"
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/action_batch_delete"
+        android:icon="@drawable/ic_action_delete"
+        android:title="@string/delete"
+        android:visible="false"
+        app:showAsAction="always" />
+
+    <item
         android:id="@+id/action_misc"
         android:icon="@drawable/ic_baseline_more_vert_24"
         android:title=""
         app:showAsAction="always">
         <menu>
             <group android:id="@+id/group_actions_ops">
+                <item
+                    android:id="@+id/action_batch_multiselect"
+                    android:icon="@drawable/solar_checklist_minimalistic_linear"
+                    android:title="@string/action_batch_multiselect" />
                 <item
                     android:id="@+id/action_export"
                     android:title="@string/action_export">

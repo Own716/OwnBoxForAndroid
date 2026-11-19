@@ -243,6 +243,9 @@ class ConfigurationFragment @JvmOverloads constructor(
                 fragment.adapter?.refreshProfileState(setOf(profileId))
             }
         }
+        if (isBatchMode) {
+            updateToolbarForBatchMode()
+        }
         (activity as? SelectCallback)?.onProfileToggled(profileId, isNowSelected, count)
     }
 
@@ -365,7 +368,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
     }
 
-    fun isSelectedProfile(profileId: Long) = if (multiSelect) multiSelectedIds.contains(profileId) else selectedProxySnapshot == profileId
+    fun isSelectedProfile(profileId: Long) = if (multiSelect || isBatchMode) multiSelectedIds.contains(profileId) else selectedProxySnapshot == profileId
 
     private fun isCurrentProfile(profileId: Long) = currentProfileSnapshot == profileId
 
@@ -436,6 +439,9 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
 
         override fun onPageSelected(position: Int) {
+            if (isBatchMode) {
+                exitBatchMode()
+            }
             if (adapter.groupList.size > position) {
                 val group = adapter.groupList[position]
                 adapter.selectedGroupIndex = position
@@ -810,7 +816,7 @@ class ConfigurationFragment @JvmOverloads constructor(
     }
 
     private fun updateToolbarMenuTitles() {
-        if (!isToolbarInitialized) return
+        if (!isToolbarInitialized || isReorderMode || isBatchMode) return
         val isAll = isCurrentAllGroups()
         val isSearching = currentSearchQuery.isNotBlank()
         val exportItem = toolbar.menu.findItem(R.id.action_export)
@@ -2157,6 +2163,10 @@ class ConfigurationFragment @JvmOverloads constructor(
     }
 
     override fun onBackPressed(): Boolean {
+        if (isBatchMode) {
+            exitBatchMode()
+            return true
+        }
         if (isReorderMode) {
             cancelReorder()
             return true
@@ -2174,6 +2184,9 @@ class ConfigurationFragment @JvmOverloads constructor(
         private set
 
     fun enterReorderMode() {
+        if (isBatchMode) {
+            exitBatchMode()
+        }
         if (isSearchActive || currentSearchQuery.isNotBlank()) {
             safeSnackbar("搜索状态下不支持调整排序")
             return
@@ -2366,6 +2379,247 @@ class ConfigurationFragment @JvmOverloads constructor(
         toolbar.menu.findItem(R.id.action_misc)?.isVisible = true
 
         toolbar.menu.findItem(R.id.action_reorder_save)?.isVisible = false
+    }
+
+    var isBatchMode: Boolean = false
+        private set
+
+    fun enterBatchMode() {
+        if (isReorderMode) {
+            cancelReorder()
+        }
+        val searchItem = if (isToolbarInitialized) toolbar.menu.findItem(R.id.action_search) else null
+        val searchView = (searchItem?.actionView as? SearchView) ?: (if (isToolbarInitialized) toolbar.findViewById<SearchView>(R.id.action_search) else null)
+        if (searchView != null && !searchView.isIconified) {
+            cancelSearch(searchView)
+        }
+
+        val currentFrag = getCurrentGroupFragment()
+        val ad = currentFrag?.adapter
+        if (ad == null || ad.configurationIdList.isEmpty()) {
+            safeSnackbar(R.string.batch_no_selection_hint)
+            return
+        }
+
+        isBatchMode = true
+        if (::groupPager.isInitialized) {
+            groupPager.isUserInputEnabled = false
+        }
+        synchronized(multiSelectedIds) {
+            multiSelectedIds.clear()
+        }
+
+        (activity as? MainActivity)?.binding?.fab?.hide()
+        (activity as? MainActivity)?.binding?.fabProgress?.visibility = View.INVISIBLE
+
+        currentFrag.adapter?.notifyDataSetChanged()
+        updateToolbarForBatchMode()
+    }
+
+    fun exitBatchMode() {
+        if (!isBatchMode) return
+        isBatchMode = false
+        if (::groupPager.isInitialized) {
+            groupPager.isUserInputEnabled = true
+        }
+
+        synchronized(multiSelectedIds) {
+            multiSelectedIds.clear()
+        }
+
+        (activity as? MainActivity)?.binding?.fab?.show()
+
+        getCurrentGroupFragment()?.adapter?.notifyDataSetChanged()
+        restoreToolbarFromBatchMode()
+    }
+
+    fun toggleSelectAllInBatchMode() {
+        if (!isBatchMode) return
+        val currentFrag = getCurrentGroupFragment() ?: return
+        val allIds = currentFrag.adapter?.configurationIdList ?: emptyList()
+        if (allIds.isEmpty()) return
+
+        synchronized(multiSelectedIds) {
+            if (multiSelectedIds.containsAll(allIds)) {
+                multiSelectedIds.clear()
+            } else {
+                multiSelectedIds.addAll(allIds)
+            }
+        }
+        currentFrag.adapter?.notifyDataSetChanged()
+        updateToolbarForBatchMode()
+    }
+
+    fun batchUrlTest() {
+        if (!isBatchMode) return
+        val selected = synchronized(multiSelectedIds) { multiSelectedIds.toSet() }
+        if (selected.isEmpty()) {
+            safeSnackbar(R.string.batch_no_selection_hint)
+            return
+        }
+        urlTest(selected)
+    }
+
+    fun batchTcpPing() {
+        if (!isBatchMode) return
+        val selected = synchronized(multiSelectedIds) { multiSelectedIds.toSet() }
+        if (selected.isEmpty()) {
+            safeSnackbar(R.string.batch_no_selection_hint)
+            return
+        }
+        tcpPingTest(selected)
+    }
+
+    fun batchDelete() {
+        if (!isBatchMode) return
+        val selectedIds = synchronized(multiSelectedIds) { multiSelectedIds.toList() }
+        if (selectedIds.isEmpty()) {
+            safeSnackbar(R.string.batch_no_selection_hint)
+            return
+        }
+
+        val ctx = context ?: MessageStore.getCurrentActivity() ?: return
+        runOnDefaultDispatcher {
+            val allSelectedProfiles = selectedIds.mapNotNull { SagerDatabase.proxyDao.getById(it) }
+            if (allSelectedProfiles.isEmpty()) return@runOnDefaultDispatcher
+
+            val serviceStarted = DataStore.serviceState.started
+            val activeProfileId = DataStore.currentProfile
+            val toDelete = mutableListOf<ProxyEntity>()
+            var skippedActive = false
+
+            for (p in allSelectedProfiles) {
+                if (serviceStarted && p.id == activeProfileId) {
+                    skippedActive = true
+                } else {
+                    toDelete.add(p)
+                }
+            }
+
+            if (toDelete.isEmpty()) {
+                onMainDispatcher {
+                    safeSnackbar(R.string.batch_skip_active_profile)
+                }
+                return@runOnDefaultDispatcher
+            }
+
+            onMainDispatcher {
+                val title = getString(R.string.batch_delete_confirm_title, toDelete.size)
+                var message = getString(R.string.batch_delete_confirm_message, toDelete.size)
+                if (skippedActive) {
+                    message += "\n\n" + getString(R.string.batch_skip_active_profile)
+                }
+
+                MaterialAlertDialogBuilder(ctx)
+                    .setTitle(title)
+                    .setMessage(message)
+                    .setPositiveButton(R.string.delete) { _, _ ->
+                        runOnDefaultDispatcher {
+                            for (profile in toDelete) {
+                                ProfileManager.deleteProfile2(profile.groupId, profile.id)
+                            }
+                            onMainDispatcher {
+                                exitBatchMode()
+                                if (isCurrentAllGroups()) {
+                                    adapter.groupFragments.values.forEach { it.adapter?.reloadProfiles() }
+                                } else {
+                                    val currentGroup = DataStore.currentGroup()
+                                    GroupManager.postReload(currentGroup.id)
+                                    getCurrentGroupFragment()?.adapter?.reloadProfiles()
+                                }
+                                var doneMsg = getString(R.string.batch_delete_completed, toDelete.size)
+                                if (skippedActive) {
+                                    doneMsg += " · " + getString(R.string.batch_skip_active_profile)
+                                }
+                                safeSnackbar(doneMsg)
+                            }
+                        }
+                    }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
+            }
+        }
+    }
+
+    fun updateToolbarForBatchMode() {
+        if (!isToolbarInitialized) return
+        val count = multiSelectedIds.size
+        val customTitle = view?.findViewById<TextView>(R.id.toolbar_title_view)
+        customTitle?.text = if (count > 0) getString(R.string.batch_selected_count, count) else getString(R.string.action_batch_multiselect)
+
+        toolbar.setNavigationIcon(R.drawable.baseline_arrow_back_24)
+        val iconColor = resolveTopBarIconTint(requireContext())
+        toolbar.navigationIcon?.let {
+            val tinted = it.mutate()
+            androidx.core.graphics.drawable.DrawableCompat.setTint(tinted, iconColor)
+            toolbar.navigationIcon = tinted
+        }
+        toolbar.setNavigationOnClickListener {
+            exitBatchMode()
+        }
+
+        toolbar.menu.findItem(R.id.action_search)?.isVisible = false
+        toolbar.menu.findItem(R.id.action_add)?.isVisible = false
+        toolbar.menu.findItem(R.id.action_connection_url_test)?.isVisible = false
+        toolbar.menu.findItem(R.id.action_locate_active_profile)?.isVisible = false
+        toolbar.menu.findItem(R.id.action_misc)?.isVisible = false
+        toolbar.menu.findItem(R.id.action_reorder_save)?.isVisible = false
+
+        val currentFrag = getCurrentGroupFragment()
+        val allIds = currentFrag?.adapter?.configurationIdList ?: emptyList()
+        val isAllSelected = allIds.isNotEmpty() && multiSelectedIds.containsAll(allIds)
+
+        listOf(
+            R.id.action_batch_select_all,
+            R.id.action_batch_url_test,
+            R.id.action_batch_tcp_ping,
+            R.id.action_batch_delete
+        ).forEach { id ->
+            toolbar.menu.findItem(id)?.let { item ->
+                item.isVisible = true
+                if (id == R.id.action_batch_select_all) {
+                    item.title = getString(if (isAllSelected) R.string.deselect_all else R.string.select_all)
+                }
+                item.icon?.let { icon ->
+                    val tinted = icon.mutate()
+                    androidx.core.graphics.drawable.DrawableCompat.setTint(tinted, iconColor)
+                    item.icon = tinted
+                }
+            }
+        }
+    }
+
+    private fun restoreToolbarFromBatchMode() {
+        if (!isToolbarInitialized) return
+        val customTitle = view?.findViewById<TextView>(R.id.toolbar_title_view)
+        customTitle?.text = getString(R.string.app_name)
+
+        toolbar.setNavigationIcon(R.drawable.ic_navigation_menu)
+        val iconColor = resolveTopBarIconTint(requireContext())
+        toolbar.navigationIcon?.let {
+            val tinted = it.mutate()
+            androidx.core.graphics.drawable.DrawableCompat.setTint(tinted, iconColor)
+            toolbar.navigationIcon = tinted
+        }
+        toolbar.setNavigationOnClickListener {
+            (activity as? MainActivity)?.binding?.drawerLayout?.openDrawer(GravityCompat.START)
+        }
+
+        toolbar.menu.findItem(R.id.action_search)?.isVisible = true
+        toolbar.menu.findItem(R.id.action_add)?.isVisible = true
+        toolbar.menu.findItem(R.id.action_connection_url_test)?.isVisible = true
+        toolbar.menu.findItem(R.id.action_locate_active_profile)?.isVisible = true
+        toolbar.menu.findItem(R.id.action_misc)?.isVisible = true
+
+        listOf(
+            R.id.action_batch_select_all,
+            R.id.action_batch_url_test,
+            R.id.action_batch_tcp_ping,
+            R.id.action_batch_delete,
+            R.id.action_reorder_save
+        ).forEach { id ->
+            toolbar.menu.findItem(id)?.isVisible = false
+        }
     }
 
     override fun onKeyDown(ketCode: Int, event: KeyEvent): Boolean {
@@ -2967,6 +3221,31 @@ class ConfigurationFragment @JvmOverloads constructor(
                 saveReorder()
                 return true
             }
+
+            R.id.action_batch_multiselect -> {
+                enterBatchMode()
+                return true
+            }
+
+            R.id.action_batch_select_all -> {
+                toggleSelectAllInBatchMode()
+                return true
+            }
+
+            R.id.action_batch_url_test -> {
+                batchUrlTest()
+                return true
+            }
+
+            R.id.action_batch_tcp_ping -> {
+                batchTcpPing()
+                return true
+            }
+
+            R.id.action_batch_delete -> {
+                batchDelete()
+                return true
+            }
         }
         return false
     }
@@ -3471,27 +3750,34 @@ class ConfigurationFragment @JvmOverloads constructor(
     }
 
     @OptIn(DelicateCoroutinesApi::class)
-    fun urlTest() {
+    fun urlTest(targetProfileIds: Set<Long>? = null) {
         if (DataStore.runningTest) return else DataStore.runningTest = true
         val test = TestDialog()
         val dialog = test.builder.show()
         val testJobs = mutableListOf<Job>()
         val isAll = isCurrentAllGroups()
         val group = DataStore.currentGroup()
-        val displayName = if (isAll) getString(R.string.group_tab_all) else group.displayName()
+        val baseName = if (isAll) getString(R.string.group_tab_all) else group.displayName()
+        val displayName = if (targetProfileIds != null) "$baseName (${targetProfileIds.size})" else baseName
         val targetUrl = if (isAll) DataStore.connectionTestURL else DataStore.groupUrlTestUrl(group.id)
         Logs.d(
             "URLTestTrace batch=start isAll=$isAll groupId=${group.id} group=${group.name} " +
                     "concurrent=${DataStore.connectionTestConcurrent} timeout=${DataStore.connectionTestTimeout}ms " +
                     "link=$targetUrl serviceState=${DataStore.serviceState} " +
-                    "currentProfile=${DataStore.currentProfile} network=${SagerNet.underlyingNetwork}"
+                    "currentProfile=${DataStore.currentProfile} network=${SagerNet.underlyingNetwork} " +
+                    "targetProfiles=${targetProfileIds?.size}"
         )
 
         val mainJob = runOnDefaultDispatcher {
-            val profilesList = if (isAll) {
+            val allList = if (isAll) {
                 SagerDatabase.proxyDao.getAll().filter { !DataStore.isGroupDisabled(it.groupId) }
             } else {
                 if (DataStore.isGroupDisabled(group.id)) emptyList() else SagerDatabase.proxyDao.getByGroup(group.id)
+            }
+            val profilesList = if (targetProfileIds != null) {
+                allList.filter { it.id in targetProfileIds }
+            } else {
+                allList
             }
             test.proxyN = profilesList.size
             val profiles = ConcurrentLinkedQueue(profilesList)
@@ -3559,6 +3845,9 @@ class ConfigurationFragment @JvmOverloads constructor(
                     }
                 } else {
                     GroupManager.postReload(DataStore.currentGroupId())
+                    onMainDispatcher {
+                        getCurrentGroupFragment()?.adapter?.reloadProfiles()
+                    }
                 }
                 DataStore.runningTest = false
             }
@@ -3574,21 +3863,27 @@ class ConfigurationFragment @JvmOverloads constructor(
     }
 
     @OptIn(DelicateCoroutinesApi::class)
-    fun tcpPingTest() {
+    fun tcpPingTest(targetProfileIds: Set<Long>? = null) {
         if (DataStore.runningTest) return else DataStore.runningTest = true
         val test = TestDialog()
         val dialog = test.builder.show()
         val testJobs = mutableListOf<Job>()
         val isAll = isCurrentAllGroups()
         val group = DataStore.currentGroup()
-        val displayName = if (isAll) getString(R.string.group_tab_all) else group.displayName()
-        Logs.d("TcpPingTrace batch=start isAll=$isAll groupId=${group.id} group=${group.name}")
+        val baseName = if (isAll) getString(R.string.group_tab_all) else group.displayName()
+        val displayName = if (targetProfileIds != null) "$baseName (${targetProfileIds.size})" else baseName
+        Logs.d("TcpPingTrace batch=start isAll=$isAll groupId=${group.id} group=${group.name} targetProfiles=${targetProfileIds?.size}")
 
         val mainJob = runOnDefaultDispatcher {
-            val profilesList = if (isAll) {
+            val allList = if (isAll) {
                 SagerDatabase.proxyDao.getAll().filter { !DataStore.isGroupDisabled(it.groupId) }
             } else {
                 if (DataStore.isGroupDisabled(group.id)) emptyList() else SagerDatabase.proxyDao.getByGroup(group.id)
+            }
+            val profilesList = if (targetProfileIds != null) {
+                allList.filter { it.id in targetProfileIds }
+            } else {
+                allList
             }
             test.proxyN = profilesList.size
             val profiles = ConcurrentLinkedQueue(profilesList)
@@ -3644,6 +3939,9 @@ class ConfigurationFragment @JvmOverloads constructor(
                     }
                 } else {
                     GroupManager.postReload(DataStore.currentGroupId())
+                    onMainDispatcher {
+                        getCurrentGroupFragment()?.adapter?.reloadProfiles()
+                    }
                 }
                 DataStore.runningTest = false
             }
@@ -4236,6 +4534,12 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             val reorderItem = menu.findItem(R.id.action_reorder_profiles)
             val resetOrderItem = menu.findItem(R.id.action_reset_profiles_order)
+            val batchItem = menu.findItem(R.id.action_batch_multiselect)
+            batchItem?.isVisible = !select
+            batchItem?.setOnMenuItemClickListener {
+                (requireParentFragment() as? ConfigurationFragment)?.enterBatchMode()
+                true
+            }
             reorderItem?.isVisible = !isAllGroupsTab && !select
             resetOrderItem?.isVisible = !isAllGroupsTab && !select
             reorderItem?.setOnMenuItemClickListener {
@@ -5579,8 +5883,12 @@ class ConfigurationFragment @JvmOverloads constructor(
                     if (adapter?.isReorderMode == true) return@setOnClickListener
                     if (DataStore.hapticFeedback) it.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                     val proxyEntity = entity
+                    val pf = parentFragment as? ConfigurationFragment
+                    if (pf?.isBatchMode == true) {
+                        pf.toggleMultiSelected(proxyEntity.id)
+                        return@setOnClickListener
+                    }
                     if (select) {
-                        val pf = parentFragment as? ConfigurationFragment
                         if (pf?.multiSelect == true) {
                             pf.toggleMultiSelected(proxyEntity.id)
                         } else {
@@ -5598,18 +5906,42 @@ class ConfigurationFragment @JvmOverloads constructor(
                 }
                 profileStatus.isFocusable = false
                 editButton.setOnClickListener {
+                    val pf = parentFragment as? ConfigurationFragment
+                    if (pf?.isBatchMode == true) {
+                        if (DataStore.hapticFeedback) it.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                        pf.toggleMultiSelected(entity.id)
+                        return@setOnClickListener
+                    }
                     if (DataStore.hapticFeedback) it.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                     showNodeCascadingMenu(it, entity)
                 }
                 removeButton.setOnClickListener {
+                    val pf = parentFragment as? ConfigurationFragment
+                    if (pf?.isBatchMode == true) {
+                        if (DataStore.hapticFeedback) it.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                        pf.toggleMultiSelected(entity.id)
+                        return@setOnClickListener
+                    }
                     if (DataStore.hapticFeedback) it.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                     removeProfile(entity)
                 }
                 doubleColumnMenuButton.setOnClickListener {
+                    val pf = parentFragment as? ConfigurationFragment
+                    if (pf?.isBatchMode == true) {
+                        if (DataStore.hapticFeedback) it.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                        pf.toggleMultiSelected(entity.id)
+                        return@setOnClickListener
+                    }
                     if (DataStore.hapticFeedback) it.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                     showNodeCascadingMenu(it, entity)
                 }
                 shareLayout.setOnClickListener {
+                    val pf = parentFragment as? ConfigurationFragment
+                    if (pf?.isBatchMode == true) {
+                        if (DataStore.hapticFeedback) it.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                        pf.toggleMultiSelected(entity.id)
+                        return@setOnClickListener
+                    }
                     if (DataStore.hapticFeedback) it.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                     val proxyEntity = entity
                     if (!select && proxyEntity.type != ProxyEntity.TYPE_CHAIN && proxyEntity.type != ProxyEntity.TYPE_BALANCER) {
@@ -5621,6 +5953,12 @@ class ConfigurationFragment @JvmOverloads constructor(
                     if (adapter?.isReorderMode == true) {
                         if (DataStore.hapticFeedback) it.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                         itemTouchHelper.startDrag(this)
+                        return@setOnLongClickListener true
+                    }
+                    val pf = parentFragment as? ConfigurationFragment
+                    if (pf?.isBatchMode == true) {
+                        if (DataStore.hapticFeedback) it.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                        pf.toggleMultiSelected(entity.id)
                         return@setOnLongClickListener true
                     }
                     if (DataStore.hapticFeedback) it.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)

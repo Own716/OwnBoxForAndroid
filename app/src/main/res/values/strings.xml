@@ -1573,4 +1573,13 @@
     <string name="balancer_tier_sum_both">%1$s · %2$s (%3$d matched)</string>
     <string name="balancer_tier_sum_all">All matched profiles (%d)</string>
     <string name="balancer_tier_fallback_note">Fallback tier: %d remaining</string>
+    <string name="action_batch_multiselect">Multi-select</string>
+    <string name="batch_selected_count">%d selected</string>
+    <string name="select_all">Select All</string>
+    <string name="deselect_all">Deselect All</string>
+    <string name="batch_delete_confirm_title">Delete %d item(s)?</string>
+    <string name="batch_delete_confirm_message">Are you sure you want to delete the selected %d profile(s)? This action cannot be undone.</string>
+    <string name="batch_delete_completed">Deleted %d profile(s)</string>
+    <string name="batch_skip_active_profile">Protected and skipped active profile in use</string>
+    <string name="batch_no_selection_hint">Please select at least one profile</string>
 </resources>
