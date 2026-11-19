@@ -1,10 +1,12 @@
 package io.nekohasekai.sagernet.ui
 
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.ColorFilter
 import android.graphics.Paint
 import android.graphics.PixelFormat
+import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.drawable.Drawable
 import kotlin.math.exp
@@ -149,65 +151,154 @@ object FloatingCapsuleRenderer {
     }
 }
 
+private class CapsuleBitmapCache {
+    private var bitmap: Bitmap? = null
+    private var dirty: Boolean = true
+    val paint: Paint = Paint(Paint.FILTER_BITMAP_FLAG)
+
+    fun invalidate() {
+        dirty = true
+    }
+
+    fun onBoundsChanged(width: Int, height: Int) {
+        val bmp = bitmap
+        if (bmp == null || bmp.isRecycled || bmp.width != width || bmp.height != height) {
+            dirty = true
+        }
+    }
+
+    fun draw(canvas: Canvas, bounds: Rect, render: (Canvas) -> Unit) {
+        val w = bounds.width()
+        val h = bounds.height()
+        if (w <= 0 || h <= 0) return
+
+        // Guard against unexpected oversized bounds
+        if (w > 4096 || h > 512) {
+            render(canvas)
+            return
+        }
+
+        var bmp = bitmap
+        if (dirty || bmp == null || bmp.isRecycled || bmp.width != w || bmp.height != h) {
+            // Allocate a fresh immutable snapshot instead of mutating or manually recycling
+            // an in-flight bitmap that HardwareRenderer may still reference.
+            val newBmp = try {
+                Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            } catch (_: OutOfMemoryError) {
+                bitmap = null
+                render(canvas)
+                return
+            }
+            val cacheCanvas = Canvas(newBmp)
+            cacheCanvas.translate(-bounds.left.toFloat(), -bounds.top.toFloat())
+            render(cacheCanvas)
+            bitmap = newBmp
+            bmp = newBmp
+            dirty = false
+        }
+
+        canvas.drawBitmap(bmp, bounds.left.toFloat(), bounds.top.toFloat(), paint)
+    }
+}
+
 /**
  * Drawable for a single floating capsule (e.g. group_tab_container) where the shadow
  * is rendered inside the view's padding/inset area so it is never clipped by RenderNode.
  */
 class SingleFloatingCapsuleDrawable(
-    private val fillColor: Int,
-    private val strokeColor: Int,
-    private val strokeWidthPx: Float,
-    private val cornerRadiusPx: Float,
-    private val insetLeft: Int,
-    private val insetTop: Int,
-    private val insetRight: Int,
-    private val insetBottom: Int,
-    private val isDark: Boolean,
+    private var fillColor: Int,
+    private var strokeColor: Int,
+    private var strokeWidthPx: Float,
+    private var cornerRadiusPx: Float,
+    private var insetLeft: Int,
+    private var insetTop: Int,
+    private var insetRight: Int,
+    private var insetBottom: Int,
+    private var isDark: Boolean,
     private val density: Float,
-    private val shadowBaseColor: Int = Color.BLACK,
+    private var shadowBaseColor: Int = Color.BLACK,
 ) : Drawable() {
 
     private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val scratchRect = RectF()
+    private val bitmapCache = CapsuleBitmapCache()
+
+    fun updateStyle(
+        fillColor: Int,
+        strokeColor: Int,
+        strokeWidthPx: Float,
+        cornerRadiusPx: Float,
+        insetLeft: Int,
+        insetTop: Int,
+        insetRight: Int,
+        insetBottom: Int,
+        isDark: Boolean,
+        shadowBaseColor: Int = Color.BLACK,
+    ) {
+        var changed = false
+        if (this.fillColor != fillColor) { this.fillColor = fillColor; changed = true }
+        if (this.strokeColor != strokeColor) { this.strokeColor = strokeColor; changed = true }
+        if (kotlin.math.abs(this.strokeWidthPx - strokeWidthPx) > 0.05f) { this.strokeWidthPx = strokeWidthPx; changed = true }
+        if (kotlin.math.abs(this.cornerRadiusPx - cornerRadiusPx) > 0.4f) { this.cornerRadiusPx = cornerRadiusPx; changed = true }
+        if (this.insetLeft != insetLeft) { this.insetLeft = insetLeft; changed = true }
+        if (this.insetTop != insetTop) { this.insetTop = insetTop; changed = true }
+        if (this.insetRight != insetRight) { this.insetRight = insetRight; changed = true }
+        if (this.insetBottom != insetBottom) { this.insetBottom = insetBottom; changed = true }
+        if (this.isDark != isDark) { this.isDark = isDark; changed = true }
+        if (this.shadowBaseColor != shadowBaseColor) { this.shadowBaseColor = shadowBaseColor; changed = true }
+        if (changed) {
+            bitmapCache.invalidate()
+            invalidateSelf()
+        }
+    }
+
+    override fun onBoundsChange(bounds: Rect) {
+        super.onBoundsChange(bounds)
+        bitmapCache.onBoundsChanged(bounds.width(), bounds.height())
+    }
 
     override fun draw(canvas: Canvas) {
         val b = bounds
-        val left = (b.left + insetLeft).toFloat()
-        val top = (b.top + insetTop).toFloat()
-        val right = (b.right - insetRight).toFloat()
-        val bottom = (b.bottom - insetBottom).toFloat()
-        val r = cornerRadiusPx.coerceAtMost((bottom - top) * 0.5f)
+        bitmapCache.draw(canvas, b) { targetCanvas ->
+            val left = (b.left + insetLeft).toFloat()
+            val top = (b.top + insetTop).toFloat()
+            val right = (b.right - insetRight).toFloat()
+            val bottom = (b.bottom - insetBottom).toFloat()
+            val r = cornerRadiusPx.coerceAtMost((bottom - top) * 0.5f)
 
-        FloatingCapsuleRenderer.drawFloatingCapsule(
-            canvas = canvas,
-            left = left,
-            top = top,
-            right = right,
-            bottom = bottom,
-            cornerRadius = r,
-            fillColor = fillColor,
-            strokeColor = strokeColor,
-            strokeWidthPx = strokeWidthPx,
-            shadowBaseColor = shadowBaseColor,
-            isDark = isDark,
-            density = density,
-            shadowPaint = shadowPaint,
-            fillPaint = fillPaint,
-            strokePaint = strokePaint,
-            scratchRect = scratchRect,
-        )
+            FloatingCapsuleRenderer.drawFloatingCapsule(
+                canvas = targetCanvas,
+                left = left,
+                top = top,
+                right = right,
+                bottom = bottom,
+                cornerRadius = r,
+                fillColor = fillColor,
+                strokeColor = strokeColor,
+                strokeWidthPx = strokeWidthPx,
+                shadowBaseColor = shadowBaseColor,
+                isDark = isDark,
+                density = density,
+                shadowPaint = shadowPaint,
+                fillPaint = fillPaint,
+                strokePaint = strokePaint,
+                scratchRect = scratchRect,
+            )
+        }
     }
 
     override fun setAlpha(alpha: Int) {
-        fillPaint.alpha = alpha
-        strokePaint.alpha = alpha
+        if (bitmapCache.paint.alpha != alpha) {
+            bitmapCache.paint.alpha = alpha
+            invalidateSelf()
+        }
     }
 
     override fun setColorFilter(colorFilter: ColorFilter?) {
-        fillPaint.colorFilter = colorFilter
-        strokePaint.colorFilter = colorFilter
+        bitmapCache.paint.colorFilter = colorFilter
+        invalidateSelf()
     }
 
     @Deprecated("Deprecated in Java")
@@ -219,22 +310,78 @@ class SingleFloatingCapsuleDrawable(
  * button [|] + Right 5-in-1 action buttons floating capsule).
  */
 class DualFloatingCapsulesDrawable(
-    var fillColor: Int,
-    var strokeColor: Int,
-    var strokeWidthPx: Float,
-    var isDark: Boolean,
+    fillColor: Int,
+    strokeColor: Int,
+    strokeWidthPx: Float,
+    isDark: Boolean,
     private val density: Float,
-    var shadowBaseColor: Int = Color.BLACK,
+    shadowBaseColor: Int = Color.BLACK,
 ) : Drawable() {
 
     private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val scratchRect = RectF()
+    private val bitmapCache = CapsuleBitmapCache()
+
+    var fillColor: Int = fillColor
+        set(value) {
+            if (field != value) {
+                field = value
+                bitmapCache.invalidate()
+            }
+        }
+    var strokeColor: Int = strokeColor
+        set(value) {
+            if (field != value) {
+                field = value
+                bitmapCache.invalidate()
+            }
+        }
+    var strokeWidthPx: Float = strokeWidthPx
+        set(value) {
+            if (kotlin.math.abs(field - value) > 0.05f) {
+                field = value
+                bitmapCache.invalidate()
+            }
+        }
+    var isDark: Boolean = isDark
+        set(value) {
+            if (field != value) {
+                field = value
+                bitmapCache.invalidate()
+            }
+        }
+    var shadowBaseColor: Int = shadowBaseColor
+        set(value) {
+            if (field != value) {
+                field = value
+                bitmapCache.invalidate()
+            }
+        }
 
     val leftCapsuleRect = RectF()
     val rightCapsuleRect = RectF()
     var cornerRadiusPx: Float = 18f * density
+
+    fun updateStyle(
+        fillColor: Int,
+        strokeColor: Int,
+        strokeWidthPx: Float,
+        shadowBaseColor: Int,
+        isDark: Boolean,
+    ) {
+        var changed = false
+        if (this.fillColor != fillColor) { this.fillColor = fillColor; changed = true }
+        if (this.strokeColor != strokeColor) { this.strokeColor = strokeColor; changed = true }
+        if (kotlin.math.abs(this.strokeWidthPx - strokeWidthPx) > 0.05f) { this.strokeWidthPx = strokeWidthPx; changed = true }
+        if (this.shadowBaseColor != shadowBaseColor) { this.shadowBaseColor = shadowBaseColor; changed = true }
+        if (this.isDark != isDark) { this.isDark = isDark; changed = true }
+        if (changed) {
+            bitmapCache.invalidate()
+            invalidateSelf()
+        }
+    }
 
     fun updateCapsules(
         leftL: Float,
@@ -269,63 +416,74 @@ class DualFloatingCapsulesDrawable(
             changed = true
         }
         if (changed) {
+            bitmapCache.invalidate()
             invalidateSelf()
         }
     }
 
+    override fun onBoundsChange(bounds: Rect) {
+        super.onBoundsChange(bounds)
+        bitmapCache.onBoundsChanged(bounds.width(), bounds.height())
+    }
+
     override fun draw(canvas: Canvas) {
-        if (!leftCapsuleRect.isEmpty) {
-            val r = cornerRadiusPx.coerceAtMost(leftCapsuleRect.height() * 0.5f)
-            FloatingCapsuleRenderer.drawFloatingCapsule(
-                canvas = canvas,
-                left = leftCapsuleRect.left,
-                top = leftCapsuleRect.top,
-                right = leftCapsuleRect.right,
-                bottom = leftCapsuleRect.bottom,
-                cornerRadius = r,
-                fillColor = fillColor,
-                strokeColor = strokeColor,
-                strokeWidthPx = strokeWidthPx,
-                shadowBaseColor = shadowBaseColor,
-                isDark = isDark,
-                density = density,
-                shadowPaint = shadowPaint,
-                fillPaint = fillPaint,
-                strokePaint = strokePaint,
-                scratchRect = scratchRect,
-            )
-        }
-        if (!rightCapsuleRect.isEmpty) {
-            val r = cornerRadiusPx.coerceAtMost(rightCapsuleRect.height() * 0.5f)
-            FloatingCapsuleRenderer.drawFloatingCapsule(
-                canvas = canvas,
-                left = rightCapsuleRect.left,
-                top = rightCapsuleRect.top,
-                right = rightCapsuleRect.right,
-                bottom = rightCapsuleRect.bottom,
-                cornerRadius = r,
-                fillColor = fillColor,
-                strokeColor = strokeColor,
-                strokeWidthPx = strokeWidthPx,
-                shadowBaseColor = shadowBaseColor,
-                isDark = isDark,
-                density = density,
-                shadowPaint = shadowPaint,
-                fillPaint = fillPaint,
-                strokePaint = strokePaint,
-                scratchRect = scratchRect,
-            )
+        if (leftCapsuleRect.isEmpty && rightCapsuleRect.isEmpty) return
+        bitmapCache.draw(canvas, bounds) { targetCanvas ->
+            if (!leftCapsuleRect.isEmpty) {
+                val r = cornerRadiusPx.coerceAtMost(leftCapsuleRect.height() * 0.5f)
+                FloatingCapsuleRenderer.drawFloatingCapsule(
+                    canvas = targetCanvas,
+                    left = leftCapsuleRect.left,
+                    top = leftCapsuleRect.top,
+                    right = leftCapsuleRect.right,
+                    bottom = leftCapsuleRect.bottom,
+                    cornerRadius = r,
+                    fillColor = fillColor,
+                    strokeColor = strokeColor,
+                    strokeWidthPx = strokeWidthPx,
+                    shadowBaseColor = shadowBaseColor,
+                    isDark = isDark,
+                    density = density,
+                    shadowPaint = shadowPaint,
+                    fillPaint = fillPaint,
+                    strokePaint = strokePaint,
+                    scratchRect = scratchRect,
+                )
+            }
+            if (!rightCapsuleRect.isEmpty) {
+                val r = cornerRadiusPx.coerceAtMost(rightCapsuleRect.height() * 0.5f)
+                FloatingCapsuleRenderer.drawFloatingCapsule(
+                    canvas = targetCanvas,
+                    left = rightCapsuleRect.left,
+                    top = rightCapsuleRect.top,
+                    right = rightCapsuleRect.right,
+                    bottom = rightCapsuleRect.bottom,
+                    cornerRadius = r,
+                    fillColor = fillColor,
+                    strokeColor = strokeColor,
+                    strokeWidthPx = strokeWidthPx,
+                    shadowBaseColor = shadowBaseColor,
+                    isDark = isDark,
+                    density = density,
+                    shadowPaint = shadowPaint,
+                    fillPaint = fillPaint,
+                    strokePaint = strokePaint,
+                    scratchRect = scratchRect,
+                )
+            }
         }
     }
 
     override fun setAlpha(alpha: Int) {
-        fillPaint.alpha = alpha
-        strokePaint.alpha = alpha
+        if (bitmapCache.paint.alpha != alpha) {
+            bitmapCache.paint.alpha = alpha
+            invalidateSelf()
+        }
     }
 
     override fun setColorFilter(colorFilter: ColorFilter?) {
-        fillPaint.colorFilter = colorFilter
-        strokePaint.colorFilter = colorFilter
+        bitmapCache.paint.colorFilter = colorFilter
+        invalidateSelf()
     }
 
     @Deprecated("Deprecated in Java")

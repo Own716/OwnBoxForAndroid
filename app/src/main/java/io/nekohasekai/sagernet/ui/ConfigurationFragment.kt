@@ -195,12 +195,32 @@ class ConfigurationFragment @JvmOverloads constructor(
         /** Synthetic ProxyGroup ID used for the "All Groups" tab. Must be negative to avoid DB collision. */
         const val ALL_GROUPS_SENTINEL_ID = -1L
         val recentlyUpdatedGroupIds = java.util.Collections.synchronizedSet(mutableSetOf<Long>())
+
+        private val TAB_TYPEFACE_NORMAL: Typeface by lazy {
+            Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        }
+        private val TAB_TYPEFACE_SELECTED: Typeface by lazy {
+            Typeface.create("sans-serif-medium", Typeface.BOLD)
+        }
+
+        internal val SUB_UPLOAD_REGEX = Regex("upload=([0-9]+)", RegexOption.IGNORE_CASE)
+        internal val SUB_DOWNLOAD_REGEX = Regex("download=([0-9]+)", RegexOption.IGNORE_CASE)
+        internal val SUB_TOTAL_REGEX = Regex("total=([0-9]+)", RegexOption.IGNORE_CASE)
+        internal val SUB_EXPIRE_REGEX = Regex("expire=([0-9]+)", RegexOption.IGNORE_CASE)
+        internal val FALLBACK_EXPIRE_REGEX = Regex(".*(?:套餐到期|到期时间|过期时间|到期)[：:]\\s*([0-9]{4}[-/][0-9]{2}[-/][0-9]{2})", RegexOption.IGNORE_CASE)
+        internal val FALLBACK_TRAFFIC_REGEX = Regex(".*(?:剩余流量|可用流量|剩余)[：:]\\s*([0-9.]+\\s*[KMGT]?B|无限|不限|不限量)", RegexOption.IGNORE_CASE)
+        internal val FALLBACK_USED_REGEX = Regex(".*(?:已用流量|已用|已使用)[：:]\\s*([0-9.]+\\s*[KMGT]?B)", RegexOption.IGNORE_CASE)
     }
 
     lateinit var adapter: GroupPagerAdapter
     var groupTabContainer: View? = null
     lateinit var tabLayout: TabLayout
     lateinit var groupPager: ViewPager2
+
+    internal val sharedProfileViewPool = RecyclerView.RecycledViewPool().apply {
+        setMaxRecycledViews(0, 24)
+        setMaxRecycledViews(1, 24)
+    }
 
     val alwaysShowAddress by lazy { DataStore.alwaysShowAddress }
 
@@ -388,10 +408,36 @@ class ConfigurationFragment @JvmOverloads constructor(
     }
 
     private var isUserInteractingWithPager = false
+    private var isPageChangeCallbackRegistered = false
+    private var pendingSelectedGroupSaveId: Long? = null
+
+    private fun registerPageChangeCallbackIfNeeded() {
+        if (select || !::groupPager.isInitialized || isPageChangeCallbackRegistered) return
+        groupPager.registerOnPageChangeCallback(updateSelectedCallback)
+        isPageChangeCallbackRegistered = true
+    }
+
+    private fun unregisterPageChangeCallbackIfNeeded() {
+        if (!::groupPager.isInitialized || !isPageChangeCallbackRegistered) return
+        groupPager.unregisterOnPageChangeCallback(updateSelectedCallback)
+        isPageChangeCallbackRegistered = false
+    }
 
     val updateSelectedCallback = object : ViewPager2.OnPageChangeCallback() {
         override fun onPageScrollStateChanged(state: Int) {
             isUserInteractingWithPager = (state == ViewPager2.SCROLL_STATE_DRAGGING || state == ViewPager2.SCROLL_STATE_SETTLING)
+            if (state == ViewPager2.SCROLL_STATE_IDLE) {
+                val pendingId = pendingSelectedGroupSaveId
+                if (pendingId != null) {
+                    pendingSelectedGroupSaveId = null
+                    if (DataStore.selectedGroup != pendingId) {
+                        DataStore.selectedGroup = pendingId
+                    }
+                }
+                if (::groupPager.isInitialized && ::tabLayout.isInitialized) {
+                    centerSelectedTab(groupPager.currentItem, smooth = true)
+                }
+            }
         }
 
         override fun onPageSelected(position: Int) {
@@ -403,9 +449,17 @@ class ConfigurationFragment @JvmOverloads constructor(
                     getCurrentGroupFragment()?.adapter?.filter(currentSearchQuery)
                 }
                 // Skip updating DataStore.selectedGroup for the synthetic "All" tab
-                if (group.id == ALL_GROUPS_SENTINEL_ID) return
-                if (DataStore.selectedGroup != group.id) {
-                    DataStore.selectedGroup = group.id
+                if (group.id == ALL_GROUPS_SENTINEL_ID) {
+                    pendingSelectedGroupSaveId = null
+                    return
+                }
+                if (isUserInteractingWithPager) {
+                    pendingSelectedGroupSaveId = group.id
+                } else {
+                    pendingSelectedGroupSaveId = null
+                    if (DataStore.selectedGroup != group.id) {
+                        DataStore.selectedGroup = group.id
+                    }
                 }
             }
         }
@@ -481,9 +535,13 @@ class ConfigurationFragment @JvmOverloads constructor(
         return true
     }
 
+    private var lastStyledSortMenu: Menu? = null
+    private var lastStyledSortMenuColor: Int? = null
+
     fun styleSortAndLayoutHeaders(menu: Menu) {
         val ctx = context ?: return
         val primaryColor = ctx.getColorAttr(R.attr.colorPrimary)
+        if (lastStyledSortMenu === menu && lastStyledSortMenuColor == primaryColor) return
         val headerIds = intArrayOf(
             R.id.action_header_order,
             R.id.action_header_layout,
@@ -502,6 +560,8 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
             item.title = spannable
         }
+        lastStyledSortMenu = menu
+        lastStyledSortMenuColor = primaryColor
     }
 
     private fun tintMenuIcons(menu: Menu, color: Int) {
@@ -520,6 +580,7 @@ class ConfigurationFragment @JvmOverloads constructor(
     private val actionMenuLayoutListener = View.OnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
         if (v is ActionMenuView) {
             applyActionMenuSpacing(v)
+            updateTopBarCapsulesBounds()
             (activity as? MainActivity)?.let { main ->
                 moe.matsuri.nb4a.ui.MenuScrimHelper.hookActionMenuView(toolbar, v, main)
             }
@@ -622,6 +683,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                     }
                 }
             }
+            updateTopBarCapsulesBounds()
         }
     }
 
@@ -828,6 +890,8 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
     }
 
+    private var pendingCenterTabRunnable: Runnable? = null
+
     private fun applyTabMargins() {
         if (!::tabLayout.isInitialized) return
         val slidingTabIndicator = tabLayout.getChildAt(0) as? ViewGroup ?: return
@@ -835,8 +899,18 @@ class ConfigurationFragment @JvmOverloads constructor(
         if (count == 0) return
         val innerMargin = dp2px(2)
         val edgeMargin = dp2px(4)
+        val tabFactor = UiScaleManager.tabBarFactor()
+        val applyScale = tabFactor != 1.0f
+        val targetTextSizeSp = 13f * tabFactor
+        val blockFocus = !SagerNet.isTv
+        val selectedPos = tabLayout.selectedTabPosition
+
         for (i in 0 until count) {
             val tabView = slidingTabIndicator.getChildAt(i)
+            if (blockFocus) {
+                if (tabView.isFocusable) tabView.isFocusable = false
+                if (tabView.isFocusableInTouchMode) tabView.isFocusableInTouchMode = false
+            }
             val lp = tabView.layoutParams as? ViewGroup.MarginLayoutParams
             if (lp != null) {
                 val left = if (i == 0) edgeMargin else innerMargin
@@ -848,11 +922,16 @@ class ConfigurationFragment @JvmOverloads constructor(
                 }
             }
             if (tabView is ViewGroup) {
-                val isSelected = tabLayout.selectedTabPosition == i
+                val targetTypeface = if (selectedPos == i) TAB_TYPEFACE_SELECTED else TAB_TYPEFACE_NORMAL
                 for (j in 0 until tabView.childCount) {
                     val child = tabView.getChildAt(j)
                     if (child is TextView) {
-                        child.typeface = Typeface.create("sans-serif-medium", if (isSelected) Typeface.BOLD else Typeface.NORMAL)
+                        if (child.typeface !== targetTypeface) {
+                            child.typeface = targetTypeface
+                        }
+                        if (applyScale) {
+                            child.setTextSize(TypedValue.COMPLEX_UNIT_SP, targetTextSizeSp)
+                        }
                     }
                 }
             }
@@ -861,17 +940,138 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     private fun updateTabTypeface(tab: TabLayout.Tab?, isSelected: Boolean) {
         val tabView = tab?.view ?: return
+        val targetTypeface = if (isSelected) TAB_TYPEFACE_SELECTED else TAB_TYPEFACE_NORMAL
         for (j in 0 until tabView.childCount) {
             val child = tabView.getChildAt(j)
-            if (child is TextView) {
-                child.typeface = Typeface.create("sans-serif-medium", if (isSelected) Typeface.BOLD else Typeface.NORMAL)
+            if (child is TextView && child.typeface !== targetTypeface) {
+                child.typeface = targetTypeface
             }
         }
     }
 
+    /**
+     * Scheme A centering:
+     * - When total tabs width <= viewport width: center the entire strip via symmetrical horizontal padding.
+     * - When total tabs width > viewport width: keep padding 0 so first/last tabs stay flush at edges,
+     *   and scroll the selected tab to the horizontal center clamped within [0, maxScrollX].
+     */
+    private fun updateTabBarCenteringPadding(): Boolean {
+        if (!::tabLayout.isInitialized) return false
+        val slidingTabIndicator = tabLayout.getChildAt(0) as? ViewGroup ?: return false
+        val availableWidth = tabLayout.width - tabLayout.paddingLeft - tabLayout.paddingRight
+        if (availableWidth <= 0) return false
+        val count = slidingTabIndicator.childCount
+        if (count == 0) return false
+
+        var contentWidth = 0
+        for (i in 0 until count) {
+            val child = slidingTabIndicator.getChildAt(i)
+            val w = child.measuredWidth.takeIf { it > 0 } ?: child.width
+            if (w <= 0) return false
+            val lp = child.layoutParams as? ViewGroup.MarginLayoutParams
+            contentWidth += w + (lp?.leftMargin ?: 0) + (lp?.rightMargin ?: 0)
+        }
+
+        val targetPad = if (contentWidth < availableWidth) {
+            (availableWidth - contentWidth) / 2
+        } else {
+            0
+        }
+        if (slidingTabIndicator.paddingLeft != targetPad || slidingTabIndicator.paddingRight != targetPad) {
+            slidingTabIndicator.setPadding(
+                targetPad,
+                slidingTabIndicator.paddingTop,
+                targetPad,
+                slidingTabIndicator.paddingBottom
+            )
+            return true
+        }
+        return false
+    }
+
+    private fun computeCenteredTabScrollX(position: Int): Int? {
+        if (!::tabLayout.isInitialized) return null
+        val slidingTabIndicator = tabLayout.getChildAt(0) as? ViewGroup ?: return null
+        val viewportWidth = tabLayout.width - tabLayout.paddingLeft - tabLayout.paddingRight
+        if (viewportWidth <= 0) return null
+        if (position !in 0 until slidingTabIndicator.childCount) return null
+        val tabView = slidingTabIndicator.getChildAt(position) ?: return null
+        val tabWidth = tabView.width
+        if (tabWidth <= 0) return null
+        val maxScrollX = (slidingTabIndicator.width - viewportWidth).coerceAtLeast(0)
+        if (maxScrollX == 0) return 0
+        val tabCenterX = tabView.left + tabWidth / 2
+        return (tabCenterX - viewportWidth / 2).coerceIn(0, maxScrollX)
+    }
+
+    private fun centerSelectedTab(
+        position: Int = if (::tabLayout.isInitialized) tabLayout.selectedTabPosition else -1,
+        smooth: Boolean = true,
+        afterLayout: Boolean = false,
+    ) {
+        if (!::tabLayout.isInitialized || !isAdded || view == null) return
+        if (position < 0 || position >= tabLayout.tabCount) return
+        pendingCenterTabRunnable?.let { tabLayout.removeCallbacks(it) }
+        pendingCenterTabRunnable = null
+
+        fun applyCenter() {
+            if (!isAdded || view == null || !::tabLayout.isInitialized) return
+            if (position < 0 || position >= tabLayout.tabCount) return
+            val paddingChanged = updateTabBarCenteringPadding()
+            if (paddingChanged) {
+                val retry = Runnable {
+                    pendingCenterTabRunnable = null
+                    if (!isAdded || view == null || !::tabLayout.isInitialized) return@Runnable
+                    val targetX = computeCenteredTabScrollX(position) ?: return@Runnable
+                    if (abs(tabLayout.scrollX - targetX) > 1) {
+                        if (smooth) tabLayout.smoothScrollTo(targetX, 0) else tabLayout.scrollTo(targetX, 0)
+                    }
+                }
+                pendingCenterTabRunnable = retry
+                tabLayout.post(retry)
+                return
+            }
+            val targetX = computeCenteredTabScrollX(position) ?: return
+            if (abs(tabLayout.scrollX - targetX) > 1) {
+                if (smooth) tabLayout.smoothScrollTo(targetX, 0) else tabLayout.scrollTo(targetX, 0)
+            }
+        }
+
+        if (afterLayout || tabLayout.width <= 0 || tabLayout.isLayoutRequested) {
+            val runnable = Runnable {
+                pendingCenterTabRunnable = null
+                applyCenter()
+            }
+            pendingCenterTabRunnable = runnable
+            tabLayout.post(runnable)
+        } else {
+            applyCenter()
+        }
+    }
+
+    private fun scheduleTabSettleCenterCheck(position: Int) {
+        if (!::tabLayout.isInitialized || !isAdded || view == null) return
+        if (position < 0 || position >= tabLayout.tabCount) return
+        pendingCenterTabRunnable?.let { tabLayout.removeCallbacks(it) }
+        val runnable = Runnable {
+            pendingCenterTabRunnable = null
+            if (!isAdded || view == null || !::tabLayout.isInitialized || isUserInteractingWithPager) return@Runnable
+            if (tabLayout.selectedTabPosition != position) return@Runnable
+            updateTabBarCenteringPadding()
+            val targetX = computeCenteredTabScrollX(position) ?: return@Runnable
+            if (abs(tabLayout.scrollX - targetX) > 2) {
+                tabLayout.smoothScrollTo(targetX, 0)
+            }
+        }
+        pendingCenterTabRunnable = runnable
+        tabLayout.postDelayed(runnable, 320L)
+    }
+
     private var topBarCapsulesDrawable: DualFloatingCapsulesDrawable? = null
-    private var topBarPreDrawListener: android.view.ViewTreeObserver.OnPreDrawListener? = null
-    private var topBarPreDrawTarget: View? = null
+    private var topBarLayoutChangeListener: View.OnLayoutChangeListener? = null
+    private var topBarContainerRef: View? = null
+    private var topBarTitleViewRef: TextView? = null
+    private var topBarToolbarLayoutTarget: View? = null
 
     private fun setupTopBarFloatingCapsules(
         fillColor: Int,
@@ -884,13 +1084,17 @@ class ConfigurationFragment @JvmOverloads constructor(
         val capsulesBgView = rootView.findViewById<View>(R.id.toolbar_capsules_bg) ?: return
         val density = resources.displayMetrics.density
 
+        topBarContainerRef = toolbarContainer
+        topBarTitleViewRef = rootView.findViewById(R.id.toolbar_title_view)
+
         val drawable = topBarCapsulesDrawable?.apply {
-            this.fillColor = fillColor
-            this.strokeColor = strokeColor
-            this.strokeWidthPx = 0.9f * density
-            this.shadowBaseColor = shadowBaseColor
-            this.isDark = isDark
-            invalidateSelf()
+            updateStyle(
+                fillColor = fillColor,
+                strokeColor = strokeColor,
+                strokeWidthPx = 0.9f * density,
+                shadowBaseColor = shadowBaseColor,
+                isDark = isDark,
+            )
         } ?: DualFloatingCapsulesDrawable(
             fillColor = fillColor,
             strokeColor = strokeColor,
@@ -904,26 +1108,26 @@ class ConfigurationFragment @JvmOverloads constructor(
             capsulesBgView.background = drawable
         }
 
-        if (topBarPreDrawTarget !== toolbarContainer || topBarPreDrawListener == null) {
-            topBarPreDrawTarget?.viewTreeObserver?.let { vto ->
-                if (vto.isAlive && topBarPreDrawListener != null) {
-                    vto.removeOnPreDrawListener(topBarPreDrawListener)
-                }
+        if (topBarLayoutChangeListener == null || topBarToolbarLayoutTarget !== toolbar) {
+            topBarLayoutChangeListener?.let { oldListener ->
+                topBarContainerRef?.removeOnLayoutChangeListener(oldListener)
+                topBarToolbarLayoutTarget?.removeOnLayoutChangeListener(oldListener)
             }
-            val listener = android.view.ViewTreeObserver.OnPreDrawListener {
+            val listener = View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
                 updateTopBarCapsulesBounds()
-                true
             }
-            topBarPreDrawListener = listener
-            topBarPreDrawTarget = toolbarContainer
-            toolbarContainer.viewTreeObserver.addOnPreDrawListener(listener)
+            topBarLayoutChangeListener = listener
+            toolbarContainer.addOnLayoutChangeListener(listener)
+            if (isToolbarInitialized) {
+                toolbar.addOnLayoutChangeListener(listener)
+                topBarToolbarLayoutTarget = toolbar
+            }
         }
         updateTopBarCapsulesBounds()
     }
 
     private fun updateTopBarCapsulesBounds() {
-        val rootView = view ?: return
-        val toolbarContainer = rootView.findViewById<View>(R.id.toolbar_container) ?: return
+        val toolbarContainer = topBarContainerRef ?: view?.findViewById<View>(R.id.toolbar_container) ?: return
         val drawable = topBarCapsulesDrawable ?: return
         if (!isToolbarInitialized) return
 
@@ -1015,7 +1219,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
 
         // Dynamic Title Positioning & Anti-Collision
-        val titleView = rootView.findViewById<TextView>(R.id.toolbar_title_view)
+        val titleView = topBarTitleViewRef ?: view?.findViewById<TextView>(R.id.toolbar_title_view)
         if (titleView != null && leftR > 0f) {
             val titleStart = (leftR + 8f * density).toInt()
             (titleView.layoutParams as? ViewGroup.MarginLayoutParams)?.let { lp ->
@@ -1029,8 +1233,12 @@ class ConfigurationFragment @JvmOverloads constructor(
             if (titleView.maxWidth != maxTitleW) {
                 titleView.maxWidth = maxTitleW
             }
-            titleView.ellipsize = android.text.TextUtils.TruncateAt.END
-            titleView.isSingleLine = true
+            if (titleView.ellipsize != android.text.TextUtils.TruncateAt.END) {
+                titleView.ellipsize = android.text.TextUtils.TruncateAt.END
+            }
+            if (!titleView.isSingleLine) {
+                titleView.isSingleLine = true
+            }
         }
 
         drawable.updateCapsules(
@@ -1077,6 +1285,9 @@ class ConfigurationFragment @JvmOverloads constructor(
         sv?.findViewById<ImageView>(androidx.appcompat.R.id.search_close_btn)?.setColorFilter(iconColor)
     }
 
+    private var tabCapsuleDrawable: SingleFloatingCapsuleDrawable? = null
+    private var tabCapsuleStyleKey: String? = null
+
     private fun styleCapsuleTabLayout() {
         if (!::tabLayout.isInitialized) return
         val ctx = context ?: return
@@ -1085,9 +1296,17 @@ class ConfigurationFragment @JvmOverloads constructor(
         val isWhite = Theme.isWhiteTheme(ctx)
         val isLightGray = Theme.isLightGrayTheme(ctx)
         val themeColor = Theme.getPrimaryColor(ctx)
+        val tabFactor = UiScaleManager.tabBarFactor()
+        val density = resources.displayMetrics.density
+        val styleKey = "$isBlack|$isNight|$isWhite|$isLightGray|$themeColor|$tabFactor|$density"
+        if (tabCapsuleStyleKey == styleKey &&
+            tabCapsuleDrawable != null &&
+            groupTabContainer?.background === tabCapsuleDrawable
+        ) {
+            return
+        }
 
         // 1. Style Outer Big Capsule Track (groupTabContainer) & Top Bar Floating Capsules
-        val tabFactor = UiScaleManager.tabBarFactor()
         val scaledCapsuleH = (dp2px(38) * tabFactor).toFloat().coerceIn(dp2px(26).toFloat(), dp2px(54).toFloat())
         val containerRadius = scaledCapsuleH * 0.5f
         val containerBgColor: Int
@@ -1120,28 +1339,49 @@ class ConfigurationFragment @JvmOverloads constructor(
                 shadowBaseColor = ColorUtils.blendARGB(Color.BLACK, themeColor, 0.35f)
             }
         }
-        val density = resources.displayMetrics.density
         val padH = dp2px(8)
         val padV = dp2px(5)
-        groupTabContainer?.setPadding(padH, padV, padH, padV)
-        groupTabContainer?.clipToOutline = false
-        (groupTabContainer as? ViewGroup)?.apply {
-            clipChildren = false
-            clipToPadding = false
+        groupTabContainer?.let { container ->
+            if (container.paddingLeft != padH || container.paddingTop != padV ||
+                container.paddingRight != padH || container.paddingBottom != padV
+            ) {
+                container.setPadding(padH, padV, padH, padV)
+            }
+            container.clipToOutline = false
+            (container as? ViewGroup)?.apply {
+                clipChildren = false
+                clipToPadding = false
+            }
+            val drawable = tabCapsuleDrawable?.apply {
+                updateStyle(
+                    fillColor = containerBgColor,
+                    strokeColor = containerStrokeColor,
+                    strokeWidthPx = 0.9f * density,
+                    cornerRadiusPx = containerRadius,
+                    insetLeft = padH,
+                    insetTop = padV,
+                    insetRight = padH,
+                    insetBottom = padV,
+                    isDark = isBlack || isNight,
+                    shadowBaseColor = shadowBaseColor,
+                )
+            } ?: SingleFloatingCapsuleDrawable(
+                fillColor = containerBgColor,
+                strokeColor = containerStrokeColor,
+                strokeWidthPx = 0.9f * density,
+                cornerRadiusPx = containerRadius,
+                insetLeft = padH,
+                insetTop = padV,
+                insetRight = padH,
+                insetBottom = padV,
+                isDark = isBlack || isNight,
+                density = density,
+                shadowBaseColor = shadowBaseColor,
+            ).also { tabCapsuleDrawable = it }
+            if (container.background !== drawable) {
+                container.background = drawable
+            }
         }
-        groupTabContainer?.background = SingleFloatingCapsuleDrawable(
-            fillColor = containerBgColor,
-            strokeColor = containerStrokeColor,
-            strokeWidthPx = 0.9f * density,
-            cornerRadiusPx = containerRadius,
-            insetLeft = padH,
-            insetTop = padV,
-            insetRight = padH,
-            insetBottom = padV,
-            isDark = isBlack || isNight,
-            density = density,
-            shadowBaseColor = shadowBaseColor,
-        )
         tabLayout.outlineProvider = object : android.view.ViewOutlineProvider() {
             override fun getOutline(view: View, outline: android.graphics.Outline) {
                 val r = (view.height * 0.5f).coerceAtLeast(containerRadius)
@@ -1199,6 +1439,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         tabLayout.setSelectedTabIndicatorColor(capsuleBg)
         tabLayout.setTabTextColors(unselectedText, selectedText)
         tabLayout.tabRippleColor = android.content.res.ColorStateList.valueOf(Color.TRANSPARENT)
+        tabCapsuleStyleKey = styleKey
     }
 
     private fun styleSearchView(searchView: SearchView) {
@@ -1325,6 +1566,13 @@ class ConfigurationFragment @JvmOverloads constructor(
         groupPager = view.findViewById(R.id.group_pager)
         groupTabContainer = view.findViewById(R.id.group_tab_container)
         tabLayout = view.findViewById(R.id.group_tab)
+        if (!SagerNet.isTv) {
+            // Prevent HorizontalScrollView (TabLayout) from auto-scrolling to the last tab
+            // when a button (e.g. subscription update) becomes disabled or focus shifts in touch mode.
+            tabLayout.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
+            tabLayout.isFocusable = false
+            tabLayout.isFocusableInTouchMode = false
+        }
         cardStrategyStatus = view.findViewById(R.id.card_strategy_status)
         strategyStatusIcon = view.findViewById(R.id.strategy_status_icon)
         strategyStatusText = view.findViewById(R.id.strategy_status_text)
@@ -1349,7 +1597,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         GroupManager.addListener(adapter)
 
         groupPager.adapter = adapter
-        groupPager.offscreenPageLimit = 2
+        groupPager.offscreenPageLimit = 1
 
         val primaryTextColor = requireContext().getColorAttr(android.R.attr.textColorPrimary)
         if (!select) {
@@ -1531,22 +1779,18 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
 
         val touchSlop = ViewConfiguration.get(requireContext()).scaledTouchSlop
-        TabLayoutMediator(tabLayout, groupPager) { tab, position ->
+        TabLayoutMediator(
+            tabLayout,
+            groupPager,
+            true,
+            false,
+        ) { tab, position ->
             if (adapter.groupList.size > position) {
                 tab.text = adapter.groupList[position].displayName()
             }
-            tab.view.post {
-                applyTabMargins()
-            }
-            if (tabFactor != 1.0f) {
-                tab.view.post {
-                    for (i in 0 until tab.view.childCount) {
-                        val c = tab.view.getChildAt(i)
-                        if (c is TextView) {
-                            c.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f * tabFactor)
-                        }
-                    }
-                }
+            if (!SagerNet.isTv) {
+                tab.view.isFocusable = false
+                tab.view.isFocusableInTouchMode = false
             }
             tab.view.setOnLongClickListener { // clear toast
                 true
@@ -1598,21 +1842,42 @@ class ConfigurationFragment @JvmOverloads constructor(
                 false
             }
         }.attach()
+        applyTabMargins()
         tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab?) {
                 updateTabTypeface(tab, true)
+                val pos = tab?.position ?: -1
+                if (pos >= 0) {
+                    scheduleTabSettleCenterCheck(pos)
+                }
             }
             override fun onTabUnselected(tab: TabLayout.Tab?) {
                 updateTabTypeface(tab, false)
             }
             override fun onTabReselected(tab: TabLayout.Tab?) {
                 updateTabTypeface(tab, true)
+                val pos = tab?.position ?: -1
+                if (pos >= 0) {
+                    centerSelectedTab(pos, smooth = true)
+                }
             }
         })
-        tabLayout.post {
-            applyTabMargins()
-            styleCapsuleTabLayout()
+        val layoutListener = View.OnLayoutChangeListener { _, left, _, right, _, oldLeft, _, oldRight, _ ->
+            val newWidth = right - left
+            val oldWidth = oldRight - oldLeft
+            if (newWidth != oldWidth && newWidth > 0) {
+                val pos = tabLayout.selectedTabPosition.takeIf { it >= 0 } ?: adapter.selectedGroupIndex
+                centerSelectedTab(pos, smooth = false, afterLayout = true)
+            }
         }
+        tabLayoutChangeListener?.let { tabLayout.removeOnLayoutChangeListener(it) }
+        tabLayoutChangeListener = layoutListener
+        tabLayout.addOnLayoutChangeListener(layoutListener)
+        centerSelectedTab(
+            tabLayout.selectedTabPosition.takeIf { it >= 0 } ?: adapter.selectedGroupIndex,
+            smooth = false,
+            afterLayout = true,
+        )
 
         toolbar.setOnClickListener {
             locateActiveProfile()
@@ -1666,14 +1931,19 @@ class ConfigurationFragment @JvmOverloads constructor(
                 }
 
                 if (targetPageIndex >= 0 && groupPager.currentItem != targetPageIndex) {
-                    groupPager.setCurrentItem(targetPageIndex, true)
+                    val useSmooth = abs(targetPageIndex - groupPager.currentItem) <= 1
+                    groupPager.setCurrentItem(targetPageIndex, useSmooth)
+                    centerSelectedTab(targetPageIndex, smooth = true, afterLayout = true)
                     groupPager.postDelayed({
                         val targetFrag = adapter.groupFragments[targetGroupId]
                             ?: adapter.groupFragments[ALL_GROUPS_SENTINEL_ID]
                             ?: getCurrentGroupFragment()
                         targetFrag?.locateProfile(targetId, true)
-                    }, 280L)
+                    }, if (useSmooth) 280L else 60L)
                 } else {
+                    if (targetPageIndex >= 0) {
+                        centerSelectedTab(targetPageIndex, smooth = true)
+                    }
                     val currentFrag = getCurrentGroupFragment()
                         ?: adapter.groupFragments[targetGroupId]
                     currentFrag?.locateProfile(targetId, true)
@@ -1702,6 +1972,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                     if (targetIndex >= 0) {
                         adapter.selectedGroupIndex = targetIndex
                         groupPager.setCurrentItem(targetIndex, false)
+                        centerSelectedTab(targetIndex, smooth = false, afterLayout = true)
                     } else {
                         adapter.reload()
                     }
@@ -1714,6 +1985,8 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
     }
 
+    private var tabLayoutChangeListener: View.OnLayoutChangeListener? = null
+
     override fun onDestroyView() {
         stopStrategyTicker()
         strategyStatusJob?.cancel()
@@ -1723,14 +1996,28 @@ class ConfigurationFragment @JvmOverloads constructor(
         strategyStatusIcon = null
         strategyStatusText = null
         strategyStatusDelay = null
-        topBarPreDrawTarget?.viewTreeObserver?.let { vto ->
-            if (vto.isAlive && topBarPreDrawListener != null) {
-                vto.removeOnPreDrawListener(topBarPreDrawListener)
-            }
+        unregisterPageChangeCallbackIfNeeded()
+        pendingSelectedGroupSaveId = null
+        if (::tabLayout.isInitialized) {
+            pendingCenterTabRunnable?.let { tabLayout.removeCallbacks(it) }
+            tabLayoutChangeListener?.let { tabLayout.removeOnLayoutChangeListener(it) }
         }
-        topBarPreDrawListener = null
-        topBarPreDrawTarget = null
+        pendingCenterTabRunnable = null
+        tabLayoutChangeListener = null
+        topBarLayoutChangeListener?.let { listener ->
+            topBarContainerRef?.removeOnLayoutChangeListener(listener)
+            topBarToolbarLayoutTarget?.removeOnLayoutChangeListener(listener)
+        }
+        topBarLayoutChangeListener = null
+        topBarContainerRef = null
+        topBarTitleViewRef = null
+        topBarToolbarLayoutTarget = null
         topBarCapsulesDrawable = null
+        tabCapsuleDrawable = null
+        tabCapsuleStyleKey = null
+        lastStyledSortMenu = null
+        lastStyledSortMenuColor = null
+        sharedProfileViewPool.clear()
         super.onDestroyView()
     }
 
@@ -3406,13 +3693,10 @@ class ConfigurationFragment @JvmOverloads constructor(
         var groupList: ArrayList<ProxyGroup> = ArrayList()
         var groupFragments: HashMap<Long, GroupFragment> = HashMap()
         private val reloadGeneration = AtomicLong()
+        private var hasInitializedTabs = false
 
         fun reload(now: Boolean = false) {
             val generation = reloadGeneration.incrementAndGet()
-
-            if (!select) {
-                groupPager.unregisterOnPageChangeCallback(updateSelectedCallback)
-            }
 
             runOnDefaultDispatcher {
                 var newGroupList = ArrayList(SagerDatabase.groupDao.allGroups())
@@ -3425,15 +3709,18 @@ class ConfigurationFragment @JvmOverloads constructor(
 
                 if (generation != reloadGeneration.get()) return@runOnDefaultDispatcher
 
-                val browsingGroupId = if (selectedGroupIndex in 0 until groupList.size) {
-                    groupList[selectedGroupIndex].id
+                val currentSnapshot = groupList.toList()
+                val browsingGroupId = if (selectedGroupIndex in currentSnapshot.indices) {
+                    currentSnapshot[selectedGroupIndex].id
                 } else {
                     DataStore.selectedGroup
                 }
+                val wasOnAllGroupsTab = browsingGroupId == ALL_GROUPS_SENTINEL_ID
                 var selectedGroup = if (browsingGroupId > 0L && newGroupList.any { it.id == browsingGroupId }) {
                     browsingGroupId
                 } else {
                     selectedItem?.groupId?.takeIf { gid -> newGroupList.any { it.id == gid } }
+                        ?: DataStore.selectedGroup.takeIf { gid -> gid > 0L && newGroupList.any { it.id == gid } }
                         ?: newGroupList.firstOrNull { it.id > 0L }?.id
                         ?: 0L
                 }
@@ -3470,8 +3757,10 @@ class ConfigurationFragment @JvmOverloads constructor(
                         name = app.getString(R.string.group_tab_all)
                     }
                     newGroupList.add(0, sentinelGroup)
-                    // Shift the real-group index by 1 to account for sentinel at 0
-                    if (newSelectedGroupIndex != null && newSelectedGroupIndex!! >= 0) {
+                    if (wasOnAllGroupsTab) {
+                        newSelectedGroupIndex = 0
+                    } else if (newSelectedGroupIndex != null && newSelectedGroupIndex!! >= 0) {
+                        // Shift the real-group index by 1 to account for sentinel at 0
                         newSelectedGroupIndex = newSelectedGroupIndex!! + 1
                     }
                 }
@@ -3493,27 +3782,79 @@ class ConfigurationFragment @JvmOverloads constructor(
                                     return@launch
                                 }
                                 refreshProfileState()
+
+                                val oldList = groupList
+                                val sameStructure = hasInitializedTabs &&
+                                    oldList.size == newGroupList.size &&
+                                    oldList.indices.all { oldList[it].id == newGroupList[it].id }
+                                val sameNames = sameStructure &&
+                                    oldList.indices.all { oldList[it].displayName() == newGroupList[it].displayName() }
+
+                                val realGroupCount = newGroupList.count { it.id != ALL_GROUPS_SENTINEL_ID }
+                                val hideTab = realGroupCount < 2
+
+                                if (sameStructure && sameNames) {
+                                    // 分组结构与名称完全未变（如订阅更新、测速、重排）：
+                                    // 仅同步内存元数据，绝不触发 notifyDataSetChanged() 重建 Tab 栏，杜绝抖动与滚飞。
+                                    groupList = newGroupList
+                                    if (groupTabContainer?.isGone != hideTab) {
+                                        groupTabContainer?.isGone = hideTab
+                                    }
+                                    if (tabLayout.isGone != hideTab) {
+                                        tabLayout.isGone = hideTab
+                                    }
+                                    val targetElev = if (hideTab) 0F else dp2px(4).toFloat()
+                                    if (toolbar.elevation != targetElev) {
+                                        toolbar.elevation = targetElev
+                                    }
+                                    registerPageChangeCallbackIfNeeded()
+                                    return@launch
+                                }
+
+                                if (sameStructure) {
+                                    // 仅分组名称变化：原地更新对应 Tab 文案，不拆重建 Tab。
+                                    groupList = newGroupList
+                                    for (i in newGroupList.indices) {
+                                        val newName = newGroupList[i].displayName()
+                                        val tab = tabLayout.getTabAt(i)
+                                        if (tab != null && tab.text?.toString() != newName) {
+                                            tab.text = newName
+                                        }
+                                    }
+                                    if (groupTabContainer?.isGone != hideTab) {
+                                        groupTabContainer?.isGone = hideTab
+                                    }
+                                    if (tabLayout.isGone != hideTab) {
+                                        tabLayout.isGone = hideTab
+                                    }
+                                    toolbar.elevation = if (hideTab) 0F else dp2px(4).toFloat()
+                                    if (!hideTab) {
+                                        applyTabMargins()
+                                        val activePos = tabLayout.selectedTabPosition.takeIf { it >= 0 } ?: selectedGroupIndex
+                                        centerSelectedTab(activePos, smooth = false, afterLayout = true)
+                                    }
+                                    registerPageChangeCallbackIfNeeded()
+                                    return@launch
+                                }
+
+                                unregisterPageChangeCallbackIfNeeded()
                                 newSelectedGroupIndex?.let { selectedGroupIndex = it }
                                 groupList = newGroupList
+                                hasInitializedTabs = true
                                 notifyDataSetChanged()
+                                applyTabMargins()
                                 if (!isUserInteractingWithPager && newSelectedGroupIndex != null && groupPager.currentItem != selectedGroupIndex) {
                                     groupPager.setCurrentItem(selectedGroupIndex, false)
                                 }
                                 // Show tab if there are ≥2 real groups (or ≥3 items including sentinel)
-                                val realGroupCount = groupList.count { it.id != ALL_GROUPS_SENTINEL_ID }
-                                val hideTab = realGroupCount < 2
                                 groupTabContainer?.isGone = hideTab
                                 tabLayout.isGone = hideTab
                                 toolbar.elevation = if (hideTab) 0F else dp2px(4).toFloat()
                                 if (!hideTab) {
-                                    tabLayout.post {
-                                        applyTabMargins()
-                                        styleCapsuleTabLayout()
-                                    }
+                                    styleCapsuleTabLayout()
+                                    centerSelectedTab(selectedGroupIndex, smooth = false, afterLayout = true)
                                 }
-                                if (!select) {
-                                    groupPager.registerOnPageChangeCallback(updateSelectedCallback)
-                                }
+                                registerPageChangeCallbackIfNeeded()
                             }
                         }
                     }
@@ -3549,18 +3890,28 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
 
         override suspend fun groupAdd(group: ProxyGroup) {
+            if (!group.ungrouped && DataStore.isGroupDisabled(group.id)) return
             tabLayout.post {
+                if (!isAdded || view == null || !::tabLayout.isInitialized || !::groupPager.isInitialized) return@post
+                if (groupList.any { it.id == group.id }) return@post
                 groupList.add(group)
+                val newIndex = groupList.size - 1
+                val realGroupCount = groupList.count { it.id != ALL_GROUPS_SENTINEL_ID }
+                val hideTab = realGroupCount < 2
+                groupTabContainer?.isGone = hideTab
+                tabLayout.isGone = hideTab
+                toolbar.elevation = if (hideTab) 0F else dp2px(4).toFloat()
 
-                if (groupList.any { !it.ungrouped }) tabLayout.post {
-                    groupTabContainer?.visibility = View.VISIBLE
-                    tabLayout.visibility = View.VISIBLE
-                    applyTabMargins()
+                notifyItemInserted(newIndex)
+                applyTabMargins()
+                if (!hideTab) {
                     styleCapsuleTabLayout()
                 }
-
-                notifyItemInserted(groupList.size - 1)
-                tabLayout.getTabAt(groupList.size - 1)?.select()
+                selectedGroupIndex = newIndex
+                tabLayout.getTabAt(newIndex)?.select()
+                if (!hideTab) {
+                    centerSelectedTab(newIndex, smooth = true, afterLayout = true)
+                }
             }
         }
 
@@ -3833,14 +4184,10 @@ class ConfigurationFragment @JvmOverloads constructor(
                     configurationListView.adapter = adapter
                 }
                 lastCompactProfileRows = DataStore.compactProfileRows
-            }
-
-            if (::configurationListView.isInitialized && configurationListView.size == 0) {
-                configurationListView.adapter = adapter
-                runOnDefaultDispatcher {
+                if (adapter?.hasLoadedOnce == false) {
                     adapter?.reloadProfiles()
                 }
-            } else if (!::configurationListView.isInitialized) {
+            } else {
                 onViewCreated(requireView(), null)
             }
             checkOrderMenu()
@@ -4014,6 +4361,20 @@ class ConfigurationFragment @JvmOverloads constructor(
             adapter?.notifyDataSetChanged()
         }
 
+        private val subscriptionCardGeneration = AtomicLong(0L)
+        private var btnUpdateResetRunnable: Runnable? = null
+
+        private data class SubscriptionCardSnapshot(
+            val currentGroup: ProxyGroup,
+            val usedBytes: Long,
+            val totalBytes: Long,
+            val expireMillis: Long,
+            val fallbackExpireStr: String?,
+            val fallbackTrafficStr: String?,
+            val fallbackUsedStr: String?,
+            val isUnlimited: Boolean,
+        )
+
         override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
             if (!::proxyGroup.isInitialized) return
 
@@ -4021,12 +4382,15 @@ class ConfigurationFragment @JvmOverloads constructor(
             configurationListView.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
             setupLayoutManager()
             configurationListView.layoutManager = layoutManager
+            (parentFragment as? ConfigurationFragment)?.sharedProfileViewPool?.let {
+                configurationListView.setRecycledViewPool(it)
+            }
             adapter = ConfigurationAdapter()
             ProfileManager.addListener(adapter!!)
             GroupManager.addListener(adapter!!)
             configurationListView.adapter = adapter
             (configurationListView.itemAnimator as? SimpleItemAnimator)?.supportsChangeAnimations = false
-            configurationListView.setItemViewCacheSize(20)
+            configurationListView.setItemViewCacheSize(8)
             configurationListView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
                 override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
                     if (newState == RecyclerView.SCROLL_STATE_IDLE) {
@@ -4043,6 +4407,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             view.findViewById<View>(R.id.btn_save_reorder)?.setOnClickListener {
                 (parentFragment as? ConfigurationFragment)?.saveReorder()
             }
+            adapter?.reloadProfiles()
             updateSubscriptionInfoCard(view)
         }
 
@@ -4051,12 +4416,171 @@ class ConfigurationFragment @JvmOverloads constructor(
             val card = root.findViewById<MaterialCardView>(R.id.card_subscription_info) ?: return
 
             if (select || !::proxyGroup.isInitialized || !DataStore.showSubscriptionInfoCard) {
+                subscriptionCardGeneration.incrementAndGet()
                 card.isGone = true
                 return
             }
 
-            val currentGroup = SagerDatabase.groupDao.getById(proxyGroup.id) ?: proxyGroup
-            proxyGroup = currentGroup
+            if (isAllGroupsTab) {
+                subscriptionCardGeneration.incrementAndGet()
+                bindNonSubscriptionCard(root, card, proxyGroup)
+                return
+            }
+
+            val viewOwner = viewLifecycleOwnerLiveData.value ?: return
+            val generation = subscriptionCardGeneration.incrementAndGet()
+            val groupId = proxyGroup.id
+            val fallbackGroup = proxyGroup
+            val cachedProfiles = adapter?.configurationList?.values?.toList().orEmpty()
+
+            viewOwner.lifecycleScope.launch {
+                val snapshot = withContext(Dispatchers.IO) {
+                    val currentGroup = SagerDatabase.groupDao.getById(groupId) ?: fallbackGroup
+                    val sub = currentGroup.subscription
+                    if (currentGroup.type != GroupType.SUBSCRIPTION || sub == null) {
+                        return@withContext SubscriptionCardSnapshot(
+                            currentGroup = currentGroup,
+                            usedBytes = 0L,
+                            totalBytes = 0L,
+                            expireMillis = 0L,
+                            fallbackExpireStr = null,
+                            fallbackTrafficStr = null,
+                            fallbackUsedStr = null,
+                            isUnlimited = false,
+                        )
+                    }
+
+                    var usedBytes = 0L
+                    var totalBytes = 0L
+                    var expireMillis = 0L
+
+                    if (!sub.subscriptionUserinfo.isNullOrBlank()) {
+                        val info = sub.subscriptionUserinfo
+                        fun extract(regex: Regex): Long {
+                            return regex.find(info)?.groupValues?.getOrNull(1)?.toLongOrNull() ?: 0L
+                        }
+                        val up = extract(SUB_UPLOAD_REGEX)
+                        val down = extract(SUB_DOWNLOAD_REGEX)
+                        usedBytes = up + down
+                        totalBytes = extract(SUB_TOTAL_REGEX)
+                        val exp = extract(SUB_EXPIRE_REGEX)
+                        if (exp > 0L) {
+                            expireMillis = if (exp > 100_000_000_000L) exp else exp * 1000L
+                        }
+                    } else if (sub.bytesUsed != null || sub.bytesRemaining != null) {
+                        usedBytes = sub.bytesUsed ?: 0L
+                        totalBytes = (sub.bytesUsed ?: 0L) + (sub.bytesRemaining ?: 0L)
+                        if (sub.expiryDate != null && sub.expiryDate > 0) {
+                            val exp = sub.expiryDate.toLong()
+                            expireMillis = if (exp > 100_000_000_000L) exp else exp * 1000L
+                        }
+                    }
+
+                    // 仅在完全没有提取到任何流量信息时，尝试从节点名称回退（全部在后台线程执行）
+                    var fallbackExpireStr: String? = null
+                    var fallbackTrafficStr: String? = null
+                    var fallbackUsedStr: String? = null
+                    var isUnlimited = false
+                    if (usedBytes == 0L && totalBytes == 0L && expireMillis <= 0L) {
+                        val allGroupProfiles = cachedProfiles.ifEmpty {
+                            SagerDatabase.proxyDao.getByGroup(currentGroup.id)
+                        }
+                        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                        for (p in allGroupProfiles) {
+                            val name = p.displayName()
+                            if (expireMillis <= 0L && fallbackExpireStr == null) {
+                                val m = FALLBACK_EXPIRE_REGEX.find(name)
+                                if (m != null) {
+                                    fallbackExpireStr = m.groupValues[1]
+                                    try {
+                                        expireMillis = sdf.parse(fallbackExpireStr.replace('/', '-'))?.time ?: 0L
+                                    } catch (_: Throwable) {}
+                                }
+                            }
+                            if (fallbackTrafficStr == null) {
+                                val m = FALLBACK_TRAFFIC_REGEX.find(name)
+                                if (m != null) {
+                                    val candidate = m.groupValues[1].trim()
+                                    if (candidate.contains("无限") || candidate.contains("不限")) {
+                                        isUnlimited = true
+                                    } else {
+                                        fallbackTrafficStr = candidate
+                                    }
+                                }
+                            }
+                            if (fallbackUsedStr == null) {
+                                val m = FALLBACK_USED_REGEX.find(name)
+                                if (m != null) {
+                                    fallbackUsedStr = m.groupValues[1].trim()
+                                }
+                            }
+                            if ((expireMillis > 0L || fallbackExpireStr != null) &&
+                                (fallbackTrafficStr != null || isUnlimited) &&
+                                fallbackUsedStr != null
+                            ) {
+                                break
+                            }
+                        }
+                    }
+
+                    SubscriptionCardSnapshot(
+                        currentGroup = currentGroup,
+                        usedBytes = usedBytes,
+                        totalBytes = totalBytes,
+                        expireMillis = expireMillis,
+                        fallbackExpireStr = fallbackExpireStr,
+                        fallbackTrafficStr = fallbackTrafficStr,
+                        fallbackUsedStr = fallbackUsedStr,
+                        isUnlimited = isUnlimited,
+                    )
+                }
+
+                if (generation != subscriptionCardGeneration.get() || !isAdded || view == null) return@launch
+                val liveRoot = view ?: root
+                val liveCard = liveRoot.findViewById<MaterialCardView>(R.id.card_subscription_info) ?: return@launch
+                if (!DataStore.showSubscriptionInfoCard) {
+                    liveCard.isGone = true
+                    return@launch
+                }
+                proxyGroup = snapshot.currentGroup
+                bindSubscriptionCardSnapshot(liveRoot, liveCard, snapshot)
+            }
+        }
+
+        private fun bindNonSubscriptionCard(root: View, card: MaterialCardView, currentGroup: ProxyGroup) {
+            val tvTitle = root.findViewById<TextView>(R.id.tv_subscription_title)
+            val tvExpire = root.findViewById<TextView>(R.id.tv_expire_date)
+            val layoutTraffic = root.findViewById<View>(R.id.layout_traffic_details)
+            val tvNodeCount = root.findViewById<TextView>(R.id.tv_node_count)
+            val tvLastUpdated = root.findViewById<TextView>(R.id.tv_last_updated)
+            val btnUpdate = root.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_card_update)
+
+            val groupName = if (isAllGroupsTab) {
+                getString(R.string.group_tab_all)
+            } else {
+                currentGroup.displayName()
+            }
+            tvTitle?.text = groupName
+            tvExpire?.isGone = true
+            layoutTraffic?.isGone = true
+            tvLastUpdated?.isGone = true
+            btnUpdate?.isGone = true
+            val count = adapter?.configurationIdList?.size ?: 0
+            tvNodeCount?.text = "$count 个节点"
+            card.isVisible = true
+        }
+
+        private fun bindSubscriptionCardSnapshot(
+            root: View,
+            card: MaterialCardView,
+            snapshot: SubscriptionCardSnapshot,
+        ) {
+            val currentGroup = snapshot.currentGroup
+            val sub = currentGroup.subscription
+            if (isAllGroupsTab || currentGroup.type != GroupType.SUBSCRIPTION || sub == null) {
+                bindNonSubscriptionCard(root, card, currentGroup)
+                return
+            }
 
             val tvTitle = root.findViewById<TextView>(R.id.tv_subscription_title)
             val tvExpire = root.findViewById<TextView>(R.id.tv_expire_date)
@@ -4069,25 +4593,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             val tvLastUpdated = root.findViewById<TextView>(R.id.tv_last_updated)
             val btnUpdate = root.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_card_update)
 
-            if (isAllGroupsTab || currentGroup.type != GroupType.SUBSCRIPTION || currentGroup.subscription == null) {
-                val groupName = if (isAllGroupsTab) {
-                    getString(R.string.group_tab_all)
-                } else {
-                    currentGroup.displayName()
-                }
-                tvTitle?.text = groupName
-                tvExpire?.isGone = true
-                layoutTraffic?.isGone = true
-                tvLastUpdated?.isGone = true
-                btnUpdate?.isGone = true
-                val count = adapter?.configurationIdList?.size ?: 0
-                tvNodeCount?.text = "$count 个节点"
-                card.isVisible = true
-                return
-            }
-
             layoutTraffic?.isVisible = true
-            val sub = currentGroup.subscription!!
             tvTitle?.text = currentGroup.displayName()
 
             val isUpdating = GroupUpdater.updating.contains(currentGroup.id)
@@ -4098,6 +4604,9 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             val normalColor = root.context.getColorAttr(android.R.attr.textColorSecondary)
             val emeraldColor = 0xFF10B981.toInt()
+
+            btnUpdateResetRunnable?.let { btnUpdate?.removeCallbacks(it) }
+            btnUpdateResetRunnable = null
 
             if (isUpdating) {
                 btnUpdate?.text = ""
@@ -4115,13 +4624,17 @@ class ConfigurationFragment @JvmOverloads constructor(
                 btnUpdate?.setTextColor(emeraldColor)
                 btnUpdate?.text = "更新完毕"
 
-                btnUpdate?.postDelayed({
+                val resetRunnable = Runnable {
+                    btnUpdateResetRunnable = null
+                    if (!isAdded || view == null) return@Runnable
                     btnUpdate?.setIconResource(R.drawable.solar_cloud_download_linear)
                     btnUpdate?.iconTint = android.content.res.ColorStateList.valueOf(normalColor)
                     btnUpdate?.setTextColor(normalColor)
                     btnUpdate?.text = root.context.getString(R.string.group_update)
                     btnUpdate?.isEnabled = true
-                }, 1800)
+                }
+                btnUpdateResetRunnable = resetRunnable
+                btnUpdate?.postDelayed(resetRunnable, 1800)
             } else {
                 btnUpdate?.setIconResource(R.drawable.solar_cloud_download_linear)
                 btnUpdate?.iconTint = android.content.res.ColorStateList.valueOf(normalColor)
@@ -4135,6 +4648,8 @@ class ConfigurationFragment @JvmOverloads constructor(
                 if (DataStore.hapticFeedback) {
                     it.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                 }
+                btnUpdateResetRunnable?.let { r -> btnUpdate.removeCallbacks(r) }
+                btnUpdateResetRunnable = null
                 recentlyUpdatedGroupIds.add(currentGroup.id)
                 btnUpdate.text = ""
                 btnUpdate.isEnabled = false
@@ -4144,73 +4659,12 @@ class ConfigurationFragment @JvmOverloads constructor(
                 GroupUpdater.startUpdate(currentGroup, true)
             }
 
-            var usedBytes = 0L
-            var totalBytes = 0L
-            var expireMillis = 0L
-
-            if (!sub.subscriptionUserinfo.isNullOrBlank()) {
-                val info = sub.subscriptionUserinfo
-                fun extract(pattern: String): Long {
-                    return Regex(pattern, RegexOption.IGNORE_CASE).find(info)?.groupValues?.getOrNull(1)?.toLongOrNull() ?: 0L
-                }
-                val up = extract("upload=([0-9]+)")
-                val down = extract("download=([0-9]+)")
-                usedBytes = up + down
-                totalBytes = extract("total=([0-9]+)")
-                val exp = extract("expire=([0-9]+)")
-                if (exp > 0L) {
-                    expireMillis = if (exp > 100_000_000_000L) exp else exp * 1000L
-                }
-            } else if (sub.bytesUsed != null || sub.bytesRemaining != null) {
-                usedBytes = sub.bytesUsed ?: 0L
-                totalBytes = (sub.bytesUsed ?: 0L) + (sub.bytesRemaining ?: 0L)
-                if (sub.expiryDate != null && sub.expiryDate > 0) {
-                    val exp = sub.expiryDate.toLong()
-                    expireMillis = if (exp > 100_000_000_000L) exp else exp * 1000L
-                }
-            }
-
-            // 仅在完全没有提取到任何流量信息时，尝试从节点名称回退
-            var fallbackExpireStr: String? = null
-            var fallbackTrafficStr: String? = null
-            var fallbackUsedStr: String? = null
-            var isUnlimited = false
-            if (usedBytes == 0L && totalBytes == 0L && expireMillis <= 0L) {
-                val expireRegex = Regex(".*(?:套餐到期|到期时间|过期时间|到期)[：:]\\s*([0-9]{4}[-/][0-9]{2}[-/][0-9]{2})", RegexOption.IGNORE_CASE)
-                val trafficRegex = Regex(".*(?:剩余流量|可用流量|剩余)[：:]\\s*([0-9.]+\\s*[KMGT]?B|无限|不限|不限量)", RegexOption.IGNORE_CASE)
-                val usedRegex = Regex(".*(?:已用流量|已用|已使用)[：:]\\s*([0-9.]+\\s*[KMGT]?B)", RegexOption.IGNORE_CASE)
-                val allGroupProfiles = SagerDatabase.proxyDao.getByGroup(currentGroup.id)
-                for (p in allGroupProfiles) {
-                    val name = p.displayName()
-                    if (expireMillis <= 0L && fallbackExpireStr == null) {
-                        val m = expireRegex.find(name)
-                        if (m != null) {
-                            fallbackExpireStr = m.groupValues[1]
-                            try {
-                                val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-                                expireMillis = sdf.parse(fallbackExpireStr.replace('/', '-'))?.time ?: 0L
-                            } catch (_: Throwable) {}
-                        }
-                    }
-                    if (fallbackTrafficStr == null) {
-                        val m = trafficRegex.find(name)
-                        if (m != null) {
-                            val candidate = m.groupValues[1].trim()
-                            if (candidate.contains("无限") || candidate.contains("不限")) {
-                                isUnlimited = true
-                            } else {
-                                fallbackTrafficStr = candidate
-                            }
-                        }
-                    }
-                    if (fallbackUsedStr == null) {
-                        val m = usedRegex.find(name)
-                        if (m != null) {
-                            fallbackUsedStr = m.groupValues[1].trim()
-                        }
-                    }
-                }
-            }
+            val usedBytes = snapshot.usedBytes
+            val totalBytes = snapshot.totalBytes
+            val expireMillis = snapshot.expireMillis
+            val fallbackExpireStr = snapshot.fallbackExpireStr
+            val fallbackTrafficStr = snapshot.fallbackTrafficStr
+            val fallbackUsedStr = snapshot.fallbackUsedStr
 
             if (totalBytes > 0L) {
                 val remainBytes = (totalBytes - usedBytes).coerceAtLeast(0L)
@@ -4330,6 +4784,11 @@ class ConfigurationFragment @JvmOverloads constructor(
         private var activeNodePopupMenu: PopupMenu? = null
 
         override fun onDestroyView() {
+            subscriptionCardGeneration.incrementAndGet()
+            btnUpdateResetRunnable?.let { r ->
+                view?.findViewById<View>(R.id.btn_card_update)?.removeCallbacks(r)
+            }
+            btnUpdateResetRunnable = null
             activeNodePopupMenu?.dismiss()
             activeNodePopupMenu = null
             super.onDestroyView()
@@ -4877,113 +5336,174 @@ class ConfigurationFragment @JvmOverloads constructor(
             override suspend fun groupAdd(group: ProxyGroup) = Unit
             override suspend fun groupRemoved(groupId: Long) = Unit
 
+            @Volatile
+            var hasLoadedOnce: Boolean = false
+            private val reloadGeneration = AtomicLong(0L)
+
             override suspend fun groupUpdated(group: ProxyGroup) {
+                if (isAllGroupsTab) {
+                    reloadProfiles()
+                    return
+                }
                 if (group.id != proxyGroup.id) return
                 proxyGroup = group
                 reloadProfiles()
             }
 
             override suspend fun groupUpdated(groupId: Long) {
+                if (isAllGroupsTab) {
+                    if (!GroupUpdater.updating.contains(groupId)) {
+                        reloadProfiles()
+                    }
+                    return
+                }
                 if (groupId != proxyGroup.id) return
-                proxyGroup = SagerDatabase.groupDao.getById(groupId)!!
+                if (GroupUpdater.updating.contains(groupId) && hasLoadedOnce) {
+                    onMainDispatcher {
+                        if (isAdded && view != null) {
+                            updateSubscriptionInfoCard()
+                        }
+                    }
+                    return
+                }
+                proxyGroup = SagerDatabase.groupDao.getById(groupId) ?: return
                 reloadProfiles()
             }
 
             fun reloadProfiles() {
-                var newProfiles = if (isAllGroupsTab) {
-                    // All-groups tab: fetch every profile from non-disabled groups
-                    SagerDatabase.proxyDao.getAll().filter { !DataStore.isGroupDisabled(it.groupId) }
-                } else {
-                    if (!proxyGroup.ungrouped && DataStore.isGroupDisabled(proxyGroup.id)) {
-                        emptyList()
-                    } else {
-                        SagerDatabase.proxyDao.getByGroup(proxyGroup.id)
-                    }
-                }
+                if (!::proxyGroup.isInitialized) return
+                val generation = reloadGeneration.incrementAndGet()
+                val isAll = isAllGroupsTab
+                val groupSnapshot = proxyGroup
                 val pf = parentFragment as? ConfigurationFragment
-                if (pf?.excludedIds != null && pf.excludedIds.isNotEmpty()) {
-                    val excludeSet = pf.excludedIds.toSet()
-                    newProfiles = newProfiles.filter { it.id !in excludeSet }
-                }
-                val currentOrder = if (isAllGroupsTab) DataStore.allGroupsOrder else proxyGroup.order
-                when (currentOrder) {
-                    GroupOrder.ORIGIN -> {
-                        if (isAllGroupsTab) {
-                            newProfiles = newProfiles.sortedBy { it.id }
-                        } else {
-                            newProfiles = newProfiles.sortedBy { it.userOrder }
-                        }
-                    }
+                val excludeSet = pf?.excludedIds?.takeIf { it.isNotEmpty() }?.toSet()
+                val isMultiSelect = pf?.multiSelect == true
+                val firstMultiSelected = if (isMultiSelect) pf?.multiSelectedIds?.firstOrNull() else null
+                val selectedItemId = selectedItem?.id
+                val shouldScrollToSelected = selected
 
-                    GroupOrder.BY_NAME -> {
-                        newProfiles = newProfiles.sortedBy { it.displayName() }
-                    }
-
-                    GroupOrder.BY_DELAY -> {
-                        newProfiles = newProfiles.sortedWith(
-                            compareBy(
-                                { if (it.status == 1 && it.ping > 0) 0 else 1 },
-                                { if (it.status == 1 && it.ping > 0) it.ping else Int.MAX_VALUE },
-                                { it.displayName() }
-                            )
-                        )
-                    }
-                }
-
-                if (DataStore.hideUnavailableProfiles) {
-                    val selectedProxy = selectedItem?.id ?: DataStore.selectedProxy
-                    val available = newProfiles.filter { it.status == 0 || it.status == 1 || it.id == selectedProxy }
-                    // 兜底策略：若某个分组内所有节点均测试不通，需有合理的空状态或全部展示兜底逻辑，避免列表直接变成空白界面。
-                    if (available.isNotEmpty()) {
-                        newProfiles = available
-                    }
-                }
-
-
-                val newProfileMap = newProfiles.associateBy { it.id }
-                val newProfileIds = newProfiles.map { it.id }.distinct()
-
-                var selectedProfileIndex = -1
-
-                if (selected) {
-                    if (pf?.multiSelect == true) {
-                        val firstSelected = pf.multiSelectedIds.firstOrNull()
-                        if (firstSelected != null) {
-                            selectedProfileIndex = newProfileIds.indexOf(firstSelected)
-                        }
+                runOnDefaultDispatcher {
+                    var newProfiles = if (isAll) {
+                        // All-groups tab: fetch every profile from non-disabled groups
+                        SagerDatabase.proxyDao.getAll().filter { !DataStore.isGroupDisabled(it.groupId) }
                     } else {
-                        val selectedProxy = selectedItem?.id ?: DataStore.selectedProxy
-                        selectedProfileIndex = newProfileIds.indexOf(selectedProxy)
-                    }
-                }
-
-                configurationListView.post {
-                    configurationList.clear()
-                    configurationList.putAll(newProfileMap)
-                    allConfigurationIdList.clear()
-                    allConfigurationIdList.addAll(newProfileIds)
-                    configurationIdList.clear()
-                    configurationIdList.addAll(newProfileIds)
-                    notifyDataSetChanged()
-
-                    val pendingId = pendingLocateProfileId
-                    if (pendingId != null && pendingId > 0L) {
-                        val pendingIndex = configurationIdList.indexOf(pendingId)
-                        if (pendingIndex != -1) {
-                            pendingLocateProfileId = null
-                            scrollToAndHighlight(pendingIndex, true)
-                        } else if (selectedProfileIndex != -1) {
-                            configurationListView.scrollTo(selectedProfileIndex, true)
-                        } else if (newProfiles.isNotEmpty()) {
-                            configurationListView.scrollTo(0, true)
+                        if (!groupSnapshot.ungrouped && DataStore.isGroupDisabled(groupSnapshot.id)) {
+                            emptyList()
+                        } else {
+                            SagerDatabase.proxyDao.getByGroup(groupSnapshot.id)
                         }
-                    } else if (selectedProfileIndex != -1) {
-                        configurationListView.scrollTo(selectedProfileIndex, true)
-                    } else if (newProfiles.isNotEmpty()) {
-                        configurationListView.scrollTo(0, true)
                     }
-                    updateSubscriptionInfoCard()
+                    if (generation != reloadGeneration.get()) return@runOnDefaultDispatcher
 
+                    if (excludeSet != null) {
+                        newProfiles = newProfiles.filter { it.id !in excludeSet }
+                    }
+                    val currentOrder = if (isAll) DataStore.allGroupsOrder else groupSnapshot.order
+                    when (currentOrder) {
+                        GroupOrder.ORIGIN -> {
+                            newProfiles = if (isAll) {
+                                newProfiles.sortedBy { it.id }
+                            } else {
+                                newProfiles.sortedBy { it.userOrder }
+                            }
+                        }
+
+                        GroupOrder.BY_NAME -> {
+                            newProfiles = newProfiles.sortedBy { it.displayName() }
+                        }
+
+                        GroupOrder.BY_DELAY -> {
+                            newProfiles = newProfiles.sortedWith(
+                                compareBy(
+                                    { if (it.status == 1 && it.ping > 0) 0 else 1 },
+                                    { if (it.status == 1 && it.ping > 0) it.ping else Int.MAX_VALUE },
+                                    { it.displayName() }
+                                )
+                            )
+                        }
+                    }
+
+                    if (DataStore.hideUnavailableProfiles) {
+                        val selectedProxy = selectedItemId ?: DataStore.selectedProxy
+                        val available = newProfiles.filter { it.status == 0 || it.status == 1 || it.id == selectedProxy }
+                        // 兜底策略：若某个分组内所有节点均测试不通，需有合理的空状态或全部展示兜底逻辑，避免列表直接变成空白界面。
+                        if (available.isNotEmpty()) {
+                            newProfiles = available
+                        }
+                    }
+
+                    if (generation != reloadGeneration.get()) return@runOnDefaultDispatcher
+
+                    val newProfileMap = newProfiles.associateBy { it.id }
+                    val newProfileIds = newProfiles.map { it.id }.distinct()
+
+                    var selectedProfileIndex = -1
+                    if (shouldScrollToSelected) {
+                        if (isMultiSelect) {
+                            if (firstMultiSelected != null) {
+                                selectedProfileIndex = newProfileIds.indexOf(firstMultiSelected)
+                            }
+                        } else {
+                            val selectedProxy = selectedItemId ?: DataStore.selectedProxy
+                            selectedProfileIndex = newProfileIds.indexOf(selectedProxy)
+                        }
+                    }
+
+                    onMainDispatcher {
+                        if (generation != reloadGeneration.get() || !isAdded || view == null || !::configurationListView.isInitialized) {
+                            return@onMainDispatcher
+                        }
+                        val applyResult = Runnable {
+                            if (generation != reloadGeneration.get() || !isAdded || view == null || !::configurationListView.isInitialized) {
+                                return@Runnable
+                            }
+                            hasLoadedOnce = true
+                            configurationList.clear()
+                            configurationList.putAll(newProfileMap)
+                            allConfigurationIdList.clear()
+                            allConfigurationIdList.addAll(newProfileIds)
+
+                            val activeQuery = (parentFragment as? ConfigurationFragment)?.currentSearchQuery?.trim().orEmpty()
+                            configurationIdList.clear()
+                            if (activeQuery.isNotEmpty()) {
+                                val lower = activeQuery.lowercase()
+                                configurationIdList.addAll(
+                                    newProfileIds.filter { id ->
+                                        val entity = newProfileMap[id] ?: return@filter false
+                                        (entity.displayName()?.lowercase()?.contains(lower) == true) ||
+                                            (entity.displayType()?.lowercase()?.contains(lower) == true) ||
+                                            (entity.displayAddress()?.lowercase()?.contains(lower) == true)
+                                    }
+                                )
+                            } else {
+                                configurationIdList.addAll(newProfileIds)
+                            }
+                            notifyDataSetChanged()
+
+                            val pendingId = pendingLocateProfileId
+                            if (pendingId != null && pendingId > 0L) {
+                                val pendingIndex = configurationIdList.indexOf(pendingId)
+                                if (pendingIndex != -1) {
+                                    pendingLocateProfileId = null
+                                    scrollToAndHighlight(pendingIndex, true)
+                                } else if (selectedProfileIndex != -1 && selectedProfileIndex < configurationIdList.size) {
+                                    configurationListView.scrollTo(selectedProfileIndex, true)
+                                } else if (configurationIdList.isNotEmpty()) {
+                                    configurationListView.scrollTo(0, true)
+                                }
+                            } else if (selectedProfileIndex != -1 && selectedProfileIndex < configurationIdList.size) {
+                                configurationListView.scrollTo(selectedProfileIndex, true)
+                            } else if (configurationIdList.isNotEmpty()) {
+                                configurationListView.scrollTo(0, true)
+                            }
+                            updateSubscriptionInfoCard()
+                        }
+                        if (configurationListView.isComputingLayout) {
+                            configurationListView.post(applyResult)
+                        } else {
+                            applyResult.run()
+                        }
+                    }
                 }
             }
 
