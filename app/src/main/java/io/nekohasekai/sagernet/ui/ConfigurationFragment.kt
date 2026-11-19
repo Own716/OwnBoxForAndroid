@@ -3596,8 +3596,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                         fragment.adapter?.clearSpeedTestLive()
                         fragment.adapter?.reloadProfiles()
                     }
-                }
-                if (speedTestDialog === dialog) {
+                    if (speedTestDialog === dialog) {
                         speedTestDialog = null
                     }
                     speedTestNotification?.updateNotification(0, 0, true)
