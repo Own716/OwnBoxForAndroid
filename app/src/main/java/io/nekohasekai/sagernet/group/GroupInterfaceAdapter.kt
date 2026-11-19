@@ -36,8 +36,10 @@ class GroupInterfaceAdapter(val context: ThemedActivity) : GroupManager.Interfac
         byUser: Boolean,
         retained: List<String>
     ) {
+        if (!byUser) return
+
         if (changed == 0 && duplicate.isEmpty() && retained.isEmpty()) {
-            if (byUser) context.snackbar(
+            context.snackbar(
                     context.getString(
                             R.string.group_no_difference, group.displayName()
                     )
