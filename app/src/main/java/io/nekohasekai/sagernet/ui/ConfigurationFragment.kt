@@ -217,11 +217,6 @@ class ConfigurationFragment @JvmOverloads constructor(
     lateinit var tabLayout: TabLayout
     lateinit var groupPager: ViewPager2
 
-    internal val sharedProfileViewPool = RecyclerView.RecycledViewPool().apply {
-        setMaxRecycledViews(0, 24)
-        setMaxRecycledViews(1, 24)
-    }
-
     val alwaysShowAddress by lazy { DataStore.alwaysShowAddress }
 
     val multiSelectedIds = java.util.Collections.synchronizedSet(LinkedHashSet<Long>()).apply {
@@ -956,7 +951,7 @@ class ConfigurationFragment @JvmOverloads constructor(
      *   and scroll the selected tab to the horizontal center clamped within [0, maxScrollX].
      */
     private fun updateTabBarCenteringPadding(): Boolean {
-        if (!::tabLayout.isInitialized) return false
+        if (!::tabLayout.isInitialized || isUserInteractingWithPager) return false
         val slidingTabIndicator = tabLayout.getChildAt(0) as? ViewGroup ?: return false
         val availableWidth = tabLayout.width - tabLayout.paddingLeft - tabLayout.paddingRight
         if (availableWidth <= 0) return false
@@ -1010,18 +1005,20 @@ class ConfigurationFragment @JvmOverloads constructor(
         afterLayout: Boolean = false,
     ) {
         if (!::tabLayout.isInitialized || !isAdded || view == null) return
+        if (isUserInteractingWithPager && !afterLayout) return
         if (position < 0 || position >= tabLayout.tabCount) return
         pendingCenterTabRunnable?.let { tabLayout.removeCallbacks(it) }
         pendingCenterTabRunnable = null
 
         fun applyCenter() {
             if (!isAdded || view == null || !::tabLayout.isInitialized) return
+            if (isUserInteractingWithPager && !afterLayout) return
             if (position < 0 || position >= tabLayout.tabCount) return
             val paddingChanged = updateTabBarCenteringPadding()
             if (paddingChanged) {
                 val retry = Runnable {
                     pendingCenterTabRunnable = null
-                    if (!isAdded || view == null || !::tabLayout.isInitialized) return@Runnable
+                    if (!isAdded || view == null || !::tabLayout.isInitialized || (isUserInteractingWithPager && !afterLayout)) return@Runnable
                     val targetX = computeCenteredTabScrollX(position) ?: return@Runnable
                     if (abs(tabLayout.scrollX - targetX) > 1) {
                         if (smooth) tabLayout.smoothScrollTo(targetX, 0) else tabLayout.scrollTo(targetX, 0)
@@ -1047,24 +1044,6 @@ class ConfigurationFragment @JvmOverloads constructor(
         } else {
             applyCenter()
         }
-    }
-
-    private fun scheduleTabSettleCenterCheck(position: Int) {
-        if (!::tabLayout.isInitialized || !isAdded || view == null) return
-        if (position < 0 || position >= tabLayout.tabCount) return
-        pendingCenterTabRunnable?.let { tabLayout.removeCallbacks(it) }
-        val runnable = Runnable {
-            pendingCenterTabRunnable = null
-            if (!isAdded || view == null || !::tabLayout.isInitialized || isUserInteractingWithPager) return@Runnable
-            if (tabLayout.selectedTabPosition != position) return@Runnable
-            updateTabBarCenteringPadding()
-            val targetX = computeCenteredTabScrollX(position) ?: return@Runnable
-            if (abs(tabLayout.scrollX - targetX) > 2) {
-                tabLayout.smoothScrollTo(targetX, 0)
-            }
-        }
-        pendingCenterTabRunnable = runnable
-        tabLayout.postDelayed(runnable, 320L)
     }
 
     private var topBarCapsulesDrawable: DualFloatingCapsulesDrawable? = null
@@ -1597,7 +1576,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         GroupManager.addListener(adapter)
 
         groupPager.adapter = adapter
-        groupPager.offscreenPageLimit = 1
+        groupPager.offscreenPageLimit = 2
 
         val primaryTextColor = requireContext().getColorAttr(android.R.attr.textColorPrimary)
         if (!select) {
@@ -1779,12 +1758,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
 
         val touchSlop = ViewConfiguration.get(requireContext()).scaledTouchSlop
-        TabLayoutMediator(
-            tabLayout,
-            groupPager,
-            true,
-            false,
-        ) { tab, position ->
+        TabLayoutMediator(tabLayout, groupPager) { tab, position ->
             if (adapter.groupList.size > position) {
                 tab.text = adapter.groupList[position].displayName()
             }
@@ -1847,8 +1821,8 @@ class ConfigurationFragment @JvmOverloads constructor(
             override fun onTabSelected(tab: TabLayout.Tab?) {
                 updateTabTypeface(tab, true)
                 val pos = tab?.position ?: -1
-                if (pos >= 0) {
-                    scheduleTabSettleCenterCheck(pos)
+                if (pos >= 0 && !isUserInteractingWithPager) {
+                    centerSelectedTab(pos, smooth = true)
                 }
             }
             override fun onTabUnselected(tab: TabLayout.Tab?) {
@@ -2017,7 +1991,6 @@ class ConfigurationFragment @JvmOverloads constructor(
         tabCapsuleStyleKey = null
         lastStyledSortMenu = null
         lastStyledSortMenuColor = null
-        sharedProfileViewPool.clear()
         super.onDestroyView()
     }
 
@@ -4382,15 +4355,12 @@ class ConfigurationFragment @JvmOverloads constructor(
             configurationListView.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
             setupLayoutManager()
             configurationListView.layoutManager = layoutManager
-            (parentFragment as? ConfigurationFragment)?.sharedProfileViewPool?.let {
-                configurationListView.setRecycledViewPool(it)
-            }
             adapter = ConfigurationAdapter()
             ProfileManager.addListener(adapter!!)
             GroupManager.addListener(adapter!!)
             configurationListView.adapter = adapter
             (configurationListView.itemAnimator as? SimpleItemAnimator)?.supportsChangeAnimations = false
-            configurationListView.setItemViewCacheSize(8)
+            configurationListView.setItemViewCacheSize(20)
             configurationListView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
                 override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
                     if (newState == RecyclerView.SCROLL_STATE_IDLE) {
@@ -4407,8 +4377,6 @@ class ConfigurationFragment @JvmOverloads constructor(
             view.findViewById<View>(R.id.btn_save_reorder)?.setOnClickListener {
                 (parentFragment as? ConfigurationFragment)?.saveReorder()
             }
-            adapter?.reloadProfiles()
-            updateSubscriptionInfoCard(view)
         }
 
         fun updateSubscriptionInfoCard(targetView: View? = this.view) {
