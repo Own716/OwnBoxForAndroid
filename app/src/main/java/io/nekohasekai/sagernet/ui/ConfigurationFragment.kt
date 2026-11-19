@@ -3249,7 +3249,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                 return true
             }
 
-            R.id.action_batch_speed_test, R.id.action_batch_tcp_ping -> {
+            R.id.action_batch_speed_test -> {
                 batchSpeedTest()
                 return true
             }
