@@ -1,5 +1,7 @@
 package io.nekohasekai.sagernet.ui
 
+import io.nekohasekai.sagernet.ui.settings.enableMultiLineTitles
+
 import android.os.Bundle
 import android.view.View
 import androidx.core.graphics.drawable.DrawableCompat
@@ -30,6 +32,7 @@ class SettingsPreferenceFragment : PreferenceFragmentCompat() {
         preferenceManager.preferenceDataStore = DataStore.configurationStore
         DataStore.initGlobal()
         setPreferencesFromResource(R.xml.global_preferences, rootKey)
+        preferenceScreen.enableMultiLineTitles()
         tintPreferenceIcons(preferenceScreen, Theme.getPrimaryColor(requireContext()))
     }
 

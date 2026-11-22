@@ -1,5 +1,7 @@
 package io.nekohasekai.sagernet.ui
 
+import io.nekohasekai.sagernet.ui.settings.enableMultiLineTitles
+
 import android.app.Activity
 import android.content.DialogInterface
 import android.content.Intent
@@ -425,6 +427,7 @@ class RouteSettingsActivity(
                 activity = (requireActivity() as RouteSettingsActivity).apply {
                     createPreferences(savedInstanceState, rootKey)
                 }
+                preferenceScreen?.enableMultiLineTitles()
             } catch (e: Exception) {
                 Toast.makeText(
                     SagerNet.application,

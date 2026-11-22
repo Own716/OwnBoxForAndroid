@@ -98,6 +98,10 @@
 
         <!-- Telegram Switch & Preference Styles -->
         <item name="switchStyle">@style/Widget.Telegram.Switch</item>
+        <item name="preferenceStyle">@style/Widget.Telegram.Preference</item>
+        <item name="dialogPreferenceStyle">@style/Widget.Telegram.Preference.Dialog</item>
+        <item name="editTextPreferenceStyle">@style/Widget.Telegram.Preference.EditText</item>
+        <item name="dropdownPreferenceStyle">@style/Widget.Telegram.Preference.Dropdown</item>
         <item name="switchPreferenceCompatStyle">@style/Widget.Telegram.Preference.Switch</item>
         <item name="preferenceCategoryStyle">@style/Widget.Telegram.PreferenceCategory</item>
 
@@ -184,6 +188,10 @@
 
         <!-- Telegram Switch & Preference Styles -->
         <item name="switchStyle">@style/Widget.Telegram.Switch</item>
+        <item name="preferenceStyle">@style/Widget.Telegram.Preference</item>
+        <item name="dialogPreferenceStyle">@style/Widget.Telegram.Preference.Dialog</item>
+        <item name="editTextPreferenceStyle">@style/Widget.Telegram.Preference.EditText</item>
+        <item name="dropdownPreferenceStyle">@style/Widget.Telegram.Preference.Dropdown</item>
         <item name="switchPreferenceCompatStyle">@style/Widget.Telegram.Preference.Switch</item>
         <item name="preferenceCategoryStyle">@style/Widget.Telegram.PreferenceCategory</item>
 
@@ -404,8 +412,25 @@
         <item name="switchPadding">6dp</item>
     </style>
 
+    <style name="Widget.Telegram.Preference" parent="@style/Preference.Material">
+        <item name="singleLineTitle">false</item>
+    </style>
+
+    <style name="Widget.Telegram.Preference.Dialog" parent="@style/Preference.DialogPreference.Material">
+        <item name="singleLineTitle">false</item>
+    </style>
+
+    <style name="Widget.Telegram.Preference.EditText" parent="@style/Preference.DialogPreference.EditTextPreference.Material">
+        <item name="singleLineTitle">false</item>
+    </style>
+
+    <style name="Widget.Telegram.Preference.Dropdown" parent="@style/Preference.DropDown.Material">
+        <item name="singleLineTitle">false</item>
+    </style>
+
     <style name="Widget.Telegram.Preference.Switch" parent="@style/Preference.SwitchPreferenceCompat.Material">
         <item name="widgetLayout">@layout/layout_telegram_preference_switch</item>
+        <item name="singleLineTitle">false</item>
     </style>
 
     <style name="Widget.Telegram.PreferenceCategory" parent="@style/Preference.Category">

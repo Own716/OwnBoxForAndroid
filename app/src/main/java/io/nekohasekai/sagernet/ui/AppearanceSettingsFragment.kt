@@ -1,5 +1,7 @@
 package io.nekohasekai.sagernet.ui
 
+import io.nekohasekai.sagernet.ui.settings.enableMultiLineTitles
+
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -50,6 +52,7 @@ class AppearanceSettingsFragment : PreferenceFragmentCompat() {
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         preferenceManager.preferenceDataStore = DataStore.configurationStore
         setPreferencesFromResource(R.xml.settings_appearance, rootKey)
+        preferenceScreen.enableMultiLineTitles()
         tintPreferenceIcons(preferenceScreen, Theme.getPrimaryColor(requireContext()))
 
         findPreference<SimpleMenuPreference>(Key.APP_ICON_MODE)?.setOnPreferenceChangeListener { _, newMode ->

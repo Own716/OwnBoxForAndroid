@@ -1,5 +1,7 @@
 package io.nekohasekai.sagernet.ui
 
+import io.nekohasekai.sagernet.ui.settings.enableMultiLineTitles
+
 import android.os.Bundle
 import android.view.MenuItem
 import android.text.InputType
@@ -117,6 +119,7 @@ class WebDAVSettingsActivity : ThemedActivity() {
                 }
                 true
             }
+            preferenceScreen?.enableMultiLineTitles()
         }
 
         private fun testWebDAV() {

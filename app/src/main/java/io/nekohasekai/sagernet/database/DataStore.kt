@@ -142,6 +142,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var appIconMode by configurationStore.stringToInt(Key.APP_ICON_MODE) { 0 }
     var appLanguage by configurationStore.string(Key.APP_LANGUAGE) { "" }
     var serviceMode by configurationStore.string(Key.SERVICE_MODE) { Key.MODE_VPN }
+    val isRootServiceMode: Boolean get() = Key.isRootMode(serviceMode)
     var rootLanSharing by configurationStore.boolean(Key.ROOT_LAN_SHARING) { false }
 
     var trafficSniffing by configurationStore.stringToInt(Key.TRAFFIC_SNIFFING) { 1 }

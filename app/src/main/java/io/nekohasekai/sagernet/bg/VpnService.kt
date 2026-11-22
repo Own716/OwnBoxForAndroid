@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.os.PowerManager
 import io.nekohasekai.sagernet.*
+import io.nekohasekai.sagernet.bg.root.RootTunManager
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.fmt.LOCALHOST
 import io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean
@@ -39,6 +40,13 @@ class VpnService : BaseVpnService(),
     override var upstreamInterfaceName: String? = null
 
     override suspend fun startProcesses() {
+        if (RootTunManager.hasActiveState(this)) {
+            Logs.i("VpnService: clearing residual Root mode rules before starting standard VPN")
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching { RootTunManager.stop(this@VpnService) }
+                    .onFailure { Logs.w("VpnService: residual Root cleanup failed", it) }
+            }
+        }
         DataStore.vpnService = this
         super.startProcesses() // launch proxy instance
     }

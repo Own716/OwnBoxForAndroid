@@ -1,5 +1,7 @@
 package io.nekohasekai.sagernet.ui.profile
 
+import io.nekohasekai.sagernet.ui.settings.enableMultiLineTitles
+
 import android.annotation.SuppressLint
 import android.content.DialogInterface
 import android.content.Intent
@@ -242,6 +244,7 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
                 activity = (requireActivity() as ProfileSettingsActivity<*>).apply {
                     createPreferences(savedInstanceState, rootKey)
                 }
+                preferenceScreen?.enableMultiLineTitles()
             } catch (e: Exception) {
                 Toast.makeText(
                     SagerNet.application,

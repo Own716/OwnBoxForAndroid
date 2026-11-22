@@ -28,8 +28,22 @@ object Key {
     const val MODE_VPN = "vpn"
     const val MODE_PROXY = "proxy"
     const val MODE_ROOT_TUN = "root_tun"
+    const val MODE_ROOT_REDIRECT = "root_redirect"
+    const val MODE_ROOT_MIXED = "root_mixed"
+    const val MODE_ROOT_ENHANCE = "root_enhance"
     const val ROOT_LAN_SHARING = "rootLanSharing"
     const val ROOT_TUN_CLEANUP = "rootTunCleanup"
+
+    fun isRootMode(mode: String): Boolean {
+        return mode == MODE_ROOT_TUN ||
+            mode == MODE_ROOT_REDIRECT ||
+            mode == MODE_ROOT_MIXED ||
+            mode == MODE_ROOT_ENHANCE
+    }
+
+    fun isTunOrRootMode(mode: String): Boolean {
+        return mode == MODE_VPN || isRootMode(mode)
+    }
 
     const val GLOBAL_CUSTOM_CONFIG = "globalCustomConfig"
 

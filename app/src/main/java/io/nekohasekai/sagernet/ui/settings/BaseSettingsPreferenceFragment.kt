@@ -31,6 +31,7 @@ abstract class BaseSettingsPreferenceFragment : PreferenceFragmentCompat() {
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         preferenceManager.preferenceDataStore = DataStore.configurationStore
         setPreferencesFromResource(preferenceResId, rootKey)
+        preferenceScreen.enableMultiLineTitles()
         tintPreferenceIcons(preferenceScreen, Theme.getPrimaryColor(requireContext()))
     }
 
@@ -57,5 +58,18 @@ abstract class BaseSettingsPreferenceFragment : PreferenceFragmentCompat() {
     protected val restartListener = Preference.OnPreferenceChangeListener { _, _ ->
         needRestart()
         true
+    }
+}
+
+/**
+ * Allows every preference title inside this group to wrap cleanly across lines instead of ellipsizing.
+ */
+fun PreferenceGroup.enableMultiLineTitles() {
+    for (i in 0 until preferenceCount) {
+        val pref = getPreference(i)
+        pref.isSingleLineTitle = false
+        if (pref is PreferenceGroup) {
+            pref.enableMultiLineTitles()
+        }
     }
 }

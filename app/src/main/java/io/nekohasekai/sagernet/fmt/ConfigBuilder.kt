@@ -8,6 +8,7 @@ import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.database.ProxyEntity.Companion.TYPE_CONFIG
 import io.nekohasekai.sagernet.database.ProxyGroup
+import io.nekohasekai.sagernet.database.RuleEntity
 import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.fmt.ConfigBuildResult.IndexEntity
 import io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean
@@ -56,9 +57,39 @@ import io.nekohasekai.sagernet.route.RouteRuleEditor
 
 const val TAG_MIXED = "mixed-in"
 const val TAG_ROOT_TUN_IN = "root-tun-in"
+const val TAG_ROOT_REDIRECT_IN = "root-redirect-in"
+const val TAG_ROOT_DNS_IN = "root-dns-in"
 
-internal fun resolveTunInboundTag(serviceMode: String): String {
-    return if (serviceMode == Key.MODE_ROOT_TUN) TAG_ROOT_TUN_IN else "tun-in"
+internal fun resolveTunInboundTags(serviceMode: String): List<String> {
+    return when (serviceMode) {
+        Key.MODE_ROOT_TUN -> listOf(TAG_ROOT_TUN_IN)
+        Key.MODE_ROOT_REDIRECT -> listOf(TAG_ROOT_REDIRECT_IN, TAG_ROOT_DNS_IN)
+        Key.MODE_ROOT_MIXED, Key.MODE_ROOT_ENHANCE -> listOf(TAG_ROOT_REDIRECT_IN, TAG_ROOT_TUN_IN)
+        else -> listOf("tun-in")
+    }
+}
+
+internal fun sanitizeDirectDnsForRoot(directDnsEntries: List<String>, isRootMode: Boolean): List<String> {
+    if (!isRootMode) return directDnsEntries
+    // In Root modes, `local`/`hosts` triggers Android netd (UID 1051) UDP:53 lookups which loop back into Root DNS rules.
+    val replaced = directDnsEntries.map { entry ->
+        if (entry.equals("local", ignoreCase = true) || entry.equals("hosts", ignoreCase = true)) {
+            "https://223.5.5.5/dns-query"
+        } else {
+            entry
+        }
+    }.distinct()
+    return replaced.ifEmpty { listOf("https://223.5.5.5/dns-query") }
+}
+
+internal fun shouldWarnPackageRuleNeedsVpn(rule: RuleEntity, isRootMode: Boolean): Boolean {
+    if (rule.name == "Smart-Foreign-Apps" || rule.name.startsWith("Smart-Domestic-Apps")) {
+        return false
+    }
+    if (isRootMode && RootTunManager.isPureDirectPackageRule(rule)) {
+        return false
+    }
+    return true
 }
 
 internal fun shouldUseFakeDns(
@@ -69,9 +100,9 @@ internal fun shouldUseFakeDns(
     bypass: Boolean,
 ): Boolean {
     if (!enableFakeDns || forTest) return false
-    // In Root TUN whitelist mode, netd still issues system DNS as UID 1051 for all apps;
+    // In Root whitelist mode, netd still issues system DNS as UID 1051 for all apps;
     // disabling FakeDNS avoids returning unroutable 198.18.x.x FakeIPs to non-whitelisted apps.
-    if (serviceMode == Key.MODE_ROOT_TUN && proxyApps && !bypass) return false
+    if (Key.isRootMode(serviceMode) && proxyApps && !bypass) return false
     return true
 }
 
@@ -90,6 +121,32 @@ internal fun buildRootTunSocksInbound(
             u.username = username
             u.password = password
         })
+    }
+}
+
+internal fun buildRootRedirectInbound(
+    port: Int,
+    listenAddress: String,
+): Inbound_RedirectOptions {
+    return Inbound_RedirectOptions().apply {
+        type = "redirect"
+        tag = TAG_ROOT_REDIRECT_IN
+        listen = listenAddress
+        listen_port = port
+    }
+}
+
+internal fun buildRootDnsInbound(
+    port: Int,
+    listenAddress: String,
+): Inbound_DirectOptions {
+    return Inbound_DirectOptions().apply {
+        type = "direct"
+        tag = TAG_ROOT_DNS_IN
+        listen = listenAddress
+        listen_port = port
+        override_address = RootTunManager.DEFAULT_LAN_DNS
+        override_port = 53
     }
 }
 
@@ -972,6 +1029,8 @@ class ConfigBuildResult(
     val rootSocksPort: Int = 0,
     val rootSocksUsername: String = "",
     val rootSocksPassword: String = "",
+    val rootRedirectPort: Int = 0,
+    val rootDnsPort: Int = 0,
 ) {
     data class IndexEntity(var chain: LinkedHashMap<Int, ProxyEntity>)
 }
@@ -1079,17 +1138,21 @@ fun buildConfig(
     val hostResolvers = HashMap<String, MutableSet<String>>()
     val nonCustomFinalHosts = hashSetOf<String>()
     val groupCache = HashMap<Long, ProxyGroup?>()
-    val isVPN = DataStore.serviceMode == Key.MODE_VPN
-    val isRootTun = DataStore.serviceMode == Key.MODE_ROOT_TUN
-    val tunInboundTag = resolveTunInboundTag(DataStore.serviceMode)
+    val serviceMode = DataStore.serviceMode
+    val isVPN = serviceMode == Key.MODE_VPN
+    val isRootMode = Key.isRootMode(serviceMode)
+    val tunInboundTags = resolveTunInboundTags(serviceMode)
     var rootSocksPort = 0
     var rootSocksUsername = ""
     var rootSocksPassword = ""
+    var rootRedirectPort = 0
+    var rootDnsPort = 0
     val bind = if (!forTest && DataStore.allowAccess) "0.0.0.0" else LOCALHOST
     val remoteDns = DataStore.remoteDns.split("\n")
         .mapNotNull { dns -> dns.trim().takeIf { it.isNotBlank() && !it.startsWith("#") } }
-    val directDNS = DataStore.directDns.split("\n")
+    val rawDirectDNS = DataStore.directDns.split("\n")
         .mapNotNull { dns -> dns.trim().takeIf { it.isNotBlank() && !it.startsWith("#") } }
+    val directDNS = sanitizeDirectDnsForRoot(rawDirectDNS, isRootMode)
     val dnsHosts by lazy {
         val merged = linkedMapOf<String, List<String>>()
         merged.putAll(BUILTIN_DNS_BOOTSTRAP_HOSTS)
@@ -1464,11 +1527,23 @@ fun buildConfig(
                     )
                 }
             })
-            if (isRootTun) {
-                rootSocksPort = mkPort()
-                rootSocksUsername = RootTunManager.generateSecret(16)
-                rootSocksPassword = RootTunManager.generateSecret(24)
-                inbounds.add(buildRootTunSocksInbound(rootSocksPort, rootSocksUsername, rootSocksPassword))
+            if (isRootMode) {
+                val rootLanSharing = DataStore.rootLanSharing || serviceMode == Key.MODE_ROOT_ENHANCE
+                val rootListen = if (rootLanSharing) "0.0.0.0" else LOCALHOST
+                if (serviceMode != Key.MODE_ROOT_REDIRECT) {
+                    rootSocksPort = mkPort()
+                    rootSocksUsername = RootTunManager.generateSecret(16)
+                    rootSocksPassword = RootTunManager.generateSecret(24)
+                    inbounds.add(buildRootTunSocksInbound(rootSocksPort, rootSocksUsername, rootSocksPassword))
+                }
+                if (serviceMode != Key.MODE_ROOT_TUN) {
+                    rootRedirectPort = mkPort()
+                    inbounds.add(buildRootRedirectInbound(rootRedirectPort, rootListen))
+                }
+                if (serviceMode == Key.MODE_ROOT_REDIRECT) {
+                    rootDnsPort = mkPort()
+                    inbounds.add(buildRootDnsInbound(rootDnsPort, rootListen))
+                }
             }
             if (!DataStore.mixedInboundDisabled) inbounds.add(Inbound_MixedOptions().apply {
                 type = "mixed"
@@ -1491,7 +1566,7 @@ fun buildConfig(
         route = RouteOptions().apply {
             auto_detect_interface = true
             override_android_vpn = true
-            find_process = !isRootTun
+            find_process = !isRootMode
             rules = mutableListOf()
             rule_set = mutableListOf()
 
@@ -1626,7 +1701,7 @@ fun buildConfig(
         if (!forTest && DataStore.globalMode) {
             // 全局模式下的规则处理
             route.rules.add(Rule_DefaultOptions().apply {
-                inbound = listOf(tunInboundTag)
+                inbound = tunInboundTags
                 outbound = mainProxyTag
             })
 
@@ -1652,16 +1727,16 @@ fun buildConfig(
                 if (effectivePackages.any { it in officialTelegramPackages }) {
                     effectivePackages.addAll(officialTelegramPackages)
                 }
-                val uidList = effectivePackages.mapNotNull {
-                    if (!isVPN) {
-                        runOnMainDispatcher {
-                            Toast.makeText(
-                                SagerNet.application,
-                                SagerNet.application.getString(R.string.route_need_vpn, rule.displayName()),
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
+                if (!isVPN && effectivePackages.isNotEmpty() && shouldWarnPackageRuleNeedsVpn(rule, isRootMode)) {
+                    runOnMainDispatcher {
+                        Toast.makeText(
+                            SagerNet.application,
+                            SagerNet.application.getString(R.string.route_need_vpn, rule.displayName()),
+                            Toast.LENGTH_SHORT
+                        ).show()
                     }
+                }
+                val uidList = effectivePackages.mapNotNull {
                     (PackageCache[it] ?: runCatching {
                         SagerNet.application.packageManager.getApplicationInfo(it, 0).uid
                     }.getOrNull())?.takeIf { uid -> uid >= 1000 }
@@ -1777,7 +1852,7 @@ fun buildConfig(
                                 if (useFakeDns) {
                                     userDNSRuleList += it.apply {
                                         server = "dns-fake"
-                                        inbound = listOf(tunInboundTag)
+                                        inbound = tunInboundTags
                                         query_type = listOf("A", "AAAA")
                                     }
                                 } else {
@@ -1789,7 +1864,7 @@ fun buildConfig(
                                     if (useFakeDns) {
                                         userDNSRuleList += it.apply {
                                             server = "dns-fake"
-                                            inbound = listOf(tunInboundTag)
+                                            inbound = tunInboundTags
                                             query_type = listOf("A", "AAAA")
                                         }
                                     } else {
@@ -1804,7 +1879,7 @@ fun buildConfig(
                                     userDNSRuleList += DNSRule_DefaultOptions().apply {
                                         rule_set = mutableListOf(tag)
                                         server = "dns-fake"
-                                        inbound = listOf(tunInboundTag)
+                                        inbound = tunInboundTags
                                         query_type = listOf("A", "AAAA")
                                     }
                                 } else {
@@ -2335,7 +2410,7 @@ fun buildConfig(
                     }
                 })
                 dns.rules.add(DNSRule_DefaultOptions().apply {
-                    inbound = listOf(tunInboundTag)
+                    inbound = tunInboundTags
                     server = "dns-fake"
                     disable_cache = true
                     query_type = when (ipv6Mode) {
@@ -2510,6 +2585,8 @@ fun buildConfig(
             rootSocksPort,
             rootSocksUsername,
             rootSocksPassword,
+            rootRedirectPort,
+            rootDnsPort,
         )
     }
 

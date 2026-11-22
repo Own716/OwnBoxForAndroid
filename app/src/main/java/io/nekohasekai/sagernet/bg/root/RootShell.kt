@@ -28,6 +28,13 @@ object RootShell {
     }
 
     /**
+     * Executes a single shell command line via `su -c` and returns its result.
+     */
+    fun runCommandResult(shellLine: String, timeoutSeconds: Long = 5): CommandResult {
+        return runCommand(listOf("su", "-c", shellLine), timeoutSeconds)
+    }
+
+    /**
      * Writes [script] to a mode-0600 temporary file inside [tempDir] and executes it via `su`.
      */
     fun runScript(

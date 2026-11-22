@@ -441,16 +441,18 @@ object DocsCatalog {
         DocEntry(
             id = "vpn_root_tun_mode",
             categoryId = "vpn_perapp",
-            title = "Root TUN 模式与热点透明共享（需 su 权限）",
+            title = "Root 四大运行模式与防残留切换说明（需 su 权限）",
             badge = "进阶: 已 Root 设备可选",
-            summary = "通过 Root 权限接管虚拟网卡与 iptables 策略路由，绕开系统 VPN 槽位限制并与企业/学校 VPN 共存。",
-            desc = "Root TUN 模式面向已通过 Magisk / KernelSU / APatch 授予超级用户权限的设备：\n" +
-                "1. 工作原理：App 内置 sing-box 核心仍在应用进程运行，由独立的 hev-socks5-tunnel 守护进程在 Root 下创建 ownbox0 虚拟网卡，再通过 iptables fwmark 策略路由（路由表 2024）经随机高强度账密的本地回环 SOCKS5 入站转发至核心。\n" +
-                "2. 全功能继承：智能分流、节点自动测速与切换、实况通知灵动胶囊、落地 IP 查询均完整可用，且支持分应用代理（含 Google Play 组件自动联动）与绕过局域网。\n" +
-                "3. Root 热点透明共享（默认关闭）：仅在 Root TUN 模式下显示；开启后热点与 USB 共享设备无需手填代理即可透明代理，也可随时通过「清理 Root TUN 残留规则」一键清除。",
-            notes = "Root TUN 白名单模式下系统 DNS 仍由 netd 统一发起，此时会自动暂关 FakeDNS 改为真实抗污染解析以确保未勾选应用直连不受影响；全局与黑名单模式仍完整使用 FakeDNS。若内核不支持 mangle/policy routing 或未授予 su 权限，请使用标准 VPN 模式。",
-            recommendation = "无冲突时推荐继续使用免 Root 的标准 VPN 模式；需要与公司/校园 VPN 共存、避免系统杀后台断 VPN 或给热点设备免配置透明代理时可选 Root TUN 模式。",
-            keywords = "root tun su iptables magisk kernelsu apatch 热点 透明共享 hev-socks5-tunnel 残留清理",
+            summary = "提供 Root TUN / Redirect / Mixed / Enhance 四种真实可用模式，支持双开分身绕过、纯应用直连下沉与切回 VPN 自动清残留。",
+            desc = "在「设置 - 模式设置 - 运行模式」中为已授予 Magisk / KernelSU / APatch 超级用户权限的设备提供 4 种 Root 模式：\n" +
+                "1. Root TUN（全流量 TCP+UDP）：创建 ownbox0 独立虚拟网卡（172.20.0.1/30，不与普通 VPN 冲突），由 hev-socks5-tunnel 接管全部 TCP 与 UDP，兼容性最广。\n" +
+                "2. Root Redirect（仅 TCP 低延迟）：不启动虚拟网卡，TCP 直接经 iptables REDIRECT 进入 sing-box 内置入口，DNS 经专用端口劫持，最省电延迟最低（UDP 直连）。\n" +
+                "3. Root Mixed（混合，Root 日用推荐）：占大头的 TCP 走高速低耗的 Redirect，游戏、语音与 UDP DNS 走 ownbox0 虚拟网卡，兼顾省电与全协议支持。\n" +
+                "4. Root Enhance（增强混合）：在 Mixed 基础上默认自动开启热点/USB 透明共享与核心进程 OOM 保活。\n" +
+                "5. 分应用与双开 QQ 防误伤：自动展开工作区与应用双开多用户 UID，并将已启用的纯按应用直连规则下沉到底层 iptables 直接放行；切回普通 VPN 或仅代理时会自动清理所有 Root 规则。",
+            notes = "因官方 sing-box 内核不包含 eBPF 模块，且真 TPROXY 需独立 Root 核心进程，当前未盲目塞入不兼容的伪 TPROXY / eBPF 模式。Root 白名单模式下仍会自动暂关 FakeDNS 改为真实抗污染解析，确保未勾选应用直连正常；若误残旧规则可随时点击「清理 Root 残留规则」。",
+            recommendation = "日常免 Root 设备推荐默认 VPN 模式；已 Root 日用首选 Root Mixed 或 Root TUN，需给热点/USB 设备免配代理首选 Root Enhance，仅看网页省电选 Root Redirect。",
+            keywords = "root tun redirect mixed enhance su iptables magisk kernelsu apatch 双开 qq 热点 透明共享 残留清理",
         ),
 
         // 6. 核心与路由

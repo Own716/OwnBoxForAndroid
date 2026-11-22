@@ -14,14 +14,15 @@ import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.bg.root.RootShell
 import io.nekohasekai.sagernet.bg.root.RootTunManager
 import io.nekohasekai.sagernet.database.DataStore
+import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.ktx.Logs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.concurrent.thread
 
 /**
- * Foreground service running root-privileged `hev-socks5-tunnel` + iptables policy routing
- * backed by the app's in-process `sing-box` loopback SOCKS5 inbound.
+ * Foreground service running Root transparent proxy modes (`Root TUN`, `Root Redirect`,
+ * `Root Mixed`, `Root Enhance`) backed by the app's in-process `sing-box` instance.
  */
 class RootTunService : Service(), BaseService.Interface {
 
@@ -70,50 +71,88 @@ class RootTunService : Service(), BaseService.Interface {
     }
 
     override suspend fun startProcesses() {
+        val rootMode = RootTunManager.RootMode.fromServiceMode(DataStore.serviceMode)
         val hasRoot = withContext(Dispatchers.IO) { RootShell.isRootAvailable() }
         if (!hasRoot) {
             throw IllegalStateException(getString(R.string.root_tun_no_root))
         }
-        val hevtunBin = RootTunManager.findHevtunBinary(this)
-            ?: throw IllegalStateException(getString(R.string.root_tun_missing_binary))
+        val hevtunBin = if (rootMode.needsHevtun) {
+            RootTunManager.findHevtunBinary(this)
+                ?: throw IllegalStateException(getString(R.string.root_tun_missing_binary))
+        } else {
+            ""
+        }
 
-        // Start sing-box first so the loopback root-tun-in SOCKS5 port is listening before hevsockstun starts.
+        // Start sing-box first so loopback root-tun-in / root-redirect-in / root-dns-in ports are listening.
         super.startProcesses()
 
         val config = data.proxy?.config
-        if (config == null || config.rootSocksPort <= 0) {
+        if (config == null ||
+            (rootMode.needsHevtun && config.rootSocksPort <= 0) ||
+            (rootMode.usesTcpRedirect && config.rootRedirectPort <= 0) ||
+            (rootMode == RootTunManager.RootMode.REDIRECT && config.rootDnsPort <= 0)
+        ) {
             throw IllegalStateException(getString(R.string.root_tun_start_failed))
         }
 
         val ownUid = Process.myUid()
         val perAppEnabled = DataStore.proxyApps
-        val perAppUids = if (perAppEnabled) {
-            withContext(Dispatchers.IO) {
+        val perAppBypass = DataStore.bypass
+        val isWhitelistMode = perAppEnabled && !perAppBypass
+
+        val (perAppUids, directBypassUids) = withContext(Dispatchers.IO) {
+            val userIds = RootTunManager.resolveAllUserIds(this@RootTunService)
+            val resolvedPerApp = if (perAppEnabled) {
                 RootTunManager.resolvePerAppUids(
                     context = this@RootTunService,
                     individualRaw = DataStore.individual,
                     ownUid = ownUid,
+                    userIds = userIds,
                 )
+            } else {
+                emptySet()
             }
-        } else {
-            emptySet()
+            val resolvedDirectBypass = if (!isWhitelistMode) {
+                val directPkgs = runCatching {
+                    RootTunManager.collectPureDirectRoutePackages(SagerDatabase.rulesDao.enabledRules())
+                }.getOrDefault(emptySet())
+                RootTunManager.resolvePackageUids(
+                    context = this@RootTunService,
+                    packageNames = directPkgs,
+                    ownUid = ownUid,
+                    userIds = userIds,
+                )
+            } else {
+                emptySet()
+            }
+            resolvedPerApp to resolvedDirectBypass
         }
 
         val params = RootTunManager.StartParams(
+            mode = rootMode,
             ownUid = ownUid,
+            corePid = Process.myPid(),
             socksPort = config.rootSocksPort,
             socksUsername = config.rootSocksUsername,
             socksPassword = config.rootSocksPassword,
+            redirectPort = config.rootRedirectPort,
+            dnsRedirectPort = config.rootDnsPort,
+            dnsDnatTargetV4 = RootTunManager.extractPlainDnsIp(DataStore.remoteDns, false)
+                ?: RootTunManager.DEFAULT_LAN_DNS,
+            dnsDnatTargetV6 = RootTunManager.extractPlainDnsIp(DataStore.remoteDns, true),
             mtu = DataStore.mtu,
             enableIpv6 = DataStore.ipv6Mode != IPv6Mode.DISABLE,
             bypassLan = DataStore.bypassLan,
             rootLanSharing = DataStore.rootLanSharing,
             perAppEnabled = perAppEnabled,
-            perAppBypass = DataStore.bypass,
+            perAppBypass = perAppBypass,
             perAppUids = perAppUids,
+            directBypassUids = directBypassUids,
             hevtunBinPath = hevtunBin,
             yamlPath = RootTunManager.defaultYamlFile(this).absolutePath,
             pidPath = RootTunManager.defaultPidFile(this).absolutePath,
+            logPath = RootTunManager.defaultLogFile(this).absolutePath,
+            oomGuardPidPath = RootTunManager.defaultOomGuardPidFile(this).absolutePath,
         )
 
         withContext(Dispatchers.IO) {
@@ -145,7 +184,7 @@ class RootTunService : Service(), BaseService.Interface {
     override fun onDestroy() {
         runCatching { wifiLock?.release() }
         wifiLock = null
-        if (RootTunManager.defaultPidFile(this).exists()) {
+        if (RootTunManager.hasActiveState(this)) {
             val appCtx = applicationContext
             thread(isDaemon = true, name = "ownbox-root-cleanup") {
                 runCatching { RootTunManager.stop(appCtx) }

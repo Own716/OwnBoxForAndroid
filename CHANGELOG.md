@@ -1,5 +1,21 @@
 # OwnBox for Android 更新日志 (Changelog)
 
+# OwnBox for Android v26.11.8.30 预览版
+
+### 【Root 模式全面修复与四大模式补齐】
+- **修复 `26.11.8.29` Root TUN 断网、分流失效与 QQ 误走代理问题**：
+  - 将 `mangle OUTPUT`、`nat OUTPUT`、`ip6tables OUTPUT` 统一改为链尾追加（`-A OUTPUT`）并将策略路由优先级调整为 `1000`，同时禁用 `conf/all/rp_filter`，彻底解决 `fwmark` 被系统规则覆写与回包被内核丢弃导致的国内外网站无法打开问题。
+  - 修复 `OWNBOX_ROOT_DNS` DNS 劫持规则：仅对已打标且目标为私网 CIDR 的 53 端口做 DNAT 至公网 DNS，Root 模式下直连 DNS 设为主机 `local`/`hosts` 时自动兜底为 `https://223.5.5.5/dns-query`，防止 `netd` DNS 回环。
+  - 扩展多用户与双开分身 UID 识别（兼容主用户与 User 999 等双开分身），并将已启用的纯按应用直连规则（含智能分流 `Smart-Domestic-Apps` 与用户自建 QQ 等直连规则）自动下沉到底层 `iptables` 绕过，消除内置应用规则刷屏弹窗。
+- **彻底解决从 Root 模式切回标准 VPN 后无法联网问题**：
+  - 将 Root 虚拟网卡独立迁至 `172.20.0.1/30`（IPv6 `fdfe:dcba:9877::1/126`），不再与普通 VPN `172.19.0.1/30` 冲突。
+  - 增加三道自动防残留机制：切回 VPN / 仅代理时自动清理旧规则；启动普通 VPN 前自动检测并清理残留（含兼容清理 `26.11.8.29` 遗留的 `priority 9000` 规则）；在已 Root 设备与存在残留标记时常驻显示「清理 Root 残留规则」入口。
+- **补齐 4 种真实可用的 Root 运行模式**（设置 -> 模式设置 -> 运行模式）：
+  - **Root TUN (全流量 TCP+UDP)**、`Root Redirect (仅 TCP 低延迟)`、`Root Mixed (TCP 直转 + UDP TUN)`、`Root Enhance (增强混合 + 热点共享)`。
+
+### 【全软件设置标题完整显示优化】
+- 统一在全局主题样式及各设置页（进阶设置、模式设置、核心设置、外观设置、路由规则、分组与节点设置等）关闭标题单行截断（`singleLineTitle = false`），长标题自动换行完整展示，彻底消除省略号显示不全问题。
+
 # OwnBox for Android v26.11.8.29 预览版
 
 ### 【Root TUN 模式与 CI 原生构建接入】

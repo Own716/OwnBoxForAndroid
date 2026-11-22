@@ -1,5 +1,7 @@
 package io.nekohasekai.sagernet.ui
 
+import io.nekohasekai.sagernet.ui.settings.enableMultiLineTitles
+
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.DialogInterface
@@ -460,6 +462,7 @@ class GroupSettingsActivity(
                 activity = (requireActivity() as GroupSettingsActivity).apply {
                     createPreferences(savedInstanceState, rootKey)
                 }
+                preferenceScreen?.enableMultiLineTitles()
             } catch (e: Exception) {
                 Toast.makeText(
                     SagerNet.application,
