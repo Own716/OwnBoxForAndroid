@@ -49,11 +49,41 @@ jobs:
           path: app/libs/libcore.aar
           if-no-files-found: error
           retention-days: 1
+  hevtun:
+    name: Native Build (HevTun)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: HevTun Cache
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            app/src/main/jniLibs/*/libhevsockstun.so
+          key: hevtun-${{ hashFiles('.github/workflows/*', 'buildScript/lib/hevtun.sh') }}
+      - name: Build HevTun
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: bash buildScript/lib/hevtun.sh
+      - name: Verify HevTun Binaries
+        run: |
+          for abi in armeabi-v7a arm64-v8a x86 x86_64; do
+            test -s "app/src/main/jniLibs/${abi}/libhevsockstun.so"
+            chmod 0755 "app/src/main/jniLibs/${abi}/libhevsockstun.so"
+          done
+      - name: Upload HevTun Binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: hevtun-libs
+          path: app/src/main/jniLibs
+          if-no-files-found: error
+          retention-days: 1
   build:
     name: Build OSS APK
     runs-on: ubuntu-latest
     needs:
       - libcore
+      - hevtun
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -73,6 +103,16 @@ jobs:
           unzip -p app/libs/libcore.aar classes.jar > /tmp/libcore-classes.jar
           unzip -l /tmp/libcore-classes.jar | grep -q 'libcore/Libcore.class'
           unzip -l /tmp/libcore-classes.jar | grep -q 'go/Seq.class'
+      - name: Download HevTun Binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: hevtun-libs
+          path: app/src/main/jniLibs
+      - name: Verify HevTun Binaries
+        run: |
+          for abi in armeabi-v7a arm64-v8a x86 x86_64; do
+            test -s "app/src/main/jniLibs/${abi}/libhevsockstun.so"
+          done
       - name: Gradle cache
         uses: actions/cache@v4
         with:

@@ -438,6 +438,20 @@ object DocsCatalog {
             recommendation = "在分应用白名单中勾选 Google Play 时，保持默认智能路由规则即可实现“Play 秒下、国内不耗代理流量”。",
             keywords = "google play 商店 0% 下载 卡住 下载管理器 gms gsf vending gvt1 分应用 联动",
         ),
+        DocEntry(
+            id = "vpn_root_tun_mode",
+            categoryId = "vpn_perapp",
+            title = "Root TUN 模式与热点透明共享（需 su 权限）",
+            badge = "进阶: 已 Root 设备可选",
+            summary = "通过 Root 权限接管虚拟网卡与 iptables 策略路由，绕开系统 VPN 槽位限制并与企业/学校 VPN 共存。",
+            desc = "Root TUN 模式面向已通过 Magisk / KernelSU / APatch 授予超级用户权限的设备：\n" +
+                "1. 工作原理：App 内置 sing-box 核心仍在应用进程运行，由独立的 hev-socks5-tunnel 守护进程在 Root 下创建 ownbox0 虚拟网卡，再通过 iptables fwmark 策略路由（路由表 2024）经随机高强度账密的本地回环 SOCKS5 入站转发至核心。\n" +
+                "2. 全功能继承：智能分流、节点自动测速与切换、实况通知灵动胶囊、落地 IP 查询均完整可用，且支持分应用代理（含 Google Play 组件自动联动）与绕过局域网。\n" +
+                "3. Root 热点透明共享（默认关闭）：仅在 Root TUN 模式下显示；开启后热点与 USB 共享设备无需手填代理即可透明代理，也可随时通过「清理 Root TUN 残留规则」一键清除。",
+            notes = "Root TUN 白名单模式下系统 DNS 仍由 netd 统一发起，此时会自动暂关 FakeDNS 改为真实抗污染解析以确保未勾选应用直连不受影响；全局与黑名单模式仍完整使用 FakeDNS。若内核不支持 mangle/policy routing 或未授予 su 权限，请使用标准 VPN 模式。",
+            recommendation = "无冲突时推荐继续使用免 Root 的标准 VPN 模式；需要与公司/校园 VPN 共存、避免系统杀后台断 VPN 或给热点设备免配置透明代理时可选 Root TUN 模式。",
+            keywords = "root tun su iptables magisk kernelsu apatch 热点 透明共享 hev-socks5-tunnel 残留清理",
+        ),
 
         // 6. 核心与路由
         DocEntry(

@@ -491,6 +491,12 @@
             android:foregroundServiceType="systemExempted"
             android:process=":bg"
             tools:ignore="ForegroundServicePermission" />
+        <service
+            android:name="io.nekohasekai.sagernet.bg.RootTunService"
+            android:exported="false"
+            android:foregroundServiceType="systemExempted"
+            android:process=":bg"
+            tools:ignore="ForegroundServicePermission" />
 
         <service
             android:name="io.nekohasekai.sagernet.bg.VpnService"

@@ -1,5 +1,8 @@
 package io.nekohasekai.sagernet.ui.settings
 
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+
 import android.content.Intent
 import android.os.Bundle
 import android.widget.EditText
@@ -31,8 +34,24 @@ class ModeSettingsFragment : BaseSettingsPreferenceFragment() {
         super.onCreatePreferences(savedInstanceState, rootKey)
 
         val serviceMode = findPreference<SimpleMenuPreference>(Key.SERVICE_MODE)
-        serviceMode?.setOnPreferenceChangeListener { _, _ ->
+        serviceMode?.setOnPreferenceChangeListener { _, newValue ->
             if (DataStore.serviceState.started) SagerNet.stopService()
+            val nextMode = newValue as? String ?: DataStore.serviceMode
+            updateRootTunPrefsVisibility(nextMode)
+            if (nextMode == Key.MODE_ROOT_TUN) {
+                viewLifecycleOwner.lifecycleScope.launch {
+                    val hasRoot = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        io.nekohasekai.sagernet.bg.root.RootShell.isRootAvailable()
+                    }
+                    if (!hasRoot && isAdded) {
+                        android.widget.Toast.makeText(
+                            requireContext(),
+                            R.string.root_tun_no_root_hint,
+                            android.widget.Toast.LENGTH_LONG,
+                        ).show()
+                    }
+                }
+            }
             true
         }
 
@@ -106,6 +125,34 @@ class ModeSettingsFragment : BaseSettingsPreferenceFragment() {
             startActivity(Intent(requireContext(), LanSharingActivity::class.java))
             true
         }
+
+        findPreference<androidx.preference.SwitchPreference>(Key.ROOT_LAN_SHARING)
+            ?.setOnPreferenceChangeListener(reloadListener)
+
+        findPreference<Preference>(Key.ROOT_TUN_CLEANUP)?.setOnPreferenceClickListener { pref ->
+            pref.isEnabled = false
+            viewLifecycleOwner.lifecycleScope.launch {
+                val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    io.nekohasekai.sagernet.bg.root.RootTunManager.stop(requireContext())
+                }
+                if (isAdded) {
+                    pref.isEnabled = true
+                    android.widget.Toast.makeText(
+                        requireContext(),
+                        if (result.isSuccess) R.string.root_tun_cleanup_done else R.string.root_tun_cleanup_failed,
+                        android.widget.Toast.LENGTH_SHORT,
+                    ).show()
+                }
+            }
+            true
+        }
+        updateRootTunPrefsVisibility()
+    }
+
+    private fun updateRootTunPrefsVisibility(mode: String = DataStore.serviceMode) {
+        val isRootTun = mode == Key.MODE_ROOT_TUN
+        findPreference<androidx.preference.SwitchPreference>(Key.ROOT_LAN_SHARING)?.isVisible = isRootTun
+        findPreference<Preference>(Key.ROOT_TUN_CLEANUP)?.isVisible = isRootTun
     }
 
     private fun getLocalIps(): String {
@@ -139,5 +186,6 @@ class ModeSettingsFragment : BaseSettingsPreferenceFragment() {
     override fun onResume() {
         super.onResume()
         updateLanSharingSummary()
+        updateRootTunPrefsVisibility()
     }
 }

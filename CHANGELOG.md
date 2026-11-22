@@ -1,5 +1,13 @@
 # OwnBox for Android 更新日志 (Changelog)
 
+# OwnBox for Android v26.11.8.29 预览版
+
+### 【Root TUN 模式与 CI 原生构建接入】
+- 新增 **Root TUN 模式**（设置 -> 模式设置 -> 运行模式）：面向已 Root（Magisk / KernelSU / APatch）设备，由独立的 `hev-socks5-tunnel` 守护进程接管 `ownbox0` 虚拟网卡与 `iptables` 策略路由（表 `2024` / `fwmark 0x2024`），再经随机高强度账密的本地回环 SOCKS5 入站接入内置 `sing-box` 核心。
+- 完整保留既有能力：智能分流、节点自动优选、实况通知灵动胶囊、落地 IP 查询、局域网绕过及分应用代理（含 Google Play 服务自动联动与网银/国产应用黑白名单隔离）均可正常使用；白名单模式下自动改用真实抗污染解析，避免未勾选应用误触 FakeIP。
+- 新增 **Root 热点透明共享** 开关（默认关闭，仅 Root TUN 模式下显示），开启后支持连接手机热点或 USB 共享的设备免配置手动代理直接透明转发，并同页提供 **清理 Root TUN 残留规则** 一键兜底清理入口。
+- 接入 CI 原生构建流水线（`buildScript/lib/hevtun.sh`），自动为 4 大 ABI 编译并打包 `libhevsockstun.so`，教程文档同步补充 Root TUN 模式说明。
+
 # OwnBox for Android v26.11.8.28 预览版
 
 ### 【教程文档全面重构与功能同步】

@@ -44,6 +44,19 @@
             app:key="lanSharing"
             app:title="@string/lan_sharing" />
 
+        <SwitchPreference
+            app:defaultValue="false"
+            app:icon="@drawable/solar_wi_fi_router_linear"
+            app:key="rootLanSharing"
+            app:summary="@string/root_lan_sharing_summary"
+            app:title="@string/root_lan_sharing" />
+
+        <Preference
+            app:icon="@drawable/ic_action_delete"
+            app:key="rootTunCleanup"
+            app:summary="@string/root_tun_cleanup_summary"
+            app:title="@string/root_tun_cleanup" />
+
     </PreferenceCategory>
 
 </PreferenceScreen>

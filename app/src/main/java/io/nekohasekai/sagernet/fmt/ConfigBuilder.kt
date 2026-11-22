@@ -3,6 +3,7 @@ package io.nekohasekai.sagernet.fmt
 import android.widget.Toast
 import io.nekohasekai.sagernet.*
 import io.nekohasekai.sagernet.bg.VpnService
+import io.nekohasekai.sagernet.bg.root.RootTunManager
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.database.ProxyEntity.Companion.TYPE_CONFIG
@@ -54,6 +55,43 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import io.nekohasekai.sagernet.route.RouteRuleEditor
 
 const val TAG_MIXED = "mixed-in"
+const val TAG_ROOT_TUN_IN = "root-tun-in"
+
+internal fun resolveTunInboundTag(serviceMode: String): String {
+    return if (serviceMode == Key.MODE_ROOT_TUN) TAG_ROOT_TUN_IN else "tun-in"
+}
+
+internal fun shouldUseFakeDns(
+    enableFakeDns: Boolean,
+    forTest: Boolean,
+    serviceMode: String,
+    proxyApps: Boolean,
+    bypass: Boolean,
+): Boolean {
+    if (!enableFakeDns || forTest) return false
+    // In Root TUN whitelist mode, netd still issues system DNS as UID 1051 for all apps;
+    // disabling FakeDNS avoids returning unroutable 198.18.x.x FakeIPs to non-whitelisted apps.
+    if (serviceMode == Key.MODE_ROOT_TUN && proxyApps && !bypass) return false
+    return true
+}
+
+internal fun buildRootTunSocksInbound(
+    port: Int,
+    username: String,
+    password: String,
+): Inbound_SocksOptions {
+    return Inbound_SocksOptions().apply {
+        type = "socks"
+        tag = TAG_ROOT_TUN_IN
+        listen = LOCALHOST
+        listen_port = port
+        udp_timeout = 300L
+        users = listOf(User().also { u ->
+            u.username = username
+            u.password = password
+        })
+    }
+}
 
 const val TAG_PROXY = "proxy"
 const val TAG_DIRECT = "direct"
@@ -931,6 +969,9 @@ class ConfigBuildResult(
     val activeStrategyTag: String = "",
     val activeStrategyKind: String = "",
     val activeStrategyId: Long = 0L,
+    val rootSocksPort: Int = 0,
+    val rootSocksUsername: String = "",
+    val rootSocksPassword: String = "",
 ) {
     data class IndexEntity(var chain: LinkedHashMap<Int, ProxyEntity>)
 }
@@ -1039,6 +1080,11 @@ fun buildConfig(
     val nonCustomFinalHosts = hashSetOf<String>()
     val groupCache = HashMap<Long, ProxyGroup?>()
     val isVPN = DataStore.serviceMode == Key.MODE_VPN
+    val isRootTun = DataStore.serviceMode == Key.MODE_ROOT_TUN
+    val tunInboundTag = resolveTunInboundTag(DataStore.serviceMode)
+    var rootSocksPort = 0
+    var rootSocksUsername = ""
+    var rootSocksPassword = ""
     val bind = if (!forTest && DataStore.allowAccess) "0.0.0.0" else LOCALHOST
     val remoteDns = DataStore.remoteDns.split("\n")
         .mapNotNull { dns -> dns.trim().takeIf { it.isNotBlank() && !it.startsWith("#") } }
@@ -1051,7 +1097,13 @@ fun buildConfig(
         merged
     }
     val enableDnsRouting = DataStore.enableDnsRouting
-    val useFakeDns = DataStore.enableFakeDns && !forTest
+    val useFakeDns = shouldUseFakeDns(
+        enableFakeDns = DataStore.enableFakeDns,
+        forTest = forTest,
+        serviceMode = DataStore.serviceMode,
+        proxyApps = DataStore.proxyApps,
+        bypass = DataStore.bypass,
+    )
     // sing-box 1.13 已移除 sniff_override_destination（sniff 规则动作不再覆盖目标地址），
     // trafficSniffing 退化为开关语义（>0 即启用）。
     val needSniff = DataStore.trafficSniffing > 0
@@ -1412,6 +1464,12 @@ fun buildConfig(
                     )
                 }
             })
+            if (isRootTun) {
+                rootSocksPort = mkPort()
+                rootSocksUsername = RootTunManager.generateSecret(16)
+                rootSocksPassword = RootTunManager.generateSecret(24)
+                inbounds.add(buildRootTunSocksInbound(rootSocksPort, rootSocksUsername, rootSocksPassword))
+            }
             if (!DataStore.mixedInboundDisabled) inbounds.add(Inbound_MixedOptions().apply {
                 type = "mixed"
                 tag = TAG_MIXED
@@ -1433,7 +1491,7 @@ fun buildConfig(
         route = RouteOptions().apply {
             auto_detect_interface = true
             override_android_vpn = true
-            find_process = true
+            find_process = !isRootTun
             rules = mutableListOf()
             rule_set = mutableListOf()
 
@@ -1568,7 +1626,7 @@ fun buildConfig(
         if (!forTest && DataStore.globalMode) {
             // 全局模式下的规则处理
             route.rules.add(Rule_DefaultOptions().apply {
-                inbound = listOf("tun-in")
+                inbound = listOf(tunInboundTag)
                 outbound = mainProxyTag
             })
 
@@ -1719,7 +1777,7 @@ fun buildConfig(
                                 if (useFakeDns) {
                                     userDNSRuleList += it.apply {
                                         server = "dns-fake"
-                                        inbound = listOf("tun-in")
+                                        inbound = listOf(tunInboundTag)
                                         query_type = listOf("A", "AAAA")
                                     }
                                 } else {
@@ -1731,7 +1789,7 @@ fun buildConfig(
                                     if (useFakeDns) {
                                         userDNSRuleList += it.apply {
                                             server = "dns-fake"
-                                            inbound = listOf("tun-in")
+                                            inbound = listOf(tunInboundTag)
                                             query_type = listOf("A", "AAAA")
                                         }
                                     } else {
@@ -1746,7 +1804,7 @@ fun buildConfig(
                                     userDNSRuleList += DNSRule_DefaultOptions().apply {
                                         rule_set = mutableListOf(tag)
                                         server = "dns-fake"
-                                        inbound = listOf("tun-in")
+                                        inbound = listOf(tunInboundTag)
                                         query_type = listOf("A", "AAAA")
                                     }
                                 } else {
@@ -2277,7 +2335,7 @@ fun buildConfig(
                     }
                 })
                 dns.rules.add(DNSRule_DefaultOptions().apply {
-                    inbound = listOf("tun-in")
+                    inbound = listOf(tunInboundTag)
                     server = "dns-fake"
                     disable_cache = true
                     query_type = when (ipv6Mode) {
@@ -2449,6 +2507,9 @@ fun buildConfig(
             activeStrategyTag,
             activeStrategyKind,
             activeStrategyId,
+            rootSocksPort,
+            rootSocksUsername,
+            rootSocksPassword,
         )
     }
 

@@ -142,6 +142,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var appIconMode by configurationStore.stringToInt(Key.APP_ICON_MODE) { 0 }
     var appLanguage by configurationStore.string(Key.APP_LANGUAGE) { "" }
     var serviceMode by configurationStore.string(Key.SERVICE_MODE) { Key.MODE_VPN }
+    var rootLanSharing by configurationStore.boolean(Key.ROOT_LAN_SHARING) { false }
 
     var trafficSniffing by configurationStore.stringToInt(Key.TRAFFIC_SNIFFING) { 1 }
     var blockQuic by configurationStore.boolean(Key.BLOCK_QUIC) { true }
@@ -200,16 +201,16 @@ object DataStore : OnPreferenceDataStoreChangeListener {
 
     var disableMixedInbound by configurationStore.boolean(Key.DISABLE_MIXED_INBOUND)
 
-    // 仅在 TUN 模式下真正生效；系统代理模式必须保留 mixed 入站
+    // 仅在 TUN / Root TUN 模式下真正生效；系统代理模式必须保留 mixed 入站
     val mixedInboundDisabled: Boolean
-        get() = disableMixedInbound && serviceMode == Key.MODE_VPN
+        get() = disableMixedInbound && serviceMode != Key.MODE_PROXY
 
     // 混合入站账密由用户设置决定：用户名留空即不启用认证（本机回环免密直连）
     var mixedUsername by configurationStore.string(Key.MIXED_USERNAME) { "" }
     var mixedPassword by configurationStore.string(Key.MIXED_PASSWORD) { "" }
 
     val mixedInboundNeedsAuth: Boolean
-        get() = serviceMode == Key.MODE_VPN && !mixedInboundDisabled && mixedUsername.isNotBlank()
+        get() = serviceMode != Key.MODE_PROXY && !mixedInboundDisabled && mixedUsername.isNotBlank()
 
     val mixedInboundUser: String get() = if (mixedInboundAuthed) mixedUsername else ""
     val mixedInboundPass: String get() = if (mixedInboundAuthed) mixedPassword else ""

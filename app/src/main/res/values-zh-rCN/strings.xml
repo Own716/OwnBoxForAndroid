@@ -42,6 +42,17 @@
     <!-- misc -->
     <string name="service_mode">运行模式</string>
     <string name="service_mode_proxy">仅代理</string>
+    <string name="service_mode_root_tun">Root TUN 模式</string>
+    <string name="root_tun_no_root">未获取到 Root (su) 权限，无法启动 Root TUN 模式</string>
+    <string name="root_tun_no_root_hint">尚未检测到 Root 权限，请在 Magisk / KernelSU / APatch 中为 OwnBox 授予 su 权限后再连接</string>
+    <string name="root_tun_missing_binary">未找到 Root TUN 核心组件 (libhevsockstun.so)</string>
+    <string name="root_tun_start_failed">Root TUN 启动失败</string>
+    <string name="root_lan_sharing">Root 热点透明共享</string>
+    <string name="root_lan_sharing_summary">免在连接手机热点/USB 共享的其他设备上配置手动代理，通过 iptables 直接透明转发流量（实验性，默认关闭）</string>
+    <string name="root_tun_cleanup">清理 Root TUN 残留规则</string>
+    <string name="root_tun_cleanup_summary">仅清理 OwnBox 创建的 iptables 规则、2024 策略路由与 ownbox0 虚拟网卡，不影响系统网络</string>
+    <string name="root_tun_cleanup_done">已清理 Root TUN 残留规则</string>
+    <string name="root_tun_cleanup_failed">清理失败（需要 Root 权限）</string>
     <string name="port_proxy">代理端口</string>
     <string name="port_http">HTTP 代理端口</string>
     <string name="disable_mixed_inbound">禁用混合入站</string>

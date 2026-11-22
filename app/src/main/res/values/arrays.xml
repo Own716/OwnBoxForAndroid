@@ -319,6 +319,7 @@
     <string-array name="service_modes">
         <item>@string/service_mode_vpn</item>
         <item>@string/service_mode_proxy</item>
+        <item>@string/service_mode_root_tun</item>
         <!--
                 <item>@string/service_mode_transproxy</item>
         -->
@@ -326,6 +327,7 @@
     <string-array name="service_mode_values">
         <item>vpn</item>
         <item>proxy</item>
+        <item>root_tun</item>
         <!--
                 <item>transproxy</item>
         -->

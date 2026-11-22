@@ -27,6 +27,9 @@ object Key {
     const val SERVICE_MODE = "serviceMode"
     const val MODE_VPN = "vpn"
     const val MODE_PROXY = "proxy"
+    const val MODE_ROOT_TUN = "root_tun"
+    const val ROOT_LAN_SHARING = "rootLanSharing"
+    const val ROOT_TUN_CLEANUP = "rootTunCleanup"
 
     const val GLOBAL_CUSTOM_CONFIG = "globalCustomConfig"
 
