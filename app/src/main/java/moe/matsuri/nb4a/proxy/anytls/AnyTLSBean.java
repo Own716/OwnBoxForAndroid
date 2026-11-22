@@ -37,6 +37,8 @@ public class AnyTLSBean extends AbstractBean {
     public String echConfig;
     public String realityPubKey;
     public String realityShortId;
+    public String clientCertificate;
+    public String clientKey;
 
     @Override
     public void initializeDefaultValues() {
@@ -50,11 +52,13 @@ public class AnyTLSBean extends AbstractBean {
         if (echConfig == null) echConfig = "";
         if (realityPubKey == null) realityPubKey = "";
         if (realityShortId == null) realityShortId = "";
+        if (clientCertificate == null) clientCertificate = "";
+        if (clientKey == null) clientKey = "";
     }
 
     @Override
     public void serialize(ByteBufferOutput output) {
-        output.writeInt(1);
+        output.writeInt(2);
         super.serialize(output);
         output.writeString(password);
         output.writeString(sni);
@@ -65,6 +69,8 @@ public class AnyTLSBean extends AbstractBean {
         output.writeString(echConfig);
         output.writeString(realityPubKey);
         output.writeString(realityShortId);
+        output.writeString(clientCertificate);
+        output.writeString(clientKey);
     }
 
     @Override
@@ -84,6 +90,13 @@ public class AnyTLSBean extends AbstractBean {
         } else {
             realityPubKey = "";
             realityShortId = "";
+        }
+        if (version >= 2) {
+            clientCertificate = input.readString();
+            clientKey = input.readString();
+        } else {
+            clientCertificate = "";
+            clientKey = "";
         }
     }
 

@@ -38,27 +38,38 @@
 
     </FrameLayout>
 
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#26808080" />
+
     <LinearLayout
         android:id="@+id/keyboard_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:background="?attr/cardElevatedSurfaceColor"
         android:elevation="0dp"
-        android:orientation="horizontal">
+        android:gravity="center_vertical"
+        android:minHeight="44dp"
+        android:orientation="horizontal"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp">
 
         <ImageView
             android:id="@+id/action_tab"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:background="?colorPrimary"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
             android:padding="8dp"
             android:src="@drawable/baseline_keyboard_tab_24"
-            app:tint="?colorOnSurface" />
+            app:tint="?attr/colorOnSurface" />
 
         <moe.matsuri.nb4a.ui.ExtendedKeyboard
             android:id="@+id/extended_keyboard"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="?attr/colorSurface"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:background="@android:color/transparent"
             android:orientation="horizontal"
             app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
             tools:itemCount="6"
@@ -66,35 +77,30 @@
 
         <ImageView
             android:id="@+id/action_undo"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:background="?colorPrimary"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
             android:padding="8dp"
             android:src="@drawable/baseline_undo_24"
-            app:tint="?colorOnSurface" />
+            app:tint="?attr/colorOnSurface" />
 
         <ImageView
             android:id="@+id/action_redo"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:background="?colorPrimary"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
             android:padding="8dp"
             android:src="@drawable/baseline_redo_24"
-            app:tint="?colorOnSurface" />
+            app:tint="?attr/colorOnSurface" />
 
         <ImageView
             android:id="@+id/action_format"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:background="?colorPrimary"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
             android:padding="8dp"
             android:src="@drawable/ic_baseline_format_align_left_24"
-            app:tint="?colorOnSurface" />
-
-        <ImageView
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="?colorPrimary" />
+            app:tint="?attr/colorOnSurface" />
 
     </LinearLayout>
 

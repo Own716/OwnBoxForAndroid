@@ -39,6 +39,17 @@
             app:key="certificates"
             app:title="@string/certificates"
             app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:dialogMessage="@string/mtls_field_dialog_hint"
+            app:icon="@drawable/ic_baseline_vpn_key_24"
+            app:key="clientCertificate"
+            app:title="@string/mtls_client_certificate"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:dialogMessage="@string/mtls_field_dialog_hint"
+            app:icon="@drawable/ic_settings_password"
+            app:key="clientKey"
+            app:title="@string/mtls_client_key" />
         <SwitchPreferenceCompat
             app:icon="@drawable/ic_notification_enhanced_encryption"
             app:key="allowInsecure"

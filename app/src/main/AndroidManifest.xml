@@ -320,7 +320,8 @@
             android:taskAffinity="" />
         <activity
             android:name="io.nekohasekai.sagernet.ui.profile.ConfigEditActivity"
-            android:configChanges="uiMode" />
+            android:configChanges="uiMode"
+            android:windowSoftInputMode="adjustResize" />
         <activity
             android:name="io.nekohasekai.sagernet.ui.profile.SocksSettingsActivity"
             android:configChanges="uiMode" />

@@ -1959,6 +1959,14 @@ public class SingBoxOptions {
 
         public String certificate_path;
 
+        public String client_certificate;
+
+        public String client_certificate_path;
+
+        public String client_key;
+
+        public String client_key_path;
+
         public List<String> certificate_sha256;
 
         public List<String> certificate_public_key_sha256;

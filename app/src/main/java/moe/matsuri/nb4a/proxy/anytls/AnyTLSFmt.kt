@@ -9,7 +9,19 @@ import moe.matsuri.nb4a.SingBoxOptions
 import moe.matsuri.nb4a.utils.listByLineOrComma
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
-fun buildSingBoxOutboundAnyTLSBean(bean: AnyTLSBean): SingBoxOptions.Outbound_AnyTLSOptions {
+internal fun isCertificateFilePath(value: String): Boolean {
+    val trimmed = value.trim()
+    if (trimmed.isEmpty()) return false
+    if (trimmed.contains("-----BEGIN") || trimmed.contains('\n') || trimmed.contains('\r')) {
+        return false
+    }
+    return trimmed.startsWith("/")
+}
+
+fun buildSingBoxOutboundAnyTLSBean(
+    bean: AnyTLSBean,
+    globalAllowInsecure: Boolean = DataStore.globalAllowInsecure,
+): SingBoxOptions.Outbound_AnyTLSOptions {
     return SingBoxOptions.Outbound_AnyTLSOptions().apply {
         type = "anytls"
         server = bean.serverAddress
@@ -19,10 +31,24 @@ fun buildSingBoxOutboundAnyTLSBean(bean: AnyTLSBean): SingBoxOptions.Outbound_An
         tls = SingBoxOptions.OutboundTLSOptions().apply {
             enabled = true
             server_name = bean.sni.blankAsNull()
-            insecure = bean.allowInsecure || DataStore.globalAllowInsecure
+            insecure = bean.allowInsecure || globalAllowInsecure
             alpn = bean.alpn.blankAsNull()?.listByLineOrComma()
             bean.certificates.blankAsNull()?.let {
                 certificate = it
+            }
+            bean.clientCertificate.blankAsNull()?.trim()?.let { cert ->
+                if (isCertificateFilePath(cert)) {
+                    client_certificate_path = cert
+                } else {
+                    client_certificate = cert
+                }
+            }
+            bean.clientKey.blankAsNull()?.trim()?.let { key ->
+                if (isCertificateFilePath(key)) {
+                    client_key_path = key
+                } else {
+                    client_key = key
+                }
             }
             var fingerprint = bean.utlsFingerprint.blankAsNull()?.trim()?.lowercase()
             if (!bean.realityPubKey.isNullOrBlank()) {

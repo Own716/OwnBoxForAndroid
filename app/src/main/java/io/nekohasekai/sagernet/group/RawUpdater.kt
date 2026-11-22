@@ -806,6 +806,12 @@ object RawUpdater : GroupUpdater() {
                                         val alpn = (opt.value as? (List<String>))
                                         bean.alpn = alpn?.joinToString("\n")
                                     }
+                                    "client-certificate", "client-certificate-path" -> bean.clientCertificate =
+                                        (opt.value as? List<*>)?.joinToString("\n") { it?.toString().orEmpty() }
+                                            ?: opt.value.toString()
+                                    "client-key", "client-key-path" -> bean.clientKey =
+                                        (opt.value as? List<*>)?.joinToString("\n") { it?.toString().orEmpty() }
+                                            ?: opt.value.toString()
                                     "reality-pub-key", "public-key" -> bean.realityPubKey =
                                         opt.value.toString()
                                     "reality-short-id", "short-id" -> bean.realityShortId =

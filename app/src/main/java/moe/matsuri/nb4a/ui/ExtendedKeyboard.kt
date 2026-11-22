@@ -17,14 +17,15 @@
 package moe.matsuri.nb4a.ui
 
 import android.content.Context
-import android.graphics.Color
 import android.util.AttributeSet
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.databinding.ItemKeyboardKeyBinding
+import io.nekohasekai.sagernet.ktx.getColorAttr
 
 class ExtendedKeyboard @JvmOverloads constructor(
     context: Context,
@@ -91,7 +92,7 @@ class ExtendedKeyboard @JvmOverloads constructor(
             fun bind(item: String) {
                 char = item
                 binding.itemTitle.text = char
-                binding.itemTitle.setTextColor(Color.WHITE)
+                binding.itemTitle.setTextColor(itemView.context.getColorAttr(R.attr.colorOnSurface))
             }
         }
     }

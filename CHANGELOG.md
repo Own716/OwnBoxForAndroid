@@ -1,5 +1,15 @@
 # OwnBox for Android 更新日志 (Changelog)
 
+# OwnBox for Android v26.11.8.33 预览版
+
+### 【AnyTLS mTLS 支持与自定义配置编辑器暗色/底部遮挡修复】
+- **新增 AnyTLS 客户端双向认证（mTLS）配置支持**：
+  - 在 `SingBoxOptions.OutboundTLSOptions` 中补齐 `sing-box 1.13+` 原生支持的 `client_certificate`、`client_certificate_path`、`client_key`、`client_key_path` 字段，并在 `AnyTLSBean`（Kryo v2，完全向下兼容旧节点）与节点编辑页「安全设置」新增「客户端证书 (mTLS)」和「客户端私钥 (mTLS，副标题脱敏展示)」输入框。
+  - 支持直接粘贴 PEM 多行文本或填写本地绝对文件路径，自动匹配输出至对应的 `sing-box` 字段，留空不产生多余配置；同步打通 `sing-box` JSON 出站导入与 Clash/Mihomo YAML 订阅导入解析。
+- **修复暗色 / AMOLED 模式下自定义配置编辑器底部字符看不见与被遮挡问题**：
+  - 修复 `ExtendedKeyboard` 与 `layout_edit_config.xml` 中底部符号及图标按钮在黑/AMOLED 主题下出现的「白底白字 / 白底白图标」不可见问题：底部工具栏统一改为使用主题表面色（`cardElevatedSurfaceColor`）与高对比自适应前景色（`colorOnSurface`），并让快捷符号栏支持 `layout_weight="1"` 横向自适应滚动，避免窄屏下挤压右侧按钮。
+  - 在 `AndroidManifest.xml` 为 `ConfigEditActivity` 启用 `android:windowSoftInputMode="adjustResize"`，并在根布局统一整合 `systemBars` + `displayCutout` + `ime` Insets（去除冲突的负值边距计算），配合编辑器底部内边距，确保无论收起还是弹出输入法，底部工具栏与最后一行文本始终完整可见、不被导航条或键盘遮挡。
+
 # OwnBox for Android v26.11.8.32 预览版
 
 ### 【全 6 种运行模式深度核查修复与增强】

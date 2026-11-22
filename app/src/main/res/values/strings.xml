@@ -255,6 +255,9 @@
     <string name="sni">Server Name Indication</string>
     <string name="alpn">Application-Layer Protocol Negotiation</string>
     <string name="certificates">Certificates</string>
+    <string name="mtls_client_certificate">Client Certificate (mTLS)</string>
+    <string name="mtls_client_key">Client Private Key (mTLS)</string>
+    <string name="mtls_field_dialog_hint">Paste PEM content or enter an absolute file path (e.g. /path/to/client.pem)</string>
     <string name="early_data_header_name">Early Data Header Name</string>
     <string name="encryption">Encryption</string>
     <string name="extra_headers">Extra Headers</string>
