@@ -16,6 +16,7 @@ import io.nekohasekai.sagernet.bg.root.RootTunManager
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.ktx.Logs
+import io.nekohasekai.sagernet.route.SmartRouteRules
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.concurrent.thread
@@ -99,8 +100,9 @@ class RootTunService : Service(), BaseService.Interface {
         val perAppEnabled = DataStore.proxyApps
         val perAppBypass = DataStore.bypass
         val isWhitelistMode = perAppEnabled && !perAppBypass
+        val isSmartRouting = DataStore.smartMode && !DataStore.globalMode
 
-        val (perAppUids, directBypassUids) = withContext(Dispatchers.IO) {
+        val (perAppUids, directBypassUids, blockedUids) = withContext(Dispatchers.IO) {
             val userIds = RootTunManager.resolveAllUserIds(this@RootTunService)
             val resolvedPerApp = if (perAppEnabled) {
                 RootTunManager.resolvePerAppUids(
@@ -108,14 +110,22 @@ class RootTunService : Service(), BaseService.Interface {
                     individualRaw = DataStore.individual,
                     ownUid = ownUid,
                     userIds = userIds,
+                    expandGooglePlay = isWhitelistMode,
                 )
             } else {
                 emptySet()
             }
-            val resolvedDirectBypass = if (!isWhitelistMode) {
-                val directPkgs = runCatching {
-                    RootTunManager.collectPureDirectRoutePackages(SagerDatabase.rulesDao.enabledRules())
-                }.getOrDefault(emptySet())
+            val activeRules = when {
+                DataStore.globalMode -> emptyList()
+                isSmartRouting -> runCatching {
+                    SmartRouteRules.buildSmartRules(DataStore.smartRouteCountry)
+                }.getOrDefault(emptyList())
+                else -> runCatching {
+                    SagerDatabase.rulesDao.enabledRules()
+                }.getOrDefault(emptyList())
+            }
+            val resolvedDirectBypass = if (!isWhitelistMode && activeRules.isNotEmpty()) {
+                val directPkgs = RootTunManager.collectPureDirectRoutePackages(activeRules)
                 RootTunManager.resolvePackageUids(
                     context = this@RootTunService,
                     packageNames = directPkgs,
@@ -125,7 +135,18 @@ class RootTunService : Service(), BaseService.Interface {
             } else {
                 emptySet()
             }
-            resolvedPerApp to resolvedDirectBypass
+            val resolvedBlocked = if (activeRules.isNotEmpty()) {
+                val blockPkgs = RootTunManager.collectPureBlockRoutePackages(activeRules)
+                RootTunManager.resolvePackageUids(
+                    context = this@RootTunService,
+                    packageNames = blockPkgs,
+                    ownUid = ownUid,
+                    userIds = userIds,
+                )
+            } else {
+                emptySet()
+            }
+            Triple(resolvedPerApp, resolvedDirectBypass, resolvedBlocked)
         }
 
         val params = RootTunManager.StartParams(
@@ -144,11 +165,13 @@ class RootTunService : Service(), BaseService.Interface {
             mtu = DataStore.mtu,
             enableIpv6 = DataStore.ipv6Mode != IPv6Mode.DISABLE,
             bypassLan = DataStore.bypassLan,
+            blockQuic = DataStore.blockQuic,
             rootLanSharing = DataStore.rootLanSharing,
             perAppEnabled = perAppEnabled,
             perAppBypass = perAppBypass,
             perAppUids = perAppUids,
             directBypassUids = directBypassUids,
+            blockedUids = blockedUids,
             hevtunBinPath = hevtunBin,
             yamlPath = RootTunManager.defaultYamlFile(this).absolutePath,
             pidPath = RootTunManager.defaultPidFile(this).absolutePath,

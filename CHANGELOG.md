@@ -1,5 +1,21 @@
 # OwnBox for Android 更新日志 (Changelog)
 
+# OwnBox for Android v26.11.8.34 预览版
+
+### 【Root 模式自定义路由 / Google Play 下载、DNS 泄漏检测与网页加载延迟全面修复】
+- **修复 Root 模式自定义路由不生效与 Google Play 下载长期转圈卡死问题**：
+  - 修复普通分组模式下所有远程规则集（`geosite:cn`、`geoip:cn`、`geosite:google-play` 及自定义 `.srs` 规则集）将 `download_detour` 硬编码为不存在的 `"proxy"` 导致规则集长期为空壳的缺陷，在 `ConfigBuilder` 末尾统一对齐至实际主代理出站 `mainProxyTag`。
+  - 将 Google Play 商店防误杀规则中的 `googleapis.cn`、`google.cn`、`xn--ngstr-lra8j.com`、`xn--ngstr-cn-8za9o.com` 等由精确 `domain` 升级为后缀 `domain_suffix` 匹配，并补全 `play.google.com`、`dl.google.com`、`dl-ssl.google.com`、`mtalk.google.com`、`googlezip.net` 等下载关键后缀；同时在路由与 DNS 规则中将其精准置于用户第一条直连/绕过规则（`geosite:cn` / `dns-direct`）之前，既不覆盖用户节点分流又彻底避免商店子域名落入国内直连导致 Root 模式无法下载。
+  - 修复用户自定义路由规则被硬编码保底域名列表覆盖的问题：将 `domesticCoreDomainSuffixes` 收敛至仅「智能分流模式」生效，且仅保留基础设施规则（`hijack-dns`、`sniff`、DNS 地址隔离与显式屏蔽）前置；在 Root 模式下自动将用户规则中的 `inbound: ["tun-in"]` 映射为对应 Root 入站。
+  - 针对 4 种 Root 模式补全 `OWNBOX_ROOT_FLT (filter OUTPUT)` 内核级 `REJECT`：当开启「拦截 QUIC (UDP 443)」时通过 `icmp-port-unreachable` 秒级通知应用回退 TCP，消除 `hev-socks5-tunnel` 静默丢包黑洞；同时支持纯按应用屏蔽规则（`outbound == -2` / `reject`）、智能分流下的国内应用原生 UID 绕过，以及仅在白名单模式下展开 Google Play 关联下载器包名（新增适配 `com.oplus.providers.downloads` 等）。
+  - 在 `RouteSettingsActivity` 中允许 Root 模式下编辑与保存纯屏蔽应用规则及含域名/IP 条件的混合应用规则；在 `RouteFragment` 顶部新增当前处于「智能分流 / 全局代理」时的模式提示条与一键切回自定义路由入口。
+- **重做工具页「DNS 泄漏与 Fake-IP 检测」 (`DnsLeakTester`)**：
+  - 移除此前请求纯 IP `1.1.1.1` 并硬编码返回「DNS 解析安全」的假检测与 Root/仅代理模式下绕过代理裸奔测网的逻辑。
+  - 新增真实分模式诊断引擎：自动识别当前运行状态与 6 种运行模式；在 `VPN` 模式同时检测代理出口 IP、经代理隧道的真实 DNS 出口（32 位防缓存随机子域 `edns.ip-api.com`）与经本机系统链路的 DNS 出口；在 `Root` 与 `仅代理` 模式清晰说明 Fake-IP 策略并通过代理出站实测出口与 DNS 解析归属，发现中国大陆 DNS 泄漏时明确告警并给出排查指引，同时修复异步回调中的 Fragment 视图生命周期保护。
+- **优化网页与 GitHub 加载延迟**：
+  - 在 `dns.rules` 顶部对 `HTTPS (65)` 与 `SVCB (64)` DNS 查询使用 `sing-box` 原生 `predefined` 动作 0ms 本地响应空 `NOERROR`，并清理重复的 `AAAA reject` 规则，消除 Chrome/Android 每次打开网页触发多个子域名 `HTTPS` DNS 查询穿透远程 DoH 造成的建连阻塞。
+  - 移除 `ConfigBuilder` 对各类节点出站无条件强制注入的 `tcp_fast_open = true`，并将 `hev-socks5-tunnel` 本机回环配置改为 `tcp-fastopen: false`，避免国内移动网络中间盒丢弃 TFO SYN 包引发的 1-3 秒重传卡顿。
+
 # OwnBox for Android v26.11.8.33 预览版
 
 ### 【AnyTLS mTLS 支持与自定义配置编辑器暗色/底部遮挡修复】

@@ -1251,7 +1251,10 @@
     <string name="rr_picker">Select rule sets</string>
     <string name="rr_lines">One value per line. Ports accept 80, 443 or 1000:2000.</string>
     <string name="rr_legacy_domain">Exact domains (JSON)</string>
-    <string name="rr_apps_modes">App rules apply to VPN traffic. Root TUN relies on UID/socket ownership and may vary by Android/kernel; mixed proxy traffic cannot reliably identify its originating app.</string>
+    <string name="rr_apps_modes">App-based direct bypass and block rules work in both VPN and Root modes. Routing specific apps to individual proxy nodes requires VPN mode (mixed proxy traffic cannot identify source apps). In Root modes, rules that also include domain, IP, or rule-set conditions still apply those conditions.</string>
+    <string name="route_banner_smart_mode">Smart Routing is currently active, so custom rules below are bypassed.</string>
+    <string name="route_banner_global_mode">Global Mode is currently active, so custom rules below are bypassed.</string>
+    <string name="route_banner_switch_custom">Use Custom</string>
     <string name="rr_limits">Wi-Fi and desktop process matching are not enabled. Removed sniff destination override is unsupported by this core. Existing custom JSON is preserved; unsupported fields must be reviewed before saving.</string>
     <string name="rr_invalid">Cannot save rule</string>
     <string name="rr_problem">%1$s: %2$s</string>

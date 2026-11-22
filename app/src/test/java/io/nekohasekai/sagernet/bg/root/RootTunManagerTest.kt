@@ -65,7 +65,8 @@ class RootTunManagerTest {
         assertFalse(cfg.contains("offload:"))
         assertFalse("YAML should not fork independently when using nohup", cfg.contains("pid-file:"))
         assertTrue(cfg.contains("port: 34567"))
-        assertTrue(cfg.contains("tcp-fastopen: true"))
+        assertTrue(cfg.contains("tcp-fastopen: false"))
+        assertFalse(cfg.contains("tcp-fastopen: true"))
 
         val enhanceDual = RootTunManager.buildHevConfig(
             baseParams(
@@ -102,6 +103,9 @@ class RootTunManagerTest {
         assertFalse("Must never DNAT unmarked DNS packets", script.contains("-A OWNBOX_ROOT_DNS -p udp --dport 53 -j DNAT"))
         assertFalse("Must never DNAT to VpnService peer IP", script.contains("172.19.0.2"))
         assertTrue(script.contains("iptables -w 5 -t nat -A OUTPUT -j OWNBOX_ROOT_DNS"))
+        assertTrue("QUIC UDP 443 REJECT must guard ownUid first", script.contains("-A OWNBOX_ROOT_FLT -m owner --uid-owner 10123 -j RETURN"))
+        assertTrue("QUIC UDP 443 REJECT must return icmp-port-unreachable", script.contains("-A OWNBOX_ROOT_FLT -p udp --dport 443 -j REJECT --reject-with icmp-port-unreachable"))
+        assertTrue(script.contains("iptables -w 5 -t filter -A OUTPUT -j OWNBOX_ROOT_FLT"))
     }
 
     @Test
@@ -192,18 +196,35 @@ class RootTunManagerTest {
     }
 
     @Test
-    fun buildSetupScript_exemptsDirectBypassAndMultiUserUidsAndFailsClosedOnEmptyWhitelist() {
+    fun buildSetupScript_exemptsDirectBypassBlocksBlockedUidsAndRespectsBlockQuicAndWhitelist() {
         val mixedBypass = RootTunManager.buildSetupScript(
             baseParams(
                 mode = RootTunManager.RootMode.MIXED,
                 perAppEnabled = false,
                 directBypassUids = setOf(10200, 99910200),
+            ).copy(
+                blockedUids = setOf(10300, 99910300),
+                blockQuic = false,
             )
         )
         assertTrue(mixedBypass.contains("-A OWNBOX_ROOT_OUT -m owner --uid-owner 10200 -j RETURN"))
         assertTrue(mixedBypass.contains("-A OWNBOX_ROOT_OUT -m owner --uid-owner 99910200 -j RETURN"))
+        assertTrue(mixedBypass.contains("-A OWNBOX_ROOT_OUT -m owner --uid-owner 10300 -j RETURN"))
         assertTrue(mixedBypass.contains("-A OWNBOX_ROOT_REDIR -m owner --uid-owner 10200 -j RETURN"))
-        assertTrue(mixedBypass.contains("-A OWNBOX_ROOT_REDIR -m owner --uid-owner 99910200 -j RETURN"))
+        assertTrue(mixedBypass.contains("-A OWNBOX_ROOT_REDIR -m owner --uid-owner 10300 -j RETURN"))
+        assertTrue(mixedBypass.contains("-A OWNBOX_ROOT_FLT -m owner --uid-owner 10300 -j REJECT --reject-with icmp-admin-prohibited"))
+        assertTrue(mixedBypass.contains("-A OWNBOX_ROOT_FLT -m owner --uid-owner 99910300 -j REJECT --reject-with icmp-admin-prohibited"))
+        assertFalse("Must not block QUIC when blockQuic=false", mixedBypass.contains("-p udp --dport 443 -j REJECT"))
+
+        val whitelistQuic = RootTunManager.buildSetupScript(
+            baseParams(
+                mode = RootTunManager.RootMode.TUN,
+                perAppEnabled = true,
+                perAppBypass = false,
+                perAppUids = setOf(10555),
+            ).copy(blockQuic = true)
+        )
+        assertTrue(whitelistQuic.contains("-A OWNBOX_ROOT_FLT -p udp --dport 443 -m owner --uid-owner 10555 -j REJECT --reject-with icmp-port-unreachable"))
 
         val emptyWhitelist = RootTunManager.buildSetupScript(
             baseParams(
@@ -217,10 +238,11 @@ class RootTunManagerTest {
         assertFalse(emptyWhitelist.contains("-j REDIRECT --to-ports"))
         assertFalse(emptyWhitelist.contains("iptables -w 5 -t nat -N OWNBOX_ROOT_DNS"))
         assertFalse(emptyWhitelist.contains("-j DNAT"))
+        assertFalse(emptyWhitelist.contains("-p udp --dport 443 -j REJECT"))
     }
 
     @Test
-    fun multiUserAndDirectPackageRuleHelpers_behaveAccurately() {
+    fun multiUserAndDirectOrBlockPackageRuleHelpers_behaveAccurately() {
         val users = RootTunManager.parseUserIdsFromPmOutput(
             "Users:\n\tUserInfo{0:Owner:4c13} running\n\tUserInfo{999:MultiApp:4001010} running\n"
         )
@@ -235,12 +257,23 @@ class RootTunManagerTest {
             RuleEntity(id = 3, name = "Disabled-Direct", outbound = -1L, enabled = false, packages = setOf("com.disabled.app")),
             RuleEntity(id = 4, name = "Smart-Foreign-Apps", outbound = 0L, enabled = true, packages = setOf("org.telegram.messenger")),
             RuleEntity(id = 5, name = "Mixed-Domain-And-App", outbound = -1L, enabled = true, packages = setOf("com.android.chrome"), domains = "baidu.com"),
+            RuleEntity(id = 6, name = "Block-App", outbound = -2L, enabled = true, packages = setOf("com.blocked.app")),
+            RuleEntity(id = 7, name = "Block-App-Action", outbound = 0L, enabled = true, packages = setOf("com.blocked.action"), config = """{"action":"reject","method":"drop"}"""),
         )
         assertEquals(setOf("com.tencent.mobileqq", "com.tencent.mm"), RootTunManager.collectPureDirectRoutePackages(rules))
+        assertEquals(setOf("com.blocked.app", "com.blocked.action"), RootTunManager.collectPureBlockRoutePackages(rules))
+        assertTrue(RootTunManager.hasNonPackageCriteria(rules[4]))
+        assertFalse(RootTunManager.hasNonPackageCriteria(rules[5]))
+        assertFalse(RootTunManager.hasNonPackageCriteria(rules[6]))
+        assertTrue(RootTunManager.isPureBlockPackageRule(RuleEntity(id = 8, outbound = -2L, enabled = false, packages = setOf("a.b")), requireEnabled = false))
 
-        val withPlay = RootTunManager.expandPackageNames("\ncom.android.vending\norg.telegram.messenger\n")
-        assertTrue("com.google.android.gms" in withPlay)
-        assertTrue("com.android.providers.downloads" in withPlay)
+        val withPlayWhitelist = RootTunManager.expandPackageNames("\ncom.android.vending\norg.telegram.messenger\n", expandGooglePlay = true)
+        assertTrue("com.google.android.gms" in withPlayWhitelist)
+        assertTrue("com.android.providers.downloads" in withPlayWhitelist)
+        assertTrue("com.oplus.providers.downloads" in withPlayWhitelist)
+
+        val noExpandBypass = RootTunManager.expandPackageNames("\ncom.android.vending\n", expandGooglePlay = false)
+        assertEquals(setOf("com.android.vending"), noExpandBypass)
     }
 
     @Test
@@ -273,6 +306,7 @@ class RootTunManagerTest {
             "OWNBOX_ROOT_REDIR",
             "OWNBOX_ROOT_NAT",
             "OWNBOX_ROOT_FWD",
+            "OWNBOX_ROOT_FLT",
             "OWNBOX_ROOT_BLK6",
             "OWNBOX_ROOT_BLK6_FWD",
         ).forEach { chain ->

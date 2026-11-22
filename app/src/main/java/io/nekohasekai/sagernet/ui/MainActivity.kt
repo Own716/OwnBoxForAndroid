@@ -837,6 +837,10 @@ class MainActivity : ThemedActivity(),
         }
     }
 
+    fun refreshProxyModeCard() {
+        updateProxyModeCard()
+    }
+
     private fun updateProxyModeCard(root: View? = proxyModeCardView) {
         val view = root ?: return
         val isGlobal = DataStore.globalMode

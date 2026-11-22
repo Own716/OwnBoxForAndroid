@@ -2,8 +2,10 @@ package io.nekohasekai.sagernet.fmt
 
 import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.database.RuleEntity
+import moe.matsuri.nb4a.SingBoxOptions
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -37,15 +39,26 @@ class ConfigBuilderRootTunTest {
     }
 
     @Test
-    fun shouldWarnPackageRuleNeedsVpn_silencesSmartRulesAndPureDirectRulesInRootMode() {
+    fun shouldWarnPackageRuleNeedsVpn_silencesSmartRulesAndNativeRootOrHybridRulesInRootMode() {
         val smartForeign = RuleEntity(id = 1, name = "Smart-Foreign-Apps", outbound = 0L, enabled = true, packages = setOf("org.telegram.messenger"))
         val smartDomestic = RuleEntity(id = 2, name = "Smart-Domestic-Apps-CN", outbound = -1L, enabled = true, packages = setOf("com.tencent.mobileqq"))
         val customDirectApp = RuleEntity(id = 3, name = "QQ", outbound = -1L, enabled = true, packages = setOf("com.tencent.mobileqq"))
-        val customProxyApp = RuleEntity(id = 4, name = "Telegram", outbound = 0L, enabled = true, packages = setOf("org.telegram.messenger"))
+        val customBlockApp = RuleEntity(id = 4, name = "BlockedApp", outbound = -2L, enabled = true, packages = setOf("com.example.ads"))
+        val hybridPlayRule = RuleEntity(
+            id = 5,
+            name = "PlayStore",
+            outbound = 0L,
+            enabled = true,
+            domains = "domain:googleapis.cn",
+            packages = setOf("com.android.vending"),
+        )
+        val customProxyApp = RuleEntity(id = 6, name = "Telegram", outbound = 0L, enabled = true, packages = setOf("org.telegram.messenger"))
 
         assertFalse(shouldWarnPackageRuleNeedsVpn(smartForeign, isRootMode = true))
         assertFalse(shouldWarnPackageRuleNeedsVpn(smartDomestic, isRootMode = true))
         assertFalse(shouldWarnPackageRuleNeedsVpn(customDirectApp, isRootMode = true))
+        assertFalse(shouldWarnPackageRuleNeedsVpn(customBlockApp, isRootMode = true))
+        assertFalse(shouldWarnPackageRuleNeedsVpn(hybridPlayRule, isRootMode = true))
         assertTrue(shouldWarnPackageRuleNeedsVpn(customProxyApp, isRootMode = true))
     }
 
@@ -137,5 +150,71 @@ class ConfigBuilderRootTunTest {
         }
         assertTrue(Key.isTunOrRootMode(Key.MODE_VPN))
         assertFalse(Key.isTunOrRootMode(Key.MODE_PROXY))
+    }
+
+    @Test
+    fun syncRuleSetDownloadDetours_rewritesStaleProxyTagToMainProxyTag() {
+        val remoteDefault = SingBoxOptions.RuleSet().apply {
+            type = "remote"
+            tag = "geosite-cn"
+            download_detour = TAG_PROXY
+        }
+        val remoteCustom = SingBoxOptions.RuleSet().apply {
+            type = "remote"
+            tag = "geosite-custom"
+            download_detour = "HK Node"
+        }
+        val localSet = SingBoxOptions.RuleSet().apply {
+            type = "local"
+            tag = "local-set"
+        }
+        val available = setOf("JP Node", "HK Node", TAG_DIRECT, TAG_BYPASS)
+
+        syncRuleSetDownloadDetours(listOf(remoteDefault, remoteCustom, localSet), available, mainProxyTag = "JP Node")
+
+        assertEquals("JP Node", remoteDefault.download_detour)
+        assertEquals("HK Node", remoteCustom.download_detour)
+        assertNull(localSet.download_detour)
+    }
+
+    @Test
+    fun remapInboundTagsForServiceMode_mapsTunInForRootModesOnly() {
+        assertEquals(listOf("tun-in", "mixed-in"), remapInboundTagsForServiceMode(listOf("tun-in", "mixed-in"), Key.MODE_VPN))
+        assertEquals(listOf(TAG_ROOT_TUN_IN, "mixed-in"), remapInboundTagsForServiceMode(listOf("tun-in", "mixed-in"), Key.MODE_ROOT_TUN))
+        assertEquals(
+            listOf(TAG_ROOT_REDIRECT_IN, TAG_ROOT_DNS_IN, TAG_ROOT_DNS_LAN_IN),
+            remapInboundTagsForServiceMode(listOf("tun-in"), Key.MODE_ROOT_REDIRECT),
+        )
+        assertEquals(
+            listOf(TAG_ROOT_REDIRECT_IN, TAG_ROOT_TUN_IN),
+            remapInboundTagsForServiceMode(listOf("tun-in"), Key.MODE_ROOT_ENHANCE),
+        )
+
+        val remappedJson = remapRuleCustomConfigForServiceMode(
+            """{"inbound":["tun-in","mixed-in"],"ip_version":4}""",
+            Key.MODE_ROOT_TUN,
+        )!!
+        assertTrue(remappedJson.contains(TAG_ROOT_TUN_IN))
+        assertFalse(remappedJson.contains("\"tun-in\""))
+        assertTrue(remappedJson.contains("\"mixed-in\""))
+    }
+
+    @Test
+    fun googlePlayDomainSuffixes_coverAllDownloadCdnSubdomains() {
+        listOf(
+            "googleapis.cn",
+            "google.cn",
+            "play.googleapis.com",
+            "play.google.com",
+            "dl.google.com",
+            "dl-ssl.google.com",
+            "xn--ngstr-lra8j.com",
+            "xn--ngstr-cn-8za9o.com",
+            "gvt1.com",
+            "gvt1-cn.com",
+            "ggpht.com",
+        ).forEach { expected ->
+            assertTrue("Missing Play suffix $expected", expected in GOOGLE_PLAY_DOMAIN_SUFFIXES)
+        }
     }
 }

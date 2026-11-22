@@ -83,11 +83,91 @@ internal fun sanitizeDirectDnsForRoot(directDnsEntries: List<String>, isRootMode
     return replaced.ifEmpty { listOf("https://223.5.5.5/dns-query") }
 }
 
+internal val GOOGLE_PLAY_DOMAIN_SUFFIXES: List<String> = listOf(
+    "googleapis.cn",
+    "google.cn",
+    "play.googleapis.com",
+    "play.google.com",
+    "market.android.com",
+    "android.clients.google.com",
+    "playstoregatewayadapter-pa.googleapis.com",
+    "firebaselogging-pa.googleapis.com",
+    "dl.google.com",
+    "dl-ssl.google.com",
+    "mtalk.google.com",
+    "googlezip.net",
+    "xn--ngstr-lra8j.com",
+    "xn--ngstr-cn-8za9o.com",
+    "gvt1.com",
+    "gvt2.com",
+    "gvt3.com",
+    "gvt4.com",
+    "gvt5.com",
+    "gvt6.com",
+    "gvt7.com",
+    "gvt8.com",
+    "gvt9.com",
+    "gvt1-cn.com",
+    "gvt2-cn.com",
+    "googleusercontent.com",
+    "ggpht.com",
+)
+
+internal fun syncRuleSetDownloadDetours(
+    ruleSets: List<RuleSet>?,
+    availableOutboundTags: Set<String>,
+    mainProxyTag: String,
+) {
+    if (mainProxyTag.isBlank()) return
+    ruleSets.orEmpty().forEach { rs ->
+        if (rs.type == "remote" && !rs.download_detour.isNullOrBlank() && rs.download_detour !in availableOutboundTags) {
+            rs.download_detour = mainProxyTag
+        }
+    }
+}
+
+internal fun remapInboundTagsForServiceMode(
+    inbounds: List<String>?,
+    serviceMode: String,
+): List<String>? {
+    if (inbounds.isNullOrEmpty() || !Key.isRootMode(serviceMode)) return inbounds
+    val rootTags = resolveTunInboundTags(serviceMode)
+    return inbounds.flatMap { tag ->
+        if (tag == "tun-in") rootTags else listOf(tag)
+    }.distinct()
+}
+
+internal fun remapRuleCustomConfigForServiceMode(
+    config: String?,
+    serviceMode: String,
+): String? {
+    if (config.isNullOrBlank() || !Key.isRootMode(serviceMode)) return config
+    return runCatching {
+        val obj = org.json.JSONObject(config)
+        val inboundVal = obj.opt("inbound")
+        val inboundList = when (inboundVal) {
+            is org.json.JSONArray -> (0 until inboundVal.length())
+                .mapNotNull { idx -> inboundVal.optString(idx).takeIf { s -> s.isNotBlank() } }
+            is String -> listOf(inboundVal).filter { it.isNotBlank() }
+            else -> emptyList()
+        }
+        if ("tun-in" !in inboundList) return config
+        val remapped = remapInboundTagsForServiceMode(inboundList, serviceMode).orEmpty()
+        obj.put("inbound", org.json.JSONArray(remapped))
+        obj.toString()
+    }.getOrDefault(config)
+}
+
 internal fun shouldWarnPackageRuleNeedsVpn(rule: RuleEntity, isRootMode: Boolean): Boolean {
     if (rule.name == "Smart-Foreign-Apps" || rule.name.startsWith("Smart-Domestic-Apps")) {
         return false
     }
-    if (isRootMode && RootTunManager.isPureDirectPackageRule(rule)) {
+    if (isRootMode && (
+            RootTunManager.isPureDirectPackageRule(rule) ||
+                RootTunManager.isPureBlockPackageRule(rule) ||
+                RootTunManager.hasNonPackageCriteria(rule)
+            )
+    ) {
         return false
     }
     return true
@@ -861,17 +941,9 @@ internal class ChainGraphContext(
 
                 _hack_config_map["tag"] = tagOut
                 _hack_config_map["tcp_multi_path"] = false
-                val supportsTFO = when (bean) {
-                    is ShadowsocksBean, is ShadowsocksRBean, is SOCKSBean -> true
-                    is ShadowTLSBean -> false
-                    is StandardV2RayBean -> bean.type != "quic" && bean.type != "splithttp" && bean.type != "xhttp"
-                    else -> false
-                }
-                if (supportsTFO) {
-                    _hack_config_map["tcp_fast_open"] = true
-                } else {
-                    _hack_config_map.remove("tcp_fast_open")
-                }
+                // Avoid forcing tcp_fast_open=true globally because mobile/carrier middleboxes
+                // frequently drop TFO SYNs, causing 1-3s handshake stalls on new connections.
+                _hack_config_map.remove("tcp_fast_open")
 
                 _hack_custom_config = bean.customOutboundJson
             }
@@ -1708,6 +1780,7 @@ fun buildConfig(
 
         val earlyRejectUserRules = mutableListOf<SingBoxOptions.Rule>()
         val invalidRuleNames = linkedSetOf<String>()
+        val userRulesStartIndex = route.rules.size
 
         // 在应用用户规则之前检查全局模式
         if (!forTest && DataStore.globalMode) {
@@ -1944,6 +2017,10 @@ fun buildConfig(
                         ruleObj.outbound = targetOutbound
                     }
                     RouteRuleEditor.applyAction(ruleObj, rule.config)
+                    ruleObj._hack_custom_config = remapRuleCustomConfigForServiceMode(
+                        ruleObj._hack_custom_config,
+                        serviceMode,
+                    )
                 }
 
                 val generatedSubRules = mutableListOf<Rule_DefaultOptions>()
@@ -2203,56 +2280,25 @@ fun buildConfig(
             })
             dns.rules = testRules
         } else {
-            // built-in DNS rules
-            if (ipv6Mode == IPv6Mode.DISABLE) {
-                dns.rules.add(0, DNSRule_DefaultOptions().apply {
-                    query_type = listOf("AAAA")
-                    action = "reject"
-                })
-            } else if (ipv6Mode == IPv6Mode.ONLY) {
-                dns.rules.add(0, DNSRule_DefaultOptions().apply {
-                    query_type = listOf("A")
-                    action = "reject"
-                })
+            // Google Play 商店与核心海外服务防误杀 DNS 专线规则：
+            // 使用后缀匹配（覆盖 services.googleapis.cn / dl.google.com 等下载域名），
+            // 并插入在首条 dns-direct 用户规则之前，防止被 geosite:cn 提前劫持至国内 DNS
+            val googlePlayDnsRule = DNSRule_DefaultOptions().apply {
+                domain_suffix = GOOGLE_PLAY_DOMAIN_SUFFIXES
+                server = "dns-remote"
+            }
+            val firstDirectDnsIdx = dns.rules.indexOfFirst {
+                it is DNSRule_DefaultOptions && it.server == "dns-direct"
+            }
+            if (firstDirectDnsIdx >= 0) {
+                dns.rules.add(firstDirectDnsIdx, googlePlayDnsRule)
+            } else {
+                dns.rules.add(googlePlayDnsRule)
             }
 
-            // Google Play 商店与核心海外服务防误杀 DNS 专线规则（置于 domesticCoreDomainSuffixes 之前）：
-            // 确保 googleapis.cn / gvt1-cn.com 不被国内 .cn 规则误判为直连，由海外远程安全 DNS 解析
-            val googlePlayDomains = listOf(
-                "googleapis.cn",
-                "google.cn",
-                "play.googleapis.com",
-                "market.android.com",
-                "android.clients.google.com",
-                "playstoregatewayadapter-pa.googleapis.com",
-                "firebaselogging-pa.googleapis.com",
-                "xn--ngstr-lra8j.com",
-                "xn--ngstr-cn-8za9o.com"
-            )
-            val googlePlayDomainSuffixes = listOf(
-                "gvt1.com", "gvt2.com", "gvt3.com", "gvt5.com", "gvt6.com", "gvt7.com", "gvt9.com",
-                "gvt1-cn.com", "gvt2-cn.com",
-                "googleusercontent.com",
-                "ggpht.com"
-            )
-            val googlePlayPackages = listOf(
-                "com.android.vending",
-                "com.google.android.gms",
-                "com.google.android.gsf"
-            )
-
-            dns.rules.add(DNSRule_DefaultOptions().apply {
-                domain = googlePlayDomains
-                server = "dns-remote"
-            })
-            dns.rules.add(DNSRule_DefaultOptions().apply {
-                domain_suffix = googlePlayDomainSuffixes
-                server = "dns-remote"
-            })
-
-            // 所属国家/地区核心应用与常用域名后缀静态直连保底名单
+            // 所属国家/地区核心应用与常用域名后缀静态直连保底名单（仅在智能分流模式下附加，避免覆盖自定义路由）
             val domesticCoreDomainSuffixes = io.nekohasekai.sagernet.route.SmartRouteRules.domesticCoreDomainSuffixes(DataStore.smartRouteCountry)
-            if (!DataStore.globalMode) {
+            if (isSmartRouting) {
                 dns.rules.add(DNSRule_DefaultOptions().apply {
                     domain_suffix = domesticCoreDomainSuffixes
                     server = "dns-direct"
@@ -2265,7 +2311,7 @@ fun buildConfig(
             val directDomains = rawDirectDomains - rawRemoteDomains
             val remoteDomains = rawRemoteDomains
 
-            // 构建最优先前置路由规则（须位于所有用户规则之前）
+            // 构建基础设施前置路由规则（仅保留协议嗅探、DNS 隔离与显式 reject）
             val topRouteRules = mutableListOf<SingBoxOptions.Rule>()
 
             // 1. hijack-dns 拦截入站 DNS 流量进入内置 DNS 引擎（最高优先级，确保 DNS 解析不被后续嗅探/解析规则阻塞干扰）
@@ -2280,7 +2326,7 @@ fun buildConfig(
 
             // 顶层秒级硬拦截 QUIC (UDP 443)：在网络层 0ms 瞬间拒绝 UDP 443 握手包（返回 ICMP 端口不可达），
             // 无需等待 100ms 嗅探超时，迫使 TikTok / YouTube / Instagram 等海外客户端无缝秒级回退至
-            // 高速稳定、无丢包的 TCP TLS HTTP/2 链路，彻底根治 TikTok 评论区加载慢、视频转圈问题。
+            // 高速稳定、无丢包的 TCP TLS HTTP/2 链路。
             // 用户可在 核心设置 -> 拦截 QUIC (UDP 443) 自由开关（默认开启）。
             if (DataStore.blockQuic) {
                 topRouteRules.add(Rule_DefaultOptions().apply {
@@ -2364,28 +2410,39 @@ fun buildConfig(
                 })
             }
 
-            // 7. 用户自定义屏蔽 (reject) 规则优先于 domesticCoreDomainSuffixes（确保自定义屏蔽国内广告域名如 gdt.qq.com 生效）
+            // 7. 用户自定义屏蔽 (reject) 规则优先于保底规则
             if (earlyRejectUserRules.isNotEmpty()) {
                 topRouteRules.addAll(earlyRejectUserRules)
             }
 
-            // 8. Google Play 商店与全套下载 CDN 专线路由（必须置于 domesticCoreDomainSuffixes 直连规则之前）：
-            topRouteRules.add(Rule_DefaultOptions().apply {
-                domain = googlePlayDomains
-                outbound = mainProxyTag
-            })
-            topRouteRules.add(Rule_DefaultOptions().apply {
-                domain_suffix = googlePlayDomainSuffixes
-                outbound = mainProxyTag
-            })
-            topRouteRules.add(Rule_DefaultOptions().apply {
-                package_name = googlePlayPackages
-                outbound = mainProxyTag
-            })
-
-            // 9. 本国主流服务直连保底规则（非全局模式下保障本国核心服务绝不误入海外代理）
+            // 8. Google Play 防误杀专线保护：置于用户第一条直连/绕过规则之前（避免覆盖用户自定义节点分流，同时防止被 geosite:cn 截断）
             if (!DataStore.globalMode) {
-                topRouteRules.add(Rule_DefaultOptions().apply {
+                val googlePlayRouteRules = buildList {
+                    add(Rule_DefaultOptions().apply {
+                        domain_suffix = GOOGLE_PLAY_DOMAIN_SUFFIXES
+                        outbound = mainProxyTag
+                    })
+                    if (isVPN) {
+                        add(Rule_DefaultOptions().apply {
+                            package_name = listOf(
+                                "com.android.vending",
+                                "com.google.android.gms",
+                                "com.google.android.gsf",
+                            )
+                            outbound = mainProxyTag
+                        })
+                    }
+                }
+                val firstUserDirectIdx = (userRulesStartIndex until route.rules.size).firstOrNull { idx ->
+                    val r = route.rules[idx] as? Rule_DefaultOptions
+                    r != null && (r.outbound == TAG_BYPASS || r.outbound == TAG_DIRECT)
+                } ?: route.rules.size
+                route.rules.addAll(firstUserDirectIdx, googlePlayRouteRules)
+            }
+
+            // 9. 智能分流模式下本国主流服务静态直连兜底规则（置于所有用户/智能分流规则之后）
+            if (isSmartRouting) {
+                route.rules.add(Rule_DefaultOptions().apply {
                     domain_suffix = domesticCoreDomainSuffixes
                     outbound = TAG_DIRECT
                 })
@@ -2476,9 +2533,18 @@ fun buildConfig(
                 action = "reject"
             })
         }
+        if (!forTest) {
+            // Return empty NOERROR for HTTPS (Type 65) and SVCB (Type 64) DNS queries immediately
+            // so Chrome/Android do not stall waiting for remote DoH roundtrips on page loads.
+            dns.rules.add(0, DNSRule_DefaultOptions().apply {
+                query_type = listOf("HTTPS", "SVCB")
+                action = "predefined"
+            })
+        }
 
-        // Synchronize route.rules and route.final_ against available outbound tags to avoid "tag not found"
+        // Synchronize route.rules, route.rule_set.download_detour and route.final_ against available outbound tags
         val availableOutboundTags = outbounds.mapNotNull { it.asMap()["tag"]?.toString() }.toSet()
+        syncRuleSetDownloadDetours(route.rule_set, availableOutboundTags, mainProxyTag)
         route.rules.filterIsInstance<Rule_DefaultOptions>().forEach { r ->
             val out = r.outbound
             if (!out.isNullOrBlank() && out !in availableOutboundTags) {

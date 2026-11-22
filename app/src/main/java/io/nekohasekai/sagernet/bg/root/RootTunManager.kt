@@ -6,6 +6,7 @@ import android.os.UserHandle
 import android.os.UserManager
 import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.database.RuleEntity
+import io.nekohasekai.sagernet.route.RouteRuleEditor
 import io.nekohasekai.sagernet.utils.PackageCache
 import java.io.File
 import java.net.Inet4Address
@@ -64,6 +65,7 @@ object RootTunManager {
     const val CHAIN_REDIR_NAT = "OWNBOX_ROOT_REDIR"
     const val CHAIN_NAT_POST = "OWNBOX_ROOT_NAT"
     const val CHAIN_FWD_FILTER = "OWNBOX_ROOT_FWD"
+    const val CHAIN_OUT_FILTER = "OWNBOX_ROOT_FLT"
     const val CHAIN_BLK6_OUT = "OWNBOX_ROOT_BLK6"
     const val CHAIN_BLK6_FWD = "OWNBOX_ROOT_BLK6_FWD"
 
@@ -79,6 +81,8 @@ object RootTunManager {
         "com.android.providers.downloads",
         "com.android.providers.downloads.ui",
         "com.xiaomi.providers.downloads",
+        "com.oplus.providers.downloads",
+        "com.coloros.providers.downloads",
         "com.google.android.gsf",
         "com.google.android.gms",
     )
@@ -131,11 +135,13 @@ object RootTunManager {
         val mtu: Int = 1360,
         val enableIpv6: Boolean = false,
         val bypassLan: Boolean = true,
+        val blockQuic: Boolean = true,
         val rootLanSharing: Boolean = false,
         val perAppEnabled: Boolean = false,
         val perAppBypass: Boolean = true,
         val perAppUids: Set<Int> = emptySet(),
         val directBypassUids: Set<Int> = emptySet(),
+        val blockedUids: Set<Int> = emptySet(),
         val tunName: String = TUN_IFACE,
         val hevtunBinPath: String = "",
         val yamlPath: String = "",
@@ -166,28 +172,28 @@ object RootTunManager {
     }
 
     /**
-     * Parses `DataStore.individual` and applies Google Play support package expansion.
+     * Parses `DataStore.individual` and applies Google Play support package expansion when requested
+     * (should be true only in per-app whitelist mode, never in bypass/blacklist mode).
      */
-    fun expandPackageNames(individualRaw: String): Set<String> {
+    fun expandPackageNames(individualRaw: String, expandGooglePlay: Boolean = true): Set<String> {
         val raw = individualRaw
             .lineSequence()
             .map { it.trim() }
             .filter { it.isNotEmpty() }
             .toMutableSet()
-        if ("com.android.vending" in raw) {
+        if (expandGooglePlay && "com.android.vending" in raw) {
             raw.addAll(GOOGLE_PLAY_SUPPORT_PACKAGES)
         }
         return raw
     }
 
-    /**
-     * Collects packages from enabled rules that are strictly package-only Direct (`outbound == -1`)
-     * rules so apps like QQ/WeChat are bypassed directly in iptables regardless of Smart-Route mode.
-     */
-    fun collectPureDirectRoutePackages(rules: List<RuleEntity>): Set<String> {
+    private fun collectPurePackageRules(
+        rules: List<RuleEntity>,
+        predicate: (RuleEntity) -> Boolean,
+    ): Set<String> {
         val result = LinkedHashSet<String>()
         for (rule in rules) {
-            if (isPureDirectPackageRule(rule)) {
+            if (predicate(rule)) {
                 result.addAll(rule.packages)
             }
         }
@@ -195,21 +201,67 @@ object RootTunManager {
     }
 
     /**
-     * Returns true when [rule] is an enabled bypass rule filtering solely by package names.
+     * Collects packages from enabled rules that are strictly package-only Direct (`outbound == -1`)
+     * rules so apps like QQ/WeChat are bypassed directly in iptables regardless of Smart-Route mode.
      */
-    fun isPureDirectPackageRule(rule: RuleEntity): Boolean {
-        return rule.enabled &&
+    fun collectPureDirectRoutePackages(rules: List<RuleEntity>): Set<String> =
+        collectPurePackageRules(rules) { isPureDirectPackageRule(it) }
+
+    /**
+     * Collects packages from enabled rules that are strictly package-only Block (`outbound == -2`
+     * or `action == "reject"`) rules for native iptables REJECT enforcement in Root modes.
+     */
+    fun collectPureBlockRoutePackages(rules: List<RuleEntity>): Set<String> =
+        collectPurePackageRules(rules) { isPureBlockPackageRule(it) }
+
+    /**
+     * Returns true when [rule] carries any match condition besides app package names.
+     */
+    fun hasNonPackageCriteria(rule: RuleEntity): Boolean {
+        if (rule.domains.isNotBlank() ||
+            rule.ip.isNotBlank() ||
+            rule.port.isNotBlank() ||
+            rule.sourcePort.isNotBlank() ||
+            rule.network.isNotBlank() ||
+            rule.source.isNotBlank() ||
+            rule.protocol.isNotBlank() ||
+            rule.ruleset.isNotBlank()
+        ) {
+            return true
+        }
+        if (rule.config.isBlank()) return false
+        val obj = runCatching { RouteRuleEditor.json(rule.config) }.getOrNull() ?: return true
+        val actionOptionKeys = setOf("action", "method", "no_drop")
+        val matchKeys = RouteRuleEditor.lists + RouteRuleEditor.booleans + setOf("ip_version", "rule_set", "rules")
+        val keys = obj.keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            if (key in matchKeys || key !in actionOptionKeys) {
+                return true
+            }
+        }
+        return false
+    }
+
+    /**
+     * Returns true when [rule] is a bypass rule filtering solely by package names.
+     */
+    fun isPureDirectPackageRule(rule: RuleEntity, requireEnabled: Boolean = true): Boolean {
+        return (!requireEnabled || rule.enabled) &&
             rule.outbound == -1L &&
             rule.packages.isNotEmpty() &&
-            rule.domains.isBlank() &&
-            rule.ip.isBlank() &&
-            rule.port.isBlank() &&
-            rule.sourcePort.isBlank() &&
-            rule.network.isBlank() &&
-            rule.source.isBlank() &&
-            rule.protocol.isBlank() &&
-            rule.ruleset.isBlank() &&
-            rule.config.isBlank()
+            RouteRuleEditor.action(rule.config, rule.outbound) == "route" &&
+            !hasNonPackageCriteria(rule)
+    }
+
+    /**
+     * Returns true when [rule] is a reject/block rule filtering solely by package names.
+     */
+    fun isPureBlockPackageRule(rule: RuleEntity, requireEnabled: Boolean = true): Boolean {
+        return (!requireEnabled || rule.enabled) &&
+            rule.packages.isNotEmpty() &&
+            RouteRuleEditor.action(rule.config, rule.outbound) == "reject" &&
+            !hasNonPackageCriteria(rule)
     }
 
     /**
@@ -297,15 +349,16 @@ object RootTunManager {
     }
 
     /**
-     * Resolves `DataStore.individual` into multi-user UIDs with Google Play expansion.
+     * Resolves `DataStore.individual` into multi-user UIDs with optional Google Play expansion.
      */
     fun resolvePerAppUids(
         context: Context,
         individualRaw: String,
         ownUid: Int,
         userIds: Set<Int> = setOf(0),
+        expandGooglePlay: Boolean = true,
     ): Set<Int> {
-        return resolvePackageUids(context, expandPackageNames(individualRaw), ownUid, userIds)
+        return resolvePackageUids(context, expandPackageNames(individualRaw, expandGooglePlay), ownUid, userIds)
     }
 
     /**
@@ -360,7 +413,7 @@ object RootTunManager {
             sb.append("  username: ").append(yamlSingleQuote(params.socksUsername)).append('\n')
             sb.append("  password: ").append(yamlSingleQuote(params.socksPassword)).append('\n')
         }
-        sb.append("  tcp-fastopen: true\n")
+        sb.append("  tcp-fastopen: false\n")
         return sb.toString()
     }
 
@@ -418,6 +471,10 @@ object RootTunManager {
         } else {
             emptyList()
         }
+        val sortedBlockedUids = params.blockedUids
+            .filter { it > 0 && it != params.ownUid }
+            .distinct()
+            .sorted()
         val emptyWhitelist = params.perAppEnabled && !params.perAppBypass && sortedAllowUids.isEmpty()
 
         val sb = StringBuilder()
@@ -456,22 +513,25 @@ object RootTunManager {
             appendHevtunLaunch(sb, params)
         }
 
+        val redirectExemptUids = (sortedBypassUids + sortedBlockedUids).distinct().sorted()
         if (params.mode.usesTcpRedirect) {
-            appendTcpRedirectNat(sb, params, sortedBypassUids, sortedAllowUids, emptyWhitelist)
+            appendTcpRedirectNat(sb, params, redirectExemptUids, sortedAllowUids, emptyWhitelist)
         }
 
         if (params.mode.needsHevtun) {
-            appendMangleV4(sb, params, sortedBypassUids, sortedAllowUids, emptyWhitelist)
+            appendMangleV4(sb, params, redirectExemptUids, sortedAllowUids, emptyWhitelist)
             if (!emptyWhitelist) {
                 appendDnsDnatV4(sb, params)
             }
         }
 
+        appendFilterOutputV4(sb, params, sortedBypassUids, sortedAllowUids, sortedBlockedUids, emptyWhitelist)
+
         if (params.effectiveLanSharing) {
             appendLanSharingSetup(sb, params)
         }
 
-        appendIpv6Setup(sb, params, sortedBypassUids, sortedAllowUids, emptyWhitelist)
+        appendIpv6Setup(sb, params, sortedBypassUids, sortedAllowUids, sortedBlockedUids, emptyWhitelist)
         return sb.toString()
     }
 
@@ -638,6 +698,54 @@ object RootTunManager {
         sb.append("iptables -w 5 -t nat -A OUTPUT -j ").append(CHAIN_NAT_OUT).append(" 2>/dev/null || true\n\n")
     }
 
+    private fun appendFilterOutputV4(
+        sb: StringBuilder,
+        params: StartParams,
+        sortedBypassUids: List<Int>,
+        sortedAllowUids: List<Int>,
+        sortedBlockedUids: List<Int>,
+        emptyWhitelist: Boolean,
+    ) {
+        val enforceQuicReject = params.blockQuic && !emptyWhitelist
+        if (sortedBlockedUids.isEmpty() && !enforceQuicReject) return
+        sb.append("# IPv4 filter OUTPUT (enforce pure block app rules and fast ICMP QUIC fallback)\n")
+        sb.append("iptables -w 5 -t filter -N ").append(CHAIN_OUT_FILTER).append(" 2>/dev/null || true\n")
+        sb.append("iptables -w 5 -t filter -F ").append(CHAIN_OUT_FILTER).append(" 2>/dev/null || true\n")
+        sb.append("iptables -w 5 -t filter -A ").append(CHAIN_OUT_FILTER).append(" -m owner --uid-owner ").append(params.ownUid).append(" -j RETURN 2>/dev/null || true\n")
+        sb.append("iptables -w 5 -t filter -A ").append(CHAIN_OUT_FILTER).append(" -o lo -j RETURN 2>/dev/null || true\n")
+        sb.append("iptables -w 5 -t filter -A ").append(CHAIN_OUT_FILTER).append(" -d 127.0.0.0/8 -j RETURN 2>/dev/null || true\n")
+        for (uid in sortedBlockedUids) {
+            sb.append("(iptables -w 5 -t filter -A ").append(CHAIN_OUT_FILTER).append(" -m owner --uid-owner ").append(uid)
+                .append(" -j REJECT --reject-with icmp-admin-prohibited 2>/dev/null || iptables -w 5 -t filter -A ").append(CHAIN_OUT_FILTER)
+                .append(" -m owner --uid-owner ").append(uid).append(" -j DROP 2>/dev/null || true)\n")
+        }
+        if (enforceQuicReject) {
+            for (uid in sortedBypassUids) {
+                sb.append("iptables -w 5 -t filter -A ").append(CHAIN_OUT_FILTER).append(" -m owner --uid-owner ").append(uid).append(" -j RETURN 2>/dev/null || true\n")
+            }
+            for (cidr in RESERVED_CIDRS_V4) {
+                sb.append("iptables -w 5 -t filter -A ").append(CHAIN_OUT_FILTER).append(" -d ").append(cidr).append(" -j RETURN 2>/dev/null || true\n")
+            }
+            if (params.bypassLan) {
+                for (cidr in LAN_CIDRS_V4) {
+                    sb.append("iptables -w 5 -t filter -A ").append(CHAIN_OUT_FILTER).append(" -d ").append(cidr).append(" -j RETURN 2>/dev/null || true\n")
+                }
+            }
+            if (!params.perAppEnabled || params.perAppBypass) {
+                sb.append("(iptables -w 5 -t filter -A ").append(CHAIN_OUT_FILTER)
+                    .append(" -p udp --dport 443 -j REJECT --reject-with icmp-port-unreachable 2>/dev/null || iptables -w 5 -t filter -A ")
+                    .append(CHAIN_OUT_FILTER).append(" -p udp --dport 443 -j DROP 2>/dev/null || true)\n")
+            } else {
+                for (uid in sortedAllowUids) {
+                    sb.append("(iptables -w 5 -t filter -A ").append(CHAIN_OUT_FILTER).append(" -p udp --dport 443 -m owner --uid-owner ").append(uid)
+                        .append(" -j REJECT --reject-with icmp-port-unreachable 2>/dev/null || iptables -w 5 -t filter -A ")
+                        .append(CHAIN_OUT_FILTER).append(" -p udp --dport 443 -m owner --uid-owner ").append(uid).append(" -j DROP 2>/dev/null || true)\n")
+                }
+            }
+        }
+        sb.append("iptables -w 5 -t filter -A OUTPUT -j ").append(CHAIN_OUT_FILTER).append(" 2>/dev/null || true\n\n")
+    }
+
     private fun appendLanSharingSetup(sb: StringBuilder, params: StartParams) {
         sb.append("# Hotspot / USB transparent sharing (best-effort)\n")
         sb.append("echo 1 > /proc/sys/net/ipv4/ip_forward 2>/dev/null || sysctl -w net.ipv4.ip_forward=1 >/dev/null 2>&1 || true\n")
@@ -715,8 +823,11 @@ object RootTunManager {
         params: StartParams,
         sortedBypassUids: List<Int>,
         sortedAllowUids: List<Int>,
+        sortedBlockedUids: List<Int>,
         emptyWhitelist: Boolean,
     ) {
+        val mangleExemptUids = (sortedBypassUids + sortedBlockedUids).distinct().sorted()
+        val enforceQuicReject = params.blockQuic && !emptyWhitelist
         sb.append("if [ -d /proc/sys/net/ipv6 ]; then\n")
         if (params.enableIpv6 && params.mode.needsHevtun) {
             sb.append("  ip6tables -w 5 -t mangle -N ").append(CHAIN_OUT_MANGLE).append(" 2>/dev/null || true\n")
@@ -725,7 +836,7 @@ object RootTunManager {
             sb.append("  ip6tables -w 5 -t mangle -A ").append(CHAIN_OUT_MANGLE).append(" -m owner --uid-owner ").append(params.ownUid).append(" -j RETURN 2>/dev/null || true\n")
             sb.append("  ip6tables -w 5 -t mangle -A ").append(CHAIN_OUT_MANGLE).append(" -o lo -j RETURN 2>/dev/null || true\n")
             sb.append("  ip6tables -w 5 -t mangle -A ").append(CHAIN_OUT_MANGLE).append(" -o \"\$TUN\" -j RETURN 2>/dev/null || true\n")
-            for (uid in sortedBypassUids) {
+            for (uid in mangleExemptUids) {
                 sb.append("  ip6tables -w 5 -t mangle -A ").append(CHAIN_OUT_MANGLE).append(" -m owner --uid-owner ").append(uid).append(" -j RETURN 2>/dev/null || true\n")
             }
             if (!emptyWhitelist) {
@@ -744,6 +855,40 @@ object RootTunManager {
                 }
             }
             sb.append("  ip6tables -w 5 -t mangle -A OUTPUT -j ").append(CHAIN_OUT_MANGLE).append(" 2>/dev/null || true\n")
+
+            if (sortedBlockedUids.isNotEmpty() || enforceQuicReject) {
+                sb.append("  ip6tables -w 5 -t filter -N ").append(CHAIN_OUT_FILTER).append(" 2>/dev/null || true\n")
+                sb.append("  ip6tables -w 5 -t filter -F ").append(CHAIN_OUT_FILTER).append(" 2>/dev/null || true\n")
+                sb.append("  ip6tables -w 5 -t filter -A ").append(CHAIN_OUT_FILTER).append(" -m owner --uid-owner ").append(params.ownUid).append(" -j RETURN 2>/dev/null || true\n")
+                sb.append("  ip6tables -w 5 -t filter -A ").append(CHAIN_OUT_FILTER).append(" -o lo -j RETURN 2>/dev/null || true\n")
+                sb.append("  ip6tables -w 5 -t filter -A ").append(CHAIN_OUT_FILTER).append(" -d ::1/128 -j RETURN 2>/dev/null || true\n")
+                for (uid in sortedBlockedUids) {
+                    sb.append("  (ip6tables -w 5 -t filter -A ").append(CHAIN_OUT_FILTER).append(" -m owner --uid-owner ").append(uid)
+                        .append(" -j REJECT --reject-with icmp6-adm-prohibited 2>/dev/null || ip6tables -w 5 -t filter -A ")
+                        .append(CHAIN_OUT_FILTER).append(" -m owner --uid-owner ").append(uid).append(" -j DROP 2>/dev/null || true)\n")
+                }
+                if (enforceQuicReject) {
+                    for (uid in sortedBypassUids) {
+                        sb.append("  ip6tables -w 5 -t filter -A ").append(CHAIN_OUT_FILTER).append(" -m owner --uid-owner ").append(uid).append(" -j RETURN 2>/dev/null || true\n")
+                    }
+                    for (cidr in BYPASS_CIDRS_V6) {
+                        if (cidr == "fc00::/7" && !params.bypassLan) continue
+                        sb.append("  ip6tables -w 5 -t filter -A ").append(CHAIN_OUT_FILTER).append(" -d ").append(cidr).append(" -j RETURN 2>/dev/null || true\n")
+                    }
+                    if (!params.perAppEnabled || params.perAppBypass) {
+                        sb.append("  (ip6tables -w 5 -t filter -A ").append(CHAIN_OUT_FILTER)
+                            .append(" -p udp --dport 443 -j REJECT --reject-with icmp6-port-unreachable 2>/dev/null || ip6tables -w 5 -t filter -A ")
+                            .append(CHAIN_OUT_FILTER).append(" -p udp --dport 443 -j DROP 2>/dev/null || true)\n")
+                    } else {
+                        for (uid in sortedAllowUids) {
+                            sb.append("  (ip6tables -w 5 -t filter -A ").append(CHAIN_OUT_FILTER).append(" -p udp --dport 443 -m owner --uid-owner ").append(uid)
+                                .append(" -j REJECT --reject-with icmp6-port-unreachable 2>/dev/null || ip6tables -w 5 -t filter -A ")
+                                .append(CHAIN_OUT_FILTER).append(" -p udp --dport 443 -m owner --uid-owner ").append(uid).append(" -j DROP 2>/dev/null || true)\n")
+                        }
+                    }
+                }
+                sb.append("  ip6tables -w 5 -t filter -A OUTPUT -j ").append(CHAIN_OUT_FILTER).append(" 2>/dev/null || true\n")
+            }
 
             if (!emptyWhitelist && !params.dnsDnatTargetV6.isNullOrBlank()) {
                 sb.append("  if ip6tables -w 5 -t nat -S OUTPUT >/dev/null 2>&1; then\n")
@@ -790,6 +935,11 @@ object RootTunManager {
             sb.append("  ip6tables -w 5 -t filter -A ").append(CHAIN_BLK6_OUT).append(" -o lo -j RETURN 2>/dev/null || true\n")
             for (cidr in BYPASS_CIDRS_V6) {
                 sb.append("  ip6tables -w 5 -t filter -A ").append(CHAIN_BLK6_OUT).append(" -d ").append(cidr).append(" -j RETURN 2>/dev/null || true\n")
+            }
+            for (uid in sortedBlockedUids) {
+                sb.append("  (ip6tables -w 5 -t filter -A ").append(CHAIN_BLK6_OUT).append(" -m owner --uid-owner ").append(uid)
+                    .append(" -j REJECT --reject-with icmp6-adm-prohibited 2>/dev/null || ip6tables -w 5 -t filter -A ")
+                    .append(CHAIN_BLK6_OUT).append(" -m owner --uid-owner ").append(uid).append(" -j DROP 2>/dev/null || true)\n")
             }
             for (uid in sortedBypassUids) {
                 sb.append("  ip6tables -w 5 -t filter -A ").append(CHAIN_BLK6_OUT).append(" -m owner --uid-owner ").append(uid).append(" -j RETURN 2>/dev/null || true\n")
@@ -952,6 +1102,7 @@ object RootTunManager {
             Triple("nat", "OUTPUT", CHAIN_NAT_OUT),
             Triple("nat", "PREROUTING", CHAIN_DNS_PRE),
             Triple("nat", "POSTROUTING", CHAIN_NAT_POST),
+            Triple("filter", "OUTPUT", CHAIN_OUT_FILTER),
             Triple("filter", "FORWARD", CHAIN_FWD_FILTER),
         )
         for ((table, hook, chain) in v4Hooks) {
@@ -965,6 +1116,7 @@ object RootTunManager {
             Triple("mangle", "OUTPUT", CHAIN_OUT_MANGLE),
             Triple("mangle", "PREROUTING", CHAIN_PRE_MANGLE),
             Triple("nat", "OUTPUT", CHAIN_NAT_OUT),
+            Triple("filter", "OUTPUT", CHAIN_OUT_FILTER),
             Triple("filter", "OUTPUT", CHAIN_BLK6_OUT),
             Triple("filter", "FORWARD", CHAIN_BLK6_FWD),
             Triple("filter", "FORWARD", CHAIN_FWD_FILTER),

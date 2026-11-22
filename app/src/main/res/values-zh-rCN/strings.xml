@@ -1169,7 +1169,10 @@
     <string name="rr_picker">选择规则集</string>
     <string name="rr_lines">每行一个值。端口可填写 80、443 或 1000:2000。</string>
     <string name="rr_legacy_domain">精确域名 (JSON)</string>
-    <string name="rr_apps_modes">应用规则用于 VPN 流量；Root TUN 依赖 UID/套接字归属，效果受 Android/内核影响；普通混合代理流量无法可靠识别来源应用。</string>
+    <string name="rr_apps_modes">按应用直连和按应用屏蔽可在 VPN 与 Root 模式下生效；按应用单独分流到指定代理节点仅支持 VPN 模式（仅代理/混合流量无法识别来源应用）。若规则同时包含域名、IP 或规则集条件，在 Root 模式下这些条件仍会照常生效。</string>
+    <string name="route_banner_smart_mode">当前正在使用“智能分流”模式，下方自定义路由列表暂不生效。</string>
+    <string name="route_banner_global_mode">当前正在使用“全局代理”模式，下方自定义路由列表暂不生效。</string>
+    <string name="route_banner_switch_custom">切回自定义</string>
     <string name="rr_limits">未启用 Wi-Fi 和桌面进程匹配。本内核已移除 sniff 目标覆写。旧自定义 JSON 原值保留；不支持的字段需在保存前检查处理。</string>
     <string name="rr_invalid">无法保存规则</string>
     <string name="rr_problem">%1$s：%2$s</string>

@@ -37,7 +37,7 @@ class ConfigBuilderRouteIssuesTest {
     }
 
     @Test
-    fun topRouteRulesGuardBlockQuicMoveSniffEarlyAndKeepSmartRoutingScopedRejectSeparate() {
+    fun topRouteRulesAndPlayAndDomesticPriorityPreserveCustomRules() {
         val text = resolveSourceFile("src/main/java/io/nekohasekai/sagernet/fmt/ConfigBuilder.kt").readText()
         val topRouteStart = text.indexOf("val topRouteRules =")
         assertTrue("Expected topRouteRules builder block", topRouteStart >= 0)
@@ -45,21 +45,35 @@ class ConfigBuilderRouteIssuesTest {
         val blockQuicIf = text.indexOf("if (DataStore.blockQuic)", topRouteStart)
         val sniffIf = text.indexOf("if (needSniff)", topRouteStart)
         val rejectBucketAdd = text.indexOf("topRouteRules.addAll(earlyRejectUserRules)", topRouteStart)
-        val playDomainAdd = text.indexOf("domain = googlePlayDomains", topRouteStart)
-        val domesticAdd = text.indexOf("domain_suffix = domesticCoreDomainSuffixes", topRouteStart)
+        val playSuffixAdd = text.indexOf("domain_suffix = GOOGLE_PLAY_DOMAIN_SUFFIXES", topRouteStart)
+        val firstUserDirectLookup = text.indexOf("val firstUserDirectIdx =", topRouteStart)
+        val smartDomesticGuard = text.indexOf("if (isSmartRouting)", topRouteStart)
+        val domesticAdd = text.indexOf("domain_suffix = domesticCoreDomainSuffixes", smartDomesticGuard)
 
         assertTrue("Expected DataStore.blockQuic toggle guard", blockQuicIf >= 0)
         assertTrue("Expected needSniff guard in topRouteRules", sniffIf >= 0)
-        assertTrue("Expected earlyRejectUserRules injection before domestic/Play rules", rejectBucketAdd >= 0)
-        assertTrue("Expected googlePlayDomains rule", playDomainAdd >= 0)
-        assertTrue("Expected domesticCoreDomainSuffixes rule", domesticAdd >= 0)
+        assertTrue("Expected earlyRejectUserRules injection in topRouteRules", rejectBucketAdd >= 0)
+        assertTrue("Expected suffix-based Google Play protection rule", playSuffixAdd >= 0)
+        assertTrue("Expected firstUserDirectIdx lookup so user proxy rules precede Play fallback", firstUserDirectLookup >= 0)
+        assertTrue("Expected domesticCoreDomainSuffixes scoped to isSmartRouting", smartDomesticGuard >= 0 && domesticAdd > smartDomesticGuard)
 
-        assertTrue("needSniff must precede googlePlayDomains", sniffIf < playDomainAdd)
-        assertTrue("needSniff must precede domesticCoreDomainSuffixes", sniffIf < domesticAdd)
-        assertTrue("earlyRejectUserRules must precede domesticCoreDomainSuffixes", rejectBucketAdd < domesticAdd)
+        assertTrue("needSniff must precede Google Play rules", sniffIf < playSuffixAdd)
+        assertTrue("Google Play protection must precede smart domestic fallback", playSuffixAdd < domesticAdd)
         assertTrue(
             "Smart routing must keep its own ordering without routing reject rules into earlyRejectUserRules",
             text.contains("if (!isSmartRouting && routingAction == \"reject\")"),
+        )
+        assertTrue(
+            "ConfigBuilder must sync rule_set download_detour tags against built outbounds",
+            text.contains("syncRuleSetDownloadDetours(route.rule_set, availableOutboundTags, mainProxyTag)"),
+        )
+        assertTrue(
+            "ConfigBuilder must answer HTTPS/SVCB DNS queries via predefined NOERROR action",
+            text.contains("query_type = listOf(\"HTTPS\", \"SVCB\")") && text.contains("action = \"predefined\""),
+        )
+        assertFalse(
+            "ConfigBuilder must not force tcp_fast_open=true globally",
+            text.contains("_hack_config_map[\"tcp_fast_open\"] = true"),
         )
     }
 

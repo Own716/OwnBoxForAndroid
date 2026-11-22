@@ -10,12 +10,8 @@ import io.nekohasekai.sagernet.ktx.app
 import io.nekohasekai.sagernet.ktx.onMainDispatcher
 import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
 import io.nekohasekai.sagernet.utils.BackupHelper
+import io.nekohasekai.sagernet.utils.DnsLeakTester
 import moe.matsuri.nb4a.utils.SendLog
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import org.json.JSONObject
-import java.net.InetAddress
-import java.util.concurrent.TimeUnit
 
 class NetworkFragment : NamedFragment(R.layout.layout_network) {
 
@@ -41,58 +37,15 @@ class NetworkFragment : NamedFragment(R.layout.layout_network) {
             binding.dnsLeakTest.isEnabled = false
 
             runOnDefaultDispatcher {
-                val sb = StringBuilder()
-                try {
-                    // 1. Check DNS resolution for Fake-IP
-                    val testHost = "www.google.com"
-                    val resolvedIp = try {
-                        val addresses = InetAddress.getAllByName(testHost)
-                        addresses.firstOrNull()?.hostAddress ?: "未知"
-                    } catch (e: Exception) {
-                        "解析失败 (${e.message})"
-                    }
-
-                    val isFakeIp = resolvedIp.startsWith("198.18.") || resolvedIp.startsWith("198.19.")
-                    if (isFakeIp) {
-                        sb.append("• Fake-IP 状态: 已生效 ($resolvedIp)\n")
-                    } else {
-                        sb.append("• 解析 IP: $resolvedIp (非 Fake-IP 网段)\n")
-                    }
-
-                    // 2. Check egress IP & resolver via public API
-                    val client = OkHttpClient.Builder()
-                        .connectTimeout(5, TimeUnit.SECONDS)
-                        .readTimeout(5, TimeUnit.SECONDS)
-                        .build()
-
-                    val req = Request.Builder().url("https://1.1.1.1/cdn-cgi/trace").build()
-                    val trace = try {
-                        client.newCall(req).execute().use { response ->
-                            if (response.isSuccessful) response.body?.string() else null
-                        }
-                    } catch (_: Exception) {
-                        null
-                    }
-
-                    if (!trace.isNullOrBlank()) {
-                        val lines = trace.lines().associate {
-                            val parts = it.split("=")
-                            if (parts.size == 2) parts[0] to parts[1] else "" to ""
-                        }
-                        val ip = lines["ip"]
-                        val loc = lines["loc"]
-                        val warp = lines["warp"]
-                        sb.append("• 出口公网 IP: ${ip ?: "未知"} (${loc ?: "未知"})\n")
-                        sb.append("• DNS 链路: ${getString(R.string.dns_safe)}\n")
-                    } else {
-                        sb.append("• 网络链路: 直连或代理已接管\n")
-                    }
+                val reportText = try {
+                    DnsLeakTester.formatReport(DnsLeakTester.runFullCheck())
                 } catch (e: Exception) {
-                    sb.append("• 检测完成: ${e.message}")
+                    "检测失败: ${e.message ?: e.javaClass.simpleName}"
                 }
 
                 onMainDispatcher {
-                    binding.dnsLeakResult.text = sb.toString().trim()
+                    if (!isAdded || getView() == null) return@onMainDispatcher
+                    binding.dnsLeakResult.text = reportText
                     binding.dnsLeakTest.isEnabled = true
                 }
             }
@@ -106,6 +59,7 @@ class NetworkFragment : NamedFragment(R.layout.layout_network) {
             runOnDefaultDispatcher {
                 val success = BackupHelper.autoBackupLocal()
                 onMainDispatcher {
+                    if (!isAdded || getView() == null) return@onMainDispatcher
                     Snackbar.make(binding.root, if (success) "本地备份成功 (已保存至应用备份目录)" else "备份失败", Snackbar.LENGTH_SHORT).show()
                 }
             }

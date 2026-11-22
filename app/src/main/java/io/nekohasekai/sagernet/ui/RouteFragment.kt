@@ -92,6 +92,9 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
     lateinit var ruleListView: RecyclerView
     lateinit var ruleAdapter: RuleAdapter
     lateinit var undoManager: UndoSnackbarManager<RuleEntity>
+    private var modeBanner: View? = null
+    private var modeBannerText: android.widget.TextView? = null
+    private var modeBannerAction: View? = null
 
     fun autoReloadServiceIfStarted() {
         if (DataStore.serviceState.started) {
@@ -105,6 +108,29 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
         }
     }
 
+    private fun updateModeBanner() {
+        val banner = modeBanner ?: return
+        val text = modeBannerText ?: return
+        when {
+            DataStore.globalMode -> {
+                banner.visibility = View.VISIBLE
+                text.setText(R.string.route_banner_global_mode)
+            }
+            DataStore.smartMode -> {
+                banner.visibility = View.VISIBLE
+                text.setText(R.string.route_banner_smart_mode)
+            }
+            else -> {
+                banner.visibility = View.GONE
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updateModeBanner()
+    }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
@@ -114,6 +140,18 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
         toolbar.setTitle(R.string.menu_route)
         toolbar.inflateMenu(R.menu.add_route_menu)
         toolbar.setOnMenuItemClickListener(this)
+
+        modeBanner = view.findViewById(R.id.route_mode_banner)
+        modeBannerText = view.findViewById(R.id.route_mode_banner_text)
+        modeBannerAction = view.findViewById(R.id.route_mode_banner_action)
+        modeBannerAction?.setOnClickListener {
+            DataStore.smartMode = false
+            DataStore.globalMode = false
+            activity.refreshProxyModeCard()
+            updateModeBanner()
+            autoReloadServiceIfStarted()
+        }
+        updateModeBanner()
 
         ruleListView = view.findViewById(R.id.route_list)
         updateBottomPadding()
