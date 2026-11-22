@@ -112,4 +112,25 @@ class ConfigBuilderRootTunTest {
         assertEquals("1.1.1.1", dnsIn.override_address)
         assertEquals(53, dnsIn.override_port)
     }
+
+    @Test
+    fun standardVpnAndProxyModes_remainUntouchedByRootLogic() {
+        for (mode in listOf(Key.MODE_VPN, Key.MODE_PROXY)) {
+            assertFalse(Key.isRootMode(mode))
+            assertEquals(listOf("tun-in"), resolveTunInboundTags(mode))
+            val untouchedDns = listOf("local", "hosts", "https://223.5.5.5/dns-query")
+            assertEquals(untouchedDns, sanitizeDirectDnsForRoot(untouchedDns, isRootMode = false))
+            assertTrue(
+                shouldUseFakeDns(
+                    enableFakeDns = true,
+                    forTest = false,
+                    serviceMode = mode,
+                    proxyApps = true,
+                    bypass = false,
+                )
+            )
+        }
+        assertTrue(Key.isTunOrRootMode(Key.MODE_VPN))
+        assertFalse(Key.isTunOrRootMode(Key.MODE_PROXY))
+    }
 }

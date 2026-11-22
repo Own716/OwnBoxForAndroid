@@ -252,4 +252,16 @@ class RootTunManagerTest {
         assertTrue(teardown.contains("echo 0 > /proc/4321/oom_score_adj"))
         assertTrue(teardown.contains("ip link del dev 'ownbox0'"))
     }
+
+    @Test
+    fun hasSuBinary_detectsExistingBinaryPassivelyWithoutSpawningSu() {
+        val fakeSu = java.io.File.createTempFile("ownbox_fake_su_", "")
+        try {
+            assertTrue(RootShell.hasSuBinary(extraPaths = listOf(fakeSu.absolutePath)))
+        } finally {
+            fakeSu.delete()
+        }
+        // Must handle missing / non-existent extra paths gracefully without throwing
+        RootShell.hasSuBinary(extraPaths = listOf(fakeSu.absolutePath, "/non/existent/path/su"))
+    }
 }

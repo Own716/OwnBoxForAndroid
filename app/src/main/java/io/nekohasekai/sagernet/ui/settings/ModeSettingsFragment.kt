@@ -1,12 +1,11 @@
 package io.nekohasekai.sagernet.ui.settings
 
-import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.launch
-
 import android.content.Intent
 import android.os.Bundle
+import android.view.View
 import android.widget.EditText
 import android.widget.Toast
+import androidx.lifecycle.lifecycleScope
 import androidx.preference.EditTextPreference
 import androidx.preference.Preference
 import androidx.preference.SwitchPreferenceCompat
@@ -14,10 +13,18 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.SagerNet
+import io.nekohasekai.sagernet.bg.root.RootShell
+import io.nekohasekai.sagernet.bg.root.RootTunManager
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.preference.EditTextPreferenceModifiers
+import io.nekohasekai.sagernet.ktx.onMainDispatcher
+import io.nekohasekai.sagernet.ktx.runOnIoDispatcher
 import io.nekohasekai.sagernet.ui.LanSharingActivity
 import io.nekohasekai.sagernet.ui.SettingsPreferenceFragment.ListSummaryProvider
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import moe.matsuri.nb4a.ui.SimpleMenuPreference
 
 class ModeSettingsFragment : BaseSettingsPreferenceFragment() {
@@ -29,6 +36,7 @@ class ModeSettingsFragment : BaseSettingsPreferenceFragment() {
     private lateinit var mixedAuthConfig: Preference
     private lateinit var httpProxyBypass: EditTextPreference
     private var lanSharingPref: Preference? = null
+
     @Volatile
     private var cachedRootAvailable: Boolean = false
 
@@ -41,40 +49,40 @@ class ModeSettingsFragment : BaseSettingsPreferenceFragment() {
             val wasStarted = DataStore.serviceState.started
             if (wasStarted) SagerNet.stopService()
             val nextMode = newValue as? String ?: oldMode
+            val appCtx = requireContext().applicationContext
             updateRootTunPrefsVisibility(nextMode)
             if (Key.isRootMode(oldMode) && !Key.isRootMode(nextMode)) {
-                val appCtx = requireContext().applicationContext
-                viewLifecycleOwner.lifecycleScope.launch {
-                    if (wasStarted) kotlinx.coroutines.delay(350)
-                    val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                        io.nekohasekai.sagernet.bg.root.RootTunManager.stop(appCtx)
-                    }
-                    if (isAdded) {
-                        updateRootTunPrefsVisibility(nextMode)
+                runOnIoDispatcher {
+                    if (wasStarted) delay(350)
+                    val result = RootTunManager.stop(appCtx)
+                    onMainDispatcher {
+                        if (isAdded) {
+                            updateRootTunPrefsVisibility(nextMode)
+                        }
                         if (result.isSuccess) {
-                            android.widget.Toast.makeText(
-                                requireContext(),
+                            Toast.makeText(
+                                appCtx,
                                 R.string.root_tun_switching_cleanup_done,
-                                android.widget.Toast.LENGTH_SHORT,
+                                Toast.LENGTH_SHORT,
                             ).show()
                         }
                     }
                 }
             } else if (Key.isRootMode(nextMode)) {
-                viewLifecycleOwner.lifecycleScope.launch {
-                    val hasRoot = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                        io.nekohasekai.sagernet.bg.root.RootShell.isRootAvailable()
+                lifecycleScope.launch {
+                    val hasRoot = withContext(Dispatchers.IO) {
+                        RootShell.isRootAvailable()
                     }
                     cachedRootAvailable = hasRoot
-                    if (isAdded) {
+                    if (isAdded && context != null) {
                         updateRootTunPrefsVisibility(nextMode)
-                        if (!hasRoot) {
-                            android.widget.Toast.makeText(
-                                requireContext(),
-                                R.string.root_tun_no_root_hint,
-                                android.widget.Toast.LENGTH_LONG,
-                            ).show()
-                        }
+                    }
+                    if (!hasRoot) {
+                        Toast.makeText(
+                            appCtx,
+                            R.string.root_tun_no_root_hint,
+                            Toast.LENGTH_LONG,
+                        ).show()
                     }
                 }
             }
@@ -152,32 +160,38 @@ class ModeSettingsFragment : BaseSettingsPreferenceFragment() {
             true
         }
 
-        findPreference<androidx.preference.SwitchPreference>(Key.ROOT_LAN_SHARING)
+        findPreference<SwitchPreferenceCompat>(Key.ROOT_LAN_SHARING)
             ?.setOnPreferenceChangeListener(reloadListener)
 
         findPreference<Preference>(Key.ROOT_TUN_CLEANUP)?.setOnPreferenceClickListener { pref ->
+            val appCtx = requireContext().applicationContext
             pref.isEnabled = false
-            viewLifecycleOwner.lifecycleScope.launch {
-                val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    io.nekohasekai.sagernet.bg.root.RootTunManager.stop(requireContext())
-                }
-                if (isAdded) {
-                    pref.isEnabled = true
-                    android.widget.Toast.makeText(
-                        requireContext(),
+            runOnIoDispatcher {
+                val result = RootTunManager.stop(appCtx)
+                onMainDispatcher {
+                    if (isAdded) {
+                        pref.isEnabled = true
+                        updateRootTunPrefsVisibility()
+                    }
+                    Toast.makeText(
+                        appCtx,
                         if (result.isSuccess) R.string.root_tun_cleanup_done else R.string.root_tun_cleanup_failed,
-                        android.widget.Toast.LENGTH_SHORT,
+                        Toast.LENGTH_SHORT,
                     ).show()
                 }
             }
             true
         }
         updateRootTunPrefsVisibility()
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
         viewLifecycleOwner.lifecycleScope.launch {
-            val hasRoot = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                io.nekohasekai.sagernet.bg.root.RootShell.isRootAvailable()
+            val hasSu = withContext(Dispatchers.IO) {
+                RootShell.hasSuBinary()
             }
-            cachedRootAvailable = hasRoot
+            cachedRootAvailable = cachedRootAvailable || hasSu
             if (isAdded) {
                 updateRootTunPrefsVisibility()
             }
@@ -190,8 +204,8 @@ class ModeSettingsFragment : BaseSettingsPreferenceFragment() {
             mode == Key.MODE_ROOT_MIXED
         val showCleanup = Key.isRootMode(mode) ||
             cachedRootAvailable ||
-            context?.let { io.nekohasekai.sagernet.bg.root.RootTunManager.hasActiveState(it) } == true
-        findPreference<androidx.preference.SwitchPreference>(Key.ROOT_LAN_SHARING)?.isVisible = showLanSwitch
+            context?.let { RootTunManager.hasActiveState(it) } == true
+        findPreference<SwitchPreferenceCompat>(Key.ROOT_LAN_SHARING)?.isVisible = showLanSwitch
         findPreference<Preference>(Key.ROOT_TUN_CLEANUP)?.isVisible = showCleanup
     }
 

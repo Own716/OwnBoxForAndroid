@@ -44,7 +44,7 @@
             app:key="lanSharing"
             app:title="@string/lan_sharing" />
 
-        <SwitchPreference
+        <SwitchPreferenceCompat
             app:defaultValue="false"
             app:icon="@drawable/solar_wi_fi_router_linear"
             app:key="rootLanSharing"

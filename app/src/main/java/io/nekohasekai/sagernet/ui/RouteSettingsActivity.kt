@@ -304,7 +304,10 @@ class RouteSettingsActivity(
             val candidate = (if (editingId == 0L) RuleEntity() else SagerDatabase.rulesDao.getById(editingId)?.copy())
                 ?: return
             candidate.serialize()
-            if (candidate.packages.isNotEmpty() && DataStore.serviceMode != Key.MODE_VPN) {
+            val allowPackageRule = DataStore.serviceMode == Key.MODE_VPN ||
+                (Key.isRootMode(DataStore.serviceMode) &&
+                    io.nekohasekai.sagernet.bg.root.RootTunManager.isPureDirectPackageRule(candidate))
+            if (candidate.packages.isNotEmpty() && !allowPackageRule) {
                 onMainDispatcher { MaterialAlertDialogBuilder(this@RouteSettingsActivity).setTitle(R.string.rr_invalid)
                     .setMessage(R.string.rr_apps_modes).setPositiveButton(android.R.string.ok, null).show() }
                 return

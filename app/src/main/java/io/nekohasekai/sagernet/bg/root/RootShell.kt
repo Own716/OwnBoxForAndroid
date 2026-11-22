@@ -18,6 +18,37 @@ object RootShell {
         val isSuccess: Boolean get() = exitCode == 0
     }
 
+    private val STANDARD_SU_PATHS = listOf(
+        "/system/bin/su",
+        "/system/xbin/su",
+        "/sbin/su",
+        "/su/bin/su",
+        "/vendor/bin/su",
+        "/debug_ramdisk/su",
+        "/data/adb/ksu/bin/su",
+        "/data/adb/ap/bin/su",
+    )
+
+    /**
+     * Passively checks whether a `su` binary exists on disk without spawning `su`
+     * or triggering any Magisk / KernelSU / APatch authorization prompt.
+     */
+    fun hasSuBinary(extraPaths: List<String> = emptyList()): Boolean {
+        val candidates = LinkedHashSet<String>(STANDARD_SU_PATHS.size + extraPaths.size + 8)
+        candidates.addAll(STANDARD_SU_PATHS)
+        candidates.addAll(extraPaths.filter { it.isNotBlank() })
+        val pathEnv = runCatching { System.getenv("PATH") }.getOrNull().orEmpty()
+        for (dir in pathEnv.split(File.pathSeparatorChar)) {
+            val trimmed = dir.trim()
+            if (trimmed.isNotEmpty()) {
+                candidates.add(File(trimmed, "su").path)
+            }
+        }
+        return candidates.any { path ->
+            runCatching { File(path).isFile }.getOrDefault(false)
+        }
+    }
+
     /**
      * Checks whether `su` access is currently granted to the app process.
      */

@@ -1,5 +1,15 @@
 # OwnBox for Android 更新日志 (Changelog)
 
+# OwnBox for Android v26.11.8.31 预览版
+
+### 【模式设置闪退修复与原版 VPN/仅代理模式隔离保障】
+- **修复打开「设置 - 模式与入站管理」闪退问题**：移除 `ModeSettingsFragment.onCreatePreferences()` 中过早访问 `viewLifecycleOwner` 的调用，迁移至 `onViewCreated()`，彻底解决点击进入模式设置页即抛出 `IllegalStateException` 闪退的问题。
+- **消除多余 Root 检测与弹窗干扰**：进入模式设置页时改为纯文件系统静态探测 `su` 文件是否存在（`RootShell.hasSuBinary()`），不再主动执行 `su` 命令；普通 VPN 与仅代理用户打开设置页零 Root 弹窗、零额外性能开销。仅在用户主动切换至 Root 模式或手动点击清理时才请求并执行 Root 权限。
+- **修复界面开关控件样式一致**：将 `settings_mode.xml` 中的 `rootLanSharing` 统一为 `SwitchPreferenceCompat`，保证切换开关视觉与全局多行标题主题完全兼容。
+- **强化切回普通模式自动清残留与纯直连规则保存**：
+  - 从任意 Root 模式切回标准 **VPN** 或 **仅代理（Proxy only）** 模式后，清理任务改用独立 IO 协程执行，即使立刻点击返回也不会被页面销毁中断；`ProxyService` 启动前同样加入零开销自愈清理检查（常规状态下仅 `File.exists()` 判断，耗时可忽略，不触发 `su`）。
+  - 允许在 Root 模式下直接编辑并保存纯按应用直连路由规则（如 QQ 直连绕过）；同步补充单元测试验证标准 **VPN** 与 **仅代理** 模式的入站标签、直连 DNS、FakeDNS 与服务路径保持 100% 原版行为、零性能损耗。
+
 # OwnBox for Android v26.11.8.30 预览版
 
 ### 【Root 模式全面修复与四大模式补齐】
