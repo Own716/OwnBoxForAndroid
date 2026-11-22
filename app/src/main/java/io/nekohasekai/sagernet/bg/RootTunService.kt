@@ -137,6 +137,7 @@ class RootTunService : Service(), BaseService.Interface {
             socksPassword = config.rootSocksPassword,
             redirectPort = config.rootRedirectPort,
             dnsRedirectPort = config.rootDnsPort,
+            lanDnsRedirectPort = config.rootLanDnsPort,
             dnsDnatTargetV4 = RootTunManager.extractPlainDnsIp(DataStore.remoteDns, false)
                 ?: RootTunManager.DEFAULT_LAN_DNS,
             dnsDnatTargetV6 = RootTunManager.extractPlainDnsIp(DataStore.remoteDns, true),

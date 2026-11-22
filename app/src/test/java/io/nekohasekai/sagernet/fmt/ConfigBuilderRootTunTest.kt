@@ -14,7 +14,10 @@ class ConfigBuilderRootTunTest {
         assertEquals(listOf("tun-in"), resolveTunInboundTags(Key.MODE_VPN))
         assertEquals(listOf("tun-in"), resolveTunInboundTags(Key.MODE_PROXY))
         assertEquals(listOf(TAG_ROOT_TUN_IN), resolveTunInboundTags(Key.MODE_ROOT_TUN))
-        assertEquals(listOf(TAG_ROOT_REDIRECT_IN, TAG_ROOT_DNS_IN), resolveTunInboundTags(Key.MODE_ROOT_REDIRECT))
+        assertEquals(
+            listOf(TAG_ROOT_REDIRECT_IN, TAG_ROOT_DNS_IN, TAG_ROOT_DNS_LAN_IN),
+            resolveTunInboundTags(Key.MODE_ROOT_REDIRECT),
+        )
         assertEquals(listOf(TAG_ROOT_REDIRECT_IN, TAG_ROOT_TUN_IN), resolveTunInboundTags(Key.MODE_ROOT_MIXED))
         assertEquals(listOf(TAG_ROOT_REDIRECT_IN, TAG_ROOT_TUN_IN), resolveTunInboundTags(Key.MODE_ROOT_ENHANCE))
     }
@@ -47,17 +50,8 @@ class ConfigBuilderRootTunTest {
     }
 
     @Test
-    fun shouldUseFakeDns_suppressesFakeDnsOnlyInRootWhitelist() {
-        assertTrue(
-            shouldUseFakeDns(
-                enableFakeDns = true,
-                forTest = false,
-                serviceMode = Key.MODE_VPN,
-                proxyApps = true,
-                bypass = false,
-            )
-        )
-        for (mode in listOf(Key.MODE_ROOT_TUN, Key.MODE_ROOT_REDIRECT, Key.MODE_ROOT_MIXED, Key.MODE_ROOT_ENHANCE)) {
+    fun shouldUseFakeDns_disablesFakeDnsInAllRootModesAndPreservesVpnProxy() {
+        for (mode in listOf(Key.MODE_VPN, Key.MODE_PROXY)) {
             assertTrue(
                 shouldUseFakeDns(
                     enableFakeDns = true,
@@ -73,18 +67,23 @@ class ConfigBuilderRootTunTest {
                     forTest = false,
                     serviceMode = mode,
                     proxyApps = true,
-                    bypass = true,
-                )
-            )
-            assertFalse(
-                shouldUseFakeDns(
-                    enableFakeDns = true,
-                    forTest = false,
-                    serviceMode = mode,
-                    proxyApps = true,
                     bypass = false,
                 )
             )
+        }
+        for (mode in listOf(Key.MODE_ROOT_TUN, Key.MODE_ROOT_REDIRECT, Key.MODE_ROOT_MIXED, Key.MODE_ROOT_ENHANCE)) {
+            for ((proxyApps, bypass) in listOf(false to false, true to true, true to false)) {
+                assertFalse(
+                    "FakeDNS must stay off in $mode (proxyApps=$proxyApps, bypass=$bypass)",
+                    shouldUseFakeDns(
+                        enableFakeDns = true,
+                        forTest = false,
+                        serviceMode = mode,
+                        proxyApps = proxyApps,
+                        bypass = bypass,
+                    )
+                )
+            }
         }
     }
 
@@ -104,13 +103,19 @@ class ConfigBuilderRootTunTest {
         assertEquals("0.0.0.0", redir.listen)
         assertEquals(45679, redir.listen_port)
 
-        val dnsIn = buildRootDnsInbound(port = 45680, listenAddress = LOCALHOST)
-        assertEquals("direct", dnsIn.type)
-        assertEquals(TAG_ROOT_DNS_IN, dnsIn.tag)
-        assertEquals(LOCALHOST, dnsIn.listen)
-        assertEquals(45680, dnsIn.listen_port)
-        assertEquals("1.1.1.1", dnsIn.override_address)
-        assertEquals(53, dnsIn.override_port)
+        val dnsLocal = buildRootDnsInbound(port = 45680, listenAddress = LOCALHOST, inboundTag = TAG_ROOT_DNS_IN)
+        assertEquals("direct", dnsLocal.type)
+        assertEquals(TAG_ROOT_DNS_IN, dnsLocal.tag)
+        assertEquals(LOCALHOST, dnsLocal.listen)
+        assertEquals(45680, dnsLocal.listen_port)
+        assertEquals("1.1.1.1", dnsLocal.override_address)
+        assertEquals(53, dnsLocal.override_port)
+
+        val dnsLan = buildRootDnsInbound(port = 45681, listenAddress = "0.0.0.0", inboundTag = TAG_ROOT_DNS_LAN_IN)
+        assertEquals("direct", dnsLan.type)
+        assertEquals(TAG_ROOT_DNS_LAN_IN, dnsLan.tag)
+        assertEquals("0.0.0.0", dnsLan.listen)
+        assertEquals(45681, dnsLan.listen_port)
     }
 
     @Test

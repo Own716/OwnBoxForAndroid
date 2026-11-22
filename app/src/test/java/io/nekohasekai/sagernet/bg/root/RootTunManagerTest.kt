@@ -18,6 +18,7 @@ class RootTunManagerTest {
         socksPassword: String = "pass456",
         redirectPort: Int = 34568,
         dnsRedirectPort: Int = 34569,
+        lanDnsRedirectPort: Int = 0,
         mtu: Int = 1360,
         enableIpv6: Boolean = false,
         bypassLan: Boolean = true,
@@ -35,6 +36,7 @@ class RootTunManagerTest {
         socksPassword = socksPassword,
         redirectPort = redirectPort,
         dnsRedirectPort = dnsRedirectPort,
+        lanDnsRedirectPort = lanDnsRedirectPort,
         mtu = mtu,
         enableIpv6 = enableIpv6,
         bypassLan = bypassLan,
@@ -114,6 +116,7 @@ class RootTunManagerTest {
         assertFalse(script.contains("nohup \"\$HEV_BIN\""))
         assertFalse(script.contains("iptables -w 5 -t mangle -N OWNBOX_ROOT_OUT"))
         assertFalse(script.contains("iptables -w 5 -t mangle -A OUTPUT -j OWNBOX_ROOT_OUT"))
+        assertTrue(script.contains("echo 0 > /proc/sys/net/ipv4/conf/all/rp_filter"))
         assertTrue(script.contains("iptables -w 5 -t nat -N OWNBOX_ROOT_REDIR"))
         assertTrue(script.contains("-A OWNBOX_ROOT_REDIR -m owner --uid-owner 10123 -j RETURN"))
         assertTrue(script.contains("-A OWNBOX_ROOT_REDIR -p udp --dport 53 -j REDIRECT --to-ports 41002"))
@@ -121,6 +124,19 @@ class RootTunManagerTest {
         assertTrue(script.contains("-A OWNBOX_ROOT_REDIR -p tcp -j REDIRECT --to-ports 41001"))
         assertTrue(script.contains("iptables -w 5 -t nat -A OUTPUT -j OWNBOX_ROOT_REDIR"))
         assertTrue(script.contains("ip6tables -w 5 -t filter -A OUTPUT -j OWNBOX_ROOT_BLK6"))
+
+        val lanRedirect = RootTunManager.buildSetupScript(
+            baseParams(
+                mode = RootTunManager.RootMode.REDIRECT,
+                redirectPort = 41001,
+                dnsRedirectPort = 41002,
+                lanDnsRedirectPort = 34570,
+                rootLanSharing = true,
+            )
+        )
+        assertTrue(lanRedirect.contains("-A OWNBOX_ROOT_DNS_PRE -s 192.168.0.0/16 -p udp --dport 53 -j REDIRECT --to-ports 34570"))
+        assertTrue(lanRedirect.contains("-A OWNBOX_ROOT_DNS_PRE -m addrtype --dst-type LOCAL -j RETURN"))
+        assertTrue(lanRedirect.contains("-A OWNBOX_ROOT_DNS_PRE -s 192.168.0.0/16 -p tcp -j REDIRECT --to-ports 41001"))
     }
 
     @Test
@@ -141,7 +157,7 @@ class RootTunManagerTest {
 
     @Test
     fun buildSetupScript_enhanceModeForcesLanSharingEvenWhenSwitchOff() {
-        val script = RootTunManager.buildSetupScript(
+        val scriptV4 = RootTunManager.buildSetupScript(
             baseParams(
                 mode = RootTunManager.RootMode.ENHANCE,
                 rootLanSharing = false,
@@ -149,13 +165,30 @@ class RootTunManagerTest {
                 redirectPort = 41001,
             )
         )
-        assertTrue(script.contains("ip_forward"))
-        assertTrue(script.contains("OWNBOX_ROOT_FWD"))
-        assertTrue(script.contains("TCPMSS --set-mss 1350"))
-        assertTrue(script.contains("OWNBOX_ROOT_DNS_PRE"))
-        assertTrue(script.contains("ip -4 rule add iif lo goto 6000 pref 5000"))
-        assertTrue(script.contains("ip -4 rule add from 192.168.0.0/16 lookup 2024 pref 5050"))
-        assertTrue(script.contains("OWNBOX_ROOT_BLK6_FWD"))
+        assertTrue(scriptV4.contains("ip_forward"))
+        assertTrue(scriptV4.contains("OWNBOX_ROOT_FWD"))
+        assertTrue(scriptV4.contains("TCPMSS --set-mss 1350"))
+        assertTrue(scriptV4.contains("iptables -w 5 -t mangle -N OWNBOX_ROOT_PRE"))
+        assertTrue(scriptV4.contains("-A OWNBOX_ROOT_PRE -i \"\$TUN\" -j RETURN"))
+        assertTrue(scriptV4.contains("-A OWNBOX_ROOT_PRE -m addrtype --dst-type LOCAL -j RETURN"))
+        assertTrue(scriptV4.contains("-A OWNBOX_ROOT_PRE -s 192.168.0.0/16 -j MARK --set-xmark 0x2024"))
+        assertTrue(scriptV4.contains("OWNBOX_ROOT_DNS_PRE"))
+        assertFalse("Fragile goto 6000 ip rules must not be emitted", scriptV4.contains("goto 6000"))
+        assertFalse("Fragile source ip rule must not be emitted", scriptV4.contains("from 192.168.0.0/16 lookup 2024"))
+        assertTrue(scriptV4.contains("OWNBOX_ROOT_BLK6_FWD"))
+
+        val scriptV6 = RootTunManager.buildSetupScript(
+            baseParams(
+                mode = RootTunManager.RootMode.ENHANCE,
+                rootLanSharing = false,
+                enableIpv6 = true,
+                redirectPort = 41001,
+            )
+        )
+        val v6PreStart = scriptV6.indexOf("ip6tables -w 5 -t mangle -N OWNBOX_ROOT_PRE")
+        val v6LocalIdx = scriptV6.indexOf("ip6tables -w 5 -t mangle -A OWNBOX_ROOT_PRE -m addrtype --dst-type LOCAL -j RETURN", v6PreStart)
+        val v6MarkIdx = scriptV6.indexOf("ip6tables -w 5 -t mangle -A OWNBOX_ROOT_PRE -j MARK --set-xmark 0x2024", v6PreStart)
+        assertTrue("IPv6 OWNBOX_ROOT_PRE must bypass LOCAL before any MARK rule", v6PreStart > 0 && v6LocalIdx > v6PreStart && v6MarkIdx > v6LocalIdx)
     }
 
     @Test

@@ -1,5 +1,19 @@
 # OwnBox for Android 更新日志 (Changelog)
 
+# OwnBox for Android v26.11.8.32 预览版
+
+### 【全 6 种运行模式深度核查修复与增强】
+- **彻底解决 Root 模式下黑名单/直连应用与 Redirect UDP 假 IP 断网隐患**：
+  - 4 种 Root 模式（`Root TUN` / `Root Redirect` / `Root Mixed` / `Root Enhance`）统一改为真实抗污染 DNS 解析配合内置域名嗅探，关闭 FakeDNS，彻底避免经由系统 `netd` 解析后使绕过应用（如微信、QQ、双开分身）、Redirect 模式下直连 UDP 流量及热点设备拿到不可路由的 `198.18.x.x` 假地址。
+- **修复 `Root Enhance` 与热点透明共享 IPv4/IPv6 回包黑洞与 ROM 兼容性问题**：
+  - 移除依赖 `ip rule goto 6000` 及源地址策略路由的脆弱写法，改用 `mangle PREROUTING (OWNBOX_ROOT_PRE)` 统一打标进入 `2024` 策略表；同时在 IPv4 与 IPv6 `PREROUTING` 中优先配置 `-i "$TUN"`、`-i lo` 与 `-m addrtype --dst-type LOCAL -j RETURN`，彻底解决开启 IPv6 时本机入站回包被误打入虚拟网卡导致断网的问题。
+  - 保留对 `v26.11.8.29`/`30`/`31` 遗留 `pref 5000..6000` 规则的自动清理。
+- **修复 `Root Redirect` 热点 DNS 端口绑定冲突与全局 `rp_filter` 遗漏**：
+  - 本机 DNS 劫持入口 `root-dns-in` 严格绑定 `127.0.0.1`（保障本机 UDP `REDIRECT` 回包源地址匹配内核 conntrack），开启热点共享时单独新增绑定 `0.0.0.0` 的 `root-dns-lan-in` 处理热点客户端 DNS 查询。
+  - 将全局 `conf/all/rp_filter = 0` 提前至所有 Root 模式初始化公共阶段，确保 `Root Redirect` 与非对称转发场景同样生效。
+- **原版 `VPN` 与 `仅代理` 模式零影响保障**：
+  - 标准 `VPN` 与 `仅代理 (Proxy only)` 保持 100% 原版配置、入站（`tun-in` / `mixed-in`）、DNS 与 FakeDNS 逻辑不变，零 `su` 调用、零额外开销。
+
 # OwnBox for Android v26.11.8.31 预览版
 
 ### 【模式设置闪退修复与原版 VPN/仅代理模式隔离保障】

@@ -125,6 +125,7 @@ object RootTunManager {
         val socksPassword: String = "",
         val redirectPort: Int = 0,
         val dnsRedirectPort: Int = 0,
+        val lanDnsRedirectPort: Int = 0,
         val dnsDnatTargetV4: String = DEFAULT_LAN_DNS,
         val dnsDnatTargetV6: String? = null,
         val mtu: Int = 1360,
@@ -440,6 +441,9 @@ object RootTunManager {
             removeLog = false,
         )
 
+        sb.append("# Disable global rp_filter so asymmetric marked / PREROUTING / REDIRECT traffic is never dropped\n")
+        sb.append("echo 0 > /proc/sys/net/ipv4/conf/all/rp_filter 2>/dev/null || true\n\n")
+
         if (params.corePid > 0 && params.oomGuardPidPath.isNotBlank()) {
             sb.append("# Pin app core process against Android LMK\n")
             sb.append("nohup sh -c 'while true; do echo ").append(OOM_SCORE_ADJ)
@@ -646,36 +650,62 @@ object RootTunManager {
             sb.append("iptables -w 5 -I FORWARD -j ").append(CHAIN_FWD_FILTER).append(" 2>/dev/null || true\n")
             sb.append("iptables -w 5 -t mangle -A FORWARD -o \"\$TUN\" -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1350 2>/dev/null || true\n")
 
+            // Route hotspot client traffic via fwmark -> table 2024 instead of source-based ip rules
+            sb.append("iptables -w 5 -t mangle -N ").append(CHAIN_PRE_MANGLE).append(" 2>/dev/null || true\n")
+            sb.append("iptables -w 5 -t mangle -F ").append(CHAIN_PRE_MANGLE).append(" 2>/dev/null || true\n")
+            sb.append("iptables -w 5 -t mangle -A ").append(CHAIN_PRE_MANGLE).append(" -i \"\$TUN\" -j RETURN 2>/dev/null || true\n")
+            sb.append("iptables -w 5 -t mangle -A ").append(CHAIN_PRE_MANGLE).append(" -i lo -j RETURN 2>/dev/null || true\n")
+            for (cidr in HOTSPOT_SOURCE_CIDRS_V4) {
+                sb.append("iptables -w 5 -t mangle -A ").append(CHAIN_PRE_MANGLE).append(" -s ").append(cidr)
+                    .append(" -p udp --dport 53 -j MARK --set-xmark ").append(FWMARK).append(" 2>/dev/null || true\n")
+                sb.append("iptables -w 5 -t mangle -A ").append(CHAIN_PRE_MANGLE).append(" -s ").append(cidr)
+                    .append(" -p udp --dport 53 -j RETURN 2>/dev/null || true\n")
+                sb.append("iptables -w 5 -t mangle -A ").append(CHAIN_PRE_MANGLE).append(" -s ").append(cidr)
+                    .append(" -p tcp --dport 53 -j MARK --set-xmark ").append(FWMARK).append(" 2>/dev/null || true\n")
+                sb.append("iptables -w 5 -t mangle -A ").append(CHAIN_PRE_MANGLE).append(" -s ").append(cidr)
+                    .append(" -p tcp --dport 53 -j RETURN 2>/dev/null || true\n")
+            }
+            sb.append("iptables -w 5 -t mangle -A ").append(CHAIN_PRE_MANGLE).append(" -m addrtype --dst-type LOCAL -j RETURN 2>/dev/null || true\n")
+            for (cidr in RESERVED_CIDRS_V4 + LAN_CIDRS_V4 + listOf("127.0.0.0/8")) {
+                sb.append("iptables -w 5 -t mangle -A ").append(CHAIN_PRE_MANGLE).append(" -d ").append(cidr)
+                    .append(" -j RETURN 2>/dev/null || true\n")
+            }
+            for (cidr in HOTSPOT_SOURCE_CIDRS_V4) {
+                sb.append("iptables -w 5 -t mangle -A ").append(CHAIN_PRE_MANGLE).append(" -s ").append(cidr)
+                    .append(" -j MARK --set-xmark ").append(FWMARK).append(" 2>/dev/null || true\n")
+            }
+            sb.append("iptables -w 5 -t mangle -A PREROUTING -j ").append(CHAIN_PRE_MANGLE).append(" 2>/dev/null || true\n")
+
             sb.append("iptables -w 5 -t nat -N ").append(CHAIN_DNS_PRE).append(" 2>/dev/null || true\n")
             sb.append("iptables -w 5 -t nat -F ").append(CHAIN_DNS_PRE).append(" 2>/dev/null || true\n")
-            for (cidr in HOTSPOT_SOURCE_CIDRS_V4) {
-                sb.append("iptables -w 5 -t nat -A ").append(CHAIN_DNS_PRE).append(" ! -i \"\$TUN\" -d ").append(cidr)
-                    .append(" -p udp --dport 53 -j DNAT --to-destination ").append(dnsTarget).append(" 2>/dev/null || true\n")
+            for (cidr in LAN_CIDRS_V4) {
+                sb.append("iptables -w 5 -t nat -A ").append(CHAIN_DNS_PRE).append(" -m mark --mark ").append(FWMARK)
+                    .append(" ! -i \"\$TUN\" -d ").append(cidr).append(" -p udp --dport 53 -j DNAT --to-destination ").append(dnsTarget).append(" 2>/dev/null || true\n")
+                sb.append("iptables -w 5 -t nat -A ").append(CHAIN_DNS_PRE).append(" -m mark --mark ").append(FWMARK)
+                    .append(" ! -i \"\$TUN\" -d ").append(cidr).append(" -p tcp --dport 53 -j DNAT --to-destination ").append(dnsTarget).append(" 2>/dev/null || true\n")
             }
-            sb.append("iptables -w 5 -t nat -A PREROUTING -j ").append(CHAIN_DNS_PRE).append(" 2>/dev/null || true\n")
-
-            sb.append("ip -4 rule add iif lo goto 6000 pref 5000 2>/dev/null || true\n")
-            sb.append("ip -4 rule add iif \"\$TUN\" lookup main suppress_prefixlength 0 pref 5010 2>/dev/null || true\n")
-            sb.append("ip -4 rule add iif \"\$TUN\" goto 6000 pref 5020 2>/dev/null || true\n")
-            sb.append("ip -4 rule add to 10.0.0.0/8 lookup main pref 5025 2>/dev/null || true\n")
-            sb.append("ip -4 rule add to 172.16.0.0/12 lookup main pref 5026 2>/dev/null || true\n")
-            sb.append("ip -4 rule add to 192.168.0.0/16 lookup main pref 5027 2>/dev/null || true\n")
-            sb.append("ip -4 rule add from 10.0.0.0/8 lookup ").append(ROUTE_TABLE).append(" pref 5030 2>/dev/null || true\n")
-            sb.append("ip -4 rule add from 172.16.0.0/12 lookup ").append(ROUTE_TABLE).append(" pref 5040 2>/dev/null || true\n")
-            sb.append("ip -4 rule add from 192.168.0.0/16 lookup ").append(ROUTE_TABLE).append(" pref 5050 2>/dev/null || true\n")
-            sb.append("ip -4 rule add nop pref 6000 2>/dev/null || true\n\n")
+            sb.append("iptables -w 5 -t nat -A PREROUTING -j ").append(CHAIN_DNS_PRE).append(" 2>/dev/null || true\n\n")
         } else if (params.redirectPort > 0) {
+            val lanDnsPort = if (params.lanDnsRedirectPort > 0) params.lanDnsRedirectPort else params.dnsRedirectPort
             sb.append("iptables -w 5 -t nat -N ").append(CHAIN_DNS_PRE).append(" 2>/dev/null || true\n")
             sb.append("iptables -w 5 -t nat -F ").append(CHAIN_DNS_PRE).append(" 2>/dev/null || true\n")
             sb.append("iptables -w 5 -t nat -A ").append(CHAIN_DNS_PRE).append(" -i lo -j RETURN 2>/dev/null || true\n")
-            if (params.dnsRedirectPort > 0) {
-                sb.append("iptables -w 5 -t nat -A ").append(CHAIN_DNS_PRE).append(" -p udp --dport 53 -j REDIRECT --to-ports ").append(params.dnsRedirectPort).append(" 2>/dev/null || true\n")
-                sb.append("iptables -w 5 -t nat -A ").append(CHAIN_DNS_PRE).append(" -p tcp --dport 53 -j REDIRECT --to-ports ").append(params.dnsRedirectPort).append(" 2>/dev/null || true\n")
+            if (lanDnsPort > 0) {
+                for (cidr in HOTSPOT_SOURCE_CIDRS_V4) {
+                    sb.append("iptables -w 5 -t nat -A ").append(CHAIN_DNS_PRE).append(" -s ").append(cidr)
+                        .append(" -p udp --dport 53 -j REDIRECT --to-ports ").append(lanDnsPort).append(" 2>/dev/null || true\n")
+                    sb.append("iptables -w 5 -t nat -A ").append(CHAIN_DNS_PRE).append(" -s ").append(cidr)
+                        .append(" -p tcp --dport 53 -j REDIRECT --to-ports ").append(lanDnsPort).append(" 2>/dev/null || true\n")
+                }
             }
+            sb.append("iptables -w 5 -t nat -A ").append(CHAIN_DNS_PRE).append(" -m addrtype --dst-type LOCAL -j RETURN 2>/dev/null || true\n")
             for (cidr in RESERVED_CIDRS_V4 + LAN_CIDRS_V4 + listOf("127.0.0.0/8")) {
                 sb.append("iptables -w 5 -t nat -A ").append(CHAIN_DNS_PRE).append(" -d ").append(cidr).append(" -j RETURN 2>/dev/null || true\n")
             }
-            sb.append("iptables -w 5 -t nat -A ").append(CHAIN_DNS_PRE).append(" -p tcp -j REDIRECT --to-ports ").append(params.redirectPort).append(" 2>/dev/null || true\n")
+            for (cidr in HOTSPOT_SOURCE_CIDRS_V4) {
+                sb.append("iptables -w 5 -t nat -A ").append(CHAIN_DNS_PRE).append(" -s ").append(cidr)
+                    .append(" -p tcp -j REDIRECT --to-ports ").append(params.redirectPort).append(" 2>/dev/null || true\n")
+            }
             sb.append("iptables -w 5 -t nat -A PREROUTING -j ").append(CHAIN_DNS_PRE).append(" 2>/dev/null || true\n\n")
         }
     }
@@ -739,12 +769,17 @@ object RootTunManager {
 
                 sb.append("  ip6tables -w 5 -t mangle -N ").append(CHAIN_PRE_MANGLE).append(" 2>/dev/null || true\n")
                 sb.append("  ip6tables -w 5 -t mangle -F ").append(CHAIN_PRE_MANGLE).append(" 2>/dev/null || true\n")
-                sb.append("  ip6tables -w 5 -t mangle -A ").append(CHAIN_PRE_MANGLE).append(" ! -i \"\$TUN\" -p udp --dport 53 -j MARK --set-xmark ").append(FWMARK).append(" 2>/dev/null || true\n")
-                sb.append("  ip6tables -w 5 -t mangle -A ").append(CHAIN_PRE_MANGLE).append(" ! -i \"\$TUN\" -p tcp --dport 53 -j MARK --set-xmark ").append(FWMARK).append(" 2>/dev/null || true\n")
+                sb.append("  ip6tables -w 5 -t mangle -A ").append(CHAIN_PRE_MANGLE).append(" -i \"\$TUN\" -j RETURN 2>/dev/null || true\n")
+                sb.append("  ip6tables -w 5 -t mangle -A ").append(CHAIN_PRE_MANGLE).append(" -i lo -j RETURN 2>/dev/null || true\n")
+                sb.append("  ip6tables -w 5 -t mangle -A ").append(CHAIN_PRE_MANGLE).append(" -m addrtype --dst-type LOCAL -j RETURN 2>/dev/null || true\n")
+                sb.append("  ip6tables -w 5 -t mangle -A ").append(CHAIN_PRE_MANGLE).append(" -p udp --dport 53 -j MARK --set-xmark ").append(FWMARK).append(" 2>/dev/null || true\n")
+                sb.append("  ip6tables -w 5 -t mangle -A ").append(CHAIN_PRE_MANGLE).append(" -p udp --dport 53 -j RETURN 2>/dev/null || true\n")
+                sb.append("  ip6tables -w 5 -t mangle -A ").append(CHAIN_PRE_MANGLE).append(" -p tcp --dport 53 -j MARK --set-xmark ").append(FWMARK).append(" 2>/dev/null || true\n")
+                sb.append("  ip6tables -w 5 -t mangle -A ").append(CHAIN_PRE_MANGLE).append(" -p tcp --dport 53 -j RETURN 2>/dev/null || true\n")
                 for (cidr in BYPASS_CIDRS_V6) {
-                    sb.append("  ip6tables -w 5 -t mangle -A ").append(CHAIN_PRE_MANGLE).append(" ! -i \"\$TUN\" -d ").append(cidr).append(" -j RETURN 2>/dev/null || true\n")
+                    sb.append("  ip6tables -w 5 -t mangle -A ").append(CHAIN_PRE_MANGLE).append(" -d ").append(cidr).append(" -j RETURN 2>/dev/null || true\n")
                 }
-                sb.append("  ip6tables -w 5 -t mangle -A ").append(CHAIN_PRE_MANGLE).append(" ! -i \"\$TUN\" -j MARK --set-xmark ").append(FWMARK).append(" 2>/dev/null || true\n")
+                sb.append("  ip6tables -w 5 -t mangle -A ").append(CHAIN_PRE_MANGLE).append(" -j MARK --set-xmark ").append(FWMARK).append(" 2>/dev/null || true\n")
                 sb.append("  ip6tables -w 5 -t mangle -A PREROUTING -j ").append(CHAIN_PRE_MANGLE).append(" 2>/dev/null || true\n")
             }
         } else {

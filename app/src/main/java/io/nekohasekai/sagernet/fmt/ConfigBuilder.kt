@@ -59,11 +59,12 @@ const val TAG_MIXED = "mixed-in"
 const val TAG_ROOT_TUN_IN = "root-tun-in"
 const val TAG_ROOT_REDIRECT_IN = "root-redirect-in"
 const val TAG_ROOT_DNS_IN = "root-dns-in"
+const val TAG_ROOT_DNS_LAN_IN = "root-dns-lan-in"
 
 internal fun resolveTunInboundTags(serviceMode: String): List<String> {
     return when (serviceMode) {
         Key.MODE_ROOT_TUN -> listOf(TAG_ROOT_TUN_IN)
-        Key.MODE_ROOT_REDIRECT -> listOf(TAG_ROOT_REDIRECT_IN, TAG_ROOT_DNS_IN)
+        Key.MODE_ROOT_REDIRECT -> listOf(TAG_ROOT_REDIRECT_IN, TAG_ROOT_DNS_IN, TAG_ROOT_DNS_LAN_IN)
         Key.MODE_ROOT_MIXED, Key.MODE_ROOT_ENHANCE -> listOf(TAG_ROOT_REDIRECT_IN, TAG_ROOT_TUN_IN)
         else -> listOf("tun-in")
     }
@@ -100,9 +101,10 @@ internal fun shouldUseFakeDns(
     bypass: Boolean,
 ): Boolean {
     if (!enableFakeDns || forTest) return false
-    // In Root whitelist mode, netd still issues system DNS as UID 1051 for all apps;
-    // disabling FakeDNS avoids returning unroutable 198.18.x.x FakeIPs to non-whitelisted apps.
-    if (Key.isRootMode(serviceMode) && proxyApps && !bypass) return false
+    // In Root modes, Android netd resolves DNS under UID 1051 for all apps (bypassed/dual-app/
+    // non-whitelisted included), and Root Redirect has no TUN interface to capture 198.18.x.x.
+    // Disabling FakeDNS keeps real unpolluted IP resolution while sniff handles domain rules.
+    if (Key.isRootMode(serviceMode)) return false
     return true
 }
 
@@ -139,10 +141,11 @@ internal fun buildRootRedirectInbound(
 internal fun buildRootDnsInbound(
     port: Int,
     listenAddress: String,
+    inboundTag: String = TAG_ROOT_DNS_IN,
 ): Inbound_DirectOptions {
     return Inbound_DirectOptions().apply {
         type = "direct"
-        tag = TAG_ROOT_DNS_IN
+        tag = inboundTag
         listen = listenAddress
         listen_port = port
         override_address = RootTunManager.DEFAULT_LAN_DNS
@@ -1031,6 +1034,7 @@ class ConfigBuildResult(
     val rootSocksPassword: String = "",
     val rootRedirectPort: Int = 0,
     val rootDnsPort: Int = 0,
+    val rootLanDnsPort: Int = 0,
 ) {
     data class IndexEntity(var chain: LinkedHashMap<Int, ProxyEntity>)
 }
@@ -1147,6 +1151,7 @@ fun buildConfig(
     var rootSocksPassword = ""
     var rootRedirectPort = 0
     var rootDnsPort = 0
+    var rootLanDnsPort = 0
     val bind = if (!forTest && DataStore.allowAccess) "0.0.0.0" else LOCALHOST
     val remoteDns = DataStore.remoteDns.split("\n")
         .mapNotNull { dns -> dns.trim().takeIf { it.isNotBlank() && !it.startsWith("#") } }
@@ -1541,8 +1546,15 @@ fun buildConfig(
                     inbounds.add(buildRootRedirectInbound(rootRedirectPort, rootListen))
                 }
                 if (serviceMode == Key.MODE_ROOT_REDIRECT) {
+                    // Local OUTPUT REDIRECT always rewrites dst to 127.0.0.1, so UDP replies must originate
+                    // from 127.0.0.1 to match conntrack; bind local root-dns-in strictly to LOCALHOST.
                     rootDnsPort = mkPort()
-                    inbounds.add(buildRootDnsInbound(rootDnsPort, rootListen))
+                    inbounds.add(buildRootDnsInbound(rootDnsPort, LOCALHOST, TAG_ROOT_DNS_IN))
+                    if (rootLanSharing) {
+                        // Hotspot PREROUTING REDIRECT arrives on the tethering interface IP, requiring 0.0.0.0.
+                        rootLanDnsPort = mkPort()
+                        inbounds.add(buildRootDnsInbound(rootLanDnsPort, "0.0.0.0", TAG_ROOT_DNS_LAN_IN))
+                    }
                 }
             }
             if (!DataStore.mixedInboundDisabled) inbounds.add(Inbound_MixedOptions().apply {
@@ -2587,6 +2599,7 @@ fun buildConfig(
             rootSocksPassword,
             rootRedirectPort,
             rootDnsPort,
+            rootLanDnsPort,
         )
     }
 
