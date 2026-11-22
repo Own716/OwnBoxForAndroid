@@ -7,6 +7,9 @@
     android:layout_marginTop="4dp"
     android:layout_marginEnd="4dp"
     android:layout_marginBottom="6dp"
+    android:clickable="true"
+    android:focusable="true"
+    android:foreground="?attr/selectableItemBackground"
     app:cardCornerRadius="@dimen/card_corner_radius"
     app:cardElevation="@dimen/card_elevation"
     app:strokeColor="@color/card_stroke"
@@ -46,68 +49,91 @@
                 android:textColor="?attr/primaryOrTextPrimary"
                 android:textStyle="bold" />
 
+            <ImageView
+                android:id="@+id/doc_expand_icon"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_marginStart="6dp"
+                android:src="@drawable/ic_baseline_expand_more_24"
+                app:tint="?android:textColorSecondary" />
+
         </LinearLayout>
 
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="0.5dp"
-            android:layout_marginTop="8dp"
-            android:layout_marginBottom="8dp"
-            android:background="?attr/colorControlHighlight" />
-
-        <!-- 1. 功能说明 -->
         <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="📘 功能说明"
-            android:textAppearance="?attr/textAppearanceCaption"
-            android:textColor="?attr/primaryOrTextPrimary"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/doc_desc"
+            android:id="@+id/doc_summary"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:layout_marginBottom="8dp"
-            android:lineSpacingMultiplier="1.15"
-            android:textAppearance="?attr/textAppearanceBody2" />
-
-        <!-- 2. 优劣分析 -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="⚖️ 优劣分析"
-            android:textAppearance="?attr/textAppearanceCaption"
-            android:textColor="?attr/primaryOrTextPrimary"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/doc_pros_cons"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:layout_marginBottom="8dp"
-            android:lineSpacingMultiplier="1.15"
-            android:textAppearance="?attr/textAppearanceBody2" />
-
-        <!-- 3. 设置推荐 -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="💡 设置推荐（以最稳定为绝对核心）"
-            android:textAppearance="?attr/textAppearanceCaption"
-            android:textColor="?attr/primaryOrTextPrimary"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/doc_recommendation"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
+            android:layout_marginTop="6dp"
             android:lineSpacingMultiplier="1.15"
             android:textAppearance="?attr/textAppearanceBody2"
-            android:textStyle="bold" />
+            android:textColor="?android:textColorSecondary" />
+
+        <LinearLayout
+            android:id="@+id/doc_detail_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="0.5dp"
+                android:layout_marginTop="10dp"
+                android:layout_marginBottom="10dp"
+                android:background="?attr/colorControlHighlight" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="详细说明"
+                android:textAppearance="?attr/textAppearanceCaption"
+                android:textColor="?attr/primaryOrTextPrimary"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/doc_desc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:layout_marginBottom="8dp"
+                android:lineSpacingMultiplier="1.18"
+                android:textAppearance="?attr/textAppearanceBody2" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="适用与注意"
+                android:textAppearance="?attr/textAppearanceCaption"
+                android:textColor="?attr/primaryOrTextPrimary"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/doc_notes"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:layout_marginBottom="8dp"
+                android:lineSpacingMultiplier="1.18"
+                android:textAppearance="?attr/textAppearanceBody2" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="推荐设置"
+                android:textAppearance="?attr/textAppearanceCaption"
+                android:textColor="?attr/primaryOrTextPrimary"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/doc_recommendation"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:lineSpacingMultiplier="1.18"
+                android:textAppearance="?attr/textAppearanceBody2"
+                android:textStyle="bold" />
+
+        </LinearLayout>
 
     </LinearLayout>
 
