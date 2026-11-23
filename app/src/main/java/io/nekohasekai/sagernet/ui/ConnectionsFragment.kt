@@ -1181,9 +1181,9 @@ class ConnectionsFragment : ToolbarFragment(R.layout.layout_connections) {
             }
 
             detailProxyHopsContainer.removeAllViews()
-            val padH = safeCtx.dp2px(12)
-            val padV = safeCtx.dp2px(10)
-            val marginB = safeCtx.dp2px(8)
+            val padH = dp2px(12)
+            val padV = dp2px(10)
+            val marginB = dp2px(8)
             fun addHopCard(title: String, subtitle: String, isLast: Boolean) {
                 val card = MaterialCardView(safeCtx).apply {
                     layoutParams = LinearLayout.LayoutParams(
@@ -1192,7 +1192,7 @@ class ConnectionsFragment : ToolbarFragment(R.layout.layout_connections) {
                     ).apply { bottomMargin = marginB }
                     radius = resources.getDimension(R.dimen.card_corner_radius)
                     cardElevation = 0f
-                    strokeWidth = safeCtx.dp2px(1)
+                    strokeWidth = dp2px(1)
                     strokeColor = safeCtx.getColor(R.color.card_stroke)
                 }
                 val inner = LinearLayout(safeCtx).apply {
