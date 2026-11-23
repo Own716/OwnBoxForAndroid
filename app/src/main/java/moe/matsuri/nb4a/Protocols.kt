@@ -96,6 +96,10 @@ object Protocols {
                 if (pluginName.isNotBlank()) "缺少插件: $pluginName" else "缺少必要插件"
             }
 
+            msgL.contains("ech") && (msgL.contains("no ech config") || msgL.contains("dns")) -> {
+                "ECH 配置获取失败（请检查直连 DNS）"
+            }
+
             msgL.contains("no such host") || msgL.contains("dns") || msgL.contains("nxdomain") || msgL.contains("name resolution") -> {
                 "DNS 解析失败"
             }

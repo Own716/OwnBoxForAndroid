@@ -1,5 +1,6 @@
 package io.nekohasekai.sagernet.fmt
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -116,5 +117,141 @@ class ConfigBuilderRouteIssuesTest {
             "DataStore.groupUrlTestUrl must fallback to DataStore.connectionTestURL when blank or default",
             dataStore.contains("stored.takeIf { it.isNotBlank() && it != defaultUrl } ?: connectionTestURL"),
         )
+    }
+
+    @Test
+    fun echQueryDomainsExemptFromPredefinedHttpsBlockAndRoutedToDirectDns() {
+        val outboundMaps: List<Map<String, Any?>> = listOf(
+            // 1. Explicit ech.query_server_name (mixed case + trailing dot -> normalized)
+            mapOf(
+                "tag" to "proxy-explicit",
+                "server" to "8.216.61.208",
+                "tls" to mapOf(
+                    "enabled" to true,
+                    "server_name" to "cf.worker.example",
+                    "ech" to mapOf(
+                        "enabled" to true,
+                        "query_server_name" to "WWW.Britannica.COM.",
+                    ),
+                ),
+            ),
+            // 2. Fallback to tls.server_name when query_server_name omitted
+            mapOf(
+                "tag" to "proxy-sni-fallback",
+                "server" to "8.216.61.209",
+                "tls" to mapOf(
+                    "enabled" to true,
+                    "server_name" to "cdn.example.org",
+                    "ech" to mapOf("enabled" to true),
+                ),
+            ),
+            // 3. Fallback to server when both query_server_name and tls.server_name omitted
+            mapOf(
+                "tag" to "proxy-server-fallback",
+                "server" to "edge.example.net",
+                "tls" to mapOf(
+                    "enabled" to true,
+                    "ech" to mapOf("enabled" to true),
+                ),
+            ),
+            // 4. Static ech.config as List<String> -> skipped
+            mapOf(
+                "tag" to "proxy-static-list",
+                "server" to "static-list.example.com",
+                "tls" to mapOf(
+                    "enabled" to true,
+                    "ech" to mapOf(
+                        "enabled" to true,
+                        "config" to listOf("-----BEGIN ECH CONFIGS-----", "AAA="),
+                    ),
+                ),
+            ),
+            // 5. Static ech.config as String -> skipped
+            mapOf(
+                "tag" to "proxy-static-string",
+                "server" to "static-str.example.com",
+                "tls" to mapOf(
+                    "enabled" to true,
+                    "ech" to mapOf(
+                        "enabled" to true,
+                        "config" to "-----BEGIN ECH CONFIGS-----\nAAA=",
+                    ),
+                ),
+            ),
+            // 6. Static ech.config_path -> skipped
+            mapOf(
+                "tag" to "proxy-static-path",
+                "server" to "static-path.example.com",
+                "tls" to mapOf(
+                    "enabled" to true,
+                    "ech" to mapOf(
+                        "enabled" to true,
+                        "config_path" to "/data/local/tmp/ech.pem",
+                    ),
+                ),
+            ),
+            // 7. ech.enabled = false -> skipped
+            mapOf(
+                "tag" to "proxy-ech-disabled",
+                "server" to "no-ech.example.com",
+                "tls" to mapOf(
+                    "enabled" to true,
+                    "ech" to mapOf("enabled" to false),
+                ),
+            ),
+            // 8. tls.enabled = false -> skipped
+            mapOf(
+                "tag" to "proxy-tls-disabled",
+                "server" to "no-tls.example.com",
+                "tls" to mapOf(
+                    "enabled" to false,
+                    "ech" to mapOf("enabled" to true),
+                ),
+            ),
+            // 9. IPv4 literal server without domain SNI -> skipped
+            mapOf(
+                "tag" to "proxy-ipv4-only",
+                "server" to "8.216.61.208",
+                "tls" to mapOf(
+                    "enabled" to true,
+                    "ech" to mapOf("enabled" to true),
+                ),
+            ),
+            // 10. IPv6 literal server without domain SNI -> skipped
+            mapOf(
+                "tag" to "proxy-ipv6-only",
+                "server" to "[2606:4700::1]",
+                "tls" to mapOf(
+                    "enabled" to true,
+                    "ech" to mapOf("enabled" to true),
+                ),
+            ),
+            // 11. Duplicate domain -> deduplicated
+            mapOf(
+                "tag" to "proxy-dup",
+                "server" to "1.1.1.1",
+                "tls" to mapOf(
+                    "enabled" to true,
+                    "ech" to mapOf(
+                        "enabled" to true,
+                        "query_server_name" to "www.britannica.com",
+                    ),
+                ),
+            ),
+        )
+
+        val domains = extractEchQueryDomains(outboundMaps)
+        assertEquals(listOf("www.britannica.com", "cdn.example.org", "edge.example.net"), domains)
+
+        val text = resolveSourceFile("src/main/java/io/nekohasekai/sagernet/fmt/ConfigBuilder.kt").readText()
+        val predefinedIdx = text.indexOf("action = \"predefined\"")
+        val echExtractIdx = text.indexOf("val echQueryDomains = extractEchQueryDomains(outboundMaps)")
+        val echRuleIdx = text.indexOf("domain = echQueryDomains", echExtractIdx)
+        val echDirectIdx = text.indexOf("server = \"dns-direct\"", echRuleIdx)
+
+        assertTrue("Expected predefined HTTPS/SVCB DNS rule", predefinedIdx >= 0)
+        assertTrue("Expected ECH domain extraction after predefined rule so add(0, ...) prepends before it", echExtractIdx > predefinedIdx)
+        assertTrue("Expected ECH exemption rule referencing domain = echQueryDomains", echRuleIdx > echExtractIdx)
+        assertTrue("Expected ECH exemption rule routed explicitly via server = \"dns-direct\"", echDirectIdx > echRuleIdx)
     }
 }

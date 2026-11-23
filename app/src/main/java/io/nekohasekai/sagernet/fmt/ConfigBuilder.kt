@@ -99,6 +99,41 @@ internal fun syncRuleSetDownloadDetours(
     }
 }
 
+private fun isLiteralIpHost(host: String): Boolean {
+    val bare = host.removePrefix("[").removeSuffix("]")
+    if (bare.contains(':')) return true
+    val parts = bare.split('.')
+    return parts.size == 4 && parts.all { part ->
+        part.isNotEmpty() && part.length <= 3 && part.all(Char::isDigit) && (part.toIntOrNull() in 0..255)
+    }
+}
+
+internal fun extractEchQueryDomains(outboundMaps: List<Map<String, *>>): List<String> {
+    val domains = LinkedHashSet<String>()
+    for (outbound in outboundMaps) {
+        val tls = outbound["tls"] as? Map<*, *> ?: continue
+        if (tls["enabled"] as? Boolean == false) continue
+        val ech = tls["ech"] as? Map<*, *> ?: continue
+        if (ech["enabled"] as? Boolean != true) continue
+
+        val hasStaticConfig = when (val cfg = ech["config"]) {
+            is String -> cfg.isNotBlank()
+            is Collection<*> -> cfg.any { it?.toString()?.isNotBlank() == true }
+            else -> false
+        } || ech["config_path"]?.toString()?.isNotBlank() == true
+        if (hasStaticConfig) continue
+
+        val candidate = ech["query_server_name"]?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+            ?: tls["server_name"]?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+            ?: outbound["server"]?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+            ?: continue
+        val normalized = candidate.trimEnd('.').lowercase()
+        if (normalized.isEmpty() || isLiteralIpHost(normalized)) continue
+        domains.add(normalized)
+    }
+    return domains.toList()
+}
+
 internal fun shouldWarnPackageRuleNeedsVpn(rule: RuleEntity): Boolean {
     if (rule.name == "Smart-Foreign-Apps" || rule.name.startsWith("Smart-Domestic-Apps")) {
         return false
@@ -2400,8 +2435,20 @@ fun buildConfig(
             })
         }
 
+        val outboundMaps = outbounds.map { it.asMap() }
+        val echQueryDomains = extractEchQueryDomains(outboundMaps)
+        if (echQueryDomains.isNotEmpty()) {
+            // Allow outbound ECH HTTPS/SVCB (Type 65/64) lookups via dns-direct, bypassing both
+            // the predefined empty NOERROR rule and any dns-remote proxy bootstrap deadlock.
+            dns.rules.add(0, DNSRule_DefaultOptions().apply {
+                domain = echQueryDomains
+                query_type = listOf("HTTPS", "SVCB")
+                server = "dns-direct"
+            })
+        }
+
         // Synchronize route.rules, route.rule_set.download_detour and route.final_ against available outbound tags
-        val availableOutboundTags = outbounds.mapNotNull { it.asMap()["tag"]?.toString() }.toSet()
+        val availableOutboundTags = outboundMaps.mapNotNull { it["tag"]?.toString() }.toSet()
         syncRuleSetDownloadDetours(route.rule_set, availableOutboundTags, mainProxyTag)
         route.rules.filterIsInstance<Rule_DefaultOptions>().forEach { r ->
             val out = r.outbound

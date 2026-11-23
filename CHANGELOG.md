@@ -1,5 +1,11 @@
 # OwnBox for Android 更新日志 (Changelog)
 
+# OwnBox for Android v26.11.8.41 预览版
+
+### 【Cloudflare 等 ECH 节点连接修复】
+- **修复：Cloudflare 等启用 ECH 的节点全部报「DNS 解析失败」无法连接问题**：自动放行代理节点自身 ECH 公钥查询并交由直连加密 DNS 解析与缓存，解决此前屏蔽 HTTPS/SVCB 查询时误伤节点 ECH 握手导致无法连网与测速失败的问题，同时完整保留普通网页加速优化。
+- **优化：ECH 配置获取异常提示**：当直连 DNS 无法返回 ECH 记录时给出更明确的故障提示，便于快速排查网络环境与直连 DNS 设置。
+
 # OwnBox for Android v26.11.8.40 预览版
 
 ### 【桌面双图标与分应用代理勾选修复】
