@@ -767,19 +767,149 @@ func (b *BoxInstance) resetStatefulUDPTransports() {
 }
 
 type activeConnectionItem struct {
-	ID          string   `json:"id"`
-	Network     string   `json:"network"`
-	Host        string   `json:"host"`
-	Port        int      `json:"port"`
-	Inbound     string   `json:"inbound"`
-	PackageName string   `json:"packageName"`
-	Uid         int32    `json:"uid"`
-	Rule        string   `json:"rule"`
-	Chains      []string `json:"chains"`
-	Outbound    string   `json:"outbound"`
-	Upload      int64    `json:"upload"`
-	Download    int64    `json:"download"`
-	StartMs     int64    `json:"startMs"`
+	ID            string   `json:"id"`
+	Network       string   `json:"network"`
+	Protocol      string   `json:"protocol"`
+	Host          string   `json:"host"`
+	Port          int      `json:"port"`
+	Inbound       string   `json:"inbound"`
+	InboundType   string   `json:"inboundType"`
+	SourceIP      string   `json:"sourceIP"`
+	SourcePort    int      `json:"sourcePort"`
+	DestinationIP string   `json:"destinationIP"`
+	IpVersion     string   `json:"ipVersion"`
+	PackageName   string   `json:"packageName"`
+	ProcessPath   string   `json:"processPath"`
+	Uid           int32    `json:"uid"`
+	Rule          string   `json:"rule"`
+	Chains        []string `json:"chains"`
+	Outbound      string   `json:"outbound"`
+	OutboundType  string   `json:"outboundType"`
+	Upload        int64    `json:"upload"`
+	Download      int64    `json:"download"`
+	StartMs       int64    `json:"startMs"`
+	ClosedMs      int64    `json:"closedMs"`
+	Active        bool     `json:"active"`
+}
+
+func buildConnectionItem(m *trafficcontrol.TrackerMetadata, active bool) activeConnectionItem {
+	network := strings.ToUpper(strings.TrimSpace(m.Metadata.Network))
+	if network == "" {
+		network = "TCP"
+	}
+	host := m.Metadata.Domain
+	if host == "" {
+		host = m.Metadata.Destination.Fqdn
+	}
+	if host == "" && m.Metadata.Destination.Addr.IsValid() {
+		host = m.Metadata.Destination.Addr.String()
+	}
+	inbound := m.Metadata.Inbound
+	if inbound == "" {
+		inbound = m.Metadata.InboundType
+	}
+	inboundFull := inbound
+	if m.Metadata.InboundType != "" && m.Metadata.Inbound != "" {
+		inboundFull = m.Metadata.InboundType + "/" + m.Metadata.Inbound
+	} else if m.Metadata.InboundType != "" {
+		inboundFull = m.Metadata.InboundType
+	}
+
+	sourceIP := ""
+	if m.Metadata.Source.Addr.IsValid() {
+		sourceIP = m.Metadata.Source.Addr.String()
+	}
+	destIP := ""
+	ipVersion := ""
+	if m.Metadata.Destination.Addr.IsValid() {
+		destIP = m.Metadata.Destination.Addr.String()
+		if m.Metadata.Destination.Addr.Is6() {
+			ipVersion = "IPv6"
+		} else {
+			ipVersion = "IPv4"
+		}
+	}
+
+	pkg := ""
+	var uid int32 = -1
+	processPath := ""
+	if m.Metadata.ProcessInfo != nil {
+		uid = m.Metadata.ProcessInfo.UserId
+		for _, p := range m.Metadata.ProcessInfo.PackageNames {
+			if trimmed := strings.TrimSpace(p); trimmed != "" {
+				pkg = trimmed
+				break
+			}
+		}
+		if pkg == "" {
+			for _, p := range m.Metadata.ProcessInfo.ProcessPaths {
+				if trimmed := strings.TrimSpace(p); trimmed != "" {
+					pkg = trimmed
+					break
+				}
+			}
+		}
+		if pkg != "" && uid != -1 {
+			processPath = fmt.Sprintf("%s (%d)", pkg, uid)
+		} else if pkg != "" {
+			processPath = pkg
+		} else if uid != -1 {
+			processPath = fmt.Sprintf("%d", uid)
+		}
+	}
+
+	rule := "final"
+	if m.Rule != nil {
+		rule = F.ToString(m.Rule, " => ", m.Rule.Action())
+	}
+
+	chains := make([]string, 0, len(m.Chain))
+	for i := len(m.Chain) - 1; i >= 0; i-- {
+		if tag := strings.TrimSpace(m.Chain[i]); tag != "" {
+			chains = append(chains, tag)
+		}
+	}
+	if len(chains) == 0 && m.Outbound != "" {
+		chains = append(chains, m.Outbound)
+	}
+
+	var up, down int64
+	if m.Upload != nil {
+		up = m.Upload.Load()
+	}
+	if m.Download != nil {
+		down = m.Download.Load()
+	}
+	var closedMs int64
+	if !active && !m.ClosedAt.IsZero() {
+		closedMs = m.ClosedAt.UnixMilli()
+	}
+
+	return activeConnectionItem{
+		ID:            m.ID.String(),
+		Network:       network,
+		Protocol:      strings.TrimSpace(m.Metadata.Protocol),
+		Host:          host,
+		Port:          int(m.Metadata.Destination.Port),
+		Inbound:       inbound,
+		InboundType:   inboundFull,
+		SourceIP:      sourceIP,
+		SourcePort:    int(m.Metadata.Source.Port),
+		DestinationIP: destIP,
+		IpVersion:     ipVersion,
+		PackageName:   pkg,
+		ProcessPath:   processPath,
+		Uid:           uid,
+		Rule:          rule,
+		Chains:        chains,
+		Outbound:      m.Outbound,
+		OutboundType:  m.OutboundType,
+		Upload:        up,
+		Download:      down,
+		StartMs:       m.CreatedAt.UnixMilli(),
+		ClosedMs:      closedMs,
+		Active:        active,
+	}
 }
 
 func (b *BoxInstance) GetConnectionsJSON() string {
@@ -787,6 +917,7 @@ func (b *BoxInstance) GetConnectionsJSON() string {
 		return ""
 	}
 	conns := b.trafficManager.Connections()
+	closedConns := b.trafficManager.ClosedConnections()
 	upTotal, downTotal := b.trafficManager.Total()
 
 	filtered := make([]*trafficcontrol.TrackerMetadata, 0, len(conns))
@@ -805,90 +936,45 @@ func (b *BoxInstance) GetConnectionsJSON() string {
 
 	items := make([]activeConnectionItem, 0, len(filtered))
 	for _, m := range filtered {
-		network := strings.ToUpper(strings.TrimSpace(m.Metadata.Network))
-		if network == "" {
-			network = "TCP"
-		}
-		host := m.Metadata.Domain
-		if host == "" {
-			host = m.Metadata.Destination.Fqdn
-		}
-		if host == "" && m.Metadata.Destination.Addr.IsValid() {
-			host = m.Metadata.Destination.Addr.String()
-		}
-		inbound := m.Metadata.Inbound
-		if inbound == "" {
-			inbound = m.Metadata.InboundType
-		}
+		items = append(items, buildConnectionItem(m, true))
+	}
 
-		pkg := ""
-		var uid int32 = -1
-		if m.Metadata.ProcessInfo != nil {
-			uid = m.Metadata.ProcessInfo.UserId
-			for _, p := range m.Metadata.ProcessInfo.PackageNames {
-				if trimmed := strings.TrimSpace(p); trimmed != "" {
-					pkg = trimmed
-					break
-				}
-			}
-			if pkg == "" {
-				for _, p := range m.Metadata.ProcessInfo.ProcessPaths {
-					if trimmed := strings.TrimSpace(p); trimmed != "" {
-						pkg = trimmed
-						break
-					}
-				}
-			}
+	closedFiltered := make([]*trafficcontrol.TrackerMetadata, 0, len(closedConns))
+	for _, m := range closedConns {
+		if m == nil || m.OutboundType == constant.TypeDNS {
+			continue
 		}
+		closedFiltered = append(closedFiltered, m)
+	}
+	sort.Slice(closedFiltered, func(i, j int) bool {
+		if !closedFiltered[i].ClosedAt.Equal(closedFiltered[j].ClosedAt) {
+			return closedFiltered[i].ClosedAt.After(closedFiltered[j].ClosedAt)
+		}
+		if !closedFiltered[i].CreatedAt.Equal(closedFiltered[j].CreatedAt) {
+			return closedFiltered[i].CreatedAt.After(closedFiltered[j].CreatedAt)
+		}
+		return closedFiltered[i].ID.String() < closedFiltered[j].ID.String()
+	})
+	const maxClosedConnections = 300
+	if len(closedFiltered) > maxClosedConnections {
+		closedFiltered = closedFiltered[:maxClosedConnections]
+	}
 
-		rule := "final"
-		if m.Rule != nil {
-			rule = F.ToString(m.Rule, " => ", m.Rule.Action())
-		}
-
-		chains := make([]string, 0, len(m.Chain))
-		for i := len(m.Chain) - 1; i >= 0; i-- {
-			if tag := strings.TrimSpace(m.Chain[i]); tag != "" {
-				chains = append(chains, tag)
-			}
-		}
-		if len(chains) == 0 && m.Outbound != "" {
-			chains = append(chains, m.Outbound)
-		}
-
-		var up, down int64
-		if m.Upload != nil {
-			up = m.Upload.Load()
-		}
-		if m.Download != nil {
-			down = m.Download.Load()
-		}
-
-		items = append(items, activeConnectionItem{
-			ID:          m.ID.String(),
-			Network:     network,
-			Host:        host,
-			Port:        int(m.Metadata.Destination.Port),
-			Inbound:     inbound,
-			PackageName: pkg,
-			Uid:         uid,
-			Rule:        rule,
-			Chains:      chains,
-			Outbound:    m.Outbound,
-			Upload:      up,
-			Download:    down,
-			StartMs:     m.CreatedAt.UnixMilli(),
-		})
+	closedItems := make([]activeConnectionItem, 0, len(closedFiltered))
+	for _, m := range closedFiltered {
+		closedItems = append(closedItems, buildConnectionItem(m, false))
 	}
 
 	payload := struct {
-		UploadTotal   int64                  `json:"uploadTotal"`
-		DownloadTotal int64                  `json:"downloadTotal"`
-		Connections   []activeConnectionItem `json:"connections"`
+		UploadTotal       int64                  `json:"uploadTotal"`
+		DownloadTotal     int64                  `json:"downloadTotal"`
+		Connections       []activeConnectionItem `json:"connections"`
+		ClosedConnections []activeConnectionItem `json:"closedConnections"`
 	}{
-		UploadTotal:   upTotal,
-		DownloadTotal: downTotal,
-		Connections:   items,
+		UploadTotal:       upTotal,
+		DownloadTotal:     downTotal,
+		Connections:       items,
+		ClosedConnections: closedItems,
 	}
 	data, err := json.Marshal(payload)
 	if err != nil {
@@ -918,6 +1004,13 @@ func (b *BoxInstance) CloseAllConnections() {
 		return
 	}
 	b.trafficManager.CloseAllConnections()
+}
+
+func (b *BoxInstance) ClearClosedConnections() {
+	if b == nil || b.trafficManager == nil {
+		return
+	}
+	b.trafficManager.Clear()
 }
 
 func resolveRealTag(outboundMgr adapter.OutboundManager, detour adapter.Outbound, network string) string {

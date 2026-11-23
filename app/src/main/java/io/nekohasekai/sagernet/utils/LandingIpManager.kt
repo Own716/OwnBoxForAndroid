@@ -2,6 +2,7 @@ package io.nekohasekai.sagernet.utils
 
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.ktx.USER_AGENT
+import io.nekohasekai.sagernet.ktx.isIpAddress
 import io.nekohasekai.sagernet.ktx.tryProxyOutbound
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -9,7 +10,17 @@ import kotlinx.coroutines.withTimeoutOrNull
 import libcore.Libcore
 import moe.matsuri.nb4a.utils.Util
 import org.json.JSONObject
+import java.net.InetAddress
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
+
+data class ConnectionIpGeo(
+    val ip: String,
+    val asn: String,
+    val location: String,
+    val org: String,
+    val isPrivate: Boolean,
+)
 
 enum class IpRiskLevel(val label: String, val colorHex: String) {
     CLEAN("极低风险", "#10B981"),
@@ -89,6 +100,76 @@ object LandingIpManager {
     private var activeQueryProfileId: Long = -1L
 
     private val queryGeneration = java.util.concurrent.atomic.AtomicLong(0L)
+    private val ipGeoCache = ConcurrentHashMap<String, ConnectionIpGeo>()
+
+    private fun isPrivateOrLocalIp(ip: String): Boolean {
+        if (!ip.isIpAddress()) return false
+        return try {
+            val addr = InetAddress.getByName(ip)
+            if (addr.isAnyLocalAddress || addr.isLoopbackAddress || addr.isLinkLocalAddress ||
+                addr.isSiteLocalAddress || addr.isMulticastAddress
+            ) {
+                return true
+            }
+            val bytes = addr.address
+            if (bytes.size == 4) {
+                val b0 = bytes[0].toInt() and 0xFF
+                val b1 = bytes[1].toInt() and 0xFF
+                // 100.64.0.0/10 (CGNAT), 198.18.0.0/15 (FakeIP / Benchmarking), 169.254.0.0/16
+                (b0 == 100 && b1 in 64..127) ||
+                    (b0 == 198 && (b1 == 18 || b1 == 19)) ||
+                    (b0 == 169 && b1 == 254)
+            } else if (bytes.size == 16) {
+                val b0 = bytes[0].toInt() and 0xFF
+                // fc00::/7 (Unique Local Address)
+                (b0 and 0xFE) == 0xFC
+            } else {
+                false
+            }
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    suspend fun lookupIpGeo(rawIp: String): ConnectionIpGeo? {
+        val cleanIp = rawIp.trim().removePrefix("[").removeSuffix("]").substringBefore("%").trim()
+        if (cleanIp.isEmpty() || !cleanIp.isIpAddress()) return null
+        if (isPrivateOrLocalIp(cleanIp)) {
+            return ConnectionIpGeo(cleanIp, "", "局域网 / 内网地址", "", isPrivate = true)
+        }
+        ipGeoCache[cleanIp]?.let { return it }
+
+        return withContext(Dispatchers.IO) {
+            val startTime = System.currentTimeMillis()
+            val ua = USER_AGENT
+            val info = withTimeoutOrNull(4500L) {
+                fetchFromIpLocate(cleanIp, "", ua, startTime)
+                    ?: fetchFromIpApiCom(cleanIp, "", ua, startTime)
+            } ?: return@withContext null
+
+            val location = buildString {
+                if (info.countryFlag.isNotBlank()) append(info.countryFlag).append(' ')
+                val locText = listOf(info.city, info.country)
+                    .filter { it.isNotBlank() }
+                    .distinct()
+                    .joinToString(", ")
+                append(locText.ifBlank { info.countryCode.ifBlank { "未知地区" } })
+            }.trim()
+
+            val result = ConnectionIpGeo(
+                ip = cleanIp,
+                asn = info.asn,
+                location = location,
+                org = info.org.ifBlank { info.isp },
+                isPrivate = false,
+            )
+            if (ipGeoCache.size > 256) {
+                ipGeoCache.clear()
+            }
+            ipGeoCache[cleanIp] = result
+            result
+        }
+    }
 
     fun clearCache() {
         queryGeneration.incrementAndGet()

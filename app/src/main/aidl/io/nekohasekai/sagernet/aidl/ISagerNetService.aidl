@@ -22,4 +22,5 @@ interface ISagerNetService {
   String getActiveConnectionsJson();
   boolean closeActiveConnection(String id);
   void closeAllActiveConnections();
+  void clearClosedConnections();
 }

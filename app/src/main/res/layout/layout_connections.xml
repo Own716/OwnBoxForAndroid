@@ -15,7 +15,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingHorizontal="16dp"
+        android:paddingHorizontal="12dp"
         android:paddingTop="8dp"
         android:paddingBottom="4dp">
 
@@ -23,6 +23,7 @@
             android:id="@+id/card_stats"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            app:cardBackgroundColor="?attr/colorSurface"
             app:cardCornerRadius="@dimen/card_corner_radius"
             app:cardElevation="0dp"
             app:strokeColor="@color/card_stroke"
@@ -31,49 +32,236 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingHorizontal="14dp"
-                android:paddingVertical="10dp">
+                android:orientation="vertical"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="8dp">
 
-                <TextView
-                    android:id="@+id/tv_active_count"
-                    android:layout_width="0dp"
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:textColor="?android:attr/textColorPrimary"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    tools:text="活跃连接: 0" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_close_all"
-                    style="@style/Widget.MaterialComponents.Button.TextButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="36dp"
-                    android:insetTop="0dp"
-                    android:insetBottom="0dp"
-                    android:text="@string/connections_close_all"
-                    android:textColor="?attr/colorError" />
+                    <com.google.android.material.chip.ChipGroup
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        app:chipSpacingHorizontal="6dp"
+                        app:selectionRequired="true"
+                        app:singleLine="true"
+                        app:singleSelection="true">
+
+                        <com.google.android.material.chip.Chip
+                            android:id="@+id/btn_tab_active"
+                            style="@style/Widget.MaterialComponents.Chip.Choice"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true"
+                            android:textSize="12sp"
+                            app:ensureMinTouchTargetSize="false"
+                            tools:text="活跃 16" />
+
+                        <com.google.android.material.chip.Chip
+                            android:id="@+id/btn_tab_closed"
+                            style="@style/Widget.MaterialComponents.Chip.Choice"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textSize="12sp"
+                            app:ensureMinTouchTargetSize="false"
+                            tools:text="历史 24" />
+
+                    </com.google.android.material.chip.ChipGroup>
+
+                    <ImageView
+                        android:id="@+id/btn_pause_resume"
+                        android:layout_width="34dp"
+                        android:layout_height="34dp"
+                        android:layout_marginEnd="4dp"
+                        android:background="?android:attr/selectableItemBackgroundBorderless"
+                        android:clickable="true"
+                        android:contentDescription="@string/connections_pause"
+                        android:focusable="true"
+                        android:padding="6dp"
+                        android:src="@drawable/ic_baseline_pause_24"
+                        app:tint="?android:attr/textColorPrimary" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_close_all"
+                        style="@style/Widget.MaterialComponents.Button.TextButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="34dp"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:minWidth="0dp"
+                        android:paddingHorizontal="8dp"
+                        android:text="@string/connections_close_all"
+                        android:textColor="?attr/colorError"
+                        android:textSize="12sp" />
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tv_total_traffic"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="?android:attr/textColorSecondary"
+                        android:textSize="11.5sp"
+                        tools:text="总计 ▼ 12.5 MB  ▲ 1.8 MB" />
+
+                    <TextView
+                        android:id="@+id/tv_paused_badge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:text="@string/connections_paused_banner"
+                        android:textColor="?attr/colorError"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/tv_total_speed"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="?android:attr/textColorPrimary"
+                        android:textSize="11.5sp"
+                        android:textStyle="bold"
+                        tools:text="▼ 128 KB/s  ▲ 12 KB/s" />
+
+                </LinearLayout>
 
             </LinearLayout>
 
         </com.google.android.material.card.MaterialCardView>
 
-        <EditText
-            android:id="@+id/et_search"
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="42dp"
+            android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:background="@drawable/bg_spinner_dropdown"
-            android:drawableStart="@drawable/ic_baseline_search_24"
-            android:drawablePadding="8dp"
-            android:hint="@string/connections_search_hint"
-            android:imeOptions="actionDone"
-            android:importantForAutofill="no"
-            android:inputType="text"
-            android:paddingHorizontal="12dp"
-            android:textSize="13sp" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/tv_sort_selector"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:background="@drawable/bg_spinner_dropdown"
+                android:clickable="true"
+                android:drawablePadding="4dp"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="10dp"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textSize="12sp"
+                app:drawableEndCompat="@drawable/ic_spinner_dropdown_arrow"
+                tools:text="连接时间" />
+
+            <ImageView
+                android:id="@+id/btn_sort_order"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/bg_spinner_dropdown"
+                android:clickable="true"
+                android:contentDescription="@string/group_order"
+                android:focusable="true"
+                android:padding="8dp"
+                android:src="@drawable/ic_baseline_keyboard_arrow_down_24"
+                app:tint="?android:attr/textColorPrimary" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_spinner_dropdown"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="10dp">
+
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:contentDescription="@string/connections_search_hint_regex"
+                    android:src="@drawable/ic_baseline_search_24"
+                    app:tint="?android:attr/textColorSecondary" />
+
+                <EditText
+                    android:id="@+id/et_search"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:background="@null"
+                    android:hint="@string/connections_search_hint_regex"
+                    android:imeOptions="actionDone"
+                    android:importantForAutofill="no"
+                    android:inputType="text"
+                    android:maxLines="1"
+                    android:paddingVertical="0dp"
+                    android:singleLine="true"
+                    android:textSize="12.5sp" />
+
+                <TextView
+                    android:id="@+id/btn_regex_toggle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="26dp"
+                    android:layout_marginStart="2dp"
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:fontFamily="monospace"
+                    android:gravity="center"
+                    android:minWidth="26dp"
+                    android:paddingHorizontal="4dp"
+                    android:text=".*"
+                    android:textColor="?android:attr/textColorSecondary"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <ImageView
+                    android:id="@+id/btn_clear_search"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:clickable="true"
+                    android:contentDescription="@string/delete"
+                    android:focusable="true"
+                    android:padding="4dp"
+                    android:src="@drawable/ic_navigation_close"
+                    android:visibility="gone"
+                    app:tint="?android:attr/textColorSecondary" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:scrollbars="none">
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/chip_group_filter"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:chipSpacingHorizontal="6dp"
+                app:selectionRequired="true"
+                app:singleLine="true"
+                app:singleSelection="true" />
+
+        </HorizontalScrollView>
 
     </LinearLayout>
 

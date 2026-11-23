@@ -323,6 +323,13 @@ class BaseService {
             runCatching { box.closeAllConnections() }
         }
 
+        override fun clearClosedConnections() {
+            val currentData = data ?: return
+            if (currentData.state != State.Connected) return
+            val box = currentData.proxy?.box ?: return
+            runCatching { box.clearClosedConnections() }
+        }
+
         fun stateChanged(s: State, msg: String?) = launch {
             val profileName = profileName
             broadcast { it.stateChanged(s.ordinal, profileName, msg) }
