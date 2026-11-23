@@ -266,7 +266,11 @@ object StrategySnapshot {
         val selTrim = selectionMode.trim()
         if (typeTrim == "autoselect" || selTrim.isNotEmpty()) {
             val base = context.getString(
-                if (selTrim == "priority") R.string.balancer_selection_priority else R.string.balancer_selection_latency
+                when (selTrim) {
+                    "fallback" -> R.string.balancer_selection_fallback
+                    "priority" -> R.string.balancer_selection_priority
+                    else -> R.string.balancer_selection_latency
+                }
             )
             return if (balanceEnabled) {
                 "$base · ${context.getString(R.string.balancer_cat_load_balance)}"

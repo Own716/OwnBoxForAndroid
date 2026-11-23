@@ -302,6 +302,27 @@ class BaseService {
             return StrategySnapshotHelper.pinMemberAndSnapshotJson(currentData, memberProfileId)
         }
 
+        override fun getActiveConnectionsJson(): String {
+            val currentData = data ?: return ""
+            if (currentData.state != State.Connected) return ""
+            val box = currentData.proxy?.box ?: return ""
+            return runCatching { box.getConnectionsJSON() }.getOrDefault("")
+        }
+
+        override fun closeActiveConnection(id: String): Boolean {
+            val currentData = data ?: return false
+            if (currentData.state != State.Connected) return false
+            val box = currentData.proxy?.box ?: return false
+            return runCatching { box.closeConnection(id) }.getOrDefault(false)
+        }
+
+        override fun closeAllActiveConnections() {
+            val currentData = data ?: return
+            if (currentData.state != State.Connected) return
+            val box = currentData.proxy?.box ?: return
+            runCatching { box.closeAllConnections() }
+        }
+
         fun stateChanged(s: State, msg: String?) = launch {
             val profileName = profileName
             broadcast { it.stateChanged(s.ordinal, profileName, msg) }

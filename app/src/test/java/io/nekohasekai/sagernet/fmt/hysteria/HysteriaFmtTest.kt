@@ -75,5 +75,22 @@ class HysteriaFmtTest {
         assertEquals("hysteria2", hy2.type)
         assertEquals(8443, hy2.server_port)
         assertNull(hy2.server_ports)
+        assertNull(hy2.disable_path_mtu_discovery)
+    }
+
+    @Test
+    fun buildSingBoxOutboundHysteria2EmitsDisablePathMtuDiscoveryWhenEnabled() {
+        val bean = HysteriaBean().apply {
+            protocolVersion = 2
+            serverAddress = "203.10.99.59"
+            serverPorts = "8443"
+            authPayload = "secret-token"
+            disableMtuDiscovery = true
+        }
+
+        val option = buildSingBoxOutboundHysteriaBean(bean)
+        val hy2 = option as SingBoxOptions.Outbound_Hysteria2Options
+
+        assertEquals(true, hy2.disable_path_mtu_discovery)
     }
 }

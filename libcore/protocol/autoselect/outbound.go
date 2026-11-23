@@ -415,6 +415,13 @@ func (g *AutoSelect) resetDialFail(tag string) {
 	g.dialFailMu.Unlock()
 }
 
+func (g *AutoSelect) failureThreshold() int {
+	if g.cfg.selectionMode == SelectionModeFallback && g.cfg.fallbackMaxFails > 0 {
+		return g.cfg.fallbackMaxFails
+	}
+	return 2
+}
+
 func (g *AutoSelect) onPassiveFailure(tag, siteHost string) {
 	if !g.cfg.learnFromConnections || g.passive == nil {
 		return
@@ -422,7 +429,8 @@ func (g *AutoSelect) onPassiveFailure(tag, siteHost string) {
 	now := g.now()
 	g.passive.RecordFailure(tag, siteHost)
 	_, _, consecFails := g.passive.NodeStats(tag, now)
-	if consecFails >= 2 && tag == g.scorer.activeTagSnapshot() {
+	threshold := g.failureThreshold()
+	if consecFails >= threshold && tag == g.scorer.activeTagSnapshot() {
 		if g.scorer.switchFromConnectionFailure(tag, "passive failover", now, g.passive) {
 			g.handleSwitchInterrupt()
 		}
@@ -440,7 +448,8 @@ func (g *AutoSelect) onDialAttemptFailed(tag, siteHost string, now time.Time) {
 	count := g.dialFails[tag]
 	g.dialFailMu.Unlock()
 
-	if count >= 2 || passiveFails >= 2 {
+	threshold := g.failureThreshold()
+	if count >= threshold || passiveFails >= threshold {
 		if g.scorer.switchFromConnectionFailure(tag, "dial failover", now, g.passive) {
 			g.handleSwitchInterrupt()
 		}

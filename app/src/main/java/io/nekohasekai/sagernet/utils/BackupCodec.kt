@@ -145,6 +145,7 @@ object BackupCodec {
         "fragmentLength" to DataStore.fragmentLength,
         "fragmentInterval" to DataStore.fragmentInterval,
         "enableClashAPI" to DataStore.enableClashAPI,
+        Key.ENABLE_CONNECTIONS_MONITOR to DataStore.enableConnectionsMonitor,
         Key.MIXED_PORT to DataStore.mixedPort,
         Key.ALLOW_ACCESS to DataStore.allowAccess,
         Key.SPEED_INTERVAL to DataStore.speedInterval,

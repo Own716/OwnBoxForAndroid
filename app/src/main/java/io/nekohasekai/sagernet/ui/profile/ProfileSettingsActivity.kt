@@ -241,9 +241,9 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             preferenceManager.preferenceDataStore = DataStore.profileCacheStore
             try {
-                activity = (requireActivity() as ProfileSettingsActivity<*>).apply {
-                    createPreferences(savedInstanceState, rootKey)
-                }
+                val host = requireActivity() as ProfileSettingsActivity<*>
+                activity = host
+                host.createPreferences(savedInstanceState, rootKey)
                 preferenceScreen?.enableMultiLineTitles()
             } catch (e: Exception) {
                 Toast.makeText(

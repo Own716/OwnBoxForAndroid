@@ -11,6 +11,7 @@ const (
 
 	SelectionModeLatency  = "latency"
 	SelectionModePriority = "priority"
+	SelectionModeFallback = "fallback"
 
 	BalanceModeTimedRotation = "timed_rotation"
 	BalanceModePerConnection = "per_connection"
@@ -36,6 +37,9 @@ type AutoSelectOptions struct {
 	LearnFromConnections      *bool              `json:"learn_from_connections,omitempty"`
 	Tiers                     [][]string         `json:"tiers,omitempty"`
 	InitialDelays             map[string]uint16  `json:"initial_delays,omitempty"`
+	FallbackAutoRevert        *bool              `json:"fallback_auto_revert,omitempty"`
+	FallbackMaxFails          int                `json:"fallback_max_fails,omitempty"`
+	ProbeTimeoutMs            int                `json:"probe_timeout_ms,omitempty"`
 }
 
 type normalizedConfig struct {
@@ -49,12 +53,23 @@ type normalizedConfig struct {
 	interruptOnSwitch    bool
 	learnFromConnections bool
 	tiers                [][]string
+	fallbackAutoRevert   bool
+	fallbackMaxFails     int
+	probeTimeout         time.Duration
 }
 
 func (o AutoSelectOptions) normalized() normalizedConfig {
 	selectionMode := SelectionModeLatency
-	if o.SelectionMode == SelectionModePriority {
+	switch o.SelectionMode {
+	case SelectionModeFallback:
+		selectionMode = SelectionModeFallback
+	case SelectionModePriority:
 		selectionMode = SelectionModePriority
+	}
+
+	balanceEnabled := o.BalanceEnabled
+	if selectionMode == SelectionModeFallback {
+		balanceEnabled = false
 	}
 
 	balanceMode := BalanceModeTimedRotation
@@ -96,10 +111,31 @@ func (o AutoSelectOptions) normalized() normalizedConfig {
 		}
 	}
 
+	fallbackAutoRevert := true
+	if o.FallbackAutoRevert != nil {
+		fallbackAutoRevert = *o.FallbackAutoRevert
+	}
+
+	fallbackMaxFails := o.FallbackMaxFails
+	if fallbackMaxFails <= 0 {
+		fallbackMaxFails = 2
+	} else if fallbackMaxFails > 20 {
+		fallbackMaxFails = 20
+	}
+
+	pTimeout := probeTimeout
+	if o.ProbeTimeoutMs >= 500 {
+		clamped := o.ProbeTimeoutMs
+		if clamped > 30000 {
+			clamped = 30000
+		}
+		pTimeout = time.Duration(clamped) * time.Millisecond
+	}
+
 	return normalizedConfig{
 		url:                  o.URL,
 		selectionMode:        selectionMode,
-		balanceEnabled:       o.BalanceEnabled,
+		balanceEnabled:       balanceEnabled,
 		balanceMode:          balanceMode,
 		balanceInterval:      balanceInterval,
 		checkInterval:        checkInterval,
@@ -107,5 +143,8 @@ func (o AutoSelectOptions) normalized() normalizedConfig {
 		interruptOnSwitch:    o.InterruptExistConnections,
 		learnFromConnections: learn,
 		tiers:                tiers,
+		fallbackAutoRevert:   fallbackAutoRevert,
+		fallbackMaxFails:     fallbackMaxFails,
+		probeTimeout:         pTimeout,
 	}
 }

@@ -108,7 +108,11 @@ object BalancerMemberResolver {
                 frontProxyId = frontProxyId,
                 landingProxyId = landingProxyId,
                 countryFilter = balancer.countryFilter.orEmpty(),
-                selectionMode = if (balancer.isPriorityMode()) BalancerBean.SELECTION_PRIORITY else BalancerBean.SELECTION_LATENCY,
+                selectionMode = when {
+                    balancer.isFallbackMode() -> BalancerBean.SELECTION_FALLBACK
+                    balancer.isPriorityMode() -> BalancerBean.SELECTION_PRIORITY
+                    else -> BalancerBean.SELECTION_LATENCY
+                },
                 tiers = balancer.tiers?.mapNotNull { it?.copy() } ?: emptyList(),
             ),
             groupProfilesProvider = groupProfilesProvider,
@@ -213,7 +217,7 @@ object BalancerMemberResolver {
         val matchedCandidateCount = candidates.size
         val availableCount = candidates.count { it.status != 2 && it.status != 3 }
 
-        val ordered = if (spec.selectionMode == BalancerBean.SELECTION_PRIORITY) {
+        val ordered = if (spec.selectionMode == BalancerBean.SELECTION_PRIORITY || spec.selectionMode == BalancerBean.SELECTION_FALLBACK) {
             candidates
         } else {
             sortForColdStart(candidates)

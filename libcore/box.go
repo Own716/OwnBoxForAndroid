@@ -19,14 +19,17 @@ import (
 	"regexp"
 	"runtime"
 	"runtime/debug"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/gofrs/uuid/v5"
 	"golang.org/x/net/http2"
 
 	"github.com/sagernet/sing-box/adapter"
+	"github.com/sagernet/sing-box/common/trafficcontrol"
 	"github.com/sagernet/sing-box/experimental/v2rayapi"
 	"github.com/sagernet/sing-box/protocol/group"
 
@@ -35,6 +38,7 @@ import (
 	sblog "github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
 	E "github.com/sagernet/sing/common/exceptions"
+	F "github.com/sagernet/sing/common/format"
 	M "github.com/sagernet/sing/common/metadata"
 	"github.com/sagernet/sing/service"
 	"github.com/sagernet/sing/service/pause"
@@ -78,6 +82,28 @@ func sanitizeOutbounds(outbounds []option.Outbound) {
 		if dialerWrapper, ok := ob.Options.(option.DialerOptionsWrapper); ok {
 			dialerOpt := dialerWrapper.TakeDialerOptions()
 			changed := false
+			// 拨号策略冲突防护：bind_interface / inet*_bind_address 不得与 network_strategy 并存
+			if dialerOpt.BindInterface != "" || dialerOpt.Inet4BindAddress != nil || dialerOpt.Inet6BindAddress != nil {
+				if dialerOpt.NetworkStrategy != nil || len(dialerOpt.NetworkType) > 0 || len(dialerOpt.FallbackNetworkType) > 0 {
+					dialerOpt.NetworkStrategy = nil
+					dialerOpt.NetworkType = nil
+					dialerOpt.FallbackNetworkType = nil
+					changed = true
+				}
+			}
+			// QUIC / UDP 协议族：在双网络加速 (hybrid) / 并发拨号 (fallback) 下 UDP connect() 为 0-RTT 本地成功，
+			// 多接口竞速时备用蜂窝网可能抢跑并被 SO_BINDTOIFINDEX 绑定至无策略路由的黑洞网卡。
+			// 默认锁定 network_strategy="default" 走当前物理默认出口（用户显式指定绑卡/策略时尊重用户配置）。
+			switch ob.Type {
+			case constant.TypeHysteria2, constant.TypeHysteria, constant.TypeTUIC, juicity.TypeJuicity:
+				if dialerOpt.NetworkStrategy == nil && len(dialerOpt.NetworkType) == 0 && len(dialerOpt.FallbackNetworkType) == 0 &&
+					dialerOpt.BindInterface == "" && dialerOpt.Inet4BindAddress == nil && dialerOpt.Inet6BindAddress == nil {
+					dialerOpt.TCPFastOpen = false
+					defaultStrategy := option.NetworkStrategy(constant.NetworkStrategyDefault)
+					dialerOpt.NetworkStrategy = &defaultStrategy
+					changed = true
+				}
+			}
 			// anytls 协议不支持 TCP Fast Open (sing-box 官方内核在此处开启 TFO 时直接抛出致命错误)
 			if ob.Type == "anytls" && dialerOpt.TCPFastOpen {
 				dialerOpt.TCPFastOpen = false
@@ -286,6 +312,7 @@ type BoxInstance struct {
 	v2api           *v2rayapi.StatsService
 	selector        *group.Selector
 	pauseManager    pause.Manager
+	trafficManager  *trafficcontrol.Manager
 	platformWrapper *boxPlatformInterfaceWrapper
 
 	diagnosticID  uint64
@@ -435,6 +462,7 @@ func newSingBoxInstance(config string, localTransport LocalDNSTransport, platfor
 		startBox:        instance.Start,
 		closeBox:        instance.Close,
 		pauseManager:    service.FromContext[pause.Manager](ctx),
+		trafficManager:  service.PtrFromContext[trafficcontrol.Manager](ctx),
 		platformWrapper: platformWrapper,
 		diagnosticID:    diagnosticID,
 		diagnosticTag:   diagnosticTag,
@@ -483,7 +511,10 @@ func (b *BoxInstance) Start() (err error) {
 			b.state = boxStateStarted
 			if b.platformWrapper != nil && b.Box != nil {
 				if router := b.Box.Router(); router != nil {
-					b.platformWrapper.setRouterReset(router.ResetNetwork)
+					b.platformWrapper.setRouterReset(func() {
+						router.ResetNetwork()
+						b.resetStatefulUDPTransports()
+					})
 				}
 			}
 			b.urlTestTrace("box-start", "ok elapsed=%s", time.Since(started))
@@ -707,6 +738,186 @@ func (b *BoxInstance) PinGroupOutbound(groupTag, memberTag string) bool {
 		return false
 	}
 	return ctrl.PinOutbound(memberTag)
+}
+
+func (b *BoxInstance) resetStatefulUDPTransports() {
+	if b == nil || b.Box == nil {
+		return
+	}
+	ctx := context.Background()
+	if outboundManager := b.Box.Outbound(); outboundManager != nil {
+		for _, ob := range outboundManager.Outbounds() {
+			switch ob.Type() {
+			case constant.TypeHysteria2, constant.TypeHysteria, constant.TypeTUIC, juicity.TypeJuicity:
+				if listener, ok := ob.(adapter.InterfaceUpdateListener); ok {
+					listener.InterfaceUpdated(ctx)
+				}
+			}
+		}
+	}
+	if endpointManager := b.Box.Endpoint(); endpointManager != nil {
+		for _, ep := range endpointManager.Endpoints() {
+			if ep.Type() == constant.TypeWireGuard {
+				if listener, ok := ep.(adapter.InterfaceUpdateListener); ok {
+					listener.InterfaceUpdated(ctx)
+				}
+			}
+		}
+	}
+}
+
+type activeConnectionItem struct {
+	ID          string   `json:"id"`
+	Network     string   `json:"network"`
+	Host        string   `json:"host"`
+	Port        int      `json:"port"`
+	Inbound     string   `json:"inbound"`
+	PackageName string   `json:"packageName"`
+	Uid         int32    `json:"uid"`
+	Rule        string   `json:"rule"`
+	Chains      []string `json:"chains"`
+	Outbound    string   `json:"outbound"`
+	Upload      int64    `json:"upload"`
+	Download    int64    `json:"download"`
+	StartMs     int64    `json:"startMs"`
+}
+
+func (b *BoxInstance) GetConnectionsJSON() string {
+	if b == nil || b.trafficManager == nil {
+		return ""
+	}
+	conns := b.trafficManager.Connections()
+	upTotal, downTotal := b.trafficManager.Total()
+
+	filtered := make([]*trafficcontrol.TrackerMetadata, 0, len(conns))
+	for _, m := range conns {
+		if m == nil || m.OutboundType == constant.TypeDNS {
+			continue
+		}
+		filtered = append(filtered, m)
+	}
+	sort.Slice(filtered, func(i, j int) bool {
+		if !filtered[i].CreatedAt.Equal(filtered[j].CreatedAt) {
+			return filtered[i].CreatedAt.After(filtered[j].CreatedAt)
+		}
+		return filtered[i].ID.String() < filtered[j].ID.String()
+	})
+
+	items := make([]activeConnectionItem, 0, len(filtered))
+	for _, m := range filtered {
+		network := strings.ToUpper(strings.TrimSpace(m.Metadata.Network))
+		if network == "" {
+			network = "TCP"
+		}
+		host := m.Metadata.Domain
+		if host == "" {
+			host = m.Metadata.Destination.Fqdn
+		}
+		if host == "" && m.Metadata.Destination.Addr.IsValid() {
+			host = m.Metadata.Destination.Addr.String()
+		}
+		inbound := m.Metadata.Inbound
+		if inbound == "" {
+			inbound = m.Metadata.InboundType
+		}
+
+		pkg := ""
+		var uid int32 = -1
+		if m.Metadata.ProcessInfo != nil {
+			uid = m.Metadata.ProcessInfo.UserId
+			for _, p := range m.Metadata.ProcessInfo.PackageNames {
+				if trimmed := strings.TrimSpace(p); trimmed != "" {
+					pkg = trimmed
+					break
+				}
+			}
+			if pkg == "" {
+				for _, p := range m.Metadata.ProcessInfo.ProcessPaths {
+					if trimmed := strings.TrimSpace(p); trimmed != "" {
+						pkg = trimmed
+						break
+					}
+				}
+			}
+		}
+
+		rule := "final"
+		if m.Rule != nil {
+			rule = F.ToString(m.Rule, " => ", m.Rule.Action())
+		}
+
+		chains := make([]string, 0, len(m.Chain))
+		for i := len(m.Chain) - 1; i >= 0; i-- {
+			if tag := strings.TrimSpace(m.Chain[i]); tag != "" {
+				chains = append(chains, tag)
+			}
+		}
+		if len(chains) == 0 && m.Outbound != "" {
+			chains = append(chains, m.Outbound)
+		}
+
+		var up, down int64
+		if m.Upload != nil {
+			up = m.Upload.Load()
+		}
+		if m.Download != nil {
+			down = m.Download.Load()
+		}
+
+		items = append(items, activeConnectionItem{
+			ID:          m.ID.String(),
+			Network:     network,
+			Host:        host,
+			Port:        int(m.Metadata.Destination.Port),
+			Inbound:     inbound,
+			PackageName: pkg,
+			Uid:         uid,
+			Rule:        rule,
+			Chains:      chains,
+			Outbound:    m.Outbound,
+			Upload:      up,
+			Download:    down,
+			StartMs:     m.CreatedAt.UnixMilli(),
+		})
+	}
+
+	payload := struct {
+		UploadTotal   int64                  `json:"uploadTotal"`
+		DownloadTotal int64                  `json:"downloadTotal"`
+		Connections   []activeConnectionItem `json:"connections"`
+	}{
+		UploadTotal:   upTotal,
+		DownloadTotal: downTotal,
+		Connections:   items,
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
+func (b *BoxInstance) CloseConnection(id string) bool {
+	if b == nil || b.trafficManager == nil || strings.TrimSpace(id) == "" {
+		return false
+	}
+	uid, err := uuid.FromString(strings.TrimSpace(id))
+	if err != nil {
+		return false
+	}
+	tracker := b.trafficManager.Connection(uid)
+	if tracker == nil {
+		return false
+	}
+	_ = tracker.Close()
+	return true
+}
+
+func (b *BoxInstance) CloseAllConnections() {
+	if b == nil || b.trafficManager == nil {
+		return
+	}
+	b.trafficManager.CloseAllConnections()
 }
 
 func resolveRealTag(outboundMgr adapter.OutboundManager, detour adapter.Outbound, network string) string {

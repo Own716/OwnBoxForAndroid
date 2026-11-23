@@ -300,7 +300,11 @@ func (p *prober) defaultProbe(ctx context.Context, tag string) (uint16, error) {
 	if ob == nil {
 		return 0, errors.New("outbound not found")
 	}
-	return customUrltest.ProbeOutbound(ctx, ob, p.link, probeTimeout)
+	timeout := p.cfg.probeTimeout
+	if timeout <= 0 {
+		timeout = probeTimeout
+	}
+	return customUrltest.ProbeOutbound(ctx, ob, p.link, timeout)
 }
 
 func (p *prober) defaultConnectivityCheck(ctx context.Context) bool {

@@ -6,6 +6,7 @@ import (
 	"libcore/protocol/juicity"
 	"libcore/protocol/loadbalance"
 
+	"github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/option"
 )
 
@@ -118,16 +119,22 @@ func TestSanitizeOutbounds(t *testing.T) {
 		t.Errorf("expected anytls TCPFastOpen to be false, got true")
 	}
 
-	// Verify Hysteria2 empty obfs removed
+	// Verify Hysteria2 empty obfs removed and UDP/QUIC network strategy locked to default
 	hy2Opt := outbounds[1].Options.(*option.Hysteria2OutboundOptions)
 	if hy2Opt.Obfs != nil {
 		t.Errorf("expected hysteria2 empty password obfs to be nil, got %+v", hy2Opt.Obfs)
 	}
+	if hy2Opt.NetworkStrategy == nil || *hy2Opt.NetworkStrategy != option.NetworkStrategy(constant.NetworkStrategyDefault) {
+		t.Errorf("expected hysteria2 NetworkStrategy to default to default, got %+v", hy2Opt.NetworkStrategy)
+	}
 
-	// Verify TUIC stream/relay conflict resolved
+	// Verify TUIC stream/relay conflict resolved and network strategy locked to default
 	tuicOpt := outbounds[2].Options.(*option.TUICOutboundOptions)
 	if tuicOpt.UDPOverStream {
 		t.Errorf("expected tuic UDPOverStream to be false when UDPRelayMode is set")
+	}
+	if tuicOpt.NetworkStrategy == nil || *tuicOpt.NetworkStrategy != option.NetworkStrategy(constant.NetworkStrategyDefault) {
+		t.Errorf("expected tuic NetworkStrategy to default to default, got %+v", tuicOpt.NetworkStrategy)
 	}
 
 	// Verify WireGuard detour/listen_port conflict resolved
@@ -163,10 +170,13 @@ func TestSanitizeOutbounds(t *testing.T) {
 		t.Errorf("expected shadowtls TLS enabled and version 3, got %+v", stOpt)
 	}
 
-	// Verify Juicity TLS enabled
+	// Verify Juicity TLS enabled and network strategy locked to default
 	jOpt := outbounds[8].Options.(*juicity.JuicityOutboundOptions)
 	if jOpt.TLS == nil || !jOpt.TLS.Enabled {
 		t.Errorf("expected juicity TLS enabled, got %+v", jOpt)
+	}
+	if jOpt.NetworkStrategy == nil || *jOpt.NetworkStrategy != option.NetworkStrategy(constant.NetworkStrategyDefault) {
+		t.Errorf("expected juicity NetworkStrategy to default to default, got %+v", jOpt.NetworkStrategy)
 	}
 
 	// Verify Selector deduplicated and non-existent default cleared
@@ -192,5 +202,29 @@ func TestSanitizeOutbounds(t *testing.T) {
 	cleanCfg := sanitizeTunStack(cfg)
 	if cleanCfg != `{"inbounds":[{"type":"tun","stack":"go"},{"type":"tun","stack":"go"},{"type":"tun","stack":"go"}]}` {
 		t.Errorf("unexpected sanitizeTunStack output: %s", cleanCfg)
+	}
+}
+
+func TestSanitizeOutboundsClearsNetworkStrategyWhenBindInterfaceSet(t *testing.T) {
+	hybridStrategy := option.NetworkStrategy(constant.NetworkStrategyHybrid)
+	outbounds := []option.Outbound{
+		{
+			Type: "hysteria2",
+			Options: &option.Hysteria2OutboundOptions{
+				DialerOptions: option.DialerOptions{
+					AbstractDialerOptions: option.AbstractDialerOptions{
+						BindInterface:   "wlan0",
+						NetworkStrategy: &hybridStrategy,
+					},
+				},
+			},
+		},
+	}
+
+	sanitizeOutbounds(outbounds)
+
+	hy2Opt := outbounds[0].Options.(*option.Hysteria2OutboundOptions)
+	if hy2Opt.NetworkStrategy != nil {
+		t.Errorf("expected NetworkStrategy to be cleared when BindInterface is set, got %+v", *hy2Opt.NetworkStrategy)
 	}
 }

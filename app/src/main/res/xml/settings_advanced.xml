@@ -17,6 +17,13 @@
 
         <SwitchPreferenceCompat
             app:defaultValue="false"
+            app:icon="@drawable/solar_wi_fi_router_linear"
+            app:key="enableConnectionsMonitor"
+            app:summary="@string/enable_connections_monitor_summary"
+            app:title="@string/enable_connections_monitor" />
+
+        <SwitchPreferenceCompat
+            app:defaultValue="false"
             app:icon="@drawable/solar_transfer_horizontal_linear"
             app:key="networkChangeResetConnections"
             app:title="@string/network_change_reset_connections"

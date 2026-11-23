@@ -18,4 +18,8 @@ interface ISagerNetService {
   String getActiveStrategySnapshotJson();
   String checkActiveStrategyNowJson();
   String pinActiveStrategyMember(long memberProfileId);
+
+  String getActiveConnectionsJson();
+  boolean closeActiveConnection(String id);
+  void closeAllActiveConnections();
 }

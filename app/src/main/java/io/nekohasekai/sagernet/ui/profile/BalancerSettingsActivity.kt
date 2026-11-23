@@ -146,6 +146,8 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         DataStore.balancerToleranceUnit = "ms"
         DataStore.balancerInterruptOnSwitch = interruptOnSwitch
         DataStore.balancerLearnFromConnections = learnFromConnections
+        DataStore.balancerFallbackAutoRevert = fallbackAutoRevert
+        DataStore.balancerFallbackMaxFails = fallbackMaxFails.coerceIn(1, 20)
 
         DataStore.balancerTestUrl = testUrl ?: ""
         DataStore.balancerFrontProxy = frontProxy
@@ -186,6 +188,8 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         toleranceUnit = "ms"
         interruptOnSwitch = DataStore.balancerInterruptOnSwitch
         learnFromConnections = DataStore.balancerLearnFromConnections
+        fallbackAutoRevert = DataStore.balancerFallbackAutoRevert
+        fallbackMaxFails = DataStore.balancerFallbackMaxFails.coerceIn(1, 20)
 
         testUrl = DataStore.balancerTestUrl.trim()
         frontProxy = if (DataStore.balancerFrontProxyTmp == OutboundPreference.VALUE_SELECT_PROFILE.toInt()) {
@@ -690,15 +694,31 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         val advancedTogglePref = findPreference<Preference>("balancerAdvancedToggle")
 
         bindIntPref("balancerInterval", 300, 5, R.string.balancer_unit_seconds)
-        bindIntPref("balancerTolerance", 30, 0, R.string.balancer_unit_ms)
+        val tolerancePref = bindIntPref("balancerTolerance", 30, 0, R.string.balancer_unit_ms)
+        val toleranceSummaryProvider = Preference.SummaryProvider<EditTextPreference> { current ->
+            val isFb = DataStore.balancerSelectionMode == BalancerBean.SELECTION_FALLBACK
+            val parsed = current.text?.trim()?.toIntOrNull()
+            if (isFb) {
+                val ms = if (parsed != null && parsed >= 500) parsed else 3000
+                "${getString(R.string.balancer_unit_ms, ms)} · ${getString(R.string.balancer_fallback_timeout_summary)}"
+            } else {
+                val effective = if (parsed != null && parsed >= 0) parsed else 30
+                getString(R.string.balancer_unit_ms, effective)
+            }
+        }
+        tolerancePref?.summaryProvider = toleranceSummaryProvider
 
         val balanceSwitchPref = findPreference<SwitchPreferenceCompat>("balancerBalanceEnabled")
         val balanceModePref = findPreference<SimpleMenuPreference>("balancerBalanceMode")
         val balanceIntervalPref = bindIntPref("balancerBalanceIntervalSec", 30, 1, R.string.balancer_unit_seconds)
         val selectionModePref = findPreference<SimpleMenuPreference>("balancerSelectionMode")
-        val tolerancePref = findPreference<Preference>("balancerTolerance")
-        val fallbackAutoRevertPref = findPreference<Preference>("balancerFallbackAutoRevert")
-        val fallbackMaxFailsPref = findPreference<Preference>("balancerFallbackMaxFails")
+        val fallbackAutoRevertPref = findPreference<SwitchPreferenceCompat>("balancerFallbackAutoRevert")
+        val fallbackMaxFailsPref = bindIntPref("balancerFallbackMaxFails", 2, 1, null)
+        fallbackMaxFailsPref?.summaryProvider = Preference.SummaryProvider<EditTextPreference> { current ->
+            val parsed = current.text?.trim()?.toIntOrNull()
+            val effective = (parsed ?: 2).coerceIn(1, 20)
+            "$effective · ${getString(R.string.balancer_fallback_max_fails_summary)}"
+        }
 
         fun applyCategoryVisibility(balanceOn: Boolean) {
             catUseWhich?.isVisible = advancedExpanded
@@ -745,9 +765,7 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
             tolerancePref?.setTitle(
                 if (isFallback) R.string.balancer_fallback_timeout_title else R.string.balancer_tolerance_title
             )
-            tolerancePref?.setSummary(
-                if (isFallback) getString(R.string.balancer_fallback_timeout_summary) else null
-            )
+            tolerancePref?.summaryProvider = toleranceSummaryProvider
 
             rebuildTierPreferences()
             syncNodeListUi(DataStore.balancerType, mode)

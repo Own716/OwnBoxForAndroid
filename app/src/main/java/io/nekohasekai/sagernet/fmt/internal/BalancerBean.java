@@ -64,6 +64,9 @@ public class BalancerBean extends InternalBean {
     public boolean learnFromConnections = true;
     // v7 priority tiers
     public List<PriorityTier> tiers = new ArrayList<>();
+    // v9 fallback fields
+    public boolean fallbackAutoRevert = true;
+    public int fallbackMaxFails = 2;
 
     public static class PriorityTier {
         public long groupId = -1L;
@@ -168,7 +171,7 @@ public class BalancerBean extends InternalBean {
         if (isPriorityMode() && tiers != null && !tiers.isEmpty()) {
             stratBuilder.append(" · ").append(tiers.size()).append("层级");
         }
-        if (balanceEnabled) {
+        if (!isFallbackMode() && balanceEnabled) {
             stratBuilder.append(" · 流量分配");
         }
         String stratName = stratBuilder.toString();
@@ -231,6 +234,8 @@ public class BalancerBean extends InternalBean {
         interruptOnSwitch = false;
         learnFromConnections = true;
         tiers = new ArrayList<>();
+        fallbackAutoRevert = true;
+        fallbackMaxFails = 2;
     }
 
     private void migrateLegacyStrategy(String rawStrategy) {
@@ -269,9 +274,13 @@ public class BalancerBean extends InternalBean {
         if (targetGroupIds == null) targetGroupIds = new ArrayList<>();
         if (tiers == null) tiers = new ArrayList<>();
         if (selectionMode == null || selectionMode.isEmpty()) {
-            selectionMode = SELECTION_PRIORITY.equals(strategy) || STRATEGY_FAILOVER.equals(strategy)
-                    ? SELECTION_PRIORITY
-                    : SELECTION_LATENCY;
+            if (SELECTION_FALLBACK.equals(strategy)) {
+                selectionMode = SELECTION_FALLBACK;
+            } else if (SELECTION_PRIORITY.equals(strategy) || STRATEGY_FAILOVER.equals(strategy)) {
+                selectionMode = SELECTION_PRIORITY;
+            } else {
+                selectionMode = SELECTION_LATENCY;
+            }
         } else if (!SELECTION_LATENCY.equals(selectionMode) && !SELECTION_PRIORITY.equals(selectionMode) && !SELECTION_FALLBACK.equals(selectionMode)) {
             selectionMode = SELECTION_LATENCY;
         }
@@ -289,6 +298,7 @@ public class BalancerBean extends InternalBean {
         if (nameInclude == null) nameInclude = "";
         if (frontProxy == 0L) frontProxy = -1L;
         if (landingProxy == 0L) landingProxy = -1L;
+        if (fallbackMaxFails <= 0) fallbackMaxFails = 2;
     }
 
     @Override
@@ -298,7 +308,7 @@ public class BalancerBean extends InternalBean {
                 : (SELECTION_PRIORITY.equals(selectionMode) ? SELECTION_PRIORITY : SELECTION_LATENCY);
         strategy = effectiveSelection;
 
-        output.writeInt(8); // version
+        output.writeInt(9); // version
         output.writeInt(balancerType);
         output.writeLong(targetGroupId);
         output.writeString(strategy);
@@ -342,6 +352,8 @@ public class BalancerBean extends InternalBean {
             output.writeLong(tier != null ? tier.groupId : -1L);
             output.writeString(tier != null && tier.nameFilter != null ? tier.nameFilter : "");
         }
+        output.writeBoolean(fallbackAutoRevert);
+        output.writeInt(fallbackMaxFails > 0 ? fallbackMaxFails : 2);
     }
 
     @Override
@@ -396,11 +408,21 @@ public class BalancerBean extends InternalBean {
                 countryFilter = nonNullString(input.readString());
                 interruptOnSwitch = input.readBoolean();
                 learnFromConnections = input.readBoolean();
-                if (!SELECTION_PRIORITY.equals(selectionMode)) {
+                if (!SELECTION_PRIORITY.equals(selectionMode) && !SELECTION_FALLBACK.equals(selectionMode)) {
                     selectionMode = SELECTION_LATENCY;
                 }
                 strategy = selectionMode;
                 readTiers(input);
+                if (version >= 9) {
+                    fallbackAutoRevert = input.readBoolean();
+                    fallbackMaxFails = input.readInt();
+                    if (fallbackMaxFails <= 0) {
+                        fallbackMaxFails = 2;
+                    }
+                } else {
+                    fallbackAutoRevert = true;
+                    fallbackMaxFails = 2;
+                }
                 return;
             }
 
@@ -449,7 +471,7 @@ public class BalancerBean extends InternalBean {
                 learnFromConnections = input.readBoolean();
                 input.readInt(); // legacy siteStickyMinutes
                 input.readString(); // legacy connectivityUrl
-                if (!SELECTION_PRIORITY.equals(selectionMode)) {
+                if (!SELECTION_PRIORITY.equals(selectionMode) && !SELECTION_FALLBACK.equals(selectionMode)) {
                     selectionMode = SELECTION_LATENCY;
                 }
                 strategy = selectionMode;
@@ -457,6 +479,8 @@ public class BalancerBean extends InternalBean {
                 migrateLegacyStrategy(strategy);
             }
 
+            fallbackAutoRevert = true;
+            fallbackMaxFails = 2;
             tiers = new ArrayList<>();
             if (version >= 7) {
                 readTiers(input);

@@ -91,8 +91,8 @@ class HysteriaSettingsActivity : ProfileSettingsActivity<HysteriaBean>() {
                     false
                 findPreference<EditTextPreference>(Key.SERVER_CONNECTION_RECEIVE_WINDOW)!!.isVisible =
                     false
-                findPreference<SwitchPreferenceCompat>(Key.SERVER_DISABLE_MTU_DISCOVERY)!!.isVisible =
-                    false
+                findPreference<SwitchPreferenceCompat>(Key.SERVER_DISABLE_MTU_DISCOVERY)?.isVisible =
+                    true
                 //
                 authPayload.title = resources.getString(R.string.password)
             } else {

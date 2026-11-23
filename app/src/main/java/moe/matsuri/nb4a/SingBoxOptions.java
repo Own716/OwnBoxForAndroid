@@ -4670,6 +4670,12 @@ public class SingBoxOptions {
 
         public Map<String, Integer> initial_delays;
 
+        public Boolean fallback_auto_revert;
+
+        public Integer fallback_max_fails;
+
+        public Integer probe_timeout_ms;
+
     }
 
     public static class Rule_DefaultOptions extends Rule {

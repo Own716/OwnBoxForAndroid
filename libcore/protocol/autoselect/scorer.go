@@ -8,15 +8,16 @@ import (
 )
 
 type memberState struct {
-	tag           string
-	index         int
-	tier          int
-	checkCount    int
-	failCount     int
-	available     bool
-	lastCheckedAt time.Time
-	lastDelay     uint16
-	lastError     string
+	tag              string
+	index            int
+	tier             int
+	checkCount       int
+	failCount        int
+	consecutiveFails int
+	available        bool
+	lastCheckedAt    time.Time
+	lastDelay        uint16
+	lastError        string
 }
 
 type scorer struct {
@@ -103,21 +104,36 @@ func (s *scorer) recordSample(tag string, delay uint16, err error, now time.Time
 	st.checkCount++
 	st.lastCheckedAt = now
 	if okProbe {
+		st.consecutiveFails = 0
 		st.available = true
 		st.lastDelay = delay
 		st.lastError = ""
 		return
 	}
 
-	// Single probe failure marks the node unavailable immediately.
-	st.available = false
 	st.failCount++
-	st.lastDelay = 0
+	st.consecutiveFails++
 	if err != nil {
 		st.lastError = err.Error()
 	} else {
 		st.lastError = "probe failed"
 	}
+
+	if s.cfg.selectionMode == SelectionModeFallback {
+		maxFails := s.cfg.fallbackMaxFails
+		if maxFails <= 0 {
+			maxFails = 2
+		}
+		if st.consecutiveFails >= maxFails || !st.available {
+			st.available = false
+			st.lastDelay = 0
+		}
+		return
+	}
+
+	// Single probe failure marks the node unavailable immediately in latency/priority modes.
+	st.available = false
+	st.lastDelay = 0
 }
 
 func (s *scorer) sampleCounts(tag string) (total, fails int, lastDelay uint16) {
@@ -220,10 +236,53 @@ func (s *scorer) evaluateLocked(now time.Time) (string, string, bool, bool) {
 		}
 	}
 
+	if s.cfg.selectionMode == SelectionModeFallback {
+		return s.evaluateFallbackLocked(now, items, current)
+	}
 	if s.cfg.selectionMode == SelectionModePriority {
 		return s.evaluatePriorityLocked(now, items, current)
 	}
 	return s.evaluateLatencyLocked(now, items, current)
+}
+
+func (s *scorer) evaluateFallbackLocked(now time.Time, items []scoredEntryRef, current *scoredEntryRef) (string, string, bool, bool) {
+	var firstHealthy *scoredEntryRef
+	for i := range items {
+		if items[i].available {
+			firstHealthy = &items[i]
+			break
+		}
+	}
+	if firstHealthy == nil {
+		firstHealthy = &items[0]
+	}
+
+	if current == nil || s.activeTag == "" {
+		s.activeTag = firstHealthy.st.tag
+		s.lastSwitchAt = now
+		s.switchReason = "fallback select"
+		return s.activeTag, s.switchReason, true, false
+	}
+
+	if firstHealthy.st.tag == current.st.tag {
+		return s.activeTag, s.switchReason, false, false
+	}
+
+	if !current.available {
+		s.activeTag = firstHealthy.st.tag
+		s.lastSwitchAt = now
+		s.switchReason = "fallback failover"
+		return s.activeTag, s.switchReason, true, false
+	}
+
+	if s.cfg.fallbackAutoRevert && firstHealthy.st.index < current.st.index {
+		s.activeTag = firstHealthy.st.tag
+		s.lastSwitchAt = now
+		s.switchReason = "fallback auto-revert"
+		return s.activeTag, s.switchReason, true, true
+	}
+
+	return s.activeTag, s.switchReason, false, false
 }
 
 func (s *scorer) evaluatePriorityLocked(now time.Time, items []scoredEntryRef, current *scoredEntryRef) (string, string, bool, bool) {
@@ -469,8 +528,8 @@ func (s *scorer) switchFromConnectionFailure(failedTag, reason string, now time.
 		if (candidates[i].consecFails >= 2) != (candidates[j].consecFails >= 2) {
 			return candidates[i].consecFails < 2
 		}
-		if s.cfg.selectionMode == SelectionModePriority {
-			if s.hasTiers {
+		if s.cfg.selectionMode == SelectionModePriority || s.cfg.selectionMode == SelectionModeFallback {
+			if s.cfg.selectionMode == SelectionModePriority && s.hasTiers {
 				if candidates[i].st.tier != candidates[j].st.tier {
 					return candidates[i].st.tier < candidates[j].st.tier
 				}
@@ -710,8 +769,8 @@ func (s *scorer) candidateOrder(siteKey string, now time.Time, passive *passiveT
 		if all[i].avoid != all[j].avoid {
 			return !all[i].avoid
 		}
-		if s.cfg.selectionMode == SelectionModePriority {
-			if s.hasTiers {
+		if s.cfg.selectionMode == SelectionModePriority || s.cfg.selectionMode == SelectionModeFallback {
+			if s.cfg.selectionMode == SelectionModePriority && s.hasTiers {
 				if all[i].tier != all[j].tier {
 					return all[i].tier < all[j].tier
 				}

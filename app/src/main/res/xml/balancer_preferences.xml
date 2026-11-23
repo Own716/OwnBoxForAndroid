@@ -152,7 +152,6 @@
             app:iconSpaceReserved="false"
             app:isPreferenceVisible="false"
             app:key="balancerFallbackMaxFails"
-            app:summary="@string/balancer_fallback_max_fails_summary"
             app:title="@string/balancer_fallback_max_fails_title" />
 
         <EditTextPreference

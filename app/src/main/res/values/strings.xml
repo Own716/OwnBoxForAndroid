@@ -581,6 +581,7 @@
     <string name="hysteria_stream_receive_window">QUIC Stream Receive Window</string>
     <string name="hysteria_connection_receive_window">QUIC Connection Receive Window</string>
     <string name="hysteria_disable_mtu_discovery">Disable Path MTU Discovery</string>
+    <string name="hysteria_disable_mtu_discovery_summary">Enable when Hysteria2 stalls or fails to connect on Wi-Fi or broadband networks with MTU blackholes</string>
     <string name="group_order">Order</string>
     <string name="group_order_origin">Origin</string>
     <string name="group_order_by_name">By Name</string>
@@ -1616,4 +1617,6 @@
     <string name="connections_empty">No active connections</string>
     <string name="connections_search_hint">Search domain, IP or rule...</string>
     <string name="connections_close_all">Close All</string>
+    <string name="enable_connections_monitor">Enable Traffic Routing</string>
+    <string name="enable_connections_monitor_summary">Show Traffic Routing in the sidebar (works without Clash API; polls only while viewing)</string>
 </resources>

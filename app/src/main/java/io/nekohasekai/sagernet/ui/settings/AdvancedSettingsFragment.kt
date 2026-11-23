@@ -32,6 +32,14 @@ class AdvancedSettingsFragment : BaseSettingsPreferenceFragment() {
             reloadListener.onPreferenceChange(findPreference(Key.ENABLE_CLASH_API)!!, newValue)
         }
 
+        findPreference<SwitchPreferenceCompat>(Key.ENABLE_CONNECTIONS_MONITOR)?.setOnPreferenceChangeListener { _, newValue ->
+            (activity as? MainActivity)?.refreshNavMenu(
+                clashApi = DataStore.enableClashAPI,
+                connectionsMonitor = newValue as Boolean,
+            )
+            true
+        }
+
         findPreference<Preference>(Key.NETWORK_CHANGE_RESET_CONNECTIONS)?.onPreferenceChangeListener = reloadListener
         findPreference<Preference>(Key.WAKE_RESET_CONNECTIONS)?.onPreferenceChangeListener = reloadListener
         findPreference<Preference>(Key.GLOBAL_ALLOW_INSECURE)?.onPreferenceChangeListener = reloadListener

@@ -473,6 +473,7 @@
     <string name="hysteria_stream_receive_window">QUIC 流接收窗口</string>
     <string name="hysteria_connection_receive_window">QUIC 连接接收窗口</string>
     <string name="hysteria_disable_mtu_discovery">禁用路径最大传输单元发现</string>
+    <string name="hysteria_disable_mtu_discovery_summary">在部分 WiFi 或宽带环境下遇到 Hy2 断流、连不上时，开启此项可避开 MTU 黑洞丢包</string>
     <string name="group_order">排序</string>
     <string name="group_order_origin">原始</string>
     <string name="group_order_by_name">以名称</string>
@@ -1535,4 +1536,6 @@
     <string name="connections_empty">暂无活跃网络连接</string>
     <string name="connections_search_hint">搜索域名、IP 或规则...</string>
     <string name="connections_close_all">断开全部</string>
+    <string name="enable_connections_monitor">启用分流连接</string>
+    <string name="enable_connections_monitor_summary">开启后在左侧边栏显示「分流连接」入口（无需开启 Clash API，仅查看时按需刷新，关闭后自动隐藏）</string>
 </resources>

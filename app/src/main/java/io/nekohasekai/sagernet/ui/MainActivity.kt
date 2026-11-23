@@ -216,6 +216,7 @@ class MainActivity : ThemedActivity(),
                 is SettingsFragment -> R.id.nav_settings
                 is WebviewFragment -> R.id.nav_dashboard
                 is DiagnosticsFragment -> R.id.nav_diagnostics
+                is ConnectionsFragment -> R.id.nav_connections
                 is ToolsFragment -> R.id.nav_tools
                 is LogcatFragment -> R.id.nav_logcat
                 is DocsFragment -> R.id.nav_docs
@@ -288,7 +289,7 @@ class MainActivity : ThemedActivity(),
             onNewIntent(intent)
         }
 
-        refreshNavMenu(DataStore.enableClashAPI)
+        refreshNavMenu(DataStore.enableClashAPI, DataStore.enableConnectionsMonitor)
 
         // sdk 33 notification
         if (Build.VERSION.SDK_INT >= 33) {
@@ -325,7 +326,7 @@ class MainActivity : ThemedActivity(),
 
         checkClipboardOnResume()
         binding.stats.refreshDisplay()
-        refreshNavMenu(DataStore.enableClashAPI)
+        refreshNavMenu(DataStore.enableClashAPI, DataStore.enableConnectionsMonitor)
         updateProxyModeCard()
     }
 
@@ -425,8 +426,12 @@ class MainActivity : ThemedActivity(),
         }
     }
 
-    fun refreshNavMenu(clashApi: Boolean) {
+    fun refreshNavMenu(
+        clashApi: Boolean = DataStore.enableClashAPI,
+        connectionsMonitor: Boolean = DataStore.enableConnectionsMonitor,
+    ) {
         navigation.menu.findItem(R.id.nav_dashboard)?.isVisible = clashApi
+        navigation.menu.findItem(R.id.nav_connections)?.isVisible = connectionsMonitor
         rebuildDrawerItems()
     }
 
@@ -1177,6 +1182,9 @@ class MainActivity : ThemedActivity(),
             if (isDestroyed || isFinishing) return@runOnMainDispatcher
             when (key) {
                 Key.SERVICE_MODE -> onBinderDied()
+                Key.ENABLE_CLASH_API, Key.ENABLE_CONNECTIONS_MONITOR -> {
+                    refreshNavMenu(DataStore.enableClashAPI, DataStore.enableConnectionsMonitor)
+                }
                 Key.PROFILE_ID -> {
                     LandingIpManager.clearCache()
                     if (DataStore.serviceState.connected) {

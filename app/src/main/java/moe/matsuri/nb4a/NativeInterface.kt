@@ -261,10 +261,29 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
         }
         @Suppress("DEPRECATION") val networks = SagerNet.connectivity.allNetworks
         val networkInterfaces = NetworkInterface.getNetworkInterfaces().toList()
+        val activeUnderlying = SagerNet.underlyingNetwork
+        val candidates = networks.mapNotNull { network ->
+            val linkProperties = SagerNet.connectivity.getLinkProperties(network) ?: return@mapNotNull null
+            val networkCapabilities = SagerNet.connectivity.getNetworkCapabilities(network) ?: return@mapNotNull null
+            if (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) {
+                return@mapNotNull null
+            }
+            Triple(network, linkProperties, networkCapabilities)
+        }
+        val hasValidatedInternet = candidates.any { (_, _, caps) ->
+            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+        }
+        val filteredCandidates = if (hasValidatedInternet) {
+            candidates.filter { (network, _, caps) ->
+                network == activeUnderlying || caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+            }
+        } else {
+            candidates
+        }.sortedByDescending { it.first == activeUnderlying }
+
         val interfaces = mutableListOf<LibcoreNetworkInterface>()
-        for (network in networks) {
-            val linkProperties = SagerNet.connectivity.getLinkProperties(network) ?: continue
-            val networkCapabilities = SagerNet.connectivity.getNetworkCapabilities(network) ?: continue
+        for ((_, linkProperties, networkCapabilities) in filteredCandidates) {
             val boxInterface = LibcoreNetworkInterface()
             boxInterface.name = linkProperties.interfaceName
             val networkInterface = networkInterfaces.find { it.name == boxInterface.name } ?: continue

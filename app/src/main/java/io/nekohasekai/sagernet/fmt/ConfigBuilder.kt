@@ -274,6 +274,12 @@ internal fun buildAutoSelectOutbound(
     tolerance = balancer.calculateToleranceMs().coerceIn(0L, 65535L).toInt()
     interrupt_exist_connections = balancer.interruptOnSwitch
     learn_from_connections = balancer.learnFromConnections
+    if (balancer.isFallbackMode()) {
+        fallback_auto_revert = balancer.fallbackAutoRevert
+        fallback_max_fails = balancer.fallbackMaxFails.coerceIn(1, 20)
+        val rawTimeoutMs = balancer.calculateToleranceMs()
+        probe_timeout_ms = if (rawTimeoutMs >= 500L) rawTimeoutMs.coerceAtMost(30000L).toInt() else 3000
+    }
 
     if (balancer.isPriorityMode() && !balancer.tiers.isNullOrEmpty() && memberEntities.size == memberTags.size) {
         val (tierMap, _) = BalancerMemberResolver.assignTierIndices(memberEntities, balancer.tiers)
@@ -832,6 +838,11 @@ internal class ChainGraphContext(
                 // Avoid forcing tcp_fast_open=true globally because mobile/carrier middleboxes
                 // frequently drop TFO SYNs, causing 1-3s handshake stalls on new connections.
                 _hack_config_map.remove("tcp_fast_open")
+                if (bean is HysteriaBean || bean is TuicBean || bean is JuicityBean) {
+                    // UDP/QUIC connect() is 0-RTT in Linux: under hybrid/fallback multi-interface racing,
+                    // standby cellular interfaces can outrace Wi-Fi and bind to a blackholed socket.
+                    _hack_config_map["network_strategy"] = "default"
+                }
 
                 _hack_custom_config = bean.customOutboundJson
             }
