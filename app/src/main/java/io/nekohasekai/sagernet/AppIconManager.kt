@@ -10,7 +10,6 @@ import android.os.Build
 import androidx.appcompat.content.res.AppCompatResources
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.ktx.Logs
-import io.nekohasekai.sagernet.utils.Theme
 
 internal object AppIconStatePolicy {
     fun current(states: Map<AppIcon, Int>): AppIcon {
@@ -20,7 +19,9 @@ internal object AppIconStatePolicy {
     }
 
     fun desired(selected: AppIcon): Map<AppIcon, Int> = AppIcon.values().associateWith {
-        if (it == selected) {
+        if (selected == AppIcon.NEKOBOX_PLUS) {
+            PackageManager.COMPONENT_ENABLED_STATE_DEFAULT
+        } else if (it == selected) {
             PackageManager.COMPONENT_ENABLED_STATE_ENABLED
         } else {
             PackageManager.COMPONENT_ENABLED_STATE_DISABLED
@@ -63,13 +64,7 @@ object AppIconManager {
             val target = when (mode) {
                 MODE_LIGHT -> AppIcon.LIGHT_MODE
                 MODE_DARK -> AppIcon.DARK_MODE
-                else -> {
-                    if (Theme.usingNightMode(context)) {
-                        AppIcon.DARK_MODE
-                    } else {
-                        AppIcon.LIGHT_MODE
-                    }
-                }
+                else -> AppIcon.NEKOBOX_PLUS
             }
             val current = current(context)
             if (force || current != target) {
@@ -87,9 +82,12 @@ object AppIconManager {
                 context.resources.configuration.uiMode and Configuration.UI_MODE_TYPE_MASK ==
                     Configuration.UI_MODE_TYPE_TELEVISION,
             )
-            if (current(context) == effectiveSelection) return
-
             val packageManager = context.packageManager
+            val isDefaultDisabled = effectiveSelection == AppIcon.NEKOBOX_PLUS &&
+                packageManager.getComponentEnabledSetting(AppIcon.NEKOBOX_PLUS.componentName(context)) ==
+                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+            if (current(context) == effectiveSelection && !isDefaultDisabled) return
+
             val desiredStates = AppIconStatePolicy.desired(effectiveSelection)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 packageManager.setComponentEnabledSettings(
@@ -106,7 +104,7 @@ object AppIconManager {
 
             packageManager.setComponentEnabledSetting(
                 effectiveSelection.componentName(context),
-                PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                desiredStates[effectiveSelection] ?: PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
                 PackageManager.DONT_KILL_APP,
             )
             desiredStates.forEach { (icon, state) ->

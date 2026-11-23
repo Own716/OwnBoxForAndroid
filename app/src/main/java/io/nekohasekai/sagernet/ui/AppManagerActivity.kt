@@ -95,34 +95,52 @@ class AppManagerActivity : ThemedActivity() {
             binding.itemcheck.isChecked = isProxiedApp(app)
         }
 
-        fun handlePayload(payloads: List<String>) {
-            if (payloads.contains(SWITCH)) binding.itemcheck.isChecked = isProxiedApp(item)
+        fun handlePayload(payloads: List<Any>) {
+            if (payloads.any { it == SWITCH }) binding.itemcheck.isChecked = isProxiedApp(item)
         }
 
         override fun onClick(v: View?) {
             hasConfigChanged = true
             DataStore.dirty = true
-            if (isProxiedApp(item)) proxiedUids.delete(item.uid) else proxiedUids[item.uid] = true
-            val pos = bindingAdapterPosition
-            if (pos != RecyclerView.NO_POSITION) {
-                appsAdapter.notifyItemChanged(pos, listOf(SWITCH))
+            val targetUid = item.uid
+            if (isProxiedApp(item)) proxiedUids.delete(targetUid) else proxiedUids[targetUid] = true
+            val currentList = appsAdapter.filteredApps
+            var notifiedAny = false
+            for (idx in currentList.indices) {
+                if (currentList[idx].uid == targetUid) {
+                    appsAdapter.notifyItemChanged(idx, SWITCH)
+                    notifiedAny = true
+                }
+            }
+            if (!notifiedAny) {
+                val pos = bindingAdapterPosition
+                if (pos != RecyclerView.NO_POSITION) {
+                    appsAdapter.notifyItemChanged(pos, SWITCH)
+                }
             }
             scheduleSaveIndividual()
         }
     }
 
+    private fun buildIndividualSnapshot(): String {
+        return apps.filter { isProxiedApp(it) }.joinToString("\n") { it.packageName }
+    }
+
     private var saveIndividualJob: Job? = null
     private fun scheduleSaveIndividual(immediate: Boolean = false) {
         saveIndividualJob?.cancel()
+        if (apps.isEmpty()) return
         if (immediate) {
-            val individualStr = apps.filter { isProxiedApp(it) }.joinToString("\n") { it.packageName }
-            DataStore.individual = individualStr
+            DataStore.individual = buildIndividualSnapshot()
             return
         }
-        saveIndividualJob = lifecycleScope.launch(Dispatchers.Default) {
+        saveIndividualJob = lifecycleScope.launch {
             delay(300)
-            val individualStr = apps.filter { isProxiedApp(it) }.joinToString("\n") { it.packageName }
-            DataStore.individual = individualStr
+            if (apps.isEmpty()) return@launch
+            val individualStr = buildIndividualSnapshot()
+            withContext(Dispatchers.IO) {
+                DataStore.individual = individualStr
+            }
         }
     }
 
@@ -131,13 +149,8 @@ class AppManagerActivity : ThemedActivity() {
         FastScrollRecyclerView.SectionedAdapter {
         var filteredApps = apps
 
-        suspend fun reload() {
-            try {
-                PackageCache.reload()
-            } catch (t: Throwable) {
-                Logs.e(t)
-            }
-            apps = cachedApps.mapNotNull { (packageName, packageInfo) ->
+        suspend fun reload(proxiedSnapshot: SparseBooleanArray): List<ProxiedApp> {
+            return cachedApps.mapNotNull { (packageName, packageInfo) ->
                 coroutineContext[Job]!!.ensureActive()
                 val appInfo = packageInfo.applicationInfo ?: return@mapNotNull null
                 try {
@@ -146,7 +159,7 @@ class AppManagerActivity : ThemedActivity() {
                     Logs.e(t)
                     null
                 }
-            }.sortedWith(compareBy({ !isProxiedApp(it) }, { it.name.toString() }))
+            }.sortedWith(compareBy({ !proxiedSnapshot[it.uid] }, { it.name.toString() }))
         }
 
         override fun onBindViewHolder(holder: AppViewHolder, position: Int) =
@@ -154,7 +167,7 @@ class AppManagerActivity : ThemedActivity() {
 
         override fun onBindViewHolder(holder: AppViewHolder, position: Int, payloads: List<Any>) {
             if (payloads.isNotEmpty()) {
-                @Suppress("UNCHECKED_CAST") holder.handlePayload(payloads as List<String>)
+                holder.handlePayload(payloads)
                 return
             }
 
@@ -221,14 +234,27 @@ class AppManagerActivity : ThemedActivity() {
     private fun loadApps() {
         loader?.cancel()
         loader = lifecycleScope.launch {
+            binding.appPlaceholder.root.visibility = View.GONE
             loading.crossFadeFrom(binding.list)
             val adapter = binding.list.adapter as AppsAdapter
-            withContext(Dispatchers.IO) { adapter.reload() }
+            withContext(Dispatchers.IO) {
+                try {
+                    PackageCache.reload()
+                } catch (t: Throwable) {
+                    Logs.e(t)
+                }
+            }
+            if (!hasConfigChanged) {
+                initProxiedUids()
+            }
+            val proxiedSnapshot = proxiedUids.clone()
+            apps = withContext(Dispatchers.IO) { adapter.reload(proxiedSnapshot) }
             adapter.filter.filter(binding.search.text?.toString() ?: "")
             if (apps.isEmpty()) {
                 binding.list.visibility = View.GONE
                 binding.appPlaceholder.root.crossFadeFrom(loading)
             } else {
+                binding.appPlaceholder.root.visibility = View.GONE
                 binding.list.crossFadeFrom(loading)
             }
         }
@@ -426,9 +452,18 @@ class AppManagerActivity : ThemedActivity() {
             .show()
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (apps.isEmpty() && loader?.isActive != true) {
+            loadApps()
+        }
+    }
+
     override fun onPause() {
         super.onPause()
-        scheduleSaveIndividual(immediate = true)
+        if (apps.isNotEmpty() && saveIndividualJob?.isActive == true) {
+            scheduleSaveIndividual(immediate = true)
+        }
         checkAndApplyChanges()
     }
 

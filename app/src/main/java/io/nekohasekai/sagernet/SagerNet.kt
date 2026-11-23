@@ -154,9 +154,6 @@ class SagerNet : Application(),
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         updateNotificationChannels()
-        if (DataStore.appIconMode == AppIconManager.MODE_FOLLOW_SYSTEM) {
-            AppIconManager.applyIconMode(this)
-        }
     }
 
     override fun getWorkManagerConfiguration(): WorkConfiguration {
