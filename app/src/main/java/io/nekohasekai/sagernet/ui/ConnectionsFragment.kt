@@ -19,7 +19,6 @@ import com.google.android.material.card.MaterialCardView
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.ktx.Logs
-import io.nekohasekai.sagernet.utils.PackageCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -275,7 +274,9 @@ class ConnectionsFragment : ToolbarFragment(R.layout.layout_connections) {
             traffic.text = "▲ $upStr  ▼ $downStr"
 
             if (item.packageName.isNotBlank()) {
-                val icon = PackageCache[item.packageName]?.applicationInfo?.loadIcon(ctx.packageManager)
+                val icon = runCatching {
+                    ctx.packageManager.getApplicationIcon(item.packageName)
+                }.getOrNull()
                 if (icon != null) {
                     appIcon.setImageDrawable(icon)
                 } else {
