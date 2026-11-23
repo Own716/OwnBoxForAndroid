@@ -243,7 +243,9 @@ abstract class ProfileSettingsActivity<T : AbstractBean>(
             try {
                 val host = requireActivity() as ProfileSettingsActivity<*>
                 activity = host
-                host.createPreferences(savedInstanceState, rootKey)
+                host.apply {
+                    createPreferences(savedInstanceState, rootKey)
+                }
                 preferenceScreen?.enableMultiLineTitles()
             } catch (e: Exception) {
                 Toast.makeText(
