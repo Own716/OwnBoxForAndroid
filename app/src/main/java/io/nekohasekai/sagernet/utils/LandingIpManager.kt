@@ -4,7 +4,9 @@ import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.ktx.USER_AGENT
 import io.nekohasekai.sagernet.ktx.isIpAddress
 import io.nekohasekai.sagernet.ktx.tryProxyOutbound
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import libcore.Libcore
@@ -654,6 +656,9 @@ object LandingIpManager {
         try {
             // 第一步：先快速拿到真实出口 IP 字符串与国家（优先 Anycast 毫秒响应）
             val ipPair = withTimeoutOrNull(3500L) { fetchRawEgressIp(ua) }
+            if (!isActive || queryGeneration.get() != myGen) {
+                return@withContext Result.failure(IllegalStateException("Landing IP query superseded"))
+            }
             val rawIp = ipPair?.first.orEmpty()
             val rawCc = ipPair?.second.orEmpty()
 
@@ -663,10 +668,16 @@ object LandingIpManager {
 
             // 第二步：使用真实 IP 执行多梯队质量查询（优先 iplocate.io 对齐 FlClash，超时快速切入 ip-api.com）
             var info = withTimeoutOrNull(2000L) { fetchFromIpLocate(rawIp, rawCc, ua, startTime) }
+            if (!isActive || queryGeneration.get() != myGen) {
+                return@withContext Result.failure(IllegalStateException("Landing IP query superseded"))
+            }
 
             // 备用第二梯队：ip-api.com（毫秒级极速通道）
             if (info == null) {
                 info = withTimeoutOrNull(2000L) { fetchFromIpApiCom(rawIp, rawCc, ua, startTime) }
+                if (!isActive || queryGeneration.get() != myGen) {
+                    return@withContext Result.failure(IllegalStateException("Landing IP query superseded"))
+                }
             }
 
             // 备用第三梯队：api.ipquery.io
@@ -701,7 +712,7 @@ object LandingIpManager {
                 )
             }
 
-            if (queryGeneration.get() != myGen) {
+            if (!isActive || queryGeneration.get() != myGen) {
                 return@withContext Result.failure(IllegalStateException("Landing IP query superseded"))
             }
             currentCache = info
@@ -709,6 +720,7 @@ object LandingIpManager {
             onUpdate?.invoke(info)
             Result.success(info)
         } catch (e: Throwable) {
+            if (e is CancellationException) throw e
             Result.failure(e)
         } finally {
             if (queryGeneration.get() == myGen) {

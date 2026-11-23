@@ -57,6 +57,7 @@
             app:tabIndicatorColor="#10B981"
             app:tabIndicatorFullWidth="false"
             app:tabIndicatorHeight="3dp"
+            app:tabGravity="start"
             app:tabMode="scrollable"
             app:tabRippleColor="#20FFFFFF"
             app:tabSelectedTextColor="#FFFFFF"

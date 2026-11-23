@@ -27,9 +27,11 @@ import io.nekohasekai.sagernet.utils.LandingIpManager
 import io.nekohasekai.sagernet.utils.Theme
 import io.nekohasekai.sagernet.utils.UiScaleManager
 import kotlin.math.abs
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -78,6 +80,7 @@ class StatsBar @JvmOverloads constructor(
     private var pendingTransition: Transition? = Transition.HideImmediate
     private var isAnimatingVisibility = false
     private var pendingDisconnectedReset = false
+    private var landingIpJob: Job? = null
 
     private var scrollHidden = false
     private var scrollDirection = 0 // 1 = hide (dy>0), -1 = show (dy<0), 0 = none
@@ -605,6 +608,8 @@ class StatsBar @JvmOverloads constructor(
                 testConnection(silent = true)
             } else {
                 resetLatencyState()
+                landingIpJob?.cancel()
+                landingIpJob = null
                 LandingIpManager.clearCache()
                 pendingDisconnectedReset = true
                 val isVisiblyOnScreen =
@@ -620,6 +625,8 @@ class StatsBar @JvmOverloads constructor(
         runOnUi {
             if (currentState != BaseService.State.Connected && !DataStore.serviceState.connected) return@runOnUi
             if (!DataStore.showLandingIp) {
+                landingIpJob?.cancel()
+                landingIpJob = null
                 btnIpDetail?.visibility = View.GONE
                 statusIpText.visibility = View.GONE
                 updateStatusViews()
@@ -632,6 +639,9 @@ class StatsBar @JvmOverloads constructor(
                 updateStatusViews()
                 return@runOnUi
             }
+            if (!forceRefresh && landingIpJob?.isActive == true) {
+                return@runOnUi
+            }
 
             btnIpDetail?.visibility = View.VISIBLE
             if (forceRefresh || cached == null) {
@@ -639,10 +649,17 @@ class StatsBar @JvmOverloads constructor(
                 statusIpText.visibility = View.VISIBLE
             }
 
+            landingIpJob?.cancel()
             val activity = context as? MainActivity
             val scope = activity?.lifecycleScope ?: CoroutineScope(Dispatchers.Main)
-            scope.launch {
-                val result = LandingIpManager.queryLandingIp(currentProfile, forceRefresh = forceRefresh) { intermediateInfo ->
+            landingIpJob = scope.launch {
+                if (forceRefresh) {
+                    delay(120L)
+                }
+                if (currentState != BaseService.State.Connected && !DataStore.serviceState.connected) return@launch
+                if (!DataStore.showLandingIp) return@launch
+                val profileForQuery = DataStore.selectedProxy
+                val result = LandingIpManager.queryLandingIp(profileForQuery, forceRefresh = forceRefresh) { intermediateInfo ->
                     runOnUi {
                         if ((currentState == BaseService.State.Connected || DataStore.serviceState.connected) && DataStore.showLandingIp) {
                             statusIpText.text = "${intermediateInfo.countryFlag} ${intermediateInfo.countryCode} ${intermediateInfo.ip}"
@@ -662,6 +679,12 @@ class StatsBar @JvmOverloads constructor(
                     btnIpDetail?.visibility = View.VISIBLE
                     updateStatusViews()
                 }.onFailure { err ->
+                    if (err is CancellationException ||
+                        err.message == "Landing IP query superseded" ||
+                        err.message == "Landing IP query already in progress"
+                    ) {
+                        return@launch
+                    }
                     Logs.w(err)
                     btnIpDetail?.visibility = View.VISIBLE
                     updateStatusViews()

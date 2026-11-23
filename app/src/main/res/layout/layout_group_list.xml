@@ -97,6 +97,7 @@
             app:tabIndicatorHeight="30dp"
             app:tabIndicatorFullWidth="true"
             app:tabIndicatorAnimationMode="elastic"
+            app:tabGravity="start"
             app:tabMode="scrollable"
             app:tabPaddingStart="14dp"
             app:tabPaddingEnd="14dp"

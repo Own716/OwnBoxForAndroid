@@ -727,10 +727,15 @@ class BaseService {
             } catch (e: Throwable) {
                 Logs.w(e)
             }
-            if (SagerNet.underlyingNetwork == null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                SagerNet.connectivity.activeNetwork?.let { active ->
-                    SagerNet.underlyingNetwork = active
-                    upstreamInterfaceName = SagerNet.connectivity.getLinkProperties(active)?.interfaceName
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val active = SagerNet.underlyingNetwork ?: SagerNet.connectivity.activeNetwork
+                if (active != null) {
+                    if (SagerNet.underlyingNetwork == null) {
+                        SagerNet.underlyingNetwork = active
+                    }
+                    if (upstreamInterfaceName == null) {
+                        upstreamInterfaceName = SagerNet.connectivity.getLinkProperties(active)?.interfaceName
+                    }
                 }
             }
             // 只负责 underlyingNetwork / 网卡名跟踪，供 VpnService.setUnderlyingNetworks。
@@ -753,15 +758,18 @@ class BaseService {
                 DataStore.vpnService?.updateUnderlyingNetwork()
                 val oldName = upstreamInterfaceName
                 val newName = link?.interfaceName
-                if (newName != null && (oldName != newName || oldNetwork != network)) {
-                    Logs.d("Network changed: $oldName -> $newName (network $oldNetwork -> $network)")
-                    try {
-                        Libcore.setNetworkChangeResetConnections(DataStore.networkChangeResetConnections)
-                    } catch (e: Throwable) {
-                        Logs.w(e)
-                    }
+                if (newName != null) {
+                    val isRealNetworkSwitch =
+                        (oldName != null && oldName != newName) || (oldNetwork != null && oldNetwork != network)
                     upstreamInterfaceName = newName
-                    NativeInterface.clearInterfaceCache()
+                    if (isRealNetworkSwitch) {
+                        Logs.d("Network changed: $oldName -> $newName (network $oldNetwork -> $network)")
+                        try {
+                            Libcore.setNetworkChangeResetConnections(DataStore.networkChangeResetConnections)
+                        } catch (e: Throwable) {
+                            Logs.w(e)
+                        }
+                        NativeInterface.clearInterfaceCache()
                         if (data.state == State.Connecting) {
                             Logs.i("Network changed during Connecting state: cancelling old handshake and retrying on new network")
                             data.connectingJob?.cancel()
@@ -777,6 +785,7 @@ class BaseService {
                             }
                         }
                     }
+                }
             }
         }
 

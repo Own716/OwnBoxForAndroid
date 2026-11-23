@@ -115,6 +115,29 @@ class ConnectionsFragment : ToolbarFragment(R.layout.layout_connections) {
 
         private val COLOR_GREEN = Color.parseColor("#10B981")
         private val COLOR_BLUE = Color.parseColor("#3B82F6")
+
+        private val DIFF_CALLBACK = object : DiffUtil.ItemCallback<ConnectionItem>() {
+            override fun areItemsTheSame(oldItem: ConnectionItem, newItem: ConnectionItem): Boolean {
+                return oldItem.id == newItem.id && oldItem.active == newItem.active
+            }
+
+            override fun areContentsTheSame(oldItem: ConnectionItem, newItem: ConnectionItem): Boolean {
+                return oldItem.appName == newItem.appName &&
+                    oldItem.network == newItem.network &&
+                    oldItem.protocol == newItem.protocol &&
+                    oldItem.inboundType == newItem.inboundType &&
+                    oldItem.host == newItem.host &&
+                    oldItem.destinationIp == newItem.destinationIp &&
+                    oldItem.rule == newItem.rule &&
+                    oldItem.upload == newItem.upload &&
+                    oldItem.download == newItem.download &&
+                    oldItem.uploadSpeed == newItem.uploadSpeed &&
+                    oldItem.downloadSpeed == newItem.downloadSpeed &&
+                    oldItem.chainsDisplay == newItem.chainsDisplay &&
+                    oldItem.outbound == newItem.outbound &&
+                    oldItem.closedMs == newItem.closedMs
+            }
+        }
     }
 
     private val httpClient = OkHttpClient.Builder()
@@ -141,7 +164,9 @@ class ConnectionsFragment : ToolbarFragment(R.layout.layout_connections) {
 
     private val adapter = ConnectionsAdapter()
     private val appInfoCache = ConcurrentHashMap<String, Pair<String, Drawable?>>()
-    private val prevTrafficMap = HashMap<String, Triple<Long, Long, Long>>()
+
+    @Volatile
+    private var prevTrafficSnapshot: Map<String, Triple<Long, Long, Long>> = emptyMap()
 
     private var activeConnections = listOf<ConnectionItem>()
     private var closedConnections = listOf<ConnectionItem>()
@@ -161,8 +186,11 @@ class ConnectionsFragment : ToolbarFragment(R.layout.layout_connections) {
     private var selectedFilterKey = FILTER_ALL
     private var currentFilterChipKeys = listOf<Pair<String, String>>()
 
+    private var openDetailDialog: BottomSheetDialog? = null
     private var openDetailId: String? = null
     private var openDetailUpdater: ((ConnectionItem) -> Unit)? = null
+
+    private fun viewScope() = viewLifecycleOwnerLiveData.value?.lifecycleScope
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -285,6 +313,8 @@ class ConnectionsFragment : ToolbarFragment(R.layout.layout_connections) {
     }
 
     override fun onDestroyView() {
+        runCatching { openDetailDialog?.dismiss() }
+        openDetailDialog = null
         openDetailId = null
         openDetailUpdater = null
         stopPolling()
@@ -306,7 +336,8 @@ class ConnectionsFragment : ToolbarFragment(R.layout.layout_connections) {
     private fun startPolling() {
         stopPolling()
         if (!DataStore.enableConnectionsMonitor || isPaused) return
-        pollJob = viewLifecycleOwner.lifecycleScope.launch {
+        val scope = viewScope() ?: return
+        pollJob = scope.launch {
             while (isActive && DataStore.enableConnectionsMonitor && !isPaused) {
                 fetchConnections()
                 delay(1500)
@@ -386,7 +417,7 @@ class ConnectionsFragment : ToolbarFragment(R.layout.layout_connections) {
                 .setTitle(R.string.connections_clear_history)
                 .setMessage("确定要清空当前已记录的 ${closedConnections.size} 条历史连接吗？")
                 .setPositiveButton(android.R.string.ok) { _, _ ->
-                    viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+                    viewScope()?.launch(Dispatchers.IO) {
                         runCatching { service?.clearClosedConnections() }
                         withContext(Dispatchers.Main) {
                             closedConnections = emptyList()
@@ -433,7 +464,7 @@ class ConnectionsFragment : ToolbarFragment(R.layout.layout_connections) {
     }
 
     private fun closeAllActive(service: ISagerNetService?) {
-        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+        viewScope()?.launch(Dispatchers.IO) {
             if (service != null) {
                 runCatching { service.closeAllActiveConnections() }
             } else if (DataStore.enableClashAPI || DataStore.allowAccess) {
@@ -450,7 +481,7 @@ class ConnectionsFragment : ToolbarFragment(R.layout.layout_connections) {
 
     private fun closeConnectionsByIds(ids: List<String>) {
         val service = currentService()
-        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+        viewScope()?.launch(Dispatchers.IO) {
             for (id in ids) {
                 closeSingleInternal(service, id)
             }
@@ -460,7 +491,7 @@ class ConnectionsFragment : ToolbarFragment(R.layout.layout_connections) {
 
     private fun closeSingleConnection(id: String) {
         val service = currentService()
-        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+        viewScope()?.launch(Dispatchers.IO) {
             closeSingleInternal(service, id)
             fetchConnections()
         }
@@ -552,6 +583,7 @@ class ConnectionsFragment : ToolbarFragment(R.layout.layout_connections) {
         defaultActive: Boolean,
         nowMs: Long,
         pm: PackageManager,
+        prevTrafficMap: Map<String, Triple<Long, Long, Long>>,
         nextTrafficMap: MutableMap<String, Triple<Long, Long, Long>>,
     ): List<ConnectionItem> {
         if (arr == null || arr.length() == 0) return emptyList()
@@ -660,7 +692,7 @@ class ConnectionsFragment : ToolbarFragment(R.layout.layout_connections) {
                 if (!isAdded || view == null) return@withContext
                 activeConnections = emptyList()
                 closedConnections = emptyList()
-                prevTrafficMap.clear()
+                prevTrafficSnapshot = emptyMap()
                 totalUpload = 0L
                 totalDownload = 0L
                 totalUploadSpeed = 0L
@@ -675,6 +707,7 @@ class ConnectionsFragment : ToolbarFragment(R.layout.layout_connections) {
         val pm = context?.packageManager ?: return
         val service = currentService()
         val nowMs = System.currentTimeMillis()
+        val prevTraffic = prevTrafficSnapshot
 
         data class Snapshot(
             val active: List<ConnectionItem>,
@@ -706,6 +739,7 @@ class ConnectionsFragment : ToolbarFragment(R.layout.layout_connections) {
                         defaultActive = true,
                         nowMs = nowMs,
                         pm = pm,
+                        prevTrafficMap = prevTraffic,
                         nextTrafficMap = nextMap,
                     )
                     closedList = parseNativeItems(
@@ -713,6 +747,7 @@ class ConnectionsFragment : ToolbarFragment(R.layout.layout_connections) {
                         defaultActive = false,
                         nowMs = nowMs,
                         pm = pm,
+                        prevTrafficMap = prevTraffic,
                         nextTrafficMap = nextMap,
                     )
                 } else if (DataStore.enableClashAPI || DataStore.allowAccess) {
@@ -765,7 +800,7 @@ class ConnectionsFragment : ToolbarFragment(R.layout.layout_connections) {
 
                             val up = obj.optLong("upload", 0L)
                             val down = obj.optLong("download", 0L)
-                            val prev = prevTrafficMap[id]
+                            val prev = prevTraffic[id]
                             var itemUpSpeed = 0L
                             var itemDownSpeed = 0L
                             if (prev != null && nowMs > prev.third) {
@@ -836,8 +871,7 @@ class ConnectionsFragment : ToolbarFragment(R.layout.layout_connections) {
 
         withContext(Dispatchers.Main) {
             if (!isAdded || view == null) return@withContext
-            prevTrafficMap.clear()
-            prevTrafficMap.putAll(snap.nextMap)
+            prevTrafficSnapshot = snap.nextMap
             activeConnections = snap.active
             closedConnections = snap.closed
             totalUpload = snap.upTotal
@@ -1040,7 +1074,9 @@ class ConnectionsFragment : ToolbarFragment(R.layout.layout_connections) {
 
     private fun showConnectionDetailDialog(initialItem: ConnectionItem) {
         val ctx = context ?: return
+        runCatching { openDetailDialog?.dismiss() }
         val dialog = BottomSheetDialog(ctx)
+        openDetailDialog = dialog
         val view = LayoutInflater.from(ctx).inflate(R.layout.dialog_connection_detail, null)
         dialog.setContentView(view)
 
@@ -1048,7 +1084,7 @@ class ConnectionsFragment : ToolbarFragment(R.layout.layout_connections) {
             val sheet = dialog.findViewById<FrameLayout>(com.google.android.material.R.id.design_bottom_sheet)
             if (sheet != null) {
                 sheet.layoutParams = sheet.layoutParams.apply {
-                    height = (resources.displayMetrics.heightPixels * 0.85f).toInt()
+                    height = (ctx.resources.displayMetrics.heightPixels * 0.85f).toInt()
                 }
                 BottomSheetBehavior.from(sheet).apply {
                     skipCollapsed = true
@@ -1253,7 +1289,7 @@ class ConnectionsFragment : ToolbarFragment(R.layout.layout_connections) {
                 detailGeoIpAsn.text = "$destIp（正在查询归属信息...）"
                 detailGeoLocation.isVisible = false
                 detailGeoOrg.isVisible = false
-                viewLifecycleOwner.lifecycleScope.launch {
+                viewScope()?.launch {
                     val geo = LandingIpManager.lookupIpGeo(destIp)
                     if (!isAdded || !dialog.isShowing || currentItem.destinationIp != destIp) return@launch
                     if (geo == null) {
@@ -1276,6 +1312,9 @@ class ConnectionsFragment : ToolbarFragment(R.layout.layout_connections) {
         openDetailId = initialItem.id
         openDetailUpdater = { updated -> renderDetail(updated) }
         dialog.setOnDismissListener {
+            if (openDetailDialog === dialog) {
+                openDetailDialog = null
+            }
             openDetailId = null
             openDetailUpdater = null
         }
@@ -1375,26 +1414,6 @@ class ConnectionsFragment : ToolbarFragment(R.layout.layout_connections) {
 
         override fun onBindViewHolder(holder: ConnectionViewHolder, position: Int) {
             holder.bind(getItem(position))
-        }
-    }
-
-    private val DIFF_CALLBACK = object : DiffUtil.ItemCallback<ConnectionItem>() {
-        override fun areItemsTheSame(oldItem: ConnectionItem, newItem: ConnectionItem): Boolean {
-            return oldItem.id == newItem.id && oldItem.active == newItem.active
-        }
-
-        override fun areContentsTheSame(oldItem: ConnectionItem, newItem: ConnectionItem): Boolean {
-            return oldItem.appName == newItem.appName &&
-                oldItem.network == newItem.network &&
-                oldItem.inboundType == newItem.inboundType &&
-                oldItem.host == newItem.host &&
-                oldItem.rule == newItem.rule &&
-                oldItem.upload == newItem.upload &&
-                oldItem.download == newItem.download &&
-                oldItem.uploadSpeed == newItem.uploadSpeed &&
-                oldItem.downloadSpeed == newItem.downloadSpeed &&
-                oldItem.chainsDisplay == newItem.chainsDisplay &&
-                oldItem.closedMs == newItem.closedMs
         }
     }
 
