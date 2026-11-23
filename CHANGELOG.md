@@ -16,8 +16,6 @@
   - 在 `dns.rules` 顶部对 `HTTPS (65)` 与 `SVCB (64)` DNS 查询使用 `sing-box` 原生 `predefined` 动作 0ms 本地响应空 `NOERROR`，并清理重复的 `AAAA reject` 规则，消除 Chrome/Android 每次打开网页触发多个子域名 `HTTPS` DNS 查询穿透远程 DoH 造成的建连阻塞。
   - 移除 `ConfigBuilder` 对各类节点出站无条件强制注入的 `tcp_fast_open = true`，并将 `hev-socks5-tunnel` 本机回环配置改为 `tcp-fastopen: false`，避免国内移动网络中间盒丢弃 TFO SYN 包引发的 1-3 秒重传卡顿。
 
-# OwnBox for Android v26.11.8.33 预览版
-
 ### 【AnyTLS mTLS 支持与自定义配置编辑器暗色/底部遮挡修复】
 - **新增 AnyTLS 客户端双向认证（mTLS）配置支持**：
   - 在 `SingBoxOptions.OutboundTLSOptions` 中补齐 `sing-box 1.13+` 原生支持的 `client_certificate`、`client_certificate_path`、`client_key`、`client_key_path` 字段，并在 `AnyTLSBean`（Kryo v2，完全向下兼容旧节点）与节点编辑页「安全设置」新增「客户端证书 (mTLS)」和「客户端私钥 (mTLS，副标题脱敏展示)」输入框。
@@ -25,8 +23,6 @@
 - **修复暗色 / AMOLED 模式下自定义配置编辑器底部字符看不见与被遮挡问题**：
   - 修复 `ExtendedKeyboard` 与 `layout_edit_config.xml` 中底部符号及图标按钮在黑/AMOLED 主题下出现的「白底白字 / 白底白图标」不可见问题：底部工具栏统一改为使用主题表面色（`cardElevatedSurfaceColor`）与高对比自适应前景色（`colorOnSurface`），并让快捷符号栏支持 `layout_weight="1"` 横向自适应滚动，避免窄屏下挤压右侧按钮。
   - 在 `AndroidManifest.xml` 为 `ConfigEditActivity` 启用 `android:windowSoftInputMode="adjustResize"`，并在根布局统一整合 `systemBars` + `displayCutout` + `ime` Insets（去除冲突的负值边距计算），配合编辑器底部内边距，确保无论收起还是弹出输入法，底部工具栏与最后一行文本始终完整可见、不被导航条或键盘遮挡。
-
-# OwnBox for Android v26.11.8.32 预览版
 
 ### 【全 6 种运行模式深度核查修复与增强】
 - **彻底解决 Root 模式下黑名单/直连应用与 Redirect UDP 假 IP 断网隐患**：
@@ -40,8 +36,6 @@
 - **原版 `VPN` 与 `仅代理` 模式零影响保障**：
   - 标准 `VPN` 与 `仅代理 (Proxy only)` 保持 100% 原版配置、入站（`tun-in` / `mixed-in`）、DNS 与 FakeDNS 逻辑不变，零 `su` 调用、零额外开销。
 
-# OwnBox for Android v26.11.8.31 预览版
-
 ### 【模式设置闪退修复与原版 VPN/仅代理模式隔离保障】
 - **修复打开「设置 - 模式与入站管理」闪退问题**：移除 `ModeSettingsFragment.onCreatePreferences()` 中过早访问 `viewLifecycleOwner` 的调用，迁移至 `onViewCreated()`，彻底解决点击进入模式设置页即抛出 `IllegalStateException` 闪退的问题。
 - **消除多余 Root 检测与弹窗干扰**：进入模式设置页时改为纯文件系统静态探测 `su` 文件是否存在（`RootShell.hasSuBinary()`），不再主动执行 `su` 命令；普通 VPN 与仅代理用户打开设置页零 Root 弹窗、零额外性能开销。仅在用户主动切换至 Root 模式或手动点击清理时才请求并执行 Root 权限。
@@ -49,8 +43,6 @@
 - **强化切回普通模式自动清残留与纯直连规则保存**：
   - 从任意 Root 模式切回标准 **VPN** 或 **仅代理（Proxy only）** 模式后，清理任务改用独立 IO 协程执行，即使立刻点击返回也不会被页面销毁中断；`ProxyService` 启动前同样加入零开销自愈清理检查（常规状态下仅 `File.exists()` 判断，耗时可忽略，不触发 `su`）。
   - 允许在 Root 模式下直接编辑并保存纯按应用直连路由规则（如 QQ 直连绕过）；同步补充单元测试验证标准 **VPN** 与 **仅代理** 模式的入站标签、直连 DNS、FakeDNS 与服务路径保持 100% 原版行为、零性能损耗。
-
-# OwnBox for Android v26.11.8.30 预览版
 
 ### 【Root 模式全面修复与四大模式补齐】
 - **修复 `26.11.8.29` Root TUN 断网、分流失效与 QQ 误走代理问题**：
@@ -65,8 +57,6 @@
 
 ### 【全软件设置标题完整显示优化】
 - 统一在全局主题样式及各设置页（进阶设置、模式设置、核心设置、外观设置、路由规则、分组与节点设置等）关闭标题单行截断（`singleLineTitle = false`），长标题自动换行完整展示，彻底消除省略号显示不全问题。
-
-# OwnBox for Android v26.11.8.29 预览版
 
 ### 【Root TUN 模式与 CI 原生构建接入】
 - 新增 **Root TUN 模式**（设置 -> 模式设置 -> 运行模式）：面向已 Root（Magisk / KernelSU / APatch）设备，由独立的 `hev-socks5-tunnel` 守护进程接管 `ownbox0` 虚拟网卡与 `iptables` 策略路由（表 `2024` / `fwmark 0x2024`），再经随机高强度账密的本地回环 SOCKS5 入站接入内置 `sing-box` 核心。
