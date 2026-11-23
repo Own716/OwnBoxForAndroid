@@ -67,21 +67,6 @@
     <string name="service_mode">Service Mode</string>
     <string name="service_mode_proxy">Proxy only</string>
     <string name="service_mode_vpn" translatable="false">VPN</string>
-    <string name="service_mode_root_tun">Root TUN (TCP + UDP)</string>
-    <string name="service_mode_root_redirect">Root Redirect (TCP only)</string>
-    <string name="service_mode_root_mixed">Root Mixed (TCP Redirect + UDP TUN)</string>
-    <string name="service_mode_root_enhance">Root Enhance (Mixed + Hotspot Sharing)</string>
-    <string name="root_tun_no_root">Root permission is required for Root modes</string>
-    <string name="root_tun_no_root_hint">Root access not granted yet. Make sure Magisk / KernelSU / APatch permits su for OwnBox before connecting.</string>
-    <string name="root_tun_missing_binary">Root TUN helper binary (libhevsockstun.so) was not found in this build</string>
-    <string name="root_tun_start_failed">Failed to start Root proxy mode</string>
-    <string name="root_lan_sharing">Root Hotspot Transparent Sharing</string>
-    <string name="root_lan_sharing_summary">Transparently forward Hotspot / USB tethered client traffic without manual client proxy settings (always active in Root Enhance mode)</string>
-    <string name="root_tun_cleanup">Clean Up Root Rules</string>
-    <string name="root_tun_cleanup_summary">Force remove OwnBox iptables rules, policy routes, and TUN interface to restore normal network</string>
-    <string name="root_tun_cleanup_done">Cleaned up Root rules</string>
-    <string name="root_tun_cleanup_failed">Failed to run Root cleanup (root access required)</string>
-    <string name="root_tun_switching_cleanup_done">Cleared Root routing rules for standard mode</string>
     <string name="port_proxy">Proxy Port</string>
     <string name="port_http">HTTP Proxy Port</string>
     <string name="disable_mixed_inbound">Disable Mixed Inbound</string>
@@ -1251,7 +1236,7 @@
     <string name="rr_picker">Select rule sets</string>
     <string name="rr_lines">One value per line. Ports accept 80, 443 or 1000:2000.</string>
     <string name="rr_legacy_domain">Exact domains (JSON)</string>
-    <string name="rr_apps_modes">App-based direct bypass and block rules work in both VPN and Root modes. Routing specific apps to individual proxy nodes requires VPN mode (mixed proxy traffic cannot identify source apps). In Root modes, rules that also include domain, IP, or rule-set conditions still apply those conditions.</string>
+    <string name="rr_apps_modes">App rules apply to VPN traffic; mixed proxy traffic cannot reliably identify its originating app.</string>
     <string name="route_banner_smart_mode">Smart Routing is currently active, so custom rules below are bypassed.</string>
     <string name="route_banner_global_mode">Global Mode is currently active, so custom rules below are bypassed.</string>
     <string name="route_banner_switch_custom">Use Custom</string>

@@ -5,26 +5,13 @@ import android.app.Service
 import android.content.Intent
 import android.os.PowerManager
 import io.nekohasekai.sagernet.SagerNet
-import io.nekohasekai.sagernet.bg.root.RootTunManager
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.ktx.Logs
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 class ProxyService : Service(), BaseService.Interface {
     override val data = BaseService.Data(this)
     override val tag: String get() = "SagerNetProxyService"
 
-    override suspend fun startProcesses() {
-        if (RootTunManager.hasActiveState(this)) {
-            Logs.i("ProxyService: clearing residual Root mode rules before starting Proxy mode")
-            withContext(Dispatchers.IO) {
-                runCatching { RootTunManager.stop(this@ProxyService) }
-                    .onFailure { Logs.w("ProxyService: residual Root cleanup failed", it) }
-            }
-        }
-        super.startProcesses()
-    }
     override fun createNotification(profileName: String): ServiceNotification =
         ServiceNotification(
             this, profileName,

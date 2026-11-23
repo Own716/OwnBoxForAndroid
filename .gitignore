@@ -12,7 +12,6 @@ local.properties
 /app/src/main/assets/sing-box
 /service_account_credentials.json
 jniLibs/
-/app/src/main/jniLibs/*/libhevsockstun.so
 /library/libcore_build/
 .idea/deploymentTargetDropDown.xml
 /nkmr

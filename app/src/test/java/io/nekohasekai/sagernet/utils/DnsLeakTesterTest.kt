@@ -103,10 +103,10 @@ class DnsLeakTesterTest {
 
     @Test
     fun formatReport_explainsModesClearlyWithoutEmojis() {
-        val rootReportText = DnsLeakTester.formatReport(
+        val proxyReportText = DnsLeakTester.formatReport(
             DnsLeakReport(
                 serviceRunning = true,
-                serviceMode = Key.MODE_ROOT_TUN,
+                serviceMode = Key.MODE_PROXY,
                 fakeIp = FakeIpProbeResult(supportedInMode = false, enabledInSettings = true, active = false),
                 egressIp = "18.138.184.7",
                 egressLoc = "SG",
@@ -114,11 +114,11 @@ class DnsLeakTesterTest {
                 verdict = LeakVerdict.SAFE,
             )
         )
-        assertTrue(rootReportText.contains("Root TUN 模式"))
-        assertTrue(rootReportText.contains("Root 模式已自动关闭 Fake-IP"))
-        assertTrue(rootReportText.contains("18.138.184.7 (SG)"))
-        assertTrue(rootReportText.contains("172.217.32.158 (Singapore - Google LLC)"))
-        assertTrue(rootReportText.contains("未发现 DNS 泄漏"))
-        assertFalse("Diagnostic output must contain no surrogate emojis", rootReportText.any { Character.isSurrogate(it) })
+        assertTrue(proxyReportText.contains("仅代理模式"))
+        assertTrue(proxyReportText.contains("仅代理模式无 TUN 虚拟网卡，不使用 Fake-IP"))
+        assertTrue(proxyReportText.contains("18.138.184.7 (SG)"))
+        assertTrue(proxyReportText.contains("172.217.32.158 (Singapore - Google LLC)"))
+        assertTrue(proxyReportText.contains("未发现 DNS 泄漏"))
+        assertFalse("Diagnostic output must contain no surrogate emojis", proxyReportText.any { Character.isSurrogate(it) })
     }
 }

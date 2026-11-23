@@ -187,10 +187,6 @@ object DnsLeakTester {
     fun modeDisplayName(serviceMode: String): String = when (serviceMode) {
         Key.MODE_VPN -> "VPN 模式"
         Key.MODE_PROXY -> "仅代理模式"
-        Key.MODE_ROOT_TUN -> "Root TUN 模式"
-        Key.MODE_ROOT_REDIRECT -> "Root Redirect 模式"
-        Key.MODE_ROOT_MIXED -> "Root Mixed 模式"
-        Key.MODE_ROOT_ENHANCE -> "Root Enhance 模式"
         else -> serviceMode
     }
 
@@ -205,7 +201,6 @@ object DnsLeakTester {
         sb.append("- Fake-IP 状态: ")
         when {
             !report.serviceRunning -> sb.append("代理未启动，未启用")
-            Key.isRootMode(report.serviceMode) -> sb.append("Root 模式已自动关闭 Fake-IP（改用真实远程 DNS + 域名嗅探接管，属正常策略）")
             report.serviceMode == Key.MODE_PROXY -> sb.append("仅代理模式无 TUN 虚拟网卡，不使用 Fake-IP")
             !report.fakeIp.enabledInSettings -> sb.append("设置中未开启 FakeDNS")
             report.fakeIp.active -> sb.append("已生效 (${report.fakeIp.resolvedIps.joinToString(", ")})")
