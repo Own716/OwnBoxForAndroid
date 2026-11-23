@@ -43,7 +43,7 @@ object ActiveOutboundTracker {
         if (profile.type == ProxyEntity.TYPE_BALANCER) {
             val bean = profile.requireBean() as? BalancerBean
             return buildString {
-                append(if (bean?.isPriorityMode() == true) "按优先级" else "最快最稳")
+                append(if (bean?.isFallbackMode() == true) "故障转移" else if (bean?.isPriorityMode() == true) "按优先级" else "最快最稳")
                 if (bean?.balanceEnabled == true) append(" · 流量分配")
             }
         }

@@ -246,7 +246,7 @@ internal fun buildAutoSelectOutbound(
         initial_delays = initialDelays
     }
 
-    val uniqueTags = if (balancer.isPriorityMode()) {
+    val uniqueTags = if (balancer.isPriorityMode() || balancer.isFallbackMode()) {
         memberTags.distinct()
     } else {
         memberTags.distinct().sortedWith(compareBy<String> { tag ->
@@ -261,8 +261,12 @@ internal fun buildAutoSelectOutbound(
         ?: (if (SagerNet.isInitialized()) runCatching { DataStore.connectionTestURL }.getOrNull()?.takeIf { it.isNotBlank() } else null)
         ?: "https://cp.cloudflare.com/generate_204"
     url = balancer.testUrl?.takeIf { it.isNotBlank() } ?: fallbackUrl
-    selection_mode = if (balancer.isPriorityMode()) BalancerBean.SELECTION_PRIORITY else BalancerBean.SELECTION_LATENCY
-    balance_enabled = balancer.balanceEnabled
+    selection_mode = when {
+        balancer.isFallbackMode() -> BalancerBean.SELECTION_FALLBACK
+        balancer.isPriorityMode() -> BalancerBean.SELECTION_PRIORITY
+        else -> BalancerBean.SELECTION_LATENCY
+    }
+    balance_enabled = if (balancer.isFallbackMode()) false else balancer.balanceEnabled
     balance_mode = balancer.balanceMode?.takeIf { it == BalancerBean.BALANCE_PER_CONNECTION }
         ?: BalancerBean.BALANCE_TIMED_ROTATION
     balance_interval = "${balancer.balanceIntervalSec.coerceAtLeast(1)}s"
@@ -784,7 +788,7 @@ internal class ChainGraphContext(
                     if (tlsOptions?.get("enabled") == true) {
                         val delay = DataStore.fragmentInterval.let {
                             val first = it.split("-").firstOrNull()?.trim()
-                            val num = first?.toLongOrNull() ?: 20L
+                            val num = (first?.toLongOrNull() ?: 20L).coerceIn(1L, 1000L)
                             "${num}ms"
                         }
                         currentOutbound._hack_config_map["tls"] = mapOf(
@@ -1170,6 +1174,7 @@ fun buildConfig(
                     "cloudflare-dns.com",
                     "one.one.one.one",
                     "dns.quad9.net",
+                    "dns.adguard-dns.com",
                     "dns.opendns.com"
                 )
             )
@@ -1178,6 +1183,7 @@ fun buildConfig(
                     "8.8.8.8", "8.8.4.4",
                     "1.1.1.1", "1.0.0.1",
                     "9.9.9.9", "149.112.112.112",
+                    "94.140.14.14", "94.140.15.15",
                     "208.67.222.222", "208.67.220.220",
                     "2001:4860:4860::8888", "2001:4860:4860::8844",
                     "2606:4700:4700::1111", "2606:4700:4700::1001",

@@ -118,10 +118,10 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         DataStore.balancerTargetGroups = gids.joinToString(",")
         DataStore.balancerTargetGroup = gids.firstOrNull() ?: 0L
 
-        val normalizedSelectionMode = if (isPriorityMode()) {
-            BalancerBean.SELECTION_PRIORITY
-        } else {
-            BalancerBean.SELECTION_LATENCY
+        val normalizedSelectionMode = when {
+            isFallbackMode() -> BalancerBean.SELECTION_FALLBACK
+            isPriorityMode() -> BalancerBean.SELECTION_PRIORITY
+            else -> BalancerBean.SELECTION_LATENCY
         }
         DataStore.balancerSelectionMode = normalizedSelectionMode
         DataStore.balancerStrategy = normalizedSelectionMode
@@ -165,10 +165,10 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         targetGroupIds = ArrayList(gids)
         targetGroupId = gids.firstOrNull() ?: 0L
 
-        selectionMode = if (DataStore.balancerSelectionMode == BalancerBean.SELECTION_PRIORITY) {
-            BalancerBean.SELECTION_PRIORITY
-        } else {
-            BalancerBean.SELECTION_LATENCY
+        selectionMode = when (DataStore.balancerSelectionMode) {
+            BalancerBean.SELECTION_FALLBACK -> BalancerBean.SELECTION_FALLBACK
+            BalancerBean.SELECTION_PRIORITY -> BalancerBean.SELECTION_PRIORITY
+            else -> BalancerBean.SELECTION_LATENCY
         }
         strategy = selectionMode
 
@@ -613,7 +613,13 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
             type: Int = DataStore.balancerType,
             selectionMode: String = DataStore.balancerSelectionMode,
         ) {
+            val isFallback = selectionMode == BalancerBean.SELECTION_FALLBACK
             localNodeListPref?.isVisible = shouldShowNodeList(type, selectionMode)
+            if (isFallback) {
+                localNodeListPref?.setTitle(R.string.balancer_fallback_order_title)
+            } else {
+                localNodeListPref?.setTitle(R.string.balancer_node_order_title)
+            }
             localNodeListPref?.summary = formatNodeOrderSummary()
         }
         refreshNodeListFn = { syncNodeListUi() }
@@ -690,6 +696,9 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         val balanceModePref = findPreference<SimpleMenuPreference>("balancerBalanceMode")
         val balanceIntervalPref = bindIntPref("balancerBalanceIntervalSec", 30, 1, R.string.balancer_unit_seconds)
         val selectionModePref = findPreference<SimpleMenuPreference>("balancerSelectionMode")
+        val tolerancePref = findPreference<Preference>("balancerTolerance")
+        val fallbackAutoRevertPref = findPreference<Preference>("balancerFallbackAutoRevert")
+        val fallbackMaxFailsPref = findPreference<Preference>("balancerFallbackMaxFails")
 
         fun applyCategoryVisibility(balanceOn: Boolean) {
             catUseWhich?.isVisible = advancedExpanded
@@ -718,16 +727,32 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
             balanceModeOverride: String? = null,
         ) {
             val mode = selectionOverride ?: DataStore.balancerSelectionMode
+            val isFallback = mode == BalancerBean.SELECTION_FALLBACK
             val isPriority = mode == BalancerBean.SELECTION_PRIORITY
             selectionModePref?.value = mode
             selectionModePref?.setSummary(
-                if (isPriority) R.string.balancer_selection_priority_sum else R.string.balancer_selection_latency_sum
+                when {
+                    isFallback -> R.string.balancer_selection_fallback_sum
+                    isPriority -> R.string.balancer_selection_priority_sum
+                    else -> R.string.balancer_selection_latency_sum
+                }
+            )
+
+            fallbackAutoRevertPref?.isVisible = isFallback
+            fallbackMaxFailsPref?.isVisible = isFallback
+            balanceSwitchPref?.isVisible = !isFallback
+
+            tolerancePref?.setTitle(
+                if (isFallback) R.string.balancer_fallback_timeout_title else R.string.balancer_tolerance_title
+            )
+            tolerancePref?.setSummary(
+                if (isFallback) getString(R.string.balancer_fallback_timeout_summary) else null
             )
 
             rebuildTierPreferences()
             syncNodeListUi(DataStore.balancerType, mode)
 
-            val balanceOn = balanceEnabledOverride ?: DataStore.balancerBalanceEnabled
+            val balanceOn = if (isFallback) false else (balanceEnabledOverride ?: DataStore.balancerBalanceEnabled)
             val balMode = balanceModeOverride ?: DataStore.balancerBalanceMode
             balanceModePref?.value = balMode
             val balModeLabel = getString(
@@ -743,9 +768,9 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
                 getString(R.string.balancer_balance_enabled_off_sum)
             }
 
-            applyCategoryVisibility(balanceOn)
-            balanceModePref?.isEnabled = balanceOn
-            balanceIntervalPref?.isVisible = balanceOn && balMode != BalancerBean.BALANCE_PER_CONNECTION
+            applyCategoryVisibility(balanceOn && !isFallback)
+            balanceModePref?.isEnabled = balanceOn && !isFallback
+            balanceIntervalPref?.isVisible = balanceOn && !isFallback && balMode != BalancerBean.BALANCE_PER_CONNECTION
         }
 
         selectionModePref?.setOnPreferenceChangeListener { _, newValue ->
@@ -824,7 +849,7 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         type: Int = DataStore.balancerType,
         selectionMode: String = DataStore.balancerSelectionMode,
     ): Boolean =
-        selectionMode == BalancerBean.SELECTION_PRIORITY &&
+        (selectionMode == BalancerBean.SELECTION_PRIORITY || selectionMode == BalancerBean.SELECTION_FALLBACK) &&
             hasExplicitListType(type) &&
             proxyList.isNotEmpty()
 

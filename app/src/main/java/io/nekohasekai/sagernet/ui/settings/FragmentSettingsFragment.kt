@@ -1,6 +1,8 @@
 package io.nekohasekai.sagernet.ui.settings
 
 import android.os.Bundle
+import android.widget.Toast
+import androidx.preference.EditTextPreference
 import androidx.preference.Preference
 import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.R
@@ -14,6 +16,20 @@ class FragmentSettingsFragment : BaseSettingsPreferenceFragment() {
 
         findPreference<Preference>(Key.ENABLE_TLS_FRAGMENT)?.onPreferenceChangeListener = reloadListener
         findPreference<Preference>("fragmentLength")?.onPreferenceChangeListener = reloadListener
-        findPreference<Preference>("fragmentInterval")?.onPreferenceChangeListener = reloadListener
+        findPreference<EditTextPreference>("fragmentInterval")?.onPreferenceChangeListener =
+            Preference.OnPreferenceChangeListener { pref, newValue ->
+                val str = newValue as? String ?: return@OnPreferenceChangeListener true
+                val num = str.split("-").firstOrNull()?.trim()?.toLongOrNull()
+                if (num == null || num < 1 || num > 1000) {
+                    Toast.makeText(
+                        requireContext(),
+                        "拆包间隔须在 1~1000 之间（如 10-20 或 20）",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    false
+                } else {
+                    reloadListener.onPreferenceChange(pref, newValue)
+                }
+            }
     }
 }

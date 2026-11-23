@@ -35,6 +35,7 @@ public class BalancerBean extends InternalBean {
 
     public static final String SELECTION_LATENCY = "latency";
     public static final String SELECTION_PRIORITY = "priority";
+    public static final String SELECTION_FALLBACK = "fallback";
     public static final String BALANCE_TIMED_ROTATION = "timed_rotation";
     public static final String BALANCE_PER_CONNECTION = "per_connection";
 
@@ -130,6 +131,10 @@ public class BalancerBean extends InternalBean {
         return SELECTION_PRIORITY.equals(selectionMode);
     }
 
+    public boolean isFallbackMode() {
+        return SELECTION_FALLBACK.equals(selectionMode);
+    }
+
     public long calculateToleranceMs() {
         long value = tolerance;
         if (value < 0L) {
@@ -153,7 +158,13 @@ public class BalancerBean extends InternalBean {
     @Override
     public String displayAddress() {
         StringBuilder stratBuilder = new StringBuilder();
-        stratBuilder.append(isPriorityMode() ? "按优先级" : "最快最稳");
+        if (isFallbackMode()) {
+            stratBuilder.append("故障转移");
+        } else if (isPriorityMode()) {
+            stratBuilder.append("按优先级");
+        } else {
+            stratBuilder.append("最快最稳");
+        }
         if (isPriorityMode() && tiers != null && !tiers.isEmpty()) {
             stratBuilder.append(" · ").append(tiers.size()).append("层级");
         }
@@ -261,7 +272,7 @@ public class BalancerBean extends InternalBean {
             selectionMode = SELECTION_PRIORITY.equals(strategy) || STRATEGY_FAILOVER.equals(strategy)
                     ? SELECTION_PRIORITY
                     : SELECTION_LATENCY;
-        } else if (!SELECTION_LATENCY.equals(selectionMode) && !SELECTION_PRIORITY.equals(selectionMode)) {
+        } else if (!SELECTION_LATENCY.equals(selectionMode) && !SELECTION_PRIORITY.equals(selectionMode) && !SELECTION_FALLBACK.equals(selectionMode)) {
             selectionMode = SELECTION_LATENCY;
         }
         strategy = selectionMode;
@@ -282,7 +293,9 @@ public class BalancerBean extends InternalBean {
 
     @Override
     public void serialize(ByteBufferOutput output) {
-        String effectiveSelection = SELECTION_PRIORITY.equals(selectionMode) ? SELECTION_PRIORITY : SELECTION_LATENCY;
+        String effectiveSelection = SELECTION_FALLBACK.equals(selectionMode)
+                ? SELECTION_FALLBACK
+                : (SELECTION_PRIORITY.equals(selectionMode) ? SELECTION_PRIORITY : SELECTION_LATENCY);
         strategy = effectiveSelection;
 
         output.writeInt(8); // version

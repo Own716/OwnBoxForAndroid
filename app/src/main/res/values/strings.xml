@@ -668,8 +668,7 @@
     <string name="backup_groups_and_configurations">Groups and configurations</string>
     <string name="backup_rules">Routing rules</string>
     <string name="backup_settings">Settings</string>
-    <string name="backup_summary">If the routing settings are not backed up with configurations,
-        then custom outbounds will be lost.</string>
+    <string name="backup_summary">Includes node groups, routing rules, per-app proxy lists, and full preferences for seamless device migration.</string>
     <string name="backup_not_file">Not an backup file: excepted .json, but %s</string>
     <string name="backup_not_throne_desktop">Not a Throne desktop backup: expected .thrbackup, but %s</string>
     <string name="invalid_backup_file">Invalid backup file</string>
@@ -1591,4 +1590,30 @@
     <string name="invert_selection">Invert Selection</string>
     <string name="batch_speed_test_confirm_title">Run speed test (%d)?</string>
     <string name="batch_speed_test_confirm_message">Are you sure you want to run speed test on the selected %d profile(s)? Speed testing can use significant data.</string>
+
+    <!-- DNS Presets & Protocols -->
+    <string name="remote_dns_presets">Select Remote DNS Preset</string>
+    <string name="remote_dns_presets_summary">Quickly fill in popular anti-censorship DoH/DoQ/DoH3 addresses</string>
+    <string name="direct_dns_presets">Select Direct DNS Preset</string>
+    <string name="direct_dns_presets_summary">Quickly fill in low-latency domestic DoH/DoQ addresses</string>
+    <string name="dns_preset_applied">Applied preset: %s</string>
+
+    <!-- Fallback Strategy -->
+    <string name="balancer_selection_fallback">Fallback (Priority Failover)</string>
+    <string name="balancer_selection_fallback_sum">Fallback: Always use the primary node. Automatically switch to backup nodes on failure, and return to primary upon recovery.</string>
+    <string name="balancer_fallback_order_title">Node Priority Order</string>
+    <string name="balancer_fallback_order_summary">Drag and arrange primary node and backup nodes</string>
+    <string name="balancer_fallback_auto_revert_title">Auto-Revert to Primary</string>
+    <string name="balancer_fallback_auto_revert_summary">Automatically switch back to primary node once it recovers</string>
+    <string name="balancer_fallback_max_fails_title">Failure Threshold</string>
+    <string name="balancer_fallback_max_fails_summary">Trigger failover after N consecutive failed checks (default: 2)</string>
+    <string name="balancer_fallback_timeout_title">Health Check Timeout</string>
+    <string name="balancer_fallback_timeout_summary">Timeout before a check is considered failed (default: 3000ms)</string>
+
+    <!-- Traffic & Routing Connections -->
+    <string name="menu_connections">Traffic Routing</string>
+    <string name="connections_title">Traffic Routing</string>
+    <string name="connections_empty">No active connections</string>
+    <string name="connections_search_hint">Search domain, IP or rule...</string>
+    <string name="connections_close_all">Close All</string>
 </resources>

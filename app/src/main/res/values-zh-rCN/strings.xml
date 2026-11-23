@@ -534,7 +534,7 @@
     <string name="backup">备份</string>
     <string name="backup_groups_and_configurations">分组和配置</string>
     <string name="backup_import">导入</string>
-    <string name="backup_summary">如果路由规则不与配置一起备份，则自定义出站将丢失。</string>
+    <string name="backup_summary">包含节点分组、路由规则、分应用名单与完整高级设置，换机或重装时可一键无损还原。</string>
     <string name="backup_settings">设置</string>
     <string name="backup_not_file">不是一个备份文件，预期 .json，但 %s</string>
     <string name="backup_not_throne_desktop">不是 Throne 电脑版备份文件，预期 .thrbackup，但 %s</string>
@@ -1509,4 +1509,30 @@
     <string name="invert_selection">反选</string>
     <string name="batch_speed_test_confirm_title">运行速度测试 (%d)？</string>
     <string name="batch_speed_test_confirm_message">确定要对选中的 %d 个节点运行速度测试吗？测试可能消耗较多流量，各节点将依次通过其自身代理进行测试。</string>
+
+    <!-- DNS 预设与现代协议 -->
+    <string name="remote_dns_presets">选择常用远程 DNS 预设</string>
+    <string name="remote_dns_presets_summary">一键快速填入主流海外抗污染 DoH / DoQ / HTTP3 地址</string>
+    <string name="direct_dns_presets">选择常用直连 DNS 预设</string>
+    <string name="direct_dns_presets_summary">一键快速填入主流国内低延迟 DoH / DoQ 地址</string>
+    <string name="dns_preset_applied">已应用预设：%s</string>
+
+    <!-- Fallback 故障转移模式专属设置 -->
+    <string name="balancer_selection_fallback">故障转移 (Fallback / 首选顺位兜底)</string>
+    <string name="balancer_selection_fallback_sum">故障转移：优先使用首选节点；首位失效顺位切换备选，首位恢复自动切回。</string>
+    <string name="balancer_fallback_order_title">调整主备顺位顺序</string>
+    <string name="balancer_fallback_order_summary">拖拽排定第一主力节点与后续备选节点顺序</string>
+    <string name="balancer_fallback_auto_revert_title">主节点恢复后自动切回</string>
+    <string name="balancer_fallback_auto_revert_summary">当首选主力节点恢复健康时，秒级切回主力节点</string>
+    <string name="balancer_fallback_max_fails_title">故障判定容错次数</string>
+    <string name="balancer_fallback_max_fails_summary">连续探测失败达到指定次数后正式切换备选节点（默认 2 次）</string>
+    <string name="balancer_fallback_timeout_title">健康探测超时阈值</string>
+    <string name="balancer_fallback_timeout_summary">单次探测超过此时间判定为节点超时故障（默认 3000 毫秒）</string>
+
+    <!-- 侧边栏分流连接 -->
+    <string name="menu_connections">分流连接</string>
+    <string name="connections_title">分流连接</string>
+    <string name="connections_empty">暂无活跃网络连接</string>
+    <string name="connections_search_hint">搜索域名、IP 或规则...</string>
+    <string name="connections_close_all">断开全部</string>
 </resources>

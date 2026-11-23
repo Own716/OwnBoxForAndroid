@@ -762,10 +762,12 @@
     <string-array name="balancer_selection_mode_entries">
         <item>@string/balancer_selection_latency</item>
         <item>@string/balancer_selection_priority</item>
+        <item>@string/balancer_selection_fallback</item>
     </string-array>
     <string-array name="balancer_selection_mode_values" translatable="false">
         <item>latency</item>
         <item>priority</item>
+        <item>fallback</item>
     </string-array>
 
     <string-array name="balancer_balance_mode_entries">

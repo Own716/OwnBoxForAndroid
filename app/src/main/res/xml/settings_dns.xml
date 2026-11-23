@@ -11,6 +11,12 @@
             app:title="@string/remote_dns"
             app:useSimpleSummaryProvider="true" />
 
+        <Preference
+            app:icon="@drawable/solar_checklist_minimalistic_linear"
+            app:key="remoteDnsPresets"
+            app:summary="@string/remote_dns_presets_summary"
+            app:title="@string/remote_dns_presets" />
+
         <moe.matsuri.nb4a.ui.SimpleMenuPreference
             app:defaultValue="auto"
             app:entries="@array/dns_network_select"
@@ -26,6 +32,12 @@
             app:key="directDns"
             app:title="@string/direct_dns"
             app:useSimpleSummaryProvider="true" />
+
+        <Preference
+            app:icon="@drawable/solar_checklist_minimalistic_linear"
+            app:key="directDnsPresets"
+            app:summary="@string/direct_dns_presets_summary"
+            app:title="@string/direct_dns_presets" />
 
         <moe.matsuri.nb4a.ui.SimpleMenuPreference
             app:defaultValue="auto"

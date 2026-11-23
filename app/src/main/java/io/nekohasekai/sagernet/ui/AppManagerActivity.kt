@@ -44,6 +44,7 @@ import io.nekohasekai.sagernet.utils.PackageCache
 import io.nekohasekai.sagernet.widget.ListListener
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import moe.matsuri.nb4a.utils.NGUtil
@@ -102,10 +103,26 @@ class AppManagerActivity : ThemedActivity() {
             hasConfigChanged = true
             DataStore.dirty = true
             if (isProxiedApp(item)) proxiedUids.delete(item.uid) else proxiedUids[item.uid] = true
-            DataStore.individual = apps.filter { isProxiedApp(it) }
-                .joinToString("\n") { it.packageName }
+            val pos = bindingAdapterPosition
+            if (pos != RecyclerView.NO_POSITION) {
+                appsAdapter.notifyItemChanged(pos, listOf(SWITCH))
+            }
+            scheduleSaveIndividual()
+        }
+    }
 
-            appsAdapter.notifyItemRangeChanged(0, appsAdapter.itemCount, SWITCH)
+    private var saveIndividualJob: Job? = null
+    private fun scheduleSaveIndividual(immediate: Boolean = false) {
+        saveIndividualJob?.cancel()
+        if (immediate) {
+            val individualStr = apps.filter { isProxiedApp(it) }.joinToString("\n") { it.packageName }
+            DataStore.individual = individualStr
+            return
+        }
+        saveIndividualJob = lifecycleScope.launch(Dispatchers.Default) {
+            delay(300)
+            val individualStr = apps.filter { isProxiedApp(it) }.joinToString("\n") { it.packageName }
+            DataStore.individual = individualStr
         }
     }
 
@@ -411,6 +428,7 @@ class AppManagerActivity : ThemedActivity() {
 
     override fun onPause() {
         super.onPause()
+        scheduleSaveIndividual(immediate = true)
         checkAndApplyChanges()
     }
 

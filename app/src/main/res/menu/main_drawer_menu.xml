@@ -28,6 +28,10 @@
             android:icon="@drawable/ic_baseline_health_and_safety_24"
             android:title="@string/menu_diagnostics" />
         <item
+            android:id="@+id/nav_connections"
+            android:icon="@drawable/solar_wi_fi_router_linear"
+            android:title="@string/menu_connections" />
+        <item
             android:id="@+id/nav_apps"
             android:icon="@drawable/ic_navigation_apps"
             android:title="@string/proxied_apps"

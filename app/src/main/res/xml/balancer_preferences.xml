@@ -139,6 +139,22 @@
             app:summary="@string/balancer_learn_from_connections_sum"
             app:title="@string/balancer_learn_from_connections" />
 
+        <SwitchPreferenceCompat
+            app:defaultValue="true"
+            app:iconSpaceReserved="false"
+            app:isPreferenceVisible="false"
+            app:key="balancerFallbackAutoRevert"
+            app:summary="@string/balancer_fallback_auto_revert_summary"
+            app:title="@string/balancer_fallback_auto_revert_title" />
+
+        <EditTextPreference
+            app:defaultValue="2"
+            app:iconSpaceReserved="false"
+            app:isPreferenceVisible="false"
+            app:key="balancerFallbackMaxFails"
+            app:summary="@string/balancer_fallback_max_fails_summary"
+            app:title="@string/balancer_fallback_max_fails_title" />
+
         <EditTextPreference
             app:iconSpaceReserved="false"
             app:key="balancerTestUrl"

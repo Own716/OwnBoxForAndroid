@@ -508,6 +508,8 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var balancerToleranceUnit by profileCacheStore.string("balancerToleranceUnit") { "ms" }
     var balancerInterruptOnSwitch by profileCacheStore.boolean("balancerInterruptOnSwitch") { false }
     var balancerLearnFromConnections by profileCacheStore.boolean("balancerLearnFromConnections") { true }
+    var balancerFallbackAutoRevert by profileCacheStore.boolean("balancerFallbackAutoRevert") { true }
+    var balancerFallbackMaxFails by profileCacheStore.stringToInt("balancerFallbackMaxFails") { 2 }
     var balancerTestUrl by profileCacheStore.string("balancerTestUrl") { "" }
     var balancerFrontProxy by profileCacheStore.long("balancerFrontProxyLong")
     var balancerLandingProxy by profileCacheStore.long("balancerLandingProxyLong")

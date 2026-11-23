@@ -138,5 +138,17 @@ object BackupCodec {
         Key.NETWORK_CHANGE_RESET_CONNECTIONS to DataStore.networkChangeResetConnections,
         Key.WAKE_RESET_CONNECTIONS to DataStore.wakeResetConnections,
         Key.GLOBAL_ALLOW_INSECURE to DataStore.globalAllowInsecure,
+        Key.PROXY_APPS to DataStore.proxyApps,
+        Key.BYPASS_MODE to DataStore.bypass,
+        Key.INDIVIDUAL to DataStore.individual,
+        "enableTLSFragment" to DataStore.enableTLSFragment,
+        "fragmentLength" to DataStore.fragmentLength,
+        "fragmentInterval" to DataStore.fragmentInterval,
+        "enableClashAPI" to DataStore.enableClashAPI,
+        Key.MIXED_PORT to DataStore.mixedPort,
+        Key.ALLOW_ACCESS to DataStore.allowAccess,
+        Key.SPEED_INTERVAL to DataStore.speedInterval,
+        Key.SHOW_DIRECT_SPEED to DataStore.showDirectSpeed,
+        Key.SHOW_LANDING_IP to DataStore.showLandingIp,
     )
 }
