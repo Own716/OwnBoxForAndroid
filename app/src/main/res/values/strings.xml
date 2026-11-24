@@ -971,11 +971,19 @@
     <string name="widget_toggle">Tap to toggle connection</string>
     <string name="change_icon">Change app icon</string>
         <string name="app_icon_dynamic">Follow System (Default)</string>
-        <string name="app_icon_dynamic_desc">Auto switches between dark and light purple cat</string>
-        <string name="app_icon_light_mode">Light Mode</string>
-        <string name="app_icon_light_mode_desc">Elegant light purple gradient with white cat</string>
-        <string name="app_icon_dark_mode">Dark Mode</string>
-        <string name="app_icon_dark_mode_desc">Dark purple gradient with glowing cat</string>
+        <string name="app_icon_dynamic_desc">Auto switches between original dark and light icons</string>
+        <string name="app_icon_original_light">Classic Light (Original)</string>
+        <string name="app_icon_original_light_desc">Original classic light 4-pillar icon</string>
+        <string name="app_icon_original_dark">Classic Dark (Original)</string>
+        <string name="app_icon_original_dark_desc">Original classic dark 4-pillar icon</string>
+        <string name="app_icon_double_cat">Double Cat</string>
+        <string name="app_icon_double_cat_desc">Minimalist black cat and peek-a-boo white cat</string>
+        <string name="app_icon_phantom_cat">Phantom Halo</string>
+        <string name="app_icon_phantom_cat_desc">Black cat silhouette with rainbow neon halo</string>
+        <string name="app_icon_cat_light">Pastel Light</string>
+        <string name="app_icon_cat_light_desc">Light purple gradient with cute white cat</string>
+        <string name="app_icon_cat_dark">Midnight Dark</string>
+        <string name="app_icon_cat_dark_desc">Dark purple gradient with glowing cat</string>
         <string name="app_icon_text" translatable="false">OB+</string>
         <string name="app_icon_text_desc">Minimalist black &amp; white OB+ text</string>
         <string name="app_icon_selected">Selected</string>

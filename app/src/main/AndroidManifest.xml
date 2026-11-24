@@ -194,6 +194,86 @@
                 android:resource="@xml/shortcuts" />
         </activity-alias>
         <activity-alias
+            android:name="io.nekohasekai.sagernet.launcher.DoubleCat"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_double_cat"
+            android:roundIcon="@mipmap/ic_launcher_double_cat_round"
+            android:label="@string/app_name"
+            android:targetActivity="io.nekohasekai.sagernet.ui.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias
+            android:name="io.nekohasekai.sagernet.launcher.PhantomCat"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_phantom_cat"
+            android:roundIcon="@mipmap/ic_launcher_phantom_cat_round"
+            android:label="@string/app_name"
+            android:targetActivity="io.nekohasekai.sagernet.ui.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias
+            android:name="io.nekohasekai.sagernet.launcher.CatLight"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_cat_light"
+            android:roundIcon="@mipmap/ic_launcher_cat_light_round"
+            android:label="@string/app_name"
+            android:targetActivity="io.nekohasekai.sagernet.ui.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias
+            android:name="io.nekohasekai.sagernet.launcher.CatDark"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_cat_dark"
+            android:roundIcon="@mipmap/ic_launcher_cat_dark_round"
+            android:label="@string/app_name"
+            android:targetActivity="io.nekohasekai.sagernet.ui.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias
             android:name="io.nekohasekai.sagernet.launcher.Text"
             android:enabled="false"
             android:exported="true"

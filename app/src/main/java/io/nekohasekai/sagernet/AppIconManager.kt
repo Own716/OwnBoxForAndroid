@@ -56,7 +56,14 @@ object AppIconManager {
     }
 
     fun init(context: Context) {
-        applyIconMode(context, force = false)
+        if (DataStore.appIconResetVersion < 535) {
+            DataStore.selectedAppIcon = AppIcon.NEKOBOX_PLUS.name
+            DataStore.appIconMode = MODE_FOLLOW_SYSTEM
+            DataStore.appIconResetVersion = 535
+            set(context, AppIcon.NEKOBOX_PLUS)
+        } else {
+            applyIconMode(context, force = false)
+        }
     }
 
     fun applyIconMode(context: Context, mode: Int = DataStore.appIconMode, force: Boolean = false) {

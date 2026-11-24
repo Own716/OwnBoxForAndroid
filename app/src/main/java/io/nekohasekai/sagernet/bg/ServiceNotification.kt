@@ -107,8 +107,8 @@ class ServiceNotification(
 
     private fun resolveLiveUpdateDarkMode(ctx: Context): Boolean {
         return when (resolveActiveAppIcon(ctx)) {
-            AppIcon.LIGHT_MODE -> false
-            AppIcon.DARK_MODE -> true
+            AppIcon.LIGHT_MODE, AppIcon.CAT_LIGHT -> false
+            AppIcon.DARK_MODE, AppIcon.CAT_DARK, AppIcon.DOUBLE_CAT, AppIcon.PHANTOM_CAT, AppIcon.TEXT -> true
             else -> {
                 val uiMode = runCatching { Resources.getSystem().configuration.uiMode }
                     .getOrDefault(ctx.resources.configuration.uiMode)
@@ -129,7 +129,7 @@ class ServiceNotification(
     private fun resolveNotificationAccentColor(ctx: Context): Int {
         val active = resolveActiveAppIcon(ctx)
         return if (active == AppIcon.NEKOBOX_PLUS) {
-            if (resolveLiveUpdateDarkMode(ctx)) Color.parseColor("#A855F7") else Color.parseColor("#9333EA")
+            if (resolveLiveUpdateDarkMode(ctx)) Color.parseColor("#3B82F6") else Color.parseColor("#2563EB")
         } else {
             active.accentColor
         }

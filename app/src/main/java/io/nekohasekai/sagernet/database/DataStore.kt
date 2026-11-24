@@ -142,6 +142,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var nightTheme by configurationStore.stringToInt(Key.NIGHT_THEME)
     var appIconMode by configurationStore.stringToInt(Key.APP_ICON_MODE) { 0 }
     var selectedAppIcon by configurationStore.string("selected_app_icon") { "NEKOBOX_PLUS" }
+    var appIconResetVersion by configurationStore.int("app_icon_reset_version") { 0 }
     var appLanguage by configurationStore.string(Key.APP_LANGUAGE) { "" }
     var serviceMode by configurationStore.string(Key.SERVICE_MODE) { Key.MODE_VPN }
 
