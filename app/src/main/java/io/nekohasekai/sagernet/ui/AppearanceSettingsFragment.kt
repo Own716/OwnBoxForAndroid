@@ -63,11 +63,17 @@ class AppearanceSettingsFragment : PreferenceFragmentCompat() {
             }
         }
 
-        findPreference<SimpleMenuPreference>(Key.APP_ICON_MODE)?.setOnPreferenceChangeListener { _, newMode ->
-            val mode = (newMode as String).toInt()
-            DataStore.appIconMode = mode
-            AppIconManager.applyIconMode(requireContext(), mode = mode, force = true)
-            view?.post { notifyNotificationUpdate() }
+        val appIconPref = findPreference<Preference>("appIconSettings")
+        fun updateAppIconSummary() {
+            val current = AppIconManager.current(requireContext())
+            appIconPref?.summary = getString(current.titleRes)
+        }
+        updateAppIconSummary()
+        appIconPref?.setOnPreferenceClickListener {
+            AppIconDialog.show(requireContext()) {
+                updateAppIconSummary()
+                view?.post { notifyNotificationUpdate() }
+            }
             true
         }
 

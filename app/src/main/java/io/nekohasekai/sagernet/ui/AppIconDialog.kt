@@ -21,7 +21,7 @@ import io.nekohasekai.sagernet.ktx.getColorAttr
 
 object AppIconDialog {
 
-    fun show(context: Context) {
+    fun show(context: Context, onSelected: ((AppIcon) -> Unit)? = null) {
         val currentIcon = AppIconManager.current(context)
         val density = context.resources.displayMetrics.density
         val iconSize = (52 * density).toInt()
@@ -61,6 +61,8 @@ object AppIconDialog {
             override fun onBindViewHolder(holder: IconViewHolder, position: Int) {
                 val icon = AppIcon.values()[position]
                 holder.title.setText(icon.titleRes)
+                holder.subtitle.setText(icon.descRes)
+
                 val bmp = previews[icon]
                 if (bmp != null) {
                     holder.preview.setImageBitmap(bmp)
@@ -69,13 +71,15 @@ object AppIconDialog {
                 }
                 holder.preview.shapeAppearanceModel = holder.preview.shapeAppearanceModel
                     .toBuilder()
-                    .setAllCornerSizes(14f * density)
+                    .setAllCornerSizes(12f * density)
                     .build()
 
                 val isSelected = (icon == currentIcon)
+                holder.check.visibility = if (isSelected) View.VISIBLE else View.GONE
+
                 if (isSelected) {
                     val selBg = GradientDrawable().apply {
-                        cornerRadius = 16f * density
+                        cornerRadius = 14f * density
                         setColor(selectedColor)
                     }
                     holder.container.background = selBg
@@ -88,6 +92,7 @@ object AppIconDialog {
                 holder.container.setOnClickListener {
                     if (icon != currentIcon) {
                         AppIconManager.set(context, icon)
+                        onSelected?.invoke(icon)
                     }
                     dialog.dismiss()
                 }
@@ -101,5 +106,7 @@ object AppIconDialog {
         val container: View = itemView.findViewById(R.id.itemContainer)
         val preview: ShapeableImageView = itemView.findViewById(R.id.iconPreview)
         val title: TextView = itemView.findViewById(R.id.iconTitle)
+        val subtitle: TextView = itemView.findViewById(R.id.iconSubtitle)
+        val check: View = itemView.findViewById(R.id.iconCheck)
     }
 }

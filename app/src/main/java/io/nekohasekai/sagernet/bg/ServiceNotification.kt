@@ -101,10 +101,13 @@ class ServiceNotification(
     private var lastShowCapsule: Boolean? = null
     private val egressProbeGeneration = AtomicLong(0L)
 
+    private fun resolveActiveAppIcon(ctx: Context): AppIcon =
+        AppIcon.fromName(DataStore.selectedAppIcon) ?: AppIconManager.current(ctx)
+
     private fun resolveLiveUpdateDarkMode(ctx: Context): Boolean {
-        return when (DataStore.appIconMode) {
-            AppIconManager.MODE_LIGHT -> false
-            AppIconManager.MODE_DARK -> true
+        return when (resolveActiveAppIcon(ctx)) {
+            AppIcon.LIGHT_MODE -> false
+            AppIcon.DARK_MODE -> true
             else -> {
                 val uiMode = runCatching { Resources.getSystem().configuration.uiMode }
                     .getOrDefault(ctx.resources.configuration.uiMode)
@@ -113,11 +116,23 @@ class ServiceNotification(
         }
     }
 
-    private fun resolveLiveUpdateIconRes(ctx: Context): Int =
-        if (resolveLiveUpdateDarkMode(ctx)) R.drawable.ic_live_update_dark else R.drawable.ic_live_update_light
+    private fun resolveLiveUpdateIconRes(ctx: Context): Int {
+        val active = resolveActiveAppIcon(ctx)
+        return if (active == AppIcon.NEKOBOX_PLUS) {
+            if (resolveLiveUpdateDarkMode(ctx)) R.drawable.ic_live_update_dark else R.drawable.ic_live_update_light
+        } else {
+            active.islandIconRes
+        }
+    }
 
-    private fun resolveNotificationAccentColor(ctx: Context): Int =
-        if (resolveLiveUpdateDarkMode(ctx)) Color.parseColor("#A855F7") else Color.parseColor("#9333EA")
+    private fun resolveNotificationAccentColor(ctx: Context): Int {
+        val active = resolveActiveAppIcon(ctx)
+        return if (active == AppIcon.NEKOBOX_PLUS) {
+            if (resolveLiveUpdateDarkMode(ctx)) Color.parseColor("#A855F7") else Color.parseColor("#9333EA")
+        } else {
+            active.accentColor
+        }
+    }
 
     private fun applyNotificationBranding(target: NotificationCompat.Builder) {
         val ctx = service as Context

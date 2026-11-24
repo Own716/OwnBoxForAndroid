@@ -61,7 +61,7 @@ object AppIconManager {
 
     fun applyIconMode(context: Context, mode: Int = DataStore.appIconMode, force: Boolean = false) {
         try {
-            val target = when (mode) {
+            val target = AppIcon.fromName(DataStore.selectedAppIcon) ?: when (mode) {
                 MODE_LIGHT -> AppIcon.LIGHT_MODE
                 MODE_DARK -> AppIcon.DARK_MODE
                 else -> AppIcon.NEKOBOX_PLUS
@@ -82,6 +82,13 @@ object AppIconManager {
                 context.resources.configuration.uiMode and Configuration.UI_MODE_TYPE_MASK ==
                     Configuration.UI_MODE_TYPE_TELEVISION,
             )
+            DataStore.selectedAppIcon = effectiveSelection.name
+            DataStore.appIconMode = when (effectiveSelection) {
+                AppIcon.LIGHT_MODE -> MODE_LIGHT
+                AppIcon.DARK_MODE -> MODE_DARK
+                else -> MODE_FOLLOW_SYSTEM
+            }
+
             val packageManager = context.packageManager
             val isDefaultDisabled = effectiveSelection == AppIcon.NEKOBOX_PLUS &&
                 packageManager.getComponentEnabledSetting(AppIcon.NEKOBOX_PLUS.componentName(context)) ==
