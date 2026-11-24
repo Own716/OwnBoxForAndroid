@@ -222,6 +222,8 @@ object DataStore : OnPreferenceDataStoreChangeListener {
         }
         set(value) = configurationStore.putString(Key.DEFAULT_SUBSCRIPTION_USER_AGENT, value)
 
+    var subscriptionSendHwidHeaders by configurationStore.boolean(Key.SUBSCRIPTION_SEND_HWID_HEADERS) { false }
+
     var hideUnavailableProfiles by configurationStore.boolean(Key.HIDE_UNAVAILABLE_PROFILES) { false }
 
     fun migrateSubscriptionUserAgents(targetUa: String? = null, forceAll: Boolean = false) {

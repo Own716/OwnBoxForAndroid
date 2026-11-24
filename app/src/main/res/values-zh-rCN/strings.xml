@@ -419,6 +419,10 @@
     <string name="update_when_connected_only_sum">防止 IP 地址泄漏</string>
     <string name="subscription_user_agent">用户代理</string>
     <string name="default_subscription_user_agent">默认订阅 User-Agent</string>
+    <string name="subscription_send_hwid_headers">发送设备与 HWID 信息</string>
+    <string name="subscription_send_hwid_headers_summary">更新订阅时附带 x-hwid、x-device-os、x-ver-os 与 x-device-model 请求头，以适配 Remnawave / Marzban / 3X-UI 等限制设备数的面板</string>
+    <string name="subscription_hwid_not_supported">该订阅服务端已开启设备限制，请前往「设置 → 进阶设置」开启「发送设备与 HWID 信息」后重试</string>
+    <string name="subscription_hwid_max_devices_reached">该订阅已达服务端允许的最大设备绑定上限，请在面板后台解绑旧设备后重试</string>
     <string name="select_ua_preset">预设 User-Agent</string>
     <string name="custom_ua_hint">输入自定义 User-Agent</string>
     <string name="update_existing_subscriptions_ua">同时更新所有已保存的订阅</string>

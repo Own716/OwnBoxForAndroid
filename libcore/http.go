@@ -18,6 +18,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -378,14 +379,26 @@ type httpResponse struct {
 }
 
 func (h *httpResponse) errorString() string {
+	var hwidTags []string
+	if strings.EqualFold(h.Header.Get("x-hwid-max-devices-reached"), "true") ||
+		strings.EqualFold(h.Header.Get("x-hwid-limit"), "true") {
+		hwidTags = append(hwidTags, "x-hwid-max-devices-reached")
+	}
+	if strings.EqualFold(h.Header.Get("x-hwid-not-supported"), "true") {
+		hwidTags = append(hwidTags, "x-hwid-not-supported")
+	}
+	tagSuffix := ""
+	if len(hwidTags) > 0 {
+		tagSuffix = " [" + strings.Join(hwidTags, ",") + "]"
+	}
 	content, err := h.getContentString()
 	if err != nil {
-		return fmt.Sprint("HTTP ", h.Status)
+		return fmt.Sprint("HTTP ", h.Status, tagSuffix)
 	}
 	if len(content) > 100 {
 		content = content[:100] + " ..."
 	}
-	return fmt.Sprint("HTTP ", h.Status, ": ", content)
+	return fmt.Sprint("HTTP ", h.Status, tagSuffix, ": ", content)
 }
 
 func (h *httpResponse) GetHeader(key string) *StringBox {

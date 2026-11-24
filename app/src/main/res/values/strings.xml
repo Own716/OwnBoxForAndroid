@@ -530,6 +530,10 @@
     <string name="update_when_connected_only_sum">Prevent IP address leakage</string>
     <string name="subscription_user_agent">UserAgent</string>
     <string name="default_subscription_user_agent">Default Subscription User-Agent</string>
+    <string name="subscription_send_hwid_headers">Send Device &amp; HWID Info</string>
+    <string name="subscription_send_hwid_headers_summary">Attach x-hwid, x-device-os, x-ver-os, and x-device-model headers on subscription updates for panels with device limits (e.g. Remnawave, Marzban, 3X-UI)</string>
+    <string name="subscription_hwid_not_supported">Subscription server requires a device identifier. Please enable \"Send Device &amp; HWID Info\" in Settings → Advanced Settings and try again.</string>
+    <string name="subscription_hwid_max_devices_reached">Maximum device limit reached for this subscription. Please unbind an unused device in your subscription panel and try again.</string>
     <string name="select_ua_preset">Preset User-Agent</string>
     <string name="custom_ua_hint">Enter custom User-Agent</string>
     <string name="update_existing_subscriptions_ua">Update all saved subscriptions</string>

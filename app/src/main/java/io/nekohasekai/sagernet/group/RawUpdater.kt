@@ -29,6 +29,7 @@ import io.nekohasekai.sagernet.fmt.wireguard.WireGuardBean
 import io.nekohasekai.sagernet.fmt.wireguard.parseWireGuardConfig
 import io.nekohasekai.sagernet.fmt.wireguard.parseWireGuardEndpoints
 import io.nekohasekai.sagernet.ktx.*
+import io.nekohasekai.sagernet.utils.DeviceHwidManager
 import libcore.Libcore
 import moe.matsuri.nb4a.Protocols
 import moe.matsuri.nb4a.proxy.anytls.AnyTLSBean
@@ -46,6 +47,20 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 @Suppress("EXPERIMENTAL_API_USAGE")
 object RawUpdater : GroupUpdater() {
+
+    private class HwidRejectedException(message: String) : IllegalStateException(message)
+
+    private fun detectHwidErrorFromMessage(message: String?, sendHwidEnabled: Boolean): String? {
+        if (message.isNullOrBlank()) return null
+        val lower = message.lowercase()
+        if (lower.contains("x-hwid-max-devices-reached") || lower.contains("x-hwid-limit")) {
+            return app.getString(R.string.subscription_hwid_max_devices_reached)
+        }
+        if (lower.contains("x-hwid-not-supported") && !sendHwidEnabled) {
+            return app.getString(R.string.subscription_hwid_not_supported)
+        }
+        return null
+    }
 
     @SuppressLint("Recycle")
     override suspend fun doUpdate(
@@ -103,6 +118,11 @@ object RawUpdater : GroupUpdater() {
                         }
                         setURL(subscription.link)
                         setUserAgent(ua)
+                        if (DataStore.subscriptionSendHwidHeaders) {
+                            DeviceHwidManager.buildSubscriptionHeaders().forEach { (key, value) ->
+                                setHeader(key, value)
+                            }
+                        }
                     }
                     return consume(request.execute())
                 } finally {
@@ -138,6 +158,20 @@ object RawUpdater : GroupUpdater() {
                     fetchedProxies = parsed
                     return true
                 }
+
+                val maxDevicesReached = Util.getStringBox(
+                    response.getHeader("x-hwid-max-devices-reached")
+                        ?: response.getHeader("x-hwid-limit")
+                ).equals("true", ignoreCase = true)
+                if (maxDevicesReached) {
+                    throw HwidRejectedException(app.getString(R.string.subscription_hwid_max_devices_reached))
+                }
+                val hwidNotSupported = Util.getStringBox(
+                    response.getHeader("x-hwid-not-supported")
+                ).equals("true", ignoreCase = true)
+                if (hwidNotSupported && !DataStore.subscriptionSendHwidHeaders) {
+                    throw HwidRejectedException(app.getString(R.string.subscription_hwid_not_supported))
+                }
                 return false
             }
 
@@ -151,6 +185,10 @@ object RawUpdater : GroupUpdater() {
                         try {
                             executeRequest(ua, useProxy = true, consume = ::processResponse)
                         } catch (proxyError: Throwable) {
+                            if (proxyError is HwidRejectedException) throw proxyError
+                            detectHwidErrorFromMessage(proxyError.message, DataStore.subscriptionSendHwidHeaders)?.let {
+                                throw HwidRejectedException(it)
+                            }
                             Logs.w("Subscription proxy fetch failed for UA $ua (${proxyError.readableMessage}), falling back to direct network...")
                             executeRequest(ua, useProxy = false, consume = ::processResponse)
                         }
@@ -165,6 +203,10 @@ object RawUpdater : GroupUpdater() {
                         Logs.w("Subscription returned 0 proxies with UA: $ua, trying next candidate...")
                     }
                 } catch (e: Throwable) {
+                    if (e is HwidRejectedException) throw e
+                    detectHwidErrorFromMessage(e.message, DataStore.subscriptionSendHwidHeaders)?.let {
+                        throw HwidRejectedException(it)
+                    }
                     Logs.w("Subscription download failed with UA: $ua: ${e.readableMessage}")
                     lastException = e
                 }

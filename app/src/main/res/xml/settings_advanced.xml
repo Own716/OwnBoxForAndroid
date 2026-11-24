@@ -10,6 +10,13 @@
             app:title="@string/default_subscription_user_agent" />
 
         <SwitchPreferenceCompat
+            app:defaultValue="false"
+            app:icon="@drawable/ic_baseline_fingerprint_24"
+            app:key="subscriptionSendHwidHeaders"
+            app:summary="@string/subscription_send_hwid_headers_summary"
+            app:title="@string/subscription_send_hwid_headers" />
+
+        <SwitchPreferenceCompat
             app:icon="@drawable/baseline_construction_24"
             app:key="enableClashAPI"
             app:summary="@string/enable_clash_api_summary"
