@@ -9,6 +9,7 @@ import android.app.ActivityManager
 import android.widget.Toast
 import io.nekohasekai.sagernet.Action
 import io.nekohasekai.sagernet.BootReceiver
+import io.nekohasekai.sagernet.IPv6Mode
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.aidl.ISagerNetService
@@ -21,6 +22,7 @@ import androidx.core.app.NotificationManagerCompat
 import io.nekohasekai.sagernet.plugin.PluginManager
 import io.nekohasekai.sagernet.utils.DefaultNetworkListener
 import io.nekohasekai.sagernet.utils.LandingIpManager
+import io.nekohasekai.sagernet.utils.NetworkIPv6Detector
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -733,10 +735,16 @@ class BaseService {
                     if (SagerNet.underlyingNetwork == null) {
                         SagerNet.underlyingNetwork = active
                     }
+                    val activeLink = SagerNet.connectivity.getLinkProperties(active)
                     if (upstreamInterfaceName == null) {
-                        upstreamInterfaceName = SagerNet.connectivity.getLinkProperties(active)?.interfaceName
+                        upstreamInterfaceName = activeLink?.interfaceName
                     }
+                    NetworkIPv6Detector.syncToCore(activeLink)
+                } else {
+                    NetworkIPv6Detector.syncToCore(null)
                 }
+            } else {
+                NetworkIPv6Detector.syncToCore(null)
             }
             // 只负责 underlyingNetwork / 网卡名跟踪，供 VpnService.setUnderlyingNetworks。
             // 「网络变化时重置出站」由 DataStore.networkChangeResetConnections 控制，
@@ -749,12 +757,14 @@ class BaseService {
                     SagerNet.underlyingNetwork = null
                     upstreamInterfaceName = null
                     NativeInterface.clearInterfaceCache()
+                    NetworkIPv6Detector.syncToCore(null)
                     DataStore.vpnService?.updateUnderlyingNetwork()
                     return@start
                 }
                 val link = SagerNet.connectivity.getLinkProperties(network)
                 val oldNetwork = SagerNet.underlyingNetwork
                 SagerNet.underlyingNetwork = network
+                NetworkIPv6Detector.syncToCore(link)
                 DataStore.vpnService?.updateUnderlyingNetwork()
                 val oldName = upstreamInterfaceName
                 val newName = link?.interfaceName
@@ -899,6 +909,15 @@ class BaseService {
                     data.networkSwitchRetryAttempts = 0
 
                     DataStore.vpnService?.updateUnderlyingNetwork()
+                    if (DataStore.ipv6Mode == IPv6Mode.ONLY &&
+                        !NetworkIPv6Detector.inspectDefaultPhysicalNetwork().hasPublicIPv6
+                    ) {
+                        Toast.makeText(
+                            this@Interface,
+                            R.string.ipv6_only_no_public_ipv6_warning,
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
                     lateInit()
                 } catch (_: CancellationException) { // if the job was cancelled, it is canceller's responsibility to call stopRunner
                 } catch (_: UnknownHostException) {

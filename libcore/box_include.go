@@ -42,6 +42,7 @@ import (
 	"github.com/sagernet/sing-box/protocol/wireguard"
 
 	"libcore/protocol/autoselect"
+	customDirect "libcore/protocol/direct"
 	h2http "libcore/protocol/http"
 	"libcore/protocol/juicity"
 	"libcore/protocol/loadbalance"
@@ -73,6 +74,9 @@ func nekoboxAndroidOutboundRegistry() *outbound.Registry {
 	registry := outbound.NewRegistry()
 
 	direct.RegisterOutbound(registry)
+	// 覆盖 sing-box 的 direct outbound：在 ENABLE/PREFER 模式下遇无公网 IPv6 或假 IPv6 不可达时，
+	// 自动以已嗅探域名透明回退至 IPv4，防止 TUN 假握手破坏 Happy Eyeballs 导致 ERR_CONNECTION_RESET。
+	customDirect.RegisterOutbound(registry)
 
 	block.RegisterOutbound(registry)
 	protocolDns.RegisterOutbound(registry)
@@ -128,21 +132,21 @@ func nekoboxAndroidEndpointRegistry() *endpoint.Registry {
 func nekoboxAndroidDNSTransportRegistry(localTransport LocalDNSTransport) *dns.TransportRegistry {
 	registry := dns.NewTransportRegistry()
 
-	transport.RegisterTCP(registry)
-	transport.RegisterUDP(registry)
-	transport.RegisterTLS(registry)
-	transport.RegisterHTTPS(registry)
+	registerDirectGuardedTransport[option.RemoteDNSServerOptions](registry, C.DNSTypeTCP, transport.NewTCP)
+	registerDirectGuardedTransport[option.RemoteDNSServerOptions](registry, C.DNSTypeUDP, transport.NewUDP)
+	registerDirectGuardedTransport[option.RemoteTLSDNSServerOptions](registry, C.DNSTypeTLS, transport.NewTLS)
+	registerDirectGuardedTransport[option.RemoteHTTPSDNSServerOptions](registry, C.DNSTypeHTTPS, transport.NewHTTPS)
 	hosts.RegisterTransport(registry)
 	// local.RegisterTransport(registry)
 	fakeip.RegisterTransport(registry)
 
-	quic.RegisterTransport(registry)
-	quic.RegisterHTTP3Transport(registry)
+	registerDirectGuardedTransport[option.RemoteTLSDNSServerOptions](registry, C.DNSTypeQUIC, quic.NewQUIC)
+	registerDirectGuardedTransport[option.RemoteHTTPSDNSServerOptions](registry, C.DNSTypeHTTP3, quic.NewHTTP3)
 
 	if localTransport == nil {
-		local.RegisterTransport(registry)
+		registerDirectGuardedTransport[option.LocalDNSServerOptions](registry, C.DNSTypeLocal, local.NewTransport)
 	} else {
-		dns.RegisterTransport(registry, "local", func(ctx context.Context, logger log.ContextLogger, tag string, options option.LocalDNSServerOptions) (adapter.DNSTransport, error) {
+		registerDirectGuardedTransport[option.LocalDNSServerOptions](registry, C.DNSTypeLocal, func(ctx context.Context, logger log.ContextLogger, tag string, options option.LocalDNSServerOptions) (adapter.DNSTransport, error) {
 			return newPlatformTransport(localTransport, tag, options), nil
 		})
 	}

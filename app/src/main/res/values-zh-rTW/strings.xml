@@ -220,6 +220,7 @@
     <string name="theme">主題</string>
     <string name="edit_config">編輯設定</string>
     <string name="ipv6">IPv6 路由</string>
+    <string name="ipv6_only_no_public_ipv6_warning">目前網路無公網 IPv6，「僅 IPv6」模式下直連網站將無法連線，建議改用「啟用」或「優先」</string>
     <string name="prefer">優先</string>
     <string name="only">僅</string>
     <string name="route_add">建立路由規則</string>

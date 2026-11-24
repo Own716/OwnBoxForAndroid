@@ -22,6 +22,7 @@ import io.nekohasekai.sagernet.ktx.app
 import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
 import io.nekohasekai.sagernet.utils.DefaultNetworkListener
 import io.nekohasekai.sagernet.utils.LandingIpManager
+import io.nekohasekai.sagernet.utils.NetworkIPv6Detector
 import io.nekohasekai.sagernet.utils.PackageCache
 import kotlinx.coroutines.runBlocking
 import libcore.BoxPlatformInterface
@@ -235,6 +236,7 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
             state.network = network
             state.suppressed = 0
             clearInterfaceCache()
+            NetworkIPv6Detector.syncToCore(linkProperties)
             listener.updateDefaultInterface(linkProperties.interfaceName, interfaceIndex)
             return
         }

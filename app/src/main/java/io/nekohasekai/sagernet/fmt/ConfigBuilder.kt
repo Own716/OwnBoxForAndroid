@@ -39,7 +39,9 @@ import io.nekohasekai.sagernet.ktx.isIpAddressV6
 import io.nekohasekai.sagernet.ktx.unwrapIPV6Host
 import io.nekohasekai.sagernet.ktx.mkPort
 import io.nekohasekai.sagernet.ktx.runOnMainDispatcher
+import io.nekohasekai.sagernet.utils.NetworkIPv6Detector
 import io.nekohasekai.sagernet.utils.PackageCache
+import libcore.Libcore
 import moe.matsuri.nb4a.*
 import moe.matsuri.nb4a.SingBoxOptions.*
 import moe.matsuri.nb4a.plugin.Plugins
@@ -1172,6 +1174,11 @@ fun buildConfig(
     // 曾强制 ENABLE——测速拨号的协议族选择与真实路径不同，
     // v6 不通的网络里测速假 err（节点实际可用），反之假成功。
     val ipv6Mode = DataStore.ipv6Mode
+    val rawDirectDomainStrategy = SingBoxOptionsUtil.domainStrategy("dns-direct")
+    if (!forTest && !forExport) {
+        runCatching { Libcore.setDirectIPv6Policy(ipv6Mode, rawDirectDomainStrategy) }
+        runCatching { NetworkIPv6Detector.syncToCore() }
+    }
 
     fun genDomainStrategy(noAsIs: Boolean): String {
         return when {
@@ -1519,7 +1526,6 @@ fun buildConfig(
                 // address 为合并后的新字段。
                 address = when (ipv6Mode) {
                     IPv6Mode.DISABLE -> listOf(VpnService.PRIVATE_VLAN4_CLIENT + "/30")
-                    IPv6Mode.ONLY -> listOf(VpnService.PRIVATE_VLAN6_CLIENT + "/126")
                     else -> listOf(
                         VpnService.PRIVATE_VLAN4_CLIENT + "/30",
                         VpnService.PRIVATE_VLAN6_CLIENT + "/126"
@@ -2003,19 +2009,20 @@ fun buildConfig(
             route.rule_set = route.rule_set.distinctBy { it.tag }
         }
 
+        val directOutboundStrategy = when {
+            ipv6Mode == IPv6Mode.DISABLE -> "ipv4_only"
+            ipv6Mode == IPv6Mode.ONLY -> "ipv6_only"
+            rawDirectDomainStrategy in setOf("ipv4_only", "ipv6_only", "prefer_ipv4", "prefer_ipv6") -> rawDirectDomainStrategy
+            ipv6Mode == IPv6Mode.PREFER -> "prefer_ipv6"
+            else -> "prefer_ipv4"
+        }
         for (freedom in arrayOf(TAG_DIRECT, TAG_BYPASS)) {
             outbounds.add(Outbound().apply {
                 tag = freedom
                 type = "direct"
                 // Ensure both direct and bypass outbounds bind to Android default physical network interface
                 _hack_config_map["network_strategy"] = "default"
-                if (ipv6Mode == IPv6Mode.DISABLE) {
-                    _hack_config_map["domain_strategy"] = "ipv4_only"
-                } else if (ipv6Mode == IPv6Mode.ONLY) {
-                    _hack_config_map["domain_strategy"] = "ipv6_only"
-                } else if (ipv6Mode == IPv6Mode.PREFER) {
-                    _hack_config_map["domain_strategy"] = "prefer_ipv6"
-                }
+                _hack_config_map["domain_strategy"] = directOutboundStrategy
             })
         }
 
@@ -2060,7 +2067,17 @@ fun buildConfig(
             detour = TAG_DIRECT
         })
 
-        val directAddress = directDNS.firstOrNull()?.takeIf { it.isNotBlank() } ?: "https://223.5.5.5/dns-query"
+        val rawDirectAddress = directDNS.firstOrNull()?.takeIf { it.isNotBlank() } ?: "https://223.5.5.5/dns-query"
+        val directAddress = if (ipv6Mode == IPv6Mode.ONLY && !forExport && rawDirectAddress.trim() == "https://223.5.5.5/dns-query") {
+            val netCaps = runCatching { NetworkIPv6Detector.inspectDefaultPhysicalNetwork() }.getOrNull()
+            if (netCaps != null && netCaps.hasPublicIPv6 && !netCaps.hasIPv4) {
+                "https://[2400:3200::1]/dns-query"
+            } else {
+                rawDirectAddress
+            }
+        } else {
+            rawDirectAddress
+        }
         val normalizedDirect = normalizeDnsAddress(directAddress)
         dns.servers.add(
             buildDnsServer(
@@ -2109,12 +2126,11 @@ fun buildConfig(
         }
 
         dns.final_ = if (forTest) "dns-direct" else "dns-remote"
-        if (ipv6Mode == IPv6Mode.DISABLE) {
-            dns.strategy = "ipv4_only"
-        } else if (ipv6Mode == IPv6Mode.ONLY) {
-            dns.strategy = "ipv6_only"
-        } else if (ipv6Mode == IPv6Mode.PREFER) {
-            dns.strategy = "prefer_ipv6"
+        dns.strategy = when (ipv6Mode) {
+            IPv6Mode.DISABLE -> "ipv4_only"
+            IPv6Mode.ONLY -> "ipv6_only"
+            IPv6Mode.PREFER -> "prefer_ipv6"
+            else -> "prefer_ipv4"
         }
 
         // dns object user rules

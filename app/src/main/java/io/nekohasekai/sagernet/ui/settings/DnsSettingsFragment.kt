@@ -41,6 +41,10 @@ class DnsSettingsFragment : BaseSettingsPreferenceFragment() {
         val directDnsPref = findPreference<EditTextPreference>(Key.DIRECT_DNS)
         directDnsPref?.onPreferenceChangeListener = reloadListener
 
+        findPreference<Preference>("domain_strategy_for_remote")?.onPreferenceChangeListener = reloadListener
+        findPreference<Preference>("domain_strategy_for_direct")?.onPreferenceChangeListener = reloadListener
+        findPreference<Preference>("domain_strategy_for_server")?.onPreferenceChangeListener = reloadListener
+
         findPreference<Preference>(Key.ENABLE_DNS_ROUTING)?.onPreferenceChangeListener = reloadListener
         findPreference<Preference>(Key.ENABLE_FAKEDNS)?.onPreferenceChangeListener = reloadListener
 

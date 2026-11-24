@@ -250,6 +250,7 @@
     <string name="edit_config">Edit Config</string>
     <!-- feature category -->
     <string name="ipv6">IPv6 Route</string>
+    <string name="ipv6_only_no_public_ipv6_warning">Current network has no public IPv6. Direct websites will be unreachable in IPv6-Only mode; consider using Enable or Prefer instead.</string>
     <string name="prefer">Prefer</string>
     <string name="only">Only</string>
     <string name="metered">Metered Hint</string>

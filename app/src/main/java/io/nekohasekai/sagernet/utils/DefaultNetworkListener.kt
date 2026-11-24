@@ -2,6 +2,7 @@ package io.nekohasekai.sagernet.utils
 
 import android.annotation.TargetApi
 import android.net.ConnectivityManager
+import android.net.LinkProperties
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
@@ -122,6 +123,9 @@ object DefaultNetworkListener {
         private var lastUpdateNetwork: Network? = null
         private var lastUpdateTime = 0L
 
+        @Volatile
+        private var lastKnownPublicIPv6: Boolean? = null
+
         private fun cancelPendingUpdate() {
             pendingUpdateRunnable?.let {
                 callbackHandler.removeCallbacks(it)
@@ -133,8 +137,22 @@ object DefaultNetworkListener {
             cancelPendingUpdate()
             lastUpdateNetwork = network
             lastUpdateTime = SystemClock.elapsedRealtime()
+            val lp = runCatching { SagerNet.connectivity.getLinkProperties(network) }.getOrNull()
+            lastKnownPublicIPv6 = lp?.let { NetworkIPv6Detector.inspectLinkProperties(it).hasPublicIPv6 }
+            if (lp != null) {
+                NetworkIPv6Detector.syncToCore(lp)
+            }
             Logs.d("DefaultNetworkListener onAvailable enter network=$network thread=${Thread.currentThread().name}")
             runBlocking { networkActor.send(NetworkMessage.Put(network)) }
+        }
+
+        override fun onLinkPropertiesChanged(network: Network, linkProperties: LinkProperties) {
+            if (lastUpdateNetwork != null && lastUpdateNetwork != network) return
+            val hasPublicIPv6 = NetworkIPv6Detector.inspectLinkProperties(linkProperties).hasPublicIPv6
+            if (lastKnownPublicIPv6 == hasPublicIPv6) return
+            lastKnownPublicIPv6 = hasPublicIPv6
+            NetworkIPv6Detector.syncToCore(linkProperties)
+            Logs.i("DefaultNetworkListener onLinkPropertiesChanged network=$network hasPublicIPv6=$hasPublicIPv6")
         }
 
         override fun onCapabilitiesChanged(
@@ -164,6 +182,7 @@ object DefaultNetworkListener {
             cancelPendingUpdate()
             lastUpdateNetwork = null
             lastUpdateTime = 0L
+            lastKnownPublicIPv6 = null
             Logs.d("DefaultNetworkListener onLost enter network=$network thread=${Thread.currentThread().name}")
             runBlocking { networkActor.send(NetworkMessage.Lost(network)) }
         }

@@ -313,6 +313,7 @@ type BoxInstance struct {
 	selector        *group.Selector
 	pauseManager    pause.Manager
 	trafficManager  *trafficcontrol.Manager
+	dnsRouter       adapter.DNSRouter
 	platformWrapper *boxPlatformInterfaceWrapper
 
 	diagnosticID  uint64
@@ -463,6 +464,7 @@ func newSingBoxInstance(config string, localTransport LocalDNSTransport, platfor
 		closeBox:        instance.Close,
 		pauseManager:    service.FromContext[pause.Manager](ctx),
 		trafficManager:  service.PtrFromContext[trafficcontrol.Manager](ctx),
+		dnsRouter:       service.FromContext[adapter.DNSRouter](ctx),
 		platformWrapper: platformWrapper,
 		diagnosticID:    diagnosticID,
 		diagnosticTag:   diagnosticTag,

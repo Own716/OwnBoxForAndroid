@@ -148,6 +148,7 @@
     <string name="encryption">加密</string>
     <!-- feature category -->
     <string name="ipv6">IPv6 路由</string>
+    <string name="ipv6_only_no_public_ipv6_warning">当前网络无公网 IPv6，「仅 IPv6」模式下直连网站将不可达，建议改用「启用」或「优先」</string>
     <string name="metered">按流量计费</string>
     <string name="metered_summary">让系统认为此 VPN 按流量计费</string>
     <string name="menu_route">路由</string>
