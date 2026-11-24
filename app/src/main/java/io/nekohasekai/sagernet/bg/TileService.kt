@@ -3,9 +3,12 @@ package io.nekohasekai.sagernet.bg
 import android.graphics.drawable.Icon
 import android.service.quicksettings.Tile
 import androidx.annotation.RequiresApi
+import io.nekohasekai.sagernet.AppIcon
+import io.nekohasekai.sagernet.AppIconManager
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.aidl.ISagerNetService
+import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.utils.CustomIconManager
 import android.service.quicksettings.TileService as BaseTileService
@@ -19,11 +22,11 @@ class TileService : BaseTileService(), SagerConnection.Callback {
         val customTileBitmap = if (CustomIconManager.isTileApplied(this)) {
             CustomIconManager.loadTileAlphaBitmap(this)
         } else null
-        return if (customTileBitmap != null) {
-            Icon.createWithBitmap(customTileBitmap)
-        } else {
-            defaultIcon
+        if (customTileBitmap != null) {
+            return Icon.createWithBitmap(customTileBitmap)
         }
+        val activeIcon = AppIcon.fromName(DataStore.selectedAppIcon) ?: AppIconManager.current(this)
+        return Icon.createWithResource(this, activeIcon.tileIconRes)
     }
 
     private val connection = SagerConnection(SagerConnection.CONNECTION_ID_TILE)
@@ -46,6 +49,10 @@ class TileService : BaseTileService(), SagerConnection.Callback {
     override fun onStartListening() {
         super.onStartListening()
         connection.connect(this, this)
+        qsTile?.apply {
+            icon = getTileIcon()
+            updateTile()
+        }
     }
 
     override fun onStopListening() {

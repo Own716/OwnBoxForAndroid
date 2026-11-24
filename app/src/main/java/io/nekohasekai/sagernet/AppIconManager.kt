@@ -56,10 +56,10 @@ object AppIconManager {
     }
 
     fun init(context: Context) {
-        if (DataStore.appIconResetVersion < 535) {
+        if (DataStore.appIconResetVersion < 536) {
             DataStore.selectedAppIcon = AppIcon.NEKOBOX_PLUS.name
             DataStore.appIconMode = MODE_FOLLOW_SYSTEM
-            DataStore.appIconResetVersion = 535
+            DataStore.appIconResetVersion = 536
             set(context, AppIcon.NEKOBOX_PLUS)
         } else {
             applyIconMode(context, force = false)
@@ -131,6 +131,14 @@ object AppIconManager {
             try {
                 val refreshIntent = android.content.Intent(Action.REFRESH_NOTIFICATION).setPackage(context.packageName)
                 context.sendBroadcast(refreshIntent)
+            } catch (_: Throwable) {}
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    android.service.quicksettings.TileService.requestListeningState(
+                        context,
+                        ComponentName(context, io.nekohasekai.sagernet.bg.TileService::class.java)
+                    )
+                }
             } catch (_: Throwable) {}
         } catch (e: Throwable) {
             Logs.w(e)
