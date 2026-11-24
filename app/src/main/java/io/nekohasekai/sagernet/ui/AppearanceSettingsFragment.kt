@@ -55,10 +55,19 @@ class AppearanceSettingsFragment : PreferenceFragmentCompat() {
         preferenceScreen.enableMultiLineTitles()
         tintPreferenceIcons(preferenceScreen, Theme.getPrimaryColor(requireContext()))
 
+        fun notifyNotificationUpdate() {
+            if (DataStore.serviceState.started) {
+                val intent = Intent(Action.REFRESH_NOTIFICATION)
+                intent.setPackage(requireContext().packageName)
+                requireContext().sendBroadcast(intent)
+            }
+        }
+
         findPreference<SimpleMenuPreference>(Key.APP_ICON_MODE)?.setOnPreferenceChangeListener { _, newMode ->
             val mode = (newMode as String).toInt()
             DataStore.appIconMode = mode
             AppIconManager.applyIconMode(requireContext(), mode = mode, force = true)
+            view?.post { notifyNotificationUpdate() }
             true
         }
 
@@ -96,6 +105,7 @@ class AppearanceSettingsFragment : PreferenceFragmentCompat() {
             DataStore.nightTheme = mode
             Theme.currentNightMode = mode
             Theme.applyNightTheme()
+            view?.post { notifyNotificationUpdate() }
             activity?.recreate()
             true
         }
@@ -114,14 +124,6 @@ class AppearanceSettingsFragment : PreferenceFragmentCompat() {
         val liveUpdateContent = findPreference<EditTextPreference>(Key.LIVE_UPDATE_CONTENT_FORMAT)
         val liveUpdateSubtext = findPreference<EditTextPreference>(Key.LIVE_UPDATE_SUBTEXT_FORMAT)
         val liveUpdatePreview = findPreference<Preference>("liveUpdatePreview")
-
-        fun notifyNotificationUpdate() {
-            if (DataStore.serviceState.started) {
-                val intent = Intent(Action.REFRESH_NOTIFICATION)
-                intent.setPackage(requireContext().packageName)
-                requireContext().sendBroadcast(intent)
-            }
-        }
 
         fun updateLiveUpdatePreview() {
             if (liveUpdatePreview == null) return

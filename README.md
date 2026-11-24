@@ -1,7 +1,11 @@
 <div align="center">
   <img src="docs/assets/ownbox-hero.gif" alt="OwnBox — Android Network Tools" width="100%" />
   <br />
-  <img src="docs/assets/ownbox-mark.svg" alt="OwnBox mark" width="76" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/ownbox-mark-dark.png" />
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/ownbox-mark-light.png" />
+    <img src="docs/assets/ownbox-mark-light.png" alt="OwnBox logo" width="84" />
+  </picture>
   <h1>OwnBox for Android</h1>
   <p><strong>把连接、路由与诊断，收进一个简洁的 Android 客户端。</strong></p>
   <p>基于 sing-box 的 Android 网络工具、代理配置客户端与网络诊断工具。</p>

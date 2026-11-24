@@ -7,6 +7,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SYSTEM_EXEMPTED
+import android.content.res.Configuration
+import android.content.res.Resources
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Color
+import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.Bundle
 import android.text.format.Formatter
@@ -14,6 +20,7 @@ import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import io.nekohasekai.sagernet.Action
+import io.nekohasekai.sagernet.AppIconManager
 import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.SagerNet
@@ -93,6 +100,47 @@ class ServiceNotification(
     @Volatile
     private var lastShowCapsule: Boolean? = null
     private val egressProbeGeneration = AtomicLong(0L)
+    @Volatile
+    private var cachedLiveIconResId: Int = 0
+    @Volatile
+    private var cachedLiveIconBitmap: Bitmap? = null
+
+    private fun resolveLiveUpdateDarkMode(ctx: Context): Boolean {
+        return when (DataStore.appIconMode) {
+            AppIconManager.MODE_LIGHT -> false
+            AppIconManager.MODE_DARK -> true
+            else -> {
+                val uiMode = runCatching { Resources.getSystem().configuration.uiMode }
+                    .getOrDefault(ctx.resources.configuration.uiMode)
+                (uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+            }
+        }
+    }
+
+    private fun resolveLiveUpdateIconRes(ctx: Context): Int =
+        if (resolveLiveUpdateDarkMode(ctx)) R.drawable.ic_live_update_dark else R.drawable.ic_live_update_light
+
+    private fun getLiveUpdateLargeIcon(ctx: Context): Bitmap? {
+        val resId = resolveLiveUpdateIconRes(ctx)
+        val existing = cachedLiveIconBitmap
+        if (resId == cachedLiveIconResId && existing != null && !existing.isRecycled) {
+            return existing
+        }
+        val decoded = runCatching { BitmapFactory.decodeResource(ctx.resources, resId) }.getOrNull()
+        cachedLiveIconResId = resId
+        cachedLiveIconBitmap = decoded
+        return decoded
+    }
+
+    private fun resolveNotificationAccentColor(ctx: Context): Int =
+        if (resolveLiveUpdateDarkMode(ctx)) Color.parseColor("#A855F7") else Color.parseColor("#9333EA")
+
+    private fun applyNotificationBranding(target: NotificationCompat.Builder) {
+        val ctx = service as Context
+        target.setSmallIcon(R.drawable.ic_throne_tile)
+        target.setColor(resolveNotificationAccentColor(ctx))
+        getLiveUpdateLargeIcon(ctx)?.let { target.setLargeIcon(it) }
+    }
 
     private fun applyLiveUpdateProperties(
         builder: NotificationCompat.Builder,
@@ -103,6 +151,7 @@ class ServiceNotification(
         subText: String?
     ) {
         builder.setOngoing(true)
+        applyNotificationBranding(builder)
         val extras = builder.extras
         if (showCapsule) {
             builder.setCategory(NotificationCompat.CATEGORY_STATUS)
@@ -116,19 +165,47 @@ class ServiceNotification(
             extras.putBoolean("android.requestPromotedOngoing", true)
             extras.putCharSequence("android.shortCriticalText", collapsedTitle)
             extras.putString("capsule_text", collapsedTitle)
+            val liveIconRes = resolveLiveUpdateIconRes(service as Context)
             try {
+                val baseInfo = JSONObject().apply {
+                    put("title", collapsedTitle)
+                    put("content", contentText)
+                    if (!subText.isNullOrEmpty()) {
+                        put("subTitle", subText)
+                    }
+                }
                 val focusParam = JSONObject().apply {
                     put("type", 1)
-                    put("baseInfo", JSONObject().apply {
-                        put("title", collapsedTitle)
-                        put("content", contentText)
-                        if (!subText.isNullOrEmpty()) {
-                            put("subTitle", subText)
-                        }
+                    put("baseInfo", baseInfo)
+                    put("param_v2", JSONObject().apply {
+                        put("baseInfo", baseInfo)
+                        put("smallIsland", JSONObject().apply {
+                            put("picInfo", JSONObject().apply {
+                                put("type", 1)
+                                put("pic", "miui.focus.pic_app")
+                            })
+                        })
+                        put("bigIsland", JSONObject().apply {
+                            put("picInfo", JSONObject().apply {
+                                put("type", 1)
+                                put("pic", "miui.focus.pic_app")
+                            })
+                        })
                     })
                 }
                 extras.putString("miui.focus.param", focusParam.toString())
             } catch (_: Throwable) {}
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                try {
+                    val pics = Bundle().apply {
+                        putParcelable(
+                            "miui.focus.pic_app",
+                            Icon.createWithResource(service as Context, liveIconRes)
+                        )
+                    }
+                    extras.putBundle("miui.focus.pics", pics)
+                } catch (_: Throwable) {}
+            }
         } else {
             builder.setCategory(NotificationCompat.CATEGORY_SERVICE)
             builder.priority = NotificationCompat.PRIORITY_LOW
@@ -142,6 +219,7 @@ class ServiceNotification(
             extras.remove("capsule_text")
             extras.remove("android.shortCriticalText")
             extras.remove("miui.focus.param")
+            extras.remove("miui.focus.pics")
             try {
                 val focusParam = JSONObject().apply {
                     put("type", 0)
@@ -195,6 +273,7 @@ class ServiceNotification(
             it.extras.remove("capsule_text")
             it.extras.remove("android.shortCriticalText")
             it.extras.remove("miui.focus.param")
+            it.extras.remove("miui.focus.pics")
         }
         update()
     }
@@ -439,11 +518,11 @@ class ServiceNotification(
             .setContentTitle(baseTitle)
             .setOnlyAlertOnce(true)
             .setContentIntent(SagerNet.configureIntent(service))
-            .setSmallIcon(R.drawable.ic_throne_tile)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setPriority(if (isVisible) NotificationCompat.PRIORITY_LOW else NotificationCompat.PRIORITY_MIN)
             .setOngoing(true)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+            .apply { applyNotificationBranding(this) }
     }
 
     private fun rebuildBuilderLocked(baseTitle: String): NotificationCompat.Builder {
@@ -567,11 +646,15 @@ class ServiceNotification(
                 runOnMainDispatcher {
                     Theme.apply(app)
                     Theme.apply(service as Context)
-                    updateActions()
-                    useBuilder {
-                        it.setSmallIcon(R.drawable.ic_throne_tile)
+                    if (DataStore.liveUpdateEnabled) {
+                        refreshLiveUpdate()
+                    } else {
+                        updateActions()
+                        useBuilder {
+                            applyNotificationBranding(it)
+                        }
+                        update()
                     }
-                    update()
                 }
             }
         }
