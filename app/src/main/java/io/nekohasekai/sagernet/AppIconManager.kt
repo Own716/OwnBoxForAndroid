@@ -106,22 +106,25 @@ object AppIconManager {
                         )
                     }
                 )
-                return
-            }
-
-            packageManager.setComponentEnabledSetting(
-                effectiveSelection.componentName(context),
-                desiredStates[effectiveSelection] ?: PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
-                PackageManager.DONT_KILL_APP,
-            )
-            desiredStates.forEach { (icon, state) ->
-                if (icon == effectiveSelection) return@forEach
+            } else {
                 packageManager.setComponentEnabledSetting(
-                    icon.componentName(context),
-                    state,
+                    effectiveSelection.componentName(context),
+                    desiredStates[effectiveSelection] ?: PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
                     PackageManager.DONT_KILL_APP,
                 )
+                desiredStates.forEach { (icon, state) ->
+                    if (icon == effectiveSelection) return@forEach
+                    packageManager.setComponentEnabledSetting(
+                        icon.componentName(context),
+                        state,
+                        PackageManager.DONT_KILL_APP,
+                    )
+                }
             }
+            try {
+                val refreshIntent = android.content.Intent(Action.REFRESH_NOTIFICATION).setPackage(context.packageName)
+                context.sendBroadcast(refreshIntent)
+            } catch (_: Throwable) {}
         } catch (e: Throwable) {
             Logs.w(e)
         }

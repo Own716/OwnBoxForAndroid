@@ -135,9 +135,14 @@ class ServiceNotification(
         }
     }
 
+    private fun resolveSmallIconRes(ctx: Context): Int {
+        val active = resolveActiveAppIcon(ctx)
+        return active.tileIconRes
+    }
+
     private fun applyNotificationBranding(target: NotificationCompat.Builder) {
         val ctx = service as Context
-        target.setSmallIcon(R.drawable.ic_throne_tile)
+        target.setSmallIcon(resolveSmallIconRes(ctx))
         target.setColor(resolveNotificationAccentColor(ctx))
         target.setLargeIcon(null as Bitmap?)
     }

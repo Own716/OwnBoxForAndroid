@@ -56,11 +56,11 @@ class AppearanceSettingsFragment : PreferenceFragmentCompat() {
         tintPreferenceIcons(preferenceScreen, Theme.getPrimaryColor(requireContext()))
 
         fun notifyNotificationUpdate() {
-            if (DataStore.serviceState.started) {
+            try {
                 val intent = Intent(Action.REFRESH_NOTIFICATION)
                 intent.setPackage(requireContext().packageName)
                 requireContext().sendBroadcast(intent)
-            }
+            } catch (_: Throwable) {}
         }
 
         val appIconPref = findPreference<Preference>("appIconSettings")
