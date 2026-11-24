@@ -12,6 +12,7 @@
         <EditTextPreference
             app:defaultValue="100-200"
             app:icon="@drawable/solar_ruler_angular_linear"
+            app:isPreferenceVisible="false"
             app:key="fragmentLength"
             app:title="@string/fragment_length"
             app:useSimpleSummaryProvider="true" />

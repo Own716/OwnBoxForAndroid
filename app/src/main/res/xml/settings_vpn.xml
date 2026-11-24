@@ -29,7 +29,7 @@
             app:title="@string/bypass_lan_in_core" />
 
         <SwitchPreferenceCompat
-            app:defaultValue="true"
+            app:defaultValue="false"
             app:icon="@drawable/ic_baseline_security_24"
             app:key="strictRoute"
             app:summary="@string/strict_route_sum"
@@ -50,7 +50,7 @@
             app:title="@string/tun_implementation" />
 
         <moe.matsuri.nb4a.ui.MTUPreference
-            app:defaultValue="1400"
+            app:defaultValue="1360"
             app:entries="@array/mtu_select"
             app:entryValues="@array/mtu_select"
             app:icon="@drawable/solar_ruler_angular_linear"

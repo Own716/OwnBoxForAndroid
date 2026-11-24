@@ -48,7 +48,7 @@
     <string name="card_view_mode_detailed">Detailed</string>
     <string name="card_view_mode_compact">Compact</string>
     <string name="show_balancer_summary">Show balancer summary</string>
-    <string name="show_balancer_summary_sum">Show node count and active landing node in balancer cards (e.g. 节点 8 · 日本 02)</string>
+    <string name="show_balancer_summary_sum">Show node count and active landing node in balancer cards (e.g. Nodes 8 · JP 02)</string>
     <string name="group_status_empty">Empty group</string>
     <string name="group_status_empty_subscription">Not updated yet</string>
     <string name="group_status_proxies">%d Proxies</string>
@@ -688,8 +688,8 @@
     <string name="acquire_wake_lock">Acquire WakeLock</string>
     <string name="release_wake_lock">Release WakeLock</string>
     <string name="acquire_wake_lock_summary">Keep the CPU on</string>
-    <string name="performance_priority_mode">性能优先模式</string>
-    <string name="performance_priority_mode_summary">开启后内核不限内存，速度更快但后台 RAM 占用增大；关闭时 Go 运行时积极回收内存（推荐默认关闭）</string>
+    <string name="performance_priority_mode">Performance Priority Mode</string>
+    <string name="performance_priority_mode_summary">Removes core memory limit for higher throughput at the cost of higher background RAM usage; when off, Go runtime aggressively reclaims memory (recommended off)</string>
     <string name="hide_from_recent_apps">Hide from recent tasks</string>
     <string name="hide_from_recent_apps_summary">Hide the app from recent tasks when running in background</string>
     <string name="action_switch">Switch</string>
@@ -805,6 +805,7 @@
     <string name="enable_tls_fragment">Enable TLS Client Hello Fragment</string>
     <string name="fragment_length">Fragment Length (min-max)</string>
     <string name="fragment_interval">Fragment Interval (min-max)</string>
+    <string name="fragment_interval_invalid">Fragment interval must be between 1 and 1000 ms (e.g. 10-20 or 20)</string>
 
     <string name="backup_local">Local Backup</string>
     <string name="backup_webdav">WebDAV Backup</string>
@@ -1404,11 +1405,11 @@
     <string name="settings_ui_summary">Appearance, card style, language and haptics</string>
     <string name="settings_vpn_summary">Auto-connect, per-app proxy, bypass LAN, strict route, MTU</string>
     <string name="settings_mode_summary">Service mode, mixed inbound, proxy port, LAN sharing</string>
-    <string name="settings_core_summary">Smart routing region, traffic sniffing, IPv6, route rules provider and update</string>
-    <string name="settings_dns_summary">Remote/Direct DNS, FakeDNS, DNS strategy and Hosts</string>
-    <string name="settings_fragment_summary">TLS fragment toggle, length and interval control</string>
+    <string name="settings_core_summary">Smart routing region, traffic sniffing, QUIC blocking, IPv6, rule sets and auto update</string>
+    <string name="settings_dns_summary">Remote/Direct DNS, quick presets, FakeDNS, DNS strategy and Hosts</string>
+    <string name="settings_fragment_summary">TLS fragment toggle and fallback delay control</string>
     <string name="settings_observatory_summary">Connection test URL, speed test mode and timeouts</string>
-    <string name="settings_advanced_summary">Clash API, wake lock, log level, clear cache, reset</string>
+    <string name="settings_advanced_summary">Subscription HWID, Clash API, connections monitor, smart auto-stop, log level, reset</string>
     <string name="cag_advanced_network">Network &amp; Outbound</string>
     <string name="cag_advanced_security">Security &amp; TLS</string>
     <string name="cag_advanced_diagnostics">Diagnostics &amp; System</string>

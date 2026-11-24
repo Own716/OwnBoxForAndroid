@@ -147,9 +147,9 @@ object BackupCodec {
         "enableClashAPI" to DataStore.enableClashAPI,
         Key.ENABLE_CONNECTIONS_MONITOR to DataStore.enableConnectionsMonitor,
         Key.SUBSCRIPTION_SEND_HWID_HEADERS to DataStore.subscriptionSendHwidHeaders,
-        Key.MIXED_PORT to DataStore.mixedPort,
+        Key.MIXED_PORT to DataStore.mixedPort.toString(),
         Key.ALLOW_ACCESS to DataStore.allowAccess,
-        Key.SPEED_INTERVAL to DataStore.speedInterval,
+        Key.SPEED_INTERVAL to DataStore.speedInterval.toString(),
         Key.SHOW_DIRECT_SPEED to DataStore.showDirectSpeed,
         Key.SHOW_LANDING_IP to DataStore.showLandingIp,
     )

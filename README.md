@@ -122,7 +122,7 @@ OwnBox 是客户端软件，**不内置或销售第三方代理订阅，也不�
     </td>
     <td width="50%" valign="top">
       <strong>策略组与连接管理</strong><br />
-      <sub>支持多种自动选路策略，并可查看成员状态、检查结果及按需手动锁定节点。</sub>
+      <sub>支持自动选择策略组、实时监控与手动锁定，并提供原生「分流连接」监控、智能启停与订阅 HWID 支持。</sub>
     </td>
   </tr>
 </table>
@@ -148,7 +148,7 @@ OwnBox 是客户端软件，**不内置或销售第三方代理订阅，也不�
 4. 首次启动并导入自己的节点或订阅配置。建立 VPN 连接时，按系统弹窗授予 VPN 连接权限。
 5. 如遇到连接问题，先运行节点测试或网络诊断，再按下方说明提交反馈。
 
-> **版本说明（截至 2026-11-15）：** GitHub 最新正式 Release 为 `v26.11.8`；仓库 `main` 分支源码元数据已进入 `26.11.8.12-preview` 预览迭代，内核配置为 `sing-box v1.15.0-alpha.13`。开发分支版本不等同于正式发布版本。普通用户建议以 Releases 页面标记的正式版本为准。
+> **版本说明（截至 2026-11-24）：** GitHub 最新正式 Release 为 `v26.11.24`，内核配置为 `sing-box v1.15.0-alpha.13`。普通用户建议直接以 Releases 页面标记的正式版本为准。
 
 ## 使用与问题反馈
 
@@ -193,7 +193,7 @@ OwnBox 是客户端软件，**不内置或销售第三方代理订阅，也不�
   - **Connection testing:** node latency checks, URL-based group tests and bandwidth test entry points.
   - **Network diagnostics:** categorized connectivity checks for selected AI, streaming, social and developer services, with individual and batch retesting.
   - **Routing:** application-, domain- and IP-based routing configuration, editable rules, remote/local rule sets and per-app proxy controls.
-  - **Strategy groups:** multiple selection strategies, including latency-oriented, round-robin, random, load-oriented, consistent-hash, failover and stability-oriented modes. Availability depends on the installed build.
+  - **Strategy groups & live connections:** unified auto-select engine (fastest/most stable, priority tiers, and failover), built-in strategy monitor with manual pinning, and optional native real-time connections monitor.
   - **Backup and restore:** local configuration import/export and WebDAV backup/restore support.
   - **Customization:** theme options, home-screen widgets and Quick Settings entry points.
 
@@ -201,7 +201,7 @@ OwnBox 是客户端软件，**不内置或销售第三方代理订阅，也不�
 
   Get the current official build from [GitHub Releases](https://github.com/Own716/OwnBoxForAndroid/releases/latest). Choose the APK matching your device ABI. The repository's current formal release page provides ARM64, armeabi-v7a, x86_64 and x86 packages.
 
-  The repository's `main` branch is currently in preview iteration `26.11.8.12-preview`, while the latest formal release is `v26.11.8` as of November 15, 2026. Refer to the Releases page for the build intended for general use.
+  The latest formal release is `v26.11.24` as of November 24, 2026 (powered by `sing-box v1.15.0-alpha.13`). Refer to the Releases page for the build intended for general use.
 
   ### Important notes
 

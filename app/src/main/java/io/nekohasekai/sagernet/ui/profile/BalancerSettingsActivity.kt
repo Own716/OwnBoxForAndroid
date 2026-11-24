@@ -696,15 +696,9 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
         bindIntPref("balancerInterval", 300, 5, R.string.balancer_unit_seconds)
         val tolerancePref = bindIntPref("balancerTolerance", 30, 0, R.string.balancer_unit_ms)
         val toleranceSummaryProvider = Preference.SummaryProvider<EditTextPreference> { current ->
-            val isFb = DataStore.balancerSelectionMode == BalancerBean.SELECTION_FALLBACK
             val parsed = current.text?.trim()?.toIntOrNull()
-            if (isFb) {
-                val ms = if (parsed != null && parsed >= 500) parsed else 3000
-                "${getString(R.string.balancer_unit_ms, ms)} · ${getString(R.string.balancer_fallback_timeout_summary)}"
-            } else {
-                val effective = if (parsed != null && parsed >= 0) parsed else 30
-                getString(R.string.balancer_unit_ms, effective)
-            }
+            val effective = if (parsed != null && parsed >= 0) parsed else 30
+            getString(R.string.balancer_unit_ms, effective)
         }
         tolerancePref?.summaryProvider = toleranceSummaryProvider
 
@@ -762,9 +756,8 @@ class BalancerSettingsActivity : ProfileSettingsActivity<BalancerBean>(R.layout.
             fallbackMaxFailsPref?.isVisible = isFallback
             balanceSwitchPref?.isVisible = !isFallback
 
-            tolerancePref?.setTitle(
-                if (isFallback) R.string.balancer_fallback_timeout_title else R.string.balancer_tolerance_title
-            )
+            tolerancePref?.isVisible = !isFallback
+            tolerancePref?.setTitle(R.string.balancer_tolerance_title)
             tolerancePref?.summaryProvider = toleranceSummaryProvider
 
             rebuildTierPreferences()

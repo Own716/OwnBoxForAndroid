@@ -115,4 +115,28 @@ class BackupCompatibilityTest {
         assertEquals("1", byKey.getValue(Key.TRAFFIC_SNIFFING).string)
         assertEquals(false, byKey.getValue(Key.SMART_AUTO_STOP).boolean)
     }
+
+    @Test
+    fun exportSettingsWithDefaultsMaterializesStringBackedPortAndSpeedIntervalAsStrings() {
+        val defaults = linkedMapOf<String, Any>(
+            Key.MIXED_PORT to "2080",
+            Key.SPEED_INTERVAL to "1000",
+        )
+
+        val exported = BackupCodec.exportSettingsWithDefaults(emptyList(), defaults)
+        val byKey = exported.associateBy { it.key }
+
+        assertEquals(KeyValuePair.TYPE_STRING, byKey.getValue(Key.MIXED_PORT).valueType)
+        assertEquals("2080", byKey.getValue(Key.MIXED_PORT).string)
+        assertEquals(KeyValuePair.TYPE_STRING, byKey.getValue(Key.SPEED_INTERVAL).valueType)
+        assertEquals("1000", byKey.getValue(Key.SPEED_INTERVAL).string)
+
+        val codecSource = listOf(
+            java.io.File("src/main/java/io/nekohasekai/sagernet/utils/BackupCodec.kt"),
+            java.io.File("app/src/main/java/io/nekohasekai/sagernet/utils/BackupCodec.kt"),
+            java.io.File("../app/src/main/java/io/nekohasekai/sagernet/utils/BackupCodec.kt"),
+        ).first { it.isFile }.readText()
+        assertTrue(codecSource.contains("Key.MIXED_PORT to DataStore.mixedPort.toString()"))
+        assertTrue(codecSource.contains("Key.SPEED_INTERVAL to DataStore.speedInterval.toString()"))
+    }
 }

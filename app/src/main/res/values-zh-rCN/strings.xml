@@ -565,6 +565,8 @@
     <string name="acquire_wake_lock">获取唤醒锁</string>
     <string name="release_wake_lock">释放唤醒锁</string>
     <string name="acquire_wake_lock_summary">保持 CPU 开启</string>
+    <string name="performance_priority_mode">性能优先模式</string>
+    <string name="performance_priority_mode_summary">开启后内核不限内存，速度更快但后台 RAM 占用增大；关闭时 Go 运行时积极回收内存（推荐默认关闭）</string>
     <string name="hide_from_recent_apps">从最近任务中隐藏</string>
     <string name="hide_from_recent_apps_summary">应用在后台运行时，在最近任务中隐藏</string>
     <string name="move">移动</string>
@@ -662,6 +664,7 @@
     <string name="enable_tls_fragment">启用TLS Client Hello分片</string>
     <string name="fragment_length">分片包长（最小-最大）</string>
     <string name="fragment_interval">分片间隔（最小-最大）</string>
+    <string name="fragment_interval_invalid">拆包间隔须在 1~1000 毫秒之间（如 10-20 或 20）</string>
     <string name="custom_rules_provider">自定义</string>
     <string name="backup_webdav">WebDAV</string>
     <string name="webdav_settings">WebDAV 设置</string>
@@ -1323,11 +1326,11 @@
     <string name="settings_ui_summary">外观、主题、卡片样式、语言与触觉反馈</string>
     <string name="settings_vpn_summary">自动连接、分应用代理、绕过 LAN、严格路由、MTU</string>
     <string name="settings_mode_summary">运行模式、混合入站、代理端口、认证、局域网共享</string>
-    <string name="settings_core_summary">智能分流地区、流量探测、IPv6 策略、路由规则提供商与自动更新</string>
-    <string name="settings_dns_summary">远程/直连 DNS、FakeDNS、DNS 策略与 Hosts</string>
-    <string name="settings_fragment_summary">TLS 分片开启、分片长度与发包间隔控制</string>
+    <string name="settings_core_summary">智能分流地区、流量探测、拦截 QUIC、IPv6 策略、规则源与自动更新</string>
+    <string name="settings_dns_summary">远程/直连 DNS、快速预设、FakeDNS、解析策略与 Hosts</string>
+    <string name="settings_fragment_summary">TLS 分片开启与发包间隔控制</string>
     <string name="settings_observatory_summary">连通性测试 URL、测速模式与超时配置</string>
-    <string name="settings_advanced_summary">Clash API、唤醒锁、后台隐藏、日志级别、清理缓存、恢复默认</string>
+    <string name="settings_advanced_summary">订阅 HWID、Clash API、分流连接、智能启停、日志级别与重置</string>
     <string name="cag_advanced_network">网络与出站连接</string>
     <string name="cag_advanced_security">安全与 TLS 证书</string>
     <string name="cag_advanced_diagnostics">诊断与系统管理</string>

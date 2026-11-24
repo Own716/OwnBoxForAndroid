@@ -23,7 +23,7 @@ class FragmentSettingsFragment : BaseSettingsPreferenceFragment() {
                 if (num == null || num < 1 || num > 1000) {
                     Toast.makeText(
                         requireContext(),
-                        "拆包间隔须在 1~1000 之间（如 10-20 或 20）",
+                        R.string.fragment_interval_invalid,
                         Toast.LENGTH_SHORT
                     ).show()
                     false

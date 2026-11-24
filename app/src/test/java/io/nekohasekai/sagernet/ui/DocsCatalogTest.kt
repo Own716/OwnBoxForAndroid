@@ -100,10 +100,19 @@ class DocsCatalogTest {
     }
 
     @Test
-    fun catalogReflectsLatestV2611827FeaturesAndDefaults() {
+    fun catalogReflectsLatestV261124FeaturesAndDefaults() {
         val joined = allTextBlobs().joinToString("\n")
         assertTrue("Expected default MTU 1360", joined.contains("1360"))
-        assertTrue("Expected default balancer tolerance 50 ms", joined.contains("50 ms"))
+        assertTrue("Expected default balancer tolerance 30 ms", joined.contains("30 ms"))
+        assertTrue("Expected default speed test simple download + 8000ms", joined.contains("简单下载") && joined.contains("8000"))
+        assertTrue("Expected fallback strategy coverage", joined.contains("故障转移"))
+        assertTrue("Expected connections monitor coverage", joined.contains("分流连接"))
+        assertTrue("Expected HWID subscription toggle coverage", joined.contains("HWID"))
+        assertTrue("Expected DNS quick presets coverage", joined.contains("快速预设"))
+        assertTrue("Expected smart auto-stop without location permission", joined.contains("无需定位权限"))
+        assertTrue("Expected AnyTLS mTLS coverage", joined.contains("AnyTLS") && joined.contains("mTLS"))
+        assertTrue("Expected IPv6 dual-stack fallback coverage", joined.contains("回退至 IPv4"))
+        assertFalse("resolveDestination must not be recommended ON with FakeDNS", joined.contains("「解析目标地址」建议开启"))
         assertTrue("Expected batch multi-select coverage", joined.contains("反选") && joined.contains("速度测试本组"))
         assertTrue("Expected compact vs detailed card speed rule", joined.contains("互斥替换") && joined.contains("双行"))
         assertTrue("Expected live update island coverage", joined.contains("实况通知") && joined.contains("灵动胶囊"))

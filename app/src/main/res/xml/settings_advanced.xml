@@ -11,7 +11,7 @@
 
         <SwitchPreferenceCompat
             app:defaultValue="false"
-            app:icon="@drawable/ic_baseline_fingerprint_24"
+            app:icon="@drawable/solar_card_2_linear"
             app:key="subscriptionSendHwidHeaders"
             app:summary="@string/subscription_send_hwid_headers_summary"
             app:title="@string/subscription_send_hwid_headers" />
@@ -33,14 +33,12 @@
             app:defaultValue="false"
             app:icon="@drawable/solar_transfer_horizontal_linear"
             app:key="networkChangeResetConnections"
-            app:title="@string/network_change_reset_connections"
-            app:useSimpleSummaryProvider="true" />
+            app:title="@string/network_change_reset_connections" />
 
         <SwitchPreferenceCompat
             app:icon="@drawable/solar_sun_fog_linear"
             app:key="wakeResetConnections"
-            app:title="@string/wake_reset_connections"
-            app:useSimpleSummaryProvider="true" />
+            app:title="@string/wake_reset_connections" />
 
         <SwitchPreferenceCompat
             app:icon="@drawable/solar_lock_keyhole_minimalistic_linear"
