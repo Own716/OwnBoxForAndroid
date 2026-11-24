@@ -100,10 +100,6 @@ class ServiceNotification(
     @Volatile
     private var lastShowCapsule: Boolean? = null
     private val egressProbeGeneration = AtomicLong(0L)
-    @Volatile
-    private var cachedLiveIconResId: Int = 0
-    @Volatile
-    private var cachedLiveIconBitmap: Bitmap? = null
 
     private fun resolveLiveUpdateDarkMode(ctx: Context): Boolean {
         return when (DataStore.appIconMode) {
@@ -120,18 +116,6 @@ class ServiceNotification(
     private fun resolveLiveUpdateIconRes(ctx: Context): Int =
         if (resolveLiveUpdateDarkMode(ctx)) R.drawable.ic_live_update_dark else R.drawable.ic_live_update_light
 
-    private fun getLiveUpdateLargeIcon(ctx: Context): Bitmap? {
-        val resId = resolveLiveUpdateIconRes(ctx)
-        val existing = cachedLiveIconBitmap
-        if (resId == cachedLiveIconResId && existing != null && !existing.isRecycled) {
-            return existing
-        }
-        val decoded = runCatching { BitmapFactory.decodeResource(ctx.resources, resId) }.getOrNull()
-        cachedLiveIconResId = resId
-        cachedLiveIconBitmap = decoded
-        return decoded
-    }
-
     private fun resolveNotificationAccentColor(ctx: Context): Int =
         if (resolveLiveUpdateDarkMode(ctx)) Color.parseColor("#A855F7") else Color.parseColor("#9333EA")
 
@@ -139,7 +123,7 @@ class ServiceNotification(
         val ctx = service as Context
         target.setSmallIcon(R.drawable.ic_throne_tile)
         target.setColor(resolveNotificationAccentColor(ctx))
-        getLiveUpdateLargeIcon(ctx)?.let { target.setLargeIcon(it) }
+        target.setLargeIcon(null as Bitmap?)
     }
 
     private fun applyLiveUpdateProperties(
@@ -185,12 +169,7 @@ class ServiceNotification(
                                 put("pic", "miui.focus.pic_app")
                             })
                         })
-                        put("bigIsland", JSONObject().apply {
-                            put("picInfo", JSONObject().apply {
-                                put("type", 1)
-                                put("pic", "miui.focus.pic_app")
-                            })
-                        })
+                        put("bigIsland", JSONObject())
                     })
                 }
                 extras.putString("miui.focus.param", focusParam.toString())
