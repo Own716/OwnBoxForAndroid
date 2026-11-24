@@ -20,6 +20,7 @@ import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import io.nekohasekai.sagernet.Action
+import io.nekohasekai.sagernet.AppIcon
 import io.nekohasekai.sagernet.AppIconManager
 import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.R
