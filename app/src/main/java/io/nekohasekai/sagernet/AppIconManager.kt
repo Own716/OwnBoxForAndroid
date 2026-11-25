@@ -68,13 +68,17 @@ object AppIconManager {
 
     fun applyIconMode(context: Context, mode: Int = DataStore.appIconMode, force: Boolean = false) {
         try {
-            val target = AppIcon.fromName(DataStore.selectedAppIcon) ?: when (mode) {
+            val stored = AppIcon.fromName(DataStore.selectedAppIcon)
+            val target = stored ?: when (mode) {
                 MODE_LIGHT -> AppIcon.LIGHT_MODE
                 MODE_DARK -> AppIcon.DARK_MODE
                 else -> AppIcon.NEKOBOX_PLUS
             }
             val current = current(context)
-            if (force || current != target) {
+            val isDefaultDisabled = target == AppIcon.NEKOBOX_PLUS &&
+                context.packageManager.getComponentEnabledSetting(AppIcon.NEKOBOX_PLUS.componentName(context)) ==
+                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+            if (force || stored == null || current != target || isDefaultDisabled) {
                 set(context, target)
             }
         } catch (e: Throwable) {

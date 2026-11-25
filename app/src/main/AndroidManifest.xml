@@ -194,26 +194,6 @@
                 android:resource="@xml/shortcuts" />
         </activity-alias>
         <activity-alias
-            android:name="io.nekohasekai.sagernet.launcher.DoubleCat"
-            android:enabled="false"
-            android:exported="true"
-            android:icon="@mipmap/ic_launcher_double_cat"
-            android:roundIcon="@mipmap/ic_launcher_double_cat_round"
-            android:label="@string/app_name"
-            android:targetActivity="io.nekohasekai.sagernet.ui.MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
-            </intent-filter>
-            <meta-data
-                android:name="android.app.shortcuts"
-                android:resource="@xml/shortcuts" />
-        </activity-alias>
-        <activity-alias
             android:name="io.nekohasekai.sagernet.launcher.PhantomCat"
             android:enabled="false"
             android:exported="true"

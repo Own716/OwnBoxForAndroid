@@ -108,7 +108,7 @@ class ServiceNotification(
     private fun resolveLiveUpdateDarkMode(ctx: Context): Boolean {
         return when (resolveActiveAppIcon(ctx)) {
             AppIcon.LIGHT_MODE, AppIcon.CAT_LIGHT -> false
-            AppIcon.DARK_MODE, AppIcon.CAT_DARK, AppIcon.DOUBLE_CAT, AppIcon.PHANTOM_CAT, AppIcon.TEXT -> true
+            AppIcon.DARK_MODE, AppIcon.CAT_DARK, AppIcon.PHANTOM_CAT, AppIcon.TEXT -> true
             else -> {
                 val uiMode = runCatching { Resources.getSystem().configuration.uiMode }
                     .getOrDefault(ctx.resources.configuration.uiMode)

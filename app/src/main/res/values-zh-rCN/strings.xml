@@ -883,8 +883,6 @@
         <string name="app_icon_original_light_desc">原版纯白底四柱经典图标</string>
         <string name="app_icon_original_dark">经典深色 (原版)</string>
         <string name="app_icon_original_dark_desc">原版暗夜蓝底四柱经典图标</string>
-        <string name="app_icon_double_cat">双猫探头</string>
-        <string name="app_icon_double_cat_desc">黑猫底座与探头萌白猫极简设计</string>
         <string name="app_icon_phantom_cat">幻彩光晕</string>
         <string name="app_icon_phantom_cat_desc">黑色绒猫与彩虹幻彩光晕</string>
         <string name="app_icon_cat_light">清新浅色</string>

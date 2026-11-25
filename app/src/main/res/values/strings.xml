@@ -976,8 +976,6 @@
         <string name="app_icon_original_light_desc">Original classic light 4-pillar icon</string>
         <string name="app_icon_original_dark">Classic Dark (Original)</string>
         <string name="app_icon_original_dark_desc">Original classic dark 4-pillar icon</string>
-        <string name="app_icon_double_cat">Double Cat</string>
-        <string name="app_icon_double_cat_desc">Minimalist black cat and peek-a-boo white cat</string>
         <string name="app_icon_phantom_cat">Phantom Halo</string>
         <string name="app_icon_phantom_cat_desc">Black cat silhouette with rainbow neon halo</string>
         <string name="app_icon_cat_light">Pastel Light</string>

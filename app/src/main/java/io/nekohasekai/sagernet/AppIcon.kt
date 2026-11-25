@@ -41,15 +41,6 @@ enum class AppIcon(
         R.drawable.ic_live_update_dark,
         Color.parseColor("#3B82F6"),
     ),
-    DOUBLE_CAT(
-        "io.nekohasekai.sagernet.launcher.DoubleCat",
-        R.string.app_icon_double_cat,
-        R.string.app_icon_double_cat_desc,
-        R.mipmap.ic_launcher_double_cat,
-        R.drawable.ic_tile_double_cat,
-        R.drawable.ic_live_update_double_cat,
-        Color.parseColor("#18181B"),
-    ),
     PHANTOM_CAT(
         "io.nekohasekai.sagernet.launcher.PhantomCat",
         R.string.app_icon_phantom_cat,
