@@ -11,6 +11,7 @@ import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
 import android.view.View
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceGroupAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -126,7 +127,7 @@ class TelegramGroupedPreferenceDecoration(private val context: Context) : Recycl
         if (parent.childCount == 0) return
 
         val surfaceColor = context.getColorAttr(R.attr.cardElevatedSurfaceColor)
-        val strokeColor = context.getColor(R.color.card_stroke)
+        val strokeColor = ContextCompat.getColor(context, R.color.card_stroke)
 
         fillPaint.color = surfaceColor
         strokePaint.color = strokeColor
@@ -187,7 +188,7 @@ class TelegramGroupedPreferenceDecoration(private val context: Context) : Recycl
 
     override fun onDrawOver(c: Canvas, parent: RecyclerView, state: RecyclerView.State) {
         val adapter = parent.adapter as? PreferenceGroupAdapter ?: return
-        dividerPaint.color = context.getColor(R.color.card_stroke)
+        dividerPaint.color = ContextCompat.getColor(context, R.color.card_stroke)
 
         val insetStart = dp2px(60).toFloat()
         val insetEnd = dp2px(16).toFloat()

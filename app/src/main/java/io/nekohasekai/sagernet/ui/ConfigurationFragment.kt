@@ -1221,7 +1221,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             if (titleView.ellipsize != android.text.TextUtils.TruncateAt.END) {
                 titleView.ellipsize = android.text.TextUtils.TruncateAt.END
             }
-            if (!titleView.isSingleLine) {
+            if (titleView.maxLines != 1) {
                 titleView.isSingleLine = true
             }
         }

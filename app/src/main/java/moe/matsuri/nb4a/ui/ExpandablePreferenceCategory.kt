@@ -7,6 +7,7 @@ import android.os.Parcelable
 import android.util.AttributeSet
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceViewHolder
@@ -136,7 +137,7 @@ class ExpandablePreferenceCategory @JvmOverloads constructor(
             if (DataStore.profileCardStyle == 1) {
                 card.cardElevation = 0f
                 card.strokeWidth = ctx.resources.getDimensionPixelSize(R.dimen.card_stroke_width)
-                card.strokeColor = ctx.getColor(R.color.card_stroke)
+                card.strokeColor = ContextCompat.getColor(ctx, R.color.card_stroke)
             } else {
                 card.cardElevation = ctx.resources.getDimension(R.dimen.profile_card_elevation_classic)
                 card.strokeWidth = 0

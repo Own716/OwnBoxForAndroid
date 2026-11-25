@@ -36,6 +36,7 @@ if [ -z "$SINGBOX_VERSION" ]; then
   exit 1
 fi
 
+export CGO_LDFLAGS="-O2 -g -Wl,-z,max-page-size=16384"
 export GOBIND=gobind-matsuri
 "$GOPATH"/bin/gomobile-matsuri bind -v -androidapi 21 -cache "$(realpath $BUILD)" -trimpath -ldflags="-s -w -X github.com/sagernet/sing-box/constant.Version=$SINGBOX_VERSION" -tags='with_conntrack,with_quic,with_wireguard,with_utls,with_clash_api' . || exit 1
 rm -r libcore-sources.jar

@@ -1061,4 +1061,5 @@
     <string name="strategy_member_time_fail">失敗%s</string>
     <string name="strategy_clear_learned">清除網站選擇記憶</string>
     <string name="strategy_learned_cleared">已清除網站選擇記憶</string>
+    <string name="lan_sharing_local_network_permission_denied">Android 17+ 需要授予區域網路權限才能使用區域網路共享。</string>
 </resources>

@@ -121,6 +121,10 @@ object PackageCache {
 
     private val labelCache = ConcurrentHashMap<String, String>()
 
+    fun clearLabelCache() {
+        labelCache.clear()
+    }
+
     fun loadLabel(info: ApplicationInfo, pm: PackageManager = app.packageManager): CharSequence {
         val packageName = info.packageName
         labelCache[packageName]?.let { return it }

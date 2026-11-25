@@ -73,12 +73,15 @@ class SagerNet : Application(),
                     ?.forEach { it.delete() }
             }
             Seq.setContext(this)
-            // Write performance mode flag so Go's InitCore can read it and apply correct GC settings.
-            // Using a flag file avoids needing a new JNI binding for SetMemoryProfile.
+            // Write performance mode flag and adaptive Go memory limit so Go's InitCore
+            // can apply device-appropriate GC/SoftMemoryLimit settings across Android 9..17+.
             runCatching {
                 File(noBackupFilesDir, "perf_mode").apply {
                     if (DataStore.performancePriorityMode) writeText("1") else delete()
                 }
+                File(noBackupFilesDir, "mem_limit_mb").writeText(
+                    computeBalancedGoMemoryLimitMb().toString()
+                )
             }
             Libcore.initCore(
                 process,
@@ -169,10 +172,28 @@ class SagerNet : Application(),
             cleanWebview()
             System.gc()
         }
-        // In low-memory mode, aggressively free Go heap when OS asks us to trim.
-        // In high-performance mode, skip this to preserve warm connection pools.
-        if (!DataStore.performancePriorityMode) {
+        if (level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND) {
+            PackageCache.clearLabelCache()
+        }
+        // In balanced mode, aggressively return unused Go heap on any trim notification.
+        // In high-performance mode, still compact Go heap when backgrounded/pressured
+        // (e.g. Android 17 MemoryLimiter:AnonSwap) so the OS does not kill the tunnel.
+        if (!DataStore.performancePriorityMode || level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND) {
             Libcore.forceGc()
+        }
+    }
+
+    private fun computeBalancedGoMemoryLimitMb(): Int {
+        val totalMemBytes = runCatching {
+            val am = getSystemService<ActivityManager>() ?: return@runCatching 0L
+            ActivityManager.MemoryInfo().also { am.getMemoryInfo(it) }.totalMem
+        }.getOrDefault(0L)
+        if (totalMemBytes <= 0L) return 256
+        val totalMiB = totalMemBytes / (1024L * 1024L)
+        return when {
+            totalMiB <= 3072L -> 128
+            totalMiB <= 6144L -> 256
+            else -> 384
         }
     }
 

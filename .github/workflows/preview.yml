@@ -42,6 +42,18 @@ jobs:
           unzip -p app/libs/libcore.aar classes.jar > /tmp/libcore-classes.jar
           unzip -l /tmp/libcore-classes.jar | grep -q 'libcore/Libcore.class'
           unzip -l /tmp/libcore-classes.jar | grep -q 'go/Seq.class'
+          for abi in arm64-v8a x86_64; do
+            unzip -p app/libs/libcore.aar "jni/${abi}/libgojni.so" > "/tmp/libgojni-${abi}.so"
+            test -s "/tmp/libgojni-${abi}.so"
+            aligns=$(readelf -lW "/tmp/libgojni-${abi}.so" | awk '$1 == "LOAD" {print $NF}')
+            test -n "$aligns"
+            for align in $aligns; do
+              if [ $((align)) -lt 16384 ]; then
+                echo "::error::jni/${abi}/libgojni.so LOAD segment alignment is ${align} (< 16384)"
+                exit 1
+              fi
+            done
+          done
       - name: Upload LibCore AAR
         uses: actions/upload-artifact@v4
         with:

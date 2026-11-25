@@ -58,6 +58,7 @@
     <string name="lan_sharing_dialog_on">局域网共享当前已开启。\n\n热点内其他设备可使用：\n   主机名：%1$s\n   端口：%2$d\n\n在其他设备的 Wi-Fi 设置中手动设置上述代理。\n\n点击「关闭」可停止共享。</string>
     <string name="lan_sharing_turn_on">开启</string>
     <string name="lan_sharing_turn_off">关闭</string>
+    <string name="lan_sharing_local_network_permission_denied">Android 17+ 需要授予本地网络权限才能使用局域网共享。</string>
     <string name="lan_sharing_tools_summary">免 Root 通过手机热点或局域网 Wi-Fi 共享 VPN 科学上网代理给其他设备</string>
     <string name="lan_sharing_active">代理共享中</string>
     <string name="lan_sharing_inactive">共享未开启</string>

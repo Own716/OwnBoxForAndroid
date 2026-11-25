@@ -7,7 +7,9 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
+	"strconv"
 	"strings"
+	"sync/atomic"
 	_ "unsafe"
 
 	"log"
@@ -58,6 +60,13 @@ func InitCore(process, cachePath, internalAssets, externalAssets string,
 	os.MkdirAll(tmp, 0755)
 	os.Chdir(tmp)
 	protectSocketPath = filepath.Join(tmp, "protect_path")
+
+	memLimitFile := filepath.Join(tmp, "mem_limit_mb")
+	if data, err := os.ReadFile(memLimitFile); err == nil {
+		atomic.StoreInt64(&balancedMemoryLimitBytes, parseMemoryLimitMiB(string(data))*1024*1024)
+	} else {
+		atomic.StoreInt64(&balancedMemoryLimitBytes, defaultBalancedMemoryLimitMiB*1024*1024)
+	}
 
 	perfModeFile := filepath.Join(tmp, "perf_mode")
 	if _, err := os.Stat(perfModeFile); err == nil {
@@ -135,6 +144,28 @@ func sendFdToProtect(fd int, path string) error {
 	return nil
 }
 
+const (
+	defaultBalancedMemoryLimitMiB int64 = 256
+	minBalancedMemoryLimitMiB     int64 = 96
+	maxBalancedMemoryLimitMiB     int64 = 512
+)
+
+var balancedMemoryLimitBytes int64 = defaultBalancedMemoryLimitMiB * 1024 * 1024
+
+func parseMemoryLimitMiB(raw string) int64 {
+	v, err := strconv.ParseInt(strings.TrimSpace(raw), 10, 64)
+	if err != nil || v <= 0 {
+		return defaultBalancedMemoryLimitMiB
+	}
+	if v < minBalancedMemoryLimitMiB {
+		return minBalancedMemoryLimitMiB
+	}
+	if v > maxBalancedMemoryLimitMiB {
+		return maxBalancedMemoryLimitMiB
+	}
+	return v
+}
+
 // SetMemoryProfile dynamically switches the Go runtime GC profile.
 // Called from Android at VPN service start based on user's "性能优先模式" toggle.
 //   - performancePriority=false (default): balanced low-power mode — GOGC=100, soft limit=512MB.
@@ -143,14 +174,20 @@ func sendFdToProtect(fd int, path string) error {
 //     Maximises throughput for power users at the cost of higher background RAM.
 //
 // NOTE: interrupt_exist_connections and tolerance for leastPing are NOT affected by this switch.
+
 func SetMemoryProfile(performancePriority bool) {
 	if performancePriority {
 		// High-perf: let Go runtime grow freely (same as upstream default)
 		debug.SetGCPercent(100)
 		debug.SetMemoryLimit(-1) // -1 = math.MaxInt64, disables the soft limit
 	} else {
-		// Balanced low-power: GOGC=100, cap at 512 MiB to provide ample headroom for high-throughput streaming and downloads without GC mutator assist throttling
+		// Balanced mode: adapt soft limit to device RAM via mem_limit_mb (default 256 MiB)
+		// to mitigate Android 17 MemoryLimiter:AnonSwap and low-RAM Android 9 kills.
+		limit := atomic.LoadInt64(&balancedMemoryLimitBytes)
+		if limit <= 0 {
+			limit = defaultBalancedMemoryLimitMiB * 1024 * 1024
+		}
 		debug.SetGCPercent(100)
-		debug.SetMemoryLimit(512 * 1024 * 1024)
+		debug.SetMemoryLimit(limit)
 	}
 }

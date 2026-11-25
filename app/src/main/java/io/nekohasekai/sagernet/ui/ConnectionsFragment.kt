@@ -22,6 +22,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.widget.PopupMenu
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
@@ -1229,7 +1230,7 @@ class ConnectionsFragment : ToolbarFragment(R.layout.layout_connections) {
                     radius = resources.getDimension(R.dimen.card_corner_radius)
                     cardElevation = 0f
                     strokeWidth = dp2px(1)
-                    strokeColor = safeCtx.getColor(R.color.card_stroke)
+                    strokeColor = ContextCompat.getColor(safeCtx, R.color.card_stroke)
                 }
                 val inner = LinearLayout(safeCtx).apply {
                     orientation = LinearLayout.VERTICAL

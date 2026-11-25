@@ -84,6 +84,7 @@
     <string name="lan_sharing_dialog_on">LAN Sharing is currently ON.\n\nOther devices on the hotspot can use:\n   Hostname: %1$s\n   Port: %2$d\n\nSet Manual Proxy in Wi-Fi settings on the other device.\n\nTap \"Turn Off\" to disable sharing.</string>
     <string name="lan_sharing_turn_on">Turn On</string>
     <string name="lan_sharing_turn_off">Turn Off</string>
+    <string name="lan_sharing_local_network_permission_denied">Local network permission is required on Android 17+ for LAN sharing.</string>
     <string name="lan_sharing_tools_summary">Share VPN proxy to other devices via Hotspot or local Wi-Fi without root</string>
     <string name="lan_sharing_active">Proxy Sharing Active</string>
     <string name="lan_sharing_inactive">Sharing Disabled</string>

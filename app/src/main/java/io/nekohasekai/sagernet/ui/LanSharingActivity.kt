@@ -3,9 +3,11 @@ package io.nekohasekai.sagernet.ui
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
+import android.os.Build
 import android.os.Bundle
 import android.text.InputType
 import android.text.format.Formatter
@@ -16,6 +18,8 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -47,6 +51,31 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
 class LanSharingActivity : ThemedActivity(), SagerConnection.Callback {
+
+    companion object {
+        private const val PERMISSION_ACCESS_LOCAL_NETWORK = "android.permission.ACCESS_LOCAL_NETWORK"
+    }
+
+    private val requestLocalNetworkPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (!granted) {
+            Toast.makeText(
+                this,
+                R.string.lan_sharing_local_network_permission_denied,
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    private fun ensureLocalNetworkPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < 37) return
+        if (ContextCompat.checkSelfPermission(this, PERMISSION_ACCESS_LOCAL_NETWORK)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestLocalNetworkPermission.launch(PERMISSION_ACCESS_LOCAL_NETWORK)
+        }
+    }
 
     private lateinit var binding: ActivityLanSharingBinding
 
@@ -95,6 +124,9 @@ class LanSharingActivity : ThemedActivity(), SagerConnection.Callback {
         ViewCompat.requestApplyInsets(binding.root)
 
         setupViews()
+        if (DataStore.allowAccess) {
+            ensureLocalNetworkPermissionIfNeeded()
+        }
         connection.connect(this, this)
         refreshNetworkInfo()
 
@@ -141,6 +173,9 @@ class LanSharingActivity : ThemedActivity(), SagerConnection.Callback {
         binding.switchLanSharing.setOnCheckedChangeListener { _, isChecked ->
             if (DataStore.allowAccess != isChecked) {
                 DataStore.allowAccess = isChecked
+                if (isChecked) {
+                    ensureLocalNetworkPermissionIfNeeded()
+                }
                 updateUIState()
                 restartServiceIfNeeded(
                     if (isChecked) R.string.lan_sharing_turn_on else R.string.lan_sharing_turn_off
