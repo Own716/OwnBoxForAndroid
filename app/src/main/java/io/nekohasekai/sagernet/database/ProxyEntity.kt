@@ -14,6 +14,7 @@ import io.nekohasekai.sagernet.fmt.internal.BalancerBean
 import io.nekohasekai.sagernet.fmt.internal.ChainBean
 import io.nekohasekai.sagernet.fmt.mieru.MieruBean
 import io.nekohasekai.sagernet.fmt.mieru.buildMieruConfig
+import io.nekohasekai.sagernet.fmt.mieru.toUri
 import io.nekohasekai.sagernet.fmt.naive.NaiveBean
 import io.nekohasekai.sagernet.fmt.naive.buildNaiveConfig
 import io.nekohasekai.sagernet.fmt.naive.toUri
@@ -218,7 +219,17 @@ data class ProxyEntity(
         TYPE_HTTP -> if (httpBean!!.isTLS()) "HTTPS" else "HTTP"
         TYPE_SS -> "Shadowsocks"
         TYPE_SSR -> "ShadowsocksR"
-        TYPE_VMESS -> if (vmessBean!!.isVLESS) "VLESS" else "VMess"
+        TYPE_VMESS -> if (vmessBean!!.isVLESS) {
+            val vmess = vmessBean!!
+            val net = vmess.type?.lowercase()
+            val isXhttp = net == "xhttp" || net == "splithttp"
+            val isReality = vmess.security.equals("reality", ignoreCase = true) || !vmess.realityPubKey.isNullOrBlank()
+            when {
+                isXhttp -> "VLESS + XHTTP"
+                isReality -> "VLESS · Reality"
+                else -> "VLESS"
+            }
+        } else "VMess"
         TYPE_TROJAN -> "Trojan"
         TYPE_TROJAN_GO -> "Trojan-Go"
         TYPE_MIERU -> "Mieru"
@@ -295,6 +306,7 @@ data class ProxyEntity(
             is VMessBean -> toUriVMessVLESSTrojan(false)
             is TrojanBean -> toUriVMessVLESSTrojan(true)
             is TrojanGoBean -> toUri()
+            is MieruBean -> toUri()
             is NaiveBean -> toUri()
             is HysteriaBean -> toUri()
             is TuicBean -> toUri()
@@ -351,7 +363,6 @@ data class ProxyEntity(
     fun needExternal(): Boolean {
         return when (type) {
             TYPE_TROJAN_GO -> true
-            TYPE_MIERU -> true
             TYPE_NAIVE -> true
             TYPE_HYSTERIA -> !hysteriaBean!!.canUseSingBox()
             TYPE_NEKO -> true

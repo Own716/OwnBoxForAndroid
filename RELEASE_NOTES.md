@@ -1,3 +1,11 @@
+# OwnBox for Android v26.11.24.10-preview
+
+### 【原生支持 Mieru 协议与节点协议标签精准显示】
+
+- **原生内置 Mieru 协议支持**：无需额外安装插件即可直接导入并连接 Mieru 订阅与分享链接（支持单端口、端口范围跳跃、TCP/UDP 与多路复用），彻底解决部分 Mieru 机场订阅导入后被识别或回退显示为 VLESS 的问题。
+- **精准显示 VLESS 细分协议标签**：节点卡片、连接详情与通知栏现可直观区分显示 `VLESS + XHTTP` 与 `VLESS · Reality`，不再笼统显示为普通 VLESS，并在手动输入菜单新增 `VLESS + XHTTP` 快捷入口。
+- **升级订阅兼容标识**：优化默认订阅请求标识，使各大机场面板完整下发 Mieru、AnyTLS、XHTTP、Hysteria2 等全部新协议节点，同时补全 Clash 订阅的 SSH 节点解析与剪贴板新协议链接识别。
+
 # OwnBox for Android v26.11.24.9-preview
 
 ### 【Android 9 闪退修复与 Android 17 适配】

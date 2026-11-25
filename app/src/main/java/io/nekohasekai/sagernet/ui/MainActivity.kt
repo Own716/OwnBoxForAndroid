@@ -337,6 +337,8 @@ class MainActivity : ThemedActivity(),
             val text = SagerNet.getClipboardText().trim()
             if (text.isBlank() || text == lastPromptedClipboard || text.length < 8) return
             val looksLikeProxy = text.startsWith("vless://", ignoreCase = true) ||
+                    text.startsWith("xhttp://", ignoreCase = true) ||
+                    text.startsWith("splithttp://", ignoreCase = true) ||
                     text.startsWith("vmess://", ignoreCase = true) ||
                     text.startsWith("ss://", ignoreCase = true) ||
                     text.startsWith("ssr://", ignoreCase = true) ||
@@ -345,6 +347,12 @@ class MainActivity : ThemedActivity(),
                     text.startsWith("hysteria2://", ignoreCase = true) ||
                     text.startsWith("hy2://", ignoreCase = true) ||
                     text.startsWith("tuic://", ignoreCase = true) ||
+                    text.startsWith("juicity://", ignoreCase = true) ||
+                    text.startsWith("snell://", ignoreCase = true) ||
+                    text.startsWith("anytls://", ignoreCase = true) ||
+                    text.startsWith("mierus://", ignoreCase = true) ||
+                    text.startsWith("wireguard://", ignoreCase = true) ||
+                    text.startsWith("awg://", ignoreCase = true) ||
                     text.startsWith("sn://", ignoreCase = true) ||
                     text.startsWith("clash://", ignoreCase = true)
 

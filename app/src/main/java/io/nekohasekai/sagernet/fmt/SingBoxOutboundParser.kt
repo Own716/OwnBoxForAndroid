@@ -3,6 +3,7 @@ package io.nekohasekai.sagernet.fmt
 import io.nekohasekai.sagernet.fmt.http.HttpBean
 import io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean
 import io.nekohasekai.sagernet.fmt.juicity.JuicityBean
+import io.nekohasekai.sagernet.fmt.mieru.MieruBean
 import io.nekohasekai.sagernet.fmt.naive.NaiveBean
 import io.nekohasekai.sagernet.fmt.shadowsocks.ShadowsocksBean
 import io.nekohasekai.sagernet.fmt.shadowsocksr.ShadowsocksRBean
@@ -233,6 +234,26 @@ fun parseSingBoxOutbound(json: JSONObject): AbstractBean? {
             sni = tls?.sni ?: json.getStr("sni") ?: ""
             allowInsecure = tls?.allowInsecure ?: json.optBoolean("insecure", false)
             pinnedCertchainSha256 = json.getStr("pinned_certchain_sha256") ?: ""
+        }
+
+        "mieru" -> MieruBean().apply {
+            val range = json.getStr("port_range")?.trim()?.replace(':', '-')
+                ?: json.optJSONArray("server_ports")?.toStringList()?.firstOrNull()?.trim()?.replace(':', '-')
+                ?: ""
+            if (range.isNotBlank()) {
+                portRange = range
+                if (port == null) {
+                    serverPort = range.substringBefore('-').trim().toIntOrNull() ?: 443
+                }
+            }
+            val transport = json.getStr("transport")?.trim()?.uppercase()
+            protocol = if (transport == "UDP") "UDP" else "TCP"
+            username = json.getStr("username") ?: ""
+            password = json.getStr("password") ?: ""
+            json.getIntNya("mtu")?.let { mtu = it }
+            multiplexing = json.getStr("multiplexing") ?: ""
+            handshakeMode = json.getStr("handshake_mode") ?: ""
+            trafficPattern = json.getStr("traffic_pattern") ?: ""
         }
 
         "shadowsocksr", "ssr" -> ShadowsocksRBean().apply {

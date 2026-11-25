@@ -5,6 +5,7 @@ import (
 
 	"libcore/protocol/juicity"
 	"libcore/protocol/loadbalance"
+	"libcore/protocol/mieru"
 
 	"github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/option"
@@ -87,6 +88,12 @@ func TestSanitizeOutbounds(t *testing.T) {
 		{
 			Type: "juicity",
 			Options: &juicity.JuicityOutboundOptions{},
+		},
+		{
+			Type: "mieru",
+			Options: &mieru.MieruOutboundOptions{
+				Transport: "UDP",
+			},
 		},
 		{
 			Type: "selector",
@@ -179,20 +186,26 @@ func TestSanitizeOutbounds(t *testing.T) {
 		t.Errorf("expected juicity NetworkStrategy to default to default, got %+v", jOpt.NetworkStrategy)
 	}
 
+	// Verify Mieru UDP network strategy locked to default
+	mOpt := outbounds[9].Options.(*mieru.MieruOutboundOptions)
+	if mOpt.NetworkStrategy == nil || *mOpt.NetworkStrategy != option.NetworkStrategy(constant.NetworkStrategyDefault) {
+		t.Errorf("expected mieru UDP NetworkStrategy to default to default, got %+v", mOpt.NetworkStrategy)
+	}
+
 	// Verify Selector deduplicated and non-existent default cleared
-	selOpt := outbounds[9].Options.(*option.SelectorOutboundOptions)
+	selOpt := outbounds[10].Options.(*option.SelectorOutboundOptions)
 	if len(selOpt.Outbounds) != 3 || selOpt.Default != "" {
 		t.Errorf("expected selector 3 unique tags and empty default, got len=%d default=%s", len(selOpt.Outbounds), selOpt.Default)
 	}
 
 	// Verify URLTest deduplicated
-	urlOpt := outbounds[10].Options.(*option.URLTestOutboundOptions)
+	urlOpt := outbounds[11].Options.(*option.URLTestOutboundOptions)
 	if len(urlOpt.Outbounds) != 2 {
 		t.Errorf("expected urltest 2 unique tags, got len=%d", len(urlOpt.Outbounds))
 	}
 
 	// Verify LoadBalance deduplicated
-	lbOpt := outbounds[11].Options.(*loadbalance.LoadBalanceOptions)
+	lbOpt := outbounds[12].Options.(*loadbalance.LoadBalanceOptions)
 	if len(lbOpt.Outbounds) != 2 {
 		t.Errorf("expected loadbalance 2 unique tags, got len=%d", len(lbOpt.Outbounds))
 	}

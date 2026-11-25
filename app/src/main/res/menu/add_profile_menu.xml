@@ -46,6 +46,9 @@
                         android:id="@+id/action_new_vless"
                         android:title="VLESS" />
                     <item
+                        android:id="@+id/action_new_xhttp"
+                        android:title="VLESS + XHTTP" />
+                    <item
                         android:id="@+id/action_new_trojan"
                         android:title="@string/action_trojan" />
                     <item

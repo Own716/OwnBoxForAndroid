@@ -38,6 +38,7 @@ class MieruSettingsActivity : ProfileSettingsActivity<MieruBean>() {
         DataStore.profileName = name
         DataStore.serverAddress = serverAddress
         DataStore.serverPort = serverPort
+        DataStore.serverPorts = portRange
         DataStore.serverProtocol = protocol
         DataStore.serverUsername = username
         DataStore.serverPassword = password
@@ -47,7 +48,12 @@ class MieruSettingsActivity : ProfileSettingsActivity<MieruBean>() {
     override fun MieruBean.serialize() {
         name = DataStore.profileName
         serverAddress = DataStore.serverAddress
+        val rawRange = DataStore.serverPorts.trim().replace(':', '-')
+        portRange = rawRange
         serverPort = DataStore.serverPort
+        if ((serverPort == null || serverPort == 0) && rawRange.contains('-')) {
+            serverPort = rawRange.substringBefore('-').trim().toIntOrNull() ?: 0
+        }
         protocol = DataStore.serverProtocol
         username = DataStore.serverUsername
         password = DataStore.serverPassword

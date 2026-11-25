@@ -39,6 +39,8 @@ object Protocols {
                     "${bean.authPayload}/${bean.sni}/${bean.protocolVersion}"
                 is io.nekohasekai.sagernet.fmt.tuic.TuicBean ->
                     "${bean.token}/${bean.uuid}/${bean.sni}"
+                is io.nekohasekai.sagernet.fmt.mieru.MieruBean ->
+                    "${bean.username}/${bean.password}/${bean.protocol}/${bean.portRange}"
                 is io.nekohasekai.sagernet.fmt.wireguard.WireGuardBean ->
                     "${bean.privateKey}/${bean.peerPublicKey}/${bean.localAddress}"
                 is io.nekohasekai.sagernet.fmt.ssh.SSHBean ->

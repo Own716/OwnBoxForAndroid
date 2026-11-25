@@ -78,8 +78,18 @@ fun parseV2Ray(link: String): StandardV2RayBean {
         runCatching { java.net.URLDecoder.decode(rawFragment, "UTF-8") }.getOrDefault(rawFragment)
     } else null
 
-    val bean = VMessBean().apply { if (link.startsWith("vless://")) alterId = -1 }
-    val rawUrlStr = linkWithoutFragment.replace("vmess://", "https://").replace("vless://", "https://")
+    val isXhttpScheme = link.startsWith("xhttp://", ignoreCase = true) ||
+        link.startsWith("splithttp://", ignoreCase = true)
+    val bean = VMessBean().apply {
+        if (link.startsWith("vless://", ignoreCase = true) || isXhttpScheme) {
+            alterId = -1
+        }
+    }
+    val rawUrlStr = linkWithoutFragment
+        .replace("vmess://", "https://")
+        .replace("vless://", "https://")
+        .replace("xhttp://", "https://")
+        .replace("splithttp://", "https://")
     var url = rawUrlStr.toHttpUrlOrNull()
     if (url == null) {
         val base = rawUrlStr.substringBefore("?")
@@ -188,6 +198,13 @@ fun parseV2Ray(link: String): StandardV2RayBean {
     } else {
         // also vless format
         bean.parseDuckSoft(url, nodeName)
+        if (isXhttpScheme &&
+            url.queryParameter("type").isNullOrBlank() &&
+            url.queryParameter("transport").isNullOrBlank() &&
+            url.queryParameter("net").isNullOrBlank()
+        ) {
+            bean.type = "xhttp"
+        }
     }
 
     return bean

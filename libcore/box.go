@@ -10,6 +10,7 @@ import (
 	"libcore/device"
 	"libcore/protocol/juicity"
 	"libcore/protocol/loadbalance"
+	"libcore/protocol/mieru"
 	"libcore/protocol/urltest"
 	"log"
 	"net"
@@ -149,6 +150,20 @@ func sanitizeOutbounds(outbounds []option.Outbound) {
 					}
 				} else {
 					jOpt.TLS.Enabled = true
+				}
+			}
+		case mieru.TypeMieru:
+			if mOpt, ok := ob.Options.(*mieru.MieruOutboundOptions); ok {
+				mOpt.Transport = strings.ToUpper(strings.TrimSpace(mOpt.Transport))
+				if mOpt.Transport == "" {
+					mOpt.Transport = "TCP"
+				}
+				if mOpt.Transport == "UDP" &&
+					mOpt.NetworkStrategy == nil && len(mOpt.NetworkType) == 0 && len(mOpt.FallbackNetworkType) == 0 &&
+					mOpt.BindInterface == "" && mOpt.Inet4BindAddress == nil && mOpt.Inet6BindAddress == nil {
+					mOpt.TCPFastOpen = false
+					defaultStrategy := option.NetworkStrategy(constant.NetworkStrategyDefault)
+					mOpt.NetworkStrategy = &defaultStrategy
 				}
 			}
 		case "hysteria2":

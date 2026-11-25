@@ -27,6 +27,7 @@ import org.jetbrains.annotations.NotNull;
 
 import io.nekohasekai.sagernet.fmt.AbstractBean;
 import io.nekohasekai.sagernet.fmt.KryoConverters;
+import io.nekohasekai.sagernet.ktx.NetsKt;
 
 public class MieruBean extends AbstractBean {
 
@@ -34,19 +35,36 @@ public class MieruBean extends AbstractBean {
     public String username;
     public String password;
     public Integer mtu;
+    public String portRange;
+    public String multiplexing;
+    public String handshakeMode;
+    public String trafficPattern;
 
     @Override
     public void initializeDefaultValues() {
         super.initializeDefaultValues();
         if (protocol == null) protocol = "TCP";
+        protocol = "UDP".equalsIgnoreCase(protocol) ? "UDP" : "TCP";
         if (username == null) username = "";
         if (password == null) password = "";
         if (mtu == null) mtu = 1400;
+        if (portRange == null) portRange = "";
+        if (multiplexing == null) multiplexing = "";
+        if (handshakeMode == null) handshakeMode = "";
+        if (trafficPattern == null) trafficPattern = "";
+    }
+
+    @Override
+    public String displayAddress() {
+        if (portRange != null && !portRange.trim().isEmpty()) {
+            return NetsKt.wrapIPV6Host(serverAddress) + ":" + portRange.trim();
+        }
+        return super.displayAddress();
     }
 
     @Override
     public void serialize(ByteBufferOutput output) {
-        output.writeInt(0);
+        output.writeInt(1);
         super.serialize(output);
         output.writeString(protocol);
         output.writeString(username);
@@ -54,6 +72,10 @@ public class MieruBean extends AbstractBean {
         if (protocol.equals("UDP")) {
             output.writeInt(mtu);
         }
+        output.writeString(portRange);
+        output.writeString(multiplexing);
+        output.writeString(handshakeMode);
+        output.writeString(trafficPattern);
     }
 
     @Override
@@ -65,6 +87,17 @@ public class MieruBean extends AbstractBean {
         password = input.readString();
         if (protocol.equals("UDP")) {
             mtu = input.readInt();
+        }
+        if (version >= 1) {
+            portRange = input.readString();
+            multiplexing = input.readString();
+            handshakeMode = input.readString();
+            trafficPattern = input.readString();
+        } else {
+            portRange = "";
+            multiplexing = "";
+            handshakeMode = "";
+            trafficPattern = "";
         }
     }
 

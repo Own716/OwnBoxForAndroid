@@ -46,6 +46,7 @@ import (
 	h2http "libcore/protocol/http"
 	"libcore/protocol/juicity"
 	"libcore/protocol/loadbalance"
+	"libcore/protocol/mieru"
 	customUrltest "libcore/protocol/urltest"
 	customVless "libcore/protocol/vless"
 
@@ -110,6 +111,7 @@ func nekoboxAndroidOutboundRegistry() *outbound.Registry {
 	tuic.RegisterOutbound(registry)
 	hysteria2.RegisterOutbound(registry)
 	juicity.RegisterOutbound(registry)
+	mieru.RegisterOutbound(registry)
 
 	// 官方 sing-box 1.11 起废弃、1.13.0 移除 wireguard outbound（仅保留 endpoint，
 	// 见下方 nekoboxAndroidEndpointRegistry）；镜像官方 include/registry.go 的 stub，

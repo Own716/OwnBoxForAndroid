@@ -10,12 +10,14 @@ import io.nekohasekai.sagernet.fmt.http.HttpBean
 import io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean
 import io.nekohasekai.sagernet.fmt.hysteria.parseHysteria1Json
 import io.nekohasekai.sagernet.fmt.juicity.JuicityBean
+import io.nekohasekai.sagernet.fmt.mieru.MieruBean
 import io.nekohasekai.sagernet.fmt.shadowsocks.ShadowsocksBean
 import io.nekohasekai.sagernet.fmt.shadowsocks.parseShadowsocks
 import io.nekohasekai.sagernet.fmt.shadowsocksr.ShadowsocksRBean
 import io.nekohasekai.sagernet.fmt.shadowsocksr.parseShadowsocksR
 import io.nekohasekai.sagernet.fmt.snell.parseClashSnell
 import io.nekohasekai.sagernet.fmt.socks.SOCKSBean
+import io.nekohasekai.sagernet.fmt.ssh.SSHBean
 import io.nekohasekai.sagernet.fmt.trojan.TrojanBean
 import io.nekohasekai.sagernet.fmt.trojan_go.parseTrojanGo
 import io.nekohasekai.sagernet.fmt.tuic.TuicBean
@@ -84,11 +86,11 @@ object RawUpdater : GroupUpdater() {
             val preferredUa = subscription.customUserAgent?.takeIf { it.isNotBlank() }
                 ?: DataStore.defaultSubscriptionUserAgent
 
-            // Fallback UA candidates in order: user preferred UA -> NekoBox ClashMeta -> ClashMetaForAndroid -> clash-meta -> v2rayNG -> v2rayN -> sing-box -> Browser
+            // Fallback UA candidates in order: user preferred UA -> ClashMetaForAndroid -> NekoBox ClashMeta -> clash-meta -> v2rayNG -> v2rayN -> sing-box -> Browser
             val candidateUas = linkedSetOf(
                 preferredUa,
-                "NekoBox/Android/1.4.2 (Prefer ClashMeta Format)",
                 "ClashMetaForAndroid/2.11.5.Meta",
+                "NekoBox/Android/1.4.2 (Prefer ClashMeta Format)",
                 "clash-meta",
                 "v2rayNG/1.9.39",
                 "v2rayN/7.8.2",
@@ -1109,6 +1111,68 @@ object RawUpdater : GroupUpdater() {
                             }
                             proxies.add(bean)
                         }
+
+                        "mieru" -> {
+                            val bean = MieruBean()
+                            var hasSinglePort = false
+                            for (opt in proxy) {
+                                if (opt.value == null) continue
+                                when (opt.key.replace("_", "-")) {
+                                    "name" -> bean.name = opt.value.toString()
+                                    "server" -> bean.serverAddress = opt.value.toString()
+                                    "port" -> {
+                                        opt.value.toString().toIntOrNull()?.let {
+                                            bean.serverPort = it
+                                            hasSinglePort = true
+                                        }
+                                    }
+                                    "port-range", "ports" -> bean.portRange = opt.value.toString().trim().replace(':', '-')
+                                    "transport" -> bean.protocol = if (opt.value.toString().equals("UDP", ignoreCase = true)) "UDP" else "TCP"
+                                    "username" -> bean.username = opt.value.toString()
+                                    "password" -> bean.password = opt.value.toString()
+                                    "mtu" -> opt.value.toString().toIntOrNull()?.let { bean.mtu = it }
+                                    "multiplexing" -> bean.multiplexing = opt.value.toString()
+                                    "handshake-mode" -> bean.handshakeMode = opt.value.toString()
+                                    "traffic-pattern" -> bean.trafficPattern = opt.value.toString()
+                                }
+                            }
+                            if (!hasSinglePort && !bean.portRange.isNullOrBlank()) {
+                                bean.serverPort = bean.portRange.substringBefore('-').trim().toIntOrNull() ?: 443
+                            }
+                            proxies.add(bean)
+                        }
+
+                        "ssh" -> {
+                            val bean = SSHBean()
+                            var privKey = ""
+                            var pwd = ""
+                            for (opt in proxy) {
+                                if (opt.value == null) continue
+                                when (opt.key.replace("_", "-")) {
+                                    "name" -> bean.name = opt.value.toString()
+                                    "server" -> bean.serverAddress = opt.value.toString()
+                                    "port" -> bean.serverPort = opt.value.toString().toIntOrNull() ?: 22
+                                    "username", "user" -> bean.username = opt.value.toString()
+                                    "password" -> pwd = opt.value.toString()
+                                    "private-key" -> privKey = opt.value.toString()
+                                    "private-key-passphrase" -> bean.privateKeyPassphrase = opt.value.toString()
+                                    "host-key" -> bean.publicKey = (opt.value as? List<*>)?.joinToString("\n") { it?.toString().orEmpty() }
+                                        ?: opt.value.toString()
+                                }
+                            }
+                            when {
+                                privKey.isNotBlank() -> {
+                                    bean.authType = SSHBean.AUTH_TYPE_PRIVATE_KEY
+                                    bean.privateKey = privKey
+                                }
+                                pwd.isNotBlank() -> {
+                                    bean.authType = SSHBean.AUTH_TYPE_PASSWORD
+                                    bean.password = pwd
+                                }
+                                else -> bean.authType = SSHBean.AUTH_TYPE_NONE
+                            }
+                            proxies.add(bean)
+                        }
                     }
                 } catch (e: Throwable) {
                     Logs.w(e)
@@ -1269,7 +1333,8 @@ object RawUpdater : GroupUpdater() {
                         }.getOrDefault(emptyList()))
                 }
 
-                (json.has("server") || json.has("address")) && (json.has("server_port") || json.has("port")) -> {
+                (json.has("server") || json.has("address")) &&
+                    (json.has("server_port") || json.has("port") || json.has("port_range") || json.has("server_ports")) -> {
                     return listOf(
                         runCatching { parseSingBoxOutbound(json) }.getOrNull()
                             ?: ConfigBean().applyDefaultValues().apply {

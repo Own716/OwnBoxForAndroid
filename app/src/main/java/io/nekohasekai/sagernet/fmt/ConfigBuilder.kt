@@ -15,6 +15,8 @@ import io.nekohasekai.sagernet.fmt.hysteria.buildSingBoxOutboundHysteriaBean
 import io.nekohasekai.sagernet.fmt.internal.ChainBean
 import io.nekohasekai.sagernet.fmt.internal.BalancerBean
 import io.nekohasekai.sagernet.fmt.internal.BalancerMemberResolver
+import io.nekohasekai.sagernet.fmt.mieru.MieruBean
+import io.nekohasekai.sagernet.fmt.mieru.buildSingBoxOutboundMieruBean
 import io.nekohasekai.sagernet.fmt.shadowsocks.ShadowsocksBean
 import io.nekohasekai.sagernet.fmt.shadowsocks.buildSingBoxOutboundShadowsocksBean
 import io.nekohasekai.sagernet.fmt.socks.SOCKSBean
@@ -791,6 +793,7 @@ internal class ChainGraphContext(
                     is ShadowTLSBean -> buildSingBoxOutboundShadowTLSBean(bean)
                     is StandardV2RayBean -> buildSingBoxOutboundStandardV2RayBean(bean)
                     is HysteriaBean -> buildSingBoxOutboundHysteriaBean(bean)
+                    is MieruBean -> buildSingBoxOutboundMieruBean(bean)
                     is TuicBean -> buildSingBoxOutboundTuicBean(bean)
                     is JuicityBean -> buildSingBoxOutboundJuicityBean(bean)
                     is SOCKSBean -> buildSingBoxOutboundSocksBean(bean)
@@ -875,7 +878,9 @@ internal class ChainGraphContext(
                 // Avoid forcing tcp_fast_open=true globally because mobile/carrier middleboxes
                 // frequently drop TFO SYNs, causing 1-3s handshake stalls on new connections.
                 _hack_config_map.remove("tcp_fast_open")
-                if (bean is HysteriaBean || bean is TuicBean || bean is JuicityBean) {
+                if (bean is HysteriaBean || bean is TuicBean || bean is JuicityBean ||
+                    (bean is MieruBean && bean.protocol.equals("UDP", ignoreCase = true))
+                ) {
                     // UDP/QUIC connect() is 0-RTT in Linux: under hybrid/fallback multi-interface racing,
                     // standby cellular interfaces can outrace Wi-Fi and bind to a blackholed socket.
                     _hack_config_map["network_strategy"] = "default"

@@ -220,7 +220,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var defaultSubscriptionUserAgent: String
         get() {
             val stored = configurationStore.getString(Key.DEFAULT_SUBSCRIPTION_USER_AGENT, "")
-            return if (!stored.isNullOrBlank()) stored else "NekoBox/Android/1.4.2 (Prefer ClashMeta Format)"
+            return if (!stored.isNullOrBlank()) stored else "ClashMetaForAndroid/2.11.5.Meta"
         }
         set(value) = configurationStore.putString(Key.DEFAULT_SUBSCRIPTION_USER_AGENT, value)
 
@@ -228,11 +228,15 @@ object DataStore : OnPreferenceDataStoreChangeListener {
 
     var hideUnavailableProfiles by configurationStore.boolean(Key.HIDE_UNAVAILABLE_PROFILES) { false }
 
+    private var migratedUaToClashMeta2115 by configurationStore.boolean("migratedUaToClashMeta2115") { false }
+
     fun migrateSubscriptionUserAgents(targetUa: String? = null, forceAll: Boolean = false) {
-        val compatDefaultUa = "NekoBox/Android/1.4.2 (Prefer ClashMeta Format)"
+        val compatDefaultUa = "ClashMetaForAndroid/2.11.5.Meta"
+        val legacyNekoUa = "NekoBox/Android/1.4.2 (Prefer ClashMeta Format)"
+        val shouldMigrateOneTime = targetUa == null && !forceAll && !migratedUaToClashMeta2115
         if (targetUa == null && !forceAll) {
             val storedDefault = configurationStore.getString(Key.DEFAULT_SUBSCRIPTION_USER_AGENT, "")
-            if (storedDefault == "sing-box/1.15.0") {
+            if (storedDefault == "sing-box/1.15.0" || (shouldMigrateOneTime && storedDefault == legacyNekoUa)) {
                 configurationStore.putString(Key.DEFAULT_SUBSCRIPTION_USER_AGENT, compatDefaultUa)
             }
         }
@@ -245,11 +249,17 @@ object DataStore : OnPreferenceDataStoreChangeListener {
                 val sub = group.subscription ?: continue
                 if (sub.lockUserAgent == true) continue
                 val ua = sub.customUserAgent
-                if (forceAll || ua.isNullOrBlank() || (targetUa == null && ua == "sing-box/1.15.0")) {
+                if (forceAll ||
+                    ua.isNullOrBlank() ||
+                    (targetUa == null && (ua == "sing-box/1.15.0" || (shouldMigrateOneTime && ua == legacyNekoUa)))
+                ) {
                     sub.customUserAgent = newUa
                     groupDao.updateGroup(group)
                     changed = true
                 }
+            }
+            if (shouldMigrateOneTime) {
+                migratedUaToClashMeta2115 = true
             }
             if (changed) {
                 Logs.d("Updated subscription User-Agents to: $newUa")

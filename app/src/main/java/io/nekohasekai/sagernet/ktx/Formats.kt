@@ -6,6 +6,7 @@ import io.nekohasekai.sagernet.fmt.Serializable
 import io.nekohasekai.sagernet.fmt.http.parseHttp
 import io.nekohasekai.sagernet.fmt.hysteria.parseHysteria1
 import io.nekohasekai.sagernet.fmt.hysteria.parseHysteria2
+import io.nekohasekai.sagernet.fmt.mieru.parseMieru
 import io.nekohasekai.sagernet.fmt.naive.parseNaive
 import io.nekohasekai.sagernet.fmt.parseUniversal
 import io.nekohasekai.sagernet.fmt.shadowsocks.parseShadowsocks
@@ -111,7 +112,7 @@ suspend fun parseProxies(text: String): List<AbstractBean> {
     val rawLines = text.split('\n').map { it.trim() }.filter { it.isNotBlank() }
     val isSingleLink = rawLines.size == 1
 
-    val schemes = listOf("ss://", "ssr://", "vmess://", "vless://", "trojan://", "trojan-go://", "socks://", "socks5://", "hysteria://", "hysteria2://", "hy2://", "tuic://", "juicity://", "snell://", "anytls://", "awg://", "wireguard://", "sn://")
+    val schemes = listOf("ss://", "ssr://", "vmess://", "vless://", "xhttp://", "splithttp://", "trojan://", "trojan-go://", "socks://", "socks5://", "hysteria://", "hysteria2://", "hy2://", "tuic://", "juicity://", "mierus://", "snell://", "anytls://", "awg://", "wireguard://", "sn://")
     fun splitLinks(line: String): List<String> {
         val indices = mutableListOf<Int>()
         for (s in schemes) {
@@ -213,8 +214,8 @@ suspend fun parseProxies(text: String): List<AbstractBean> {
             }.onFailure {
                 Logs.w(it)
             }
-        } else if (startsWith("vless://")) {
-            Logs.d("Try parse vless link: $this")
+        } else if (startsWith("vless://") || startsWith("xhttp://", ignoreCase = true) || startsWith("splithttp://", ignoreCase = true)) {
+            Logs.d("Try parse vless/xhttp link: $this")
             runCatching {
                 entities.add(parseV2Ray(this))
             }.onFailure {
@@ -280,6 +281,13 @@ suspend fun parseProxies(text: String): List<AbstractBean> {
             Logs.d("Try parse Juicity link: $this")
             runCatching {
                 entities.add(parseJuicity(this))
+            }.onFailure {
+                Logs.w(it)
+            }
+        } else if (startsWith("mierus://", ignoreCase = true)) {
+            Logs.d("Try parse Mieru link: $this")
+            runCatching {
+                entities.add(parseMieru(this))
             }.onFailure {
                 Logs.w(it)
             }
