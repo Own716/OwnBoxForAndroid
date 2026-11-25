@@ -28,10 +28,6 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.json.JSONArray
 import org.json.JSONObject
 
-fun MieruBean.buildSingBoxOutboundMieruBean(): SingBoxOptions.Outbound_MieruOptions {
-    return buildSingBoxOutboundMieruBean(this)
-}
-
 fun buildSingBoxOutboundMieruBean(bean: MieruBean): SingBoxOptions.Outbound_MieruOptions {
     val isUdp = bean.protocol.equals("UDP", ignoreCase = true)
     val range = bean.portRange?.trim()?.replace(':', '-')?.takeIf { it.isNotBlank() }
