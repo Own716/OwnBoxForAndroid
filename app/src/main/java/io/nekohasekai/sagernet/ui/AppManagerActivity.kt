@@ -6,7 +6,6 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
 import android.os.Bundle
-import android.text.TextUtils
 import android.util.SparseBooleanArray
 import android.view.KeyEvent
 import android.view.Menu
@@ -40,6 +39,7 @@ import io.nekohasekai.sagernet.ktx.app
 import io.nekohasekai.sagernet.ktx.crossFadeFrom
 import io.nekohasekai.sagernet.ktx.onMainDispatcher
 import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
+import io.nekohasekai.sagernet.route.AppClassifier
 import io.nekohasekai.sagernet.utils.PackageCache
 import io.nekohasekai.sagernet.widget.ListListener
 import kotlinx.coroutines.Dispatchers
@@ -47,7 +47,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
-import moe.matsuri.nb4a.utils.NGUtil
 import kotlin.coroutines.coroutineContext
 
 class AppManagerActivity : ThemedActivity() {
@@ -290,6 +289,7 @@ class AppManagerActivity : ThemedActivity() {
         }
 
         binding.bypassGroup.check(if (DataStore.bypass) R.id.appProxyModeBypass else R.id.appProxyModeOn)
+        updateAutoSelectButtonText()
         binding.bypassGroup.setOnCheckedChangeListener { _, checkedId ->
             hasConfigChanged = true
             DataStore.dirty = true
@@ -299,8 +299,15 @@ class AppManagerActivity : ThemedActivity() {
                     finish()
                 }
 
-                R.id.appProxyModeOn -> DataStore.bypass = false
-                R.id.appProxyModeBypass -> DataStore.bypass = true
+                R.id.appProxyModeOn -> {
+                    DataStore.bypass = false
+                    updateAutoSelectButtonText()
+                }
+
+                R.id.appProxyModeBypass -> {
+                    DataStore.bypass = true
+                    updateAutoSelectButtonText()
+                }
             }
         }
         binding.autoSelectProxyApps.setOnClickListener { selectProxyApp() }
@@ -394,6 +401,7 @@ class AppManagerActivity : ThemedActivity() {
                             0, i
                         ) to proxiedAppString.substring(i + 1)
                         binding.bypassGroup.check(if (enabled.toBoolean()) R.id.appProxyModeBypass else R.id.appProxyModeOn)
+                        updateAutoSelectButtonText()
                         DataStore.individual = apps
                         hasConfigChanged = true
                         DataStore.dirty = true
@@ -412,44 +420,144 @@ class AppManagerActivity : ThemedActivity() {
         return super.onOptionsItemSelected(item)
     }
 
+    private fun updateAutoSelectButtonText() {
+        binding.autoSelectProxyApps.setText(
+            if (DataStore.bypass) R.string.auto_select_bypass_apps else R.string.auto_select_proxy_apps
+        )
+    }
+
     private fun selectProxyApp() {
-        MaterialAlertDialogBuilder(this).setTitle(R.string.confirm)
-            .setMessage(R.string.auto_select_proxy_apps_message)
-            .setPositiveButton(R.string.yes) { _, _ ->
-                try {
-                    hasConfigChanged = true
-                    DataStore.dirty = true
-                    val needProxyAppsList = getAutoProxyApps("")
-                    val bypass = DataStore.bypass
-                    proxiedUids.clear()
-                    for (app in cachedApps) {
-                        val needProxy =
-                            needProxyAppsList.contains(app.key) || (app.value.applicationInfo?.uid
-                                ?: 0) == 1000
-                        if (needProxy) {
-                            if (!bypass) {
-                                app.value.applicationInfo?.apply {
-                                    proxiedUids[uid] = true
-                                }
-                            }
+        if (!DataStore.bypass) {
+            showAutoSelectDialog(
+                titleRes = R.string.auto_select_proxy_apps,
+                items = arrayOf(
+                    getString(R.string.auto_select_opt_intl_browsers),
+                    getString(R.string.auto_select_opt_google_core),
+                    getString(R.string.auto_select_opt_play_heuristic),
+                ),
+                checked = booleanArrayOf(true, true, false),
+            ) { replace, checked ->
+                runAutoSelect(
+                    bypass = false,
+                    replace = replace,
+                    proxyOptions = AppClassifier.ProxyAutoSelectOptions(
+                        includeInternationalBrowsers = checked[0],
+                        includeGoogleCoreServices = checked[1],
+                        includePlayStoreHeuristic = checked[2],
+                    ),
+                )
+            }
+        } else {
+            showAutoSelectDialog(
+                titleRes = R.string.auto_select_bypass_apps,
+                items = arrayOf(
+                    getString(R.string.auto_select_opt_domestic_apps),
+                    getString(R.string.auto_select_opt_oem_system),
+                    getString(R.string.auto_select_opt_domestic_browsers),
+                ),
+                checked = booleanArrayOf(true, true, false),
+            ) { replace, checked ->
+                runAutoSelect(
+                    bypass = true,
+                    replace = replace,
+                    bypassOptions = AppClassifier.BypassAutoSelectOptions(
+                        includeDomesticApps = checked[0],
+                        includeChineseOemSystemApps = checked[1],
+                        includeDomesticBrowsers = checked[2],
+                    ),
+                )
+            }
+        }
+    }
+
+    private fun showAutoSelectDialog(
+        titleRes: Int,
+        items: Array<String>,
+        checked: BooleanArray,
+        onConfirm: (replace: Boolean, checked: BooleanArray) -> Unit,
+    ) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(titleRes)
+            .setMultiChoiceItems(items, checked) { _, which, isChecked ->
+                checked[which] = isChecked
+            }
+            .setPositiveButton(R.string.auto_select_action_replace) { _, _ ->
+                onConfirm(true, checked)
+            }
+            .setNeutralButton(R.string.auto_select_action_append) { _, _ ->
+                onConfirm(false, checked)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun runAutoSelect(
+        bypass: Boolean,
+        replace: Boolean,
+        proxyOptions: AppClassifier.ProxyAutoSelectOptions? = null,
+        bypassOptions: AppClassifier.BypassAutoSelectOptions? = null,
+    ) {
+        lifecycleScope.launch {
+            try {
+                val installed = cachedApps
+                val matchedUids = withContext(Dispatchers.Default) {
+                    AppClassifier.collectMatchingUids(applicationContext, installed) { signals, bundledForeign ->
+                        if (!bypass) {
+                            AppClassifier.shouldSelectForProxy(
+                                signals = signals,
+                                bundledForeign = bundledForeign,
+                                options = proxyOptions ?: AppClassifier.ProxyAutoSelectOptions(),
+                            )
                         } else {
-                            if (bypass) {
-                                app.value.applicationInfo?.apply {
-                                    proxiedUids[uid] = true
-                                }
-                            }
+                            AppClassifier.shouldSelectForBypass(
+                                signals = signals,
+                                bundledForeign = bundledForeign,
+                                options = bypassOptions ?: AppClassifier.BypassAutoSelectOptions(),
+                            )
                         }
                     }
-                    DataStore.individual =
-                        apps.filter { isProxiedApp(it) }.joinToString("\n") { it.packageName }
-                    apps = apps.sortedWith(compareBy({ !isProxiedApp(it) }, { it.name.toString() }))
-                    appsAdapter.filter.filter(binding.search.text?.toString() ?: "")
-                } catch (e: Exception) {
-                    Logs.e(e)
                 }
+
+                hasConfigChanged = true
+                DataStore.dirty = true
+                saveIndividualJob?.cancel()
+
+                val beforeCount = if (apps.isNotEmpty()) apps.count { isProxiedApp(it) } else proxiedUids.size()
+                if (replace) {
+                    proxiedUids.clear()
+                }
+                for (uid in matchedUids) {
+                    proxiedUids[uid] = true
+                }
+                val afterCount = if (apps.isNotEmpty()) apps.count { isProxiedApp(it) } else proxiedUids.size()
+                val addedCount = (afterCount - beforeCount).coerceAtLeast(0)
+
+                val individualStr = if (apps.isNotEmpty()) {
+                    buildIndividualSnapshot()
+                } else {
+                    installed.values.mapNotNull { info ->
+                        val u = info.applicationInfo?.uid ?: return@mapNotNull null
+                        if (proxiedUids[u]) info.packageName else null
+                    }.joinToString("\n")
+                }
+                withContext(Dispatchers.IO) {
+                    DataStore.individual = individualStr
+                }
+
+                apps = apps.sortedWith(compareBy({ !isProxiedApp(it) }, { it.name.toString() }))
+                appsAdapter.filter.filter(binding.search.text?.toString() ?: "")
+
+                val message = when {
+                    !bypass && replace -> getString(R.string.auto_select_proxy_result_replace, afterCount)
+                    !bypass -> getString(R.string.auto_select_proxy_result_append, addedCount, afterCount)
+                    replace -> getString(R.string.auto_select_bypass_result_replace, afterCount)
+                    else -> getString(R.string.auto_select_bypass_result_append, addedCount, afterCount)
+                }
+                Snackbar.make(binding.list, message, Snackbar.LENGTH_LONG).show()
+            } catch (e: Exception) {
+                Logs.e(e)
             }
-            .setNegativeButton(R.string.no, null)
-            .show()
+        }
     }
 
     override fun onResume() {
@@ -491,22 +599,6 @@ class AppManagerActivity : ThemedActivity() {
                 }
             }
         }
-    }
-
-    private fun getAutoProxyApps(content: String): List<String> {
-        var list = listOf<String>()
-        try {
-            val proxyApps = if (TextUtils.isEmpty(content)) {
-                NGUtil.readTextFromAssets(app, "proxy_packagename.txt")
-            } else {
-                content
-            }
-            if (!TextUtils.isEmpty(proxyApps)) {
-                list = proxyApps.split("\n")
-            }
-        } catch (_: Exception) {
-        }
-        return list
     }
 
     override fun supportNavigateUpTo(upIntent: Intent) =

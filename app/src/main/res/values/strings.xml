@@ -789,6 +789,19 @@
     <string name="auto_select_proxy_apps">Auto select proxy apps</string>
     <string name="auto_select_proxy_apps_message">Auto select proxy apps, this will clear your
         current selection.</string>
+    <string name="auto_select_bypass_apps">Auto select bypass apps</string>
+    <string name="auto_select_action_replace">Replace</string>
+    <string name="auto_select_action_append">Append</string>
+    <string name="auto_select_opt_intl_browsers">International browsers &amp; variants (Chrome, Edge, Canary, Firefox…)</string>
+    <string name="auto_select_opt_google_core">Google core services (Play Store, GMS, GSF)</string>
+    <string name="auto_select_opt_play_heuristic">Detect unlisted Google Play foreign apps (experimental)</string>
+    <string name="auto_select_opt_domestic_apps">Domestic apps &amp; local SDK fingerprint detection</string>
+    <string name="auto_select_opt_oem_system">OEM system services &amp; Wi-Fi portal</string>
+    <string name="auto_select_opt_domestic_browsers">Domestic browsers (Quark, QQ, UC, Baidu…)</string>
+    <string name="auto_select_proxy_result_replace">Auto-selected %1$d apps to proxy</string>
+    <string name="auto_select_proxy_result_append">Added %1$d proxy apps (%2$d total)</string>
+    <string name="auto_select_bypass_result_replace">Auto-selected %1$d apps to bypass</string>
+    <string name="auto_select_bypass_result_append">Added %1$d bypass apps (%2$d total)</string>
     <string name="enable_ech">Enable ECH</string>
     <string name="enable_ech_sum">Enable Encrypted Client Hello</string>
     <string name="ech_settings">ECH Settings</string>

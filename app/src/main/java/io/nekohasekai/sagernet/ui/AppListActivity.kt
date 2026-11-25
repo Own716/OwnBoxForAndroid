@@ -35,6 +35,7 @@ import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.crossFadeFrom
 import io.nekohasekai.sagernet.ktx.onMainDispatcher
 import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
+import io.nekohasekai.sagernet.route.AppClassifier
 import io.nekohasekai.sagernet.utils.PackageCache
 import io.nekohasekai.sagernet.widget.ListListener
 import kotlinx.coroutines.Dispatchers
@@ -276,49 +277,25 @@ class AppListActivity : ThemedActivity() {
             }
 
             R.id.action_preset_cn_apps -> {
-                runOnDefaultDispatcher {
-                    val cnPackages = setOf(
-                        "com.tencent.mm", "com.tencent.mobileqq", "com.eg.android.AlipayGphone",
-                        "com.taobao.taobao", "com.jingdong.app.mall", "tv.danmaku.bili",
-                        "com.ss.android.ugc.aweme", "com.netease.cloudmusic", "com.autonavi.minimap",
-                        "com.baidu.BaiduMap", "com.xunmeng.pinduoduo", "com.sankuai.meituan",
-                        "com.zhihu.android", "com.sina.weibo", "com.coolapk.market"
-                    )
-                    for (app in apps) {
-                        if (cnPackages.contains(app.packageName)) {
-                            proxiedUids[app.uid] = true
-                        }
-                    }
-                    DataStore.routePackages = apps.filter { isProxiedApp(it) }
-                        .joinToString("\n") { it.packageName }
-                    apps = apps.sortedWith(compareBy({ !isProxiedApp(it) }, { it.name.toString() }))
-                    onMainDispatcher {
-                        appsAdapter.filter.filter(binding.search.text?.toString() ?: "")
-                    }
+                val options = AppClassifier.BypassAutoSelectOptions(
+                    includeDomesticApps = true,
+                    includeChineseOemSystemApps = false,
+                    includeDomesticBrowsers = false,
+                )
+                applyPresetSelection { signals, bundledForeign ->
+                    AppClassifier.shouldSelectForBypass(signals, bundledForeign, options)
                 }
                 return true
             }
 
             R.id.action_preset_foreign_apps -> {
-                runOnDefaultDispatcher {
-                    val foreignPackages = setOf(
-                        "org.telegram.messenger", "org.thunderdog.challegram", "com.google.android.youtube",
-                        "com.twitter.android", "com.android.chrome", "com.google.android.gms",
-                        "com.android.vending", "com.discord", "com.whatsapp", "com.instagram.android",
-                        "com.zhiliaoapp.musically", "com.openai.chatgpt", "com.netflix.mediaclient",
-                        "com.spotify.music"
-                    )
-                    for (app in apps) {
-                        if (foreignPackages.contains(app.packageName)) {
-                            proxiedUids[app.uid] = true
-                        }
-                    }
-                    DataStore.routePackages = apps.filter { isProxiedApp(it) }
-                        .joinToString("\n") { it.packageName }
-                    apps = apps.sortedWith(compareBy({ !isProxiedApp(it) }, { it.name.toString() }))
-                    onMainDispatcher {
-                        appsAdapter.filter.filter(binding.search.text?.toString() ?: "")
-                    }
+                val options = AppClassifier.ProxyAutoSelectOptions(
+                    includeInternationalBrowsers = true,
+                    includeGoogleCoreServices = true,
+                    includePlayStoreHeuristic = false,
+                )
+                applyPresetSelection { signals, bundledForeign ->
+                    AppClassifier.shouldSelectForProxy(signals, bundledForeign, options)
                 }
                 return true
             }
@@ -365,6 +342,33 @@ class AppListActivity : ThemedActivity() {
             }
         }
         return super.onOptionsItemSelected(item)
+    }
+
+    private fun applyPresetSelection(
+        predicate: (AppClassifier.AppSignals, Set<String>) -> Boolean,
+    ) {
+        lifecycleScope.launch {
+            val installed = cachedApps
+            val matchedUids = withContext(Dispatchers.Default) {
+                AppClassifier.collectMatchingUids(applicationContext, installed, predicate)
+            }
+            for (uid in matchedUids) {
+                proxiedUids[uid] = true
+            }
+            val snapshot = if (apps.isNotEmpty()) {
+                apps.filter { isProxiedApp(it) }.joinToString("\n") { it.packageName }
+            } else {
+                installed.values.mapNotNull { info ->
+                    val uid = info.applicationInfo?.uid ?: return@mapNotNull null
+                    if (proxiedUids[uid]) info.packageName else null
+                }.joinToString("\n")
+            }
+            withContext(Dispatchers.IO) {
+                DataStore.routePackages = snapshot
+            }
+            apps = apps.sortedWith(compareBy({ !isProxiedApp(it) }, { it.name.toString() }))
+            appsAdapter.filter.filter(binding.search.text?.toString() ?: "")
+        }
     }
 
     override fun onSupportNavigateUp(): Boolean {

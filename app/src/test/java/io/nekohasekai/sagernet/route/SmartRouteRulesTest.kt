@@ -168,4 +168,32 @@ class SmartRouteRulesTest {
         assertEquals(setOf("com.tencent.mm"), domestic)
         assertTrue(foreign.isEmpty())
     }
+
+    @Test
+    fun classifyAppsHandlesEdgeVariantsNagramXAndMuseAi() {
+        val (domestic, foreign) = SmartRouteRules.classifyApps(
+            country = "cn",
+            installedPackages = setOf(
+                "com.microsoft.emmx.canary",
+                "com.microsoft.emmx.beta",
+                "com.microsoft.emmx.dev",
+                "nu.gpu.nagram",
+                "nu.gpu.nagramx",
+                "com.facebook.aura",
+                "com.app.museai",
+            ),
+            proxyAppsEnabled = false,
+            individualPackages = emptySet()
+        )
+        // Edge variants are hybrid browsers and must stay unlocked from app-level binding
+        for (edge in listOf("com.microsoft.emmx.canary", "com.microsoft.emmx.beta", "com.microsoft.emmx.dev")) {
+            assertFalse(domestic.contains(edge))
+            assertFalse(foreign.contains(edge))
+        }
+        // Nagram X & Muse AI must be classified as foreign
+        assertTrue(foreign.contains("nu.gpu.nagram"))
+        assertTrue(foreign.contains("nu.gpu.nagramx"))
+        assertTrue(foreign.contains("com.facebook.aura"))
+        assertTrue(foreign.contains("com.app.museai"))
+    }
 }

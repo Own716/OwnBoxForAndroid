@@ -1,5 +1,16 @@
 # OwnBox for Android 更新日志 (Changelog)
 
+# OwnBox for Android v26.11.24.8-preview
+
+### 【重构分应用代理智能自动选择引擎：全面支持代理/绕过双模式与现代应用识别】
+
+- **全新四层离线智能分类引擎（`AppClassifier`）**：取代过去单一 390 行老旧精确包名表，整合「核心包名 + 家族前缀/分词 + 本地 SDK/清单指纹 + 可选 Play 启发式」四层离线识别，零联网、无隐私上传。
+- **全面补全 Edge 变体、Nagram / Nagram X 与 AI 生态**：完美识别并覆盖 Edge 全部测试渠道（`com.microsoft.emmx.canary`/`.beta`/`.dev`）、Muse AI（`com.facebook.aura` / `com.app.museai`）、Claude / Gemini / Perplexity / Grok，以及 Nagram / Nagram X（`nu.gpu.nagram*` / `xyz.nextalone.*`）、Exteraless / Cherrygram / AyuGram 等 Telegram 全系分支及底层 `org.telegram.` 组件指纹特征。
+- **彻底修复「绕过模式」反向取反误伤漏洞**：在「绕过」模式下改为正向识别国内主流应用、本地国内 SDK 指纹与国产厂商系统服务（`自动选择需要绕过的`），不再将未收录的海外新应用或 Edge/TG 变体错误勾选为绕过。
+- **消除 `uid == 1000` 系统共享 UID 误伤**：移除硬编码 `uid == 1000` 的强制代理逻辑，避免拖入无关 Android 系统服务。
+- **模式感知弹窗与灵活操作**：自动选择按钮文案随当前模式动态切换（`自动选择需要代理的` / `自动选择需要绕过的`），弹窗支持多选配置项（其中「未收录的 Google Play 海外应用启发式识别」**默认关闭**）、**追加选择 / 覆盖重置**双操作、后台异步计算及命中数量结果提示。
+- **全端规则同步反哺**：清理并扩充 `proxy_packagename.txt`，同步升级智能分流引擎 `SmartRouteRules` 与路由规则选择页 `AppListActivity` 的国内外应用预设。
+
 # OwnBox for Android v26.11.24.7-preview
 
 ### 【移除「双猫探头」预设图标】
