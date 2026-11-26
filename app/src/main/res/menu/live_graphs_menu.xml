@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The desktop traffic graph's context menu (LiveChart::contextMenuEvent). -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/action_live_clear"
+        android:icon="@drawable/baseline_delete_sweep_24"
+        android:title="@string/live_graph_clear"
+        app:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/action_live_smooth"
+        android:checkable="true"
+        android:title="@string/live_graph_smooth"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_live_events"
+        android:checkable="true"
+        android:title="@string/live_graph_events"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_live_show_all"
+        android:title="@string/live_graph_show_all"
+        app:showAsAction="never" />
+</menu>

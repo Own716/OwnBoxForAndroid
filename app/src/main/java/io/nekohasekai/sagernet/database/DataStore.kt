@@ -637,6 +637,12 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var smartMode by configurationStore.boolean(Key.SMART_MODE) { false }
     var smartRouteCountry by configurationStore.string(Key.SMART_ROUTE_COUNTRY) { "cn" }
 
+    var liveGraphRange by configurationStore.int("liveGraphRange") { 1 }
+    var liveGraphSmooth by configurationStore.boolean("liveGraphSmooth") { true }
+    var liveGraphMarkers by configurationStore.boolean("liveGraphMarkers") { true }
+    var liveGraphHiddenRows by configurationStore.stringSet("liveGraphHiddenRows") { emptySet() }
+    var liveGraphHiddenDirs by configurationStore.int("liveGraphHiddenDirs") { 0 }
+
     override fun onPreferenceDataStoreChanged(store: PreferenceDataStore, key: String) {
     }
 }

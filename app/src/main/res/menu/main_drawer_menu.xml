@@ -46,6 +46,10 @@
             android:icon="@drawable/ic_baseline_bug_report_24"
             android:title="@string/menu_log" />
         <item
+            android:id="@+id/nav_live_graphs"
+            android:icon="@drawable/ic_baseline_show_chart_24"
+            android:title="@string/menu_traffic_charts" />
+        <item
             android:id="@+id/nav_dashboard"
             android:icon="@drawable/ic_dashboard"
             android:title="@string/menu_dashboard" />

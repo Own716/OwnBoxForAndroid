@@ -14,6 +14,7 @@ import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.aidl.ISagerNetService
 import io.nekohasekai.sagernet.aidl.ISagerNetServiceCallback
+import io.nekohasekai.sagernet.aidl.LiveStatsBatch
 import io.nekohasekai.sagernet.bg.proto.ProxyInstance
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.SagerDatabase
@@ -330,6 +331,38 @@ class BaseService {
             if (currentData.state != State.Connected) return
             val box = currentData.proxy?.box ?: return
             runCatching { box.clearClosedConnections() }
+        }
+
+        override fun liveStats(session: Long, afterSerial: Long): LiveStatsBatch {
+            return LiveStatsRecorder.batch(session, afterSerial)
+        }
+
+        override fun flushTrafficStats() {
+            val currentData = data
+            if (currentData != null && currentData.state == State.Connected) {
+                currentData.proxy?.box?.let { box ->
+                    runCatching { box.drainAppTrafficDeltaJSON() }.getOrNull()?.let { json ->
+                        TrafficStatsRecorder.recordAppDeltasJson(json)
+                    }
+                }
+            }
+            TrafficStatsRecorder.flushToDb(force = true)
+        }
+
+        override fun getSessionTrafficStatsJson(): String {
+            val currentData = data
+            if (currentData != null && currentData.state == State.Connected) {
+                currentData.proxy?.box?.let { box ->
+                    runCatching { box.drainAppTrafficDeltaJSON() }.getOrNull()?.let { json ->
+                        TrafficStatsRecorder.recordAppDeltasJson(json)
+                    }
+                }
+            }
+            return TrafficStatsRecorder.getSessionJson()
+        }
+
+        override fun clearSessionTrafficStats() {
+            TrafficStatsRecorder.clearSession()
         }
 
         fun stateChanged(s: State, msg: String?) = launch {

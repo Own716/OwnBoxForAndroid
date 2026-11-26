@@ -6,9 +6,12 @@ import io.nekohasekai.sagernet.aidl.TrafficData
 import io.nekohasekai.sagernet.aidl.TrafficDataBatch
 import io.nekohasekai.sagernet.bg.ActiveOutboundTracker
 import io.nekohasekai.sagernet.bg.BaseService
+import io.nekohasekai.sagernet.bg.LiveStatsRecorder
 import io.nekohasekai.sagernet.bg.SagerConnection
+import io.nekohasekai.sagernet.bg.TrafficStatsRecorder
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProfileManager
+import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.fmt.TAG_BYPASS
 import io.nekohasekai.sagernet.fmt.TAG_PROXY
 import io.nekohasekai.sagernet.ktx.Logs
@@ -62,6 +65,13 @@ class TrafficLooper
     suspend fun stop() {
         job?.cancelAndJoin()
         job = null
+        runCatching {
+            data.proxy?.box?.drainAppTrafficDeltaJSON()?.let { json ->
+                TrafficStatsRecorder.recordAppDeltasJson(json)
+            }
+            TrafficStatsRecorder.flushToDb(force = true)
+        }
+        LiveStatsRecorder.stopped(restart = data.notification != null)
         // finally traffic post
         if (!DataStore.profileTrafficStatistics) return
         withStateLock {
@@ -102,6 +112,8 @@ class TrafficLooper
     }
 
     fun start() {
+        LiveStatsRecorder.started(data.proxy?.profile?.displayName().orEmpty())
+        TrafficStatsRecorder.onSessionStart()
         job = sc.launch { loop() }
     }
 
@@ -224,6 +236,13 @@ class TrafficLooper
         var lastDelayMs = 3000L
         var lastForegroundUI = false
         var lastFlushTime = System.currentTimeMillis()
+        var prevMainRx = 0L
+        var prevMainTx = 0L
+        var prevBypassRx = 0L
+        var prevBypassTx = 0L
+        val prevProfileBytes = HashMap<Long, Pair<Long, Long>>()
+        val profileMetaCache = HashMap<Long, Pair<String, String>>()
+        var lastAppDrainMs = 0L
 
         while (currentCoroutineContext().isActive) {
             val isForegroundUI = data.binder.callbackIdMap.containsValue(
@@ -245,6 +264,11 @@ class TrafficLooper
                 val balancerMemberMap = currentConfig.balancerMemberMap
 
                 if (trafficUpdater == null) {
+                    prevMainRx = 0L
+                    prevMainTx = 0L
+                    prevBypassRx = 0L
+                    prevBypassTx = 0L
+                    prevProfileBytes.clear()
                     idMap.clear()
                     tagMap.clear()
                     idMap[-1] = itemBypass
@@ -338,6 +362,59 @@ class TrafficLooper
 
                 // Periodic DB persistence (every 10s)
                 val now = System.currentTimeMillis()
+                LiveStatsRecorder.record(
+                    proxyDown = mainRxRate,
+                    proxyUp = mainTxRate,
+                    directDown = itemBypass.rxRate,
+                    directUp = itemBypass.txRate,
+                    box = proxy.box,
+                )
+
+                val dProxyRx = if (mainRx >= prevMainRx) mainRx - prevMainRx else 0L
+                val dProxyTx = if (mainTx >= prevMainTx) mainTx - prevMainTx else 0L
+                prevMainRx = mainRx
+                prevMainTx = mainTx
+
+                val curBypassRx = itemBypass.rx
+                val curBypassTx = itemBypass.tx
+                val dDirectRx = if (curBypassRx >= prevBypassRx) curBypassRx - prevBypassRx else 0L
+                val dDirectTx = if (curBypassTx >= prevBypassTx) curBypassTx - prevBypassTx else 0L
+                prevBypassRx = curBypassRx
+                prevBypassTx = curBypassTx
+
+                TrafficStatsRecorder.recordTrafficDelta(dProxyRx, dProxyTx, dDirectRx, dDirectTx)
+
+                idMap.forEach { (id, item) ->
+                    if (id > 0L && id !in balancerMemberIds) {
+                        val curRx = (item.rx - item.rxBase).coerceAtLeast(0L)
+                        val curTx = (item.tx - item.txBase).coerceAtLeast(0L)
+                        val prev = prevProfileBytes[id]
+                        val dRx = if (prev == null) curRx else if (curRx >= prev.first) curRx - prev.first else 0L
+                        val dTx = if (prev == null) curTx else if (curTx >= prev.second) curTx - prev.second else 0L
+                        prevProfileBytes[id] = curRx to curTx
+                        if (dRx > 0L || dTx > 0L) {
+                            val meta = profileMetaCache.getOrPut(id) {
+                                val cachedEnt = currentConfig.trafficMap.values.asSequence()
+                                    .flatten()
+                                    .firstOrNull { it.id == id }
+                                    ?: SagerDatabase.proxyDao.getById(id)
+                                cachedEnt?.displayName().orEmpty() to cachedEnt?.displayType().orEmpty()
+                            }
+                            TrafficStatsRecorder.recordProfileDelta(id, meta.first, meta.second, dRx, dTx)
+                        }
+                    }
+                }
+
+                if (now - lastAppDrainMs >= 5_000L) {
+                    lastAppDrainMs = now
+                    runCatching {
+                        proxy.box.drainAppTrafficDeltaJSON()
+                    }.getOrNull()?.let { json ->
+                        TrafficStatsRecorder.recordAppDeltasJson(json)
+                    }
+                }
+                TrafficStatsRecorder.flushToDb(force = false)
+
                 if (profileTrafficStatistics && now - lastFlushTime >= 10_000L) {
                     lastFlushTime = now
                     idMap.forEach { (id, item) ->

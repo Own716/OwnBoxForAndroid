@@ -219,6 +219,7 @@ class MainActivity : ThemedActivity(),
                 is ConnectionsFragment -> R.id.nav_connections
                 is ToolsFragment -> R.id.nav_tools
                 is LogcatFragment -> R.id.nav_logcat
+                is LiveGraphsFragment -> R.id.nav_live_graphs
                 is DocsFragment -> R.id.nav_docs
                 is AboutFragment -> R.id.nav_about
                 else -> null
@@ -631,6 +632,7 @@ class MainActivity : ThemedActivity(),
             R.id.nav_connections -> current is ConnectionsFragment
             R.id.nav_tools -> current is ToolsFragment
             R.id.nav_logcat -> current is LogcatFragment
+            R.id.nav_live_graphs -> current is LiveGraphsFragment
             R.id.nav_docs -> current is DocsFragment
             R.id.nav_about -> current is AboutFragment
             else -> false
@@ -1094,6 +1096,7 @@ class MainActivity : ThemedActivity(),
             }
             R.id.nav_tools -> displayFragment(ToolsFragment())
             R.id.nav_logcat -> displayFragment(LogcatFragment())
+            R.id.nav_live_graphs -> displayFragment(LiveGraphsFragment())
             R.id.nav_faq -> {
                 launchCustomTab("https://t.me/OwnBoxs")
                 return false

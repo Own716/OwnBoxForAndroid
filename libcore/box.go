@@ -334,6 +334,9 @@ type BoxInstance struct {
 	diagnosticID  uint64
 	diagnosticTag string
 	isURLTest     bool
+
+	appTrafficMu sync.Mutex
+	appConnSeen  map[uuid.UUID]appConnTrafficMark
 }
 
 func (b *BoxInstance) urlTestTrace(stage string, format string, args ...any) {
@@ -1028,6 +1031,160 @@ func (b *BoxInstance) ClearClosedConnections() {
 		return
 	}
 	b.trafficManager.Clear()
+}
+
+type appConnTrafficMark struct {
+	up   int64
+	down int64
+}
+
+type appTrafficDeltaItem struct {
+	PackageName string `json:"packageName"`
+	Uid         int32  `json:"uid"`
+	ProxyDown   int64  `json:"proxyDown"`
+	ProxyUp     int64  `json:"proxyUp"`
+	DirectDown  int64  `json:"directDown"`
+	DirectUp    int64  `json:"directUp"`
+}
+
+func (b *BoxInstance) GetCoreMemoryBytes() int64 {
+	var ms runtime.MemStats
+	runtime.ReadMemStats(&ms)
+	return int64(ms.HeapInuse + ms.StackInuse)
+}
+
+func (b *BoxInstance) GetActiveConnectionCount() int32 {
+	if b == nil || b.trafficManager == nil {
+		return 0
+	}
+	var count int32
+	for _, m := range b.trafficManager.Connections() {
+		if m == nil || m.OutboundType == constant.TypeDNS {
+			continue
+		}
+		count++
+	}
+	return count
+}
+
+func (b *BoxInstance) DrainAppTrafficDeltaJSON() string {
+	if b == nil || b.trafficManager == nil {
+		return ""
+	}
+	conns := b.trafficManager.Connections()
+	closedConns := b.trafficManager.ClosedConnections()
+
+	b.appTrafficMu.Lock()
+	defer b.appTrafficMu.Unlock()
+	if b.appConnSeen == nil {
+		b.appConnSeen = make(map[uuid.UUID]appConnTrafficMark)
+	}
+
+	seenNow := make(map[uuid.UUID]struct{}, len(conns)+len(closedConns))
+	type appKey struct {
+		pkg string
+		uid int32
+	}
+	agg := make(map[appKey]*appTrafficDeltaItem)
+
+	processConn := func(m *trafficcontrol.TrackerMetadata) {
+		if m == nil || m.OutboundType == constant.TypeDNS {
+			return
+		}
+		if _, dup := seenNow[m.ID]; dup {
+			return
+		}
+		seenNow[m.ID] = struct{}{}
+
+		var up, down int64
+		if m.Upload != nil {
+			up = m.Upload.Load()
+		}
+		if m.Download != nil {
+			down = m.Download.Load()
+		}
+		prev := b.appConnSeen[m.ID]
+		b.appConnSeen[m.ID] = appConnTrafficMark{up: up, down: down}
+
+		dUp := up - prev.up
+		dDown := down - prev.down
+		if dUp <= 0 && dDown <= 0 {
+			return
+		}
+		if dUp < 0 {
+			dUp = 0
+		}
+		if dDown < 0 {
+			dDown = 0
+		}
+
+		pkg := ""
+		var uid int32 = -1
+		if m.Metadata.ProcessInfo != nil {
+			uid = m.Metadata.ProcessInfo.UserId
+			for _, p := range m.Metadata.ProcessInfo.PackageNames {
+				if trimmed := strings.TrimSpace(p); trimmed != "" {
+					pkg = trimmed
+					break
+				}
+			}
+			if pkg == "" {
+				for _, p := range m.Metadata.ProcessInfo.ProcessPaths {
+					if trimmed := strings.TrimSpace(p); trimmed != "" {
+						pkg = trimmed
+						break
+					}
+				}
+			}
+		}
+
+		key := appKey{pkg: pkg, uid: uid}
+		entry := agg[key]
+		if entry == nil {
+			entry = &appTrafficDeltaItem{
+				PackageName: pkg,
+				Uid:         uid,
+			}
+			agg[key] = entry
+		}
+
+		isDirect := strings.EqualFold(m.Outbound, "bypass") ||
+			strings.EqualFold(m.Outbound, "direct") ||
+			m.OutboundType == constant.TypeDirect
+		if isDirect {
+			entry.DirectUp += dUp
+			entry.DirectDown += dDown
+		} else {
+			entry.ProxyUp += dUp
+			entry.ProxyDown += dDown
+		}
+	}
+
+	for _, m := range conns {
+		processConn(m)
+	}
+	for _, m := range closedConns {
+		processConn(m)
+	}
+
+	for id := range b.appConnSeen {
+		if _, ok := seenNow[id]; !ok {
+			delete(b.appConnSeen, id)
+		}
+	}
+
+	if len(agg) == 0 {
+		return ""
+	}
+	items := make([]appTrafficDeltaItem, 0, len(agg))
+	for _, item := range agg {
+		items = append(items, *item)
+	}
+	data, err := json.Marshal(items)
+	if err != nil {
+		return ""
+	}
+	return string(data)
 }
 
 func resolveRealTag(outboundMgr adapter.OutboundManager, detour adapter.Outbound, network string) string {

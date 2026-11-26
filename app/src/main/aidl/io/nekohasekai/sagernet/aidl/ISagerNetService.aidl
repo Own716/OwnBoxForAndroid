@@ -1,6 +1,7 @@
 package io.nekohasekai.sagernet.aidl;
 
 import io.nekohasekai.sagernet.aidl.ISagerNetServiceCallback;
+import io.nekohasekai.sagernet.aidl.LiveStatsBatch;
 import io.nekohasekai.sagernet.aidl.SpeedDisplayData;
 
 interface ISagerNetService {
@@ -23,4 +24,9 @@ interface ISagerNetService {
   boolean closeActiveConnection(String id);
   void closeAllActiveConnections();
   void clearClosedConnections();
+
+  LiveStatsBatch liveStats(long session, long afterSerial);
+  void flushTrafficStats();
+  String getSessionTrafficStatsJson();
+  void clearSessionTrafficStats();
 }
