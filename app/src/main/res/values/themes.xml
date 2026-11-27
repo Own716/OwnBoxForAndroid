@@ -41,6 +41,8 @@
 
         <!-- 立体卡片提升表面色，默认遵循 MD3 规范使用标准表面色 -->
         <item name="cardElevatedSurfaceColor">@color/md3_surface</item>
+        <item name="popupMenuSurfaceColor">@color/popup_menu_surface</item>
+        <item name="popupMenuStrokeColor">@color/popup_menu_stroke</item>
 
         <item name="accentOrTextSecondary">?colorAccent</item>
         <item name="accentOrTextPrimary">?colorAccent</item>
@@ -142,6 +144,8 @@
 
         <!-- 立体卡片提升表面色，默认遵循 MD3 规范使用标准表面色 -->
         <item name="cardElevatedSurfaceColor">@color/md3_surface</item>
+        <item name="popupMenuSurfaceColor">@color/popup_menu_surface</item>
+        <item name="popupMenuStrokeColor">@color/popup_menu_stroke</item>
 
         <item name="accentOrTextSecondary">?colorAccent</item>
         <item name="accentOrTextPrimary">?colorAccent</item>
@@ -461,10 +465,14 @@
 
     <style name="Widget.SagerNet.PopupMenu" parent="Widget.MaterialComponents.PopupMenu">
         <item name="android:popupBackground">@drawable/bg_popup_menu</item>
+        <item name="popupMenuBackground">@drawable/bg_popup_menu</item>
+        <item name="android:popupElevation">0dp</item>
         <item name="android:popupAnimationStyle">@style/PopupMenuAnimation</item>
     </style>
     <style name="Widget.SagerNet.PopupMenu.Overflow" parent="Widget.MaterialComponents.PopupMenu.Overflow">
         <item name="android:popupBackground">@drawable/bg_popup_menu</item>
+        <item name="popupMenuBackground">@drawable/bg_popup_menu</item>
+        <item name="android:popupElevation">0dp</item>
         <item name="android:popupAnimationStyle">@style/PopupMenuAnimation</item>
         <item name="android:dropDownHorizontalOffset">-6dp</item>
         <item name="android:dropDownVerticalOffset">4dp</item>
@@ -473,10 +481,35 @@
     <style name="ThemeOverlay.SagerNet.Toolbar.Popup" parent="ThemeOverlay.AppCompat.DayNight">
         <item name="actionOverflowMenuStyle">@style/Widget.SagerNet.PopupMenu.Overflow</item>
         <item name="popupMenuStyle">@style/Widget.SagerNet.PopupMenu</item>
+        <item name="popupMenuBackground">@drawable/bg_popup_menu</item>
         <item name="dropdownListPreferredItemHeight">38dp</item>
         <item name="listPreferredItemHeightSmall">38dp</item>
         <item name="android:listPreferredItemHeightSmall">38dp</item>
         <item name="textAppearanceLargePopupMenu">@style/TextAppearance.SagerNet.PopupMenu</item>
+    </style>
+
+    <style name="ThemeOverlay.SagerNet.Toolbar.Popup.Light" parent="ThemeOverlay.MaterialComponents.Light">
+        <item name="actionOverflowMenuStyle">@style/Widget.SagerNet.PopupMenu.Overflow</item>
+        <item name="popupMenuStyle">@style/Widget.SagerNet.PopupMenu</item>
+        <item name="popupMenuBackground">@drawable/bg_popup_menu</item>
+        <item name="dropdownListPreferredItemHeight">38dp</item>
+        <item name="listPreferredItemHeightSmall">38dp</item>
+        <item name="android:listPreferredItemHeightSmall">38dp</item>
+        <item name="textAppearanceLargePopupMenu">@style/TextAppearance.SagerNet.PopupMenu</item>
+        <item name="popupMenuSurfaceColor">#F5F6FA</item>
+        <item name="popupMenuStrokeColor">#D6DBE4</item>
+    </style>
+
+    <style name="ThemeOverlay.SagerNet.Toolbar.Popup.Dark" parent="ThemeOverlay.MaterialComponents.Dark">
+        <item name="actionOverflowMenuStyle">@style/Widget.SagerNet.PopupMenu.Overflow</item>
+        <item name="popupMenuStyle">@style/Widget.SagerNet.PopupMenu</item>
+        <item name="popupMenuBackground">@drawable/bg_popup_menu</item>
+        <item name="dropdownListPreferredItemHeight">38dp</item>
+        <item name="listPreferredItemHeightSmall">38dp</item>
+        <item name="android:listPreferredItemHeightSmall">38dp</item>
+        <item name="textAppearanceLargePopupMenu">@style/TextAppearance.SagerNet.PopupMenu</item>
+        <item name="popupMenuSurfaceColor">#202228</item>
+        <item name="popupMenuStrokeColor">#363A45</item>
     </style>
 
     <style name="ShapeAppearanceOverlay.SagerNet.BottomSheet" parent="">
@@ -900,7 +933,9 @@
         <item name="accentOrTextSecondary">@color/color_black_theme_text_secondary</item>
         <item name="whiteOrTextPrimary">@color/white</item>
         <item name="actionBarTheme">@style/ThemeOverlay.SagerNet.Toolbar.Black</item>
-        <item name="actionBarPopupTheme">@style/ThemeOverlay.MaterialComponents.Dark</item>
+        <item name="actionBarPopupTheme">@style/ThemeOverlay.SagerNet.Toolbar.Popup.Dark</item>
+        <item name="popupMenuSurfaceColor">#202228</item>
+        <item name="popupMenuStrokeColor">#363A45</item>
         <item name="appBarLayoutStyle">@style/Widget.SagerNet.AppBarLayout.Black</item>
     </style>
 
@@ -930,7 +965,9 @@
         <item name="android:colorBackground">@color/color_white_theme_bg</item>
         <item name="android:windowBackground">@color/color_white_theme_bg</item>
         <item name="actionBarTheme">@style/ThemeOverlay.SagerNet.Toolbar</item>
-        <item name="actionBarPopupTheme">@style/ThemeOverlay.MaterialComponents.Light</item>
+        <item name="actionBarPopupTheme">@style/ThemeOverlay.SagerNet.Toolbar.Popup.Light</item>
+        <item name="popupMenuSurfaceColor">#F5F6FA</item>
+        <item name="popupMenuStrokeColor">#D6DBE4</item>
         <item name="tabTextColor">@color/color_white_theme_tab_unselected</item>
         <item name="tabSelectedTextColor">@color/color_white_theme_tab_selected</item>
         <item name="tabIndicatorColor">@color/color_white_theme_tab_selected</item>
@@ -962,7 +999,9 @@
         <item name="android:colorBackground">@color/color_light_gray_bg</item>
         <item name="android:windowBackground">@color/color_light_gray_bg</item>
         <item name="actionBarTheme">@style/ThemeOverlay.SagerNet.Toolbar</item>
-        <item name="actionBarPopupTheme">@style/ThemeOverlay.MaterialComponents.Light</item>
+        <item name="actionBarPopupTheme">@style/ThemeOverlay.SagerNet.Toolbar.Popup.Light</item>
+        <item name="popupMenuSurfaceColor">#F7F8FB</item>
+        <item name="popupMenuStrokeColor">#D3D8E2</item>
         <item name="tabTextColor">@color/color_light_gray_tab_unselected</item>
         <item name="tabSelectedTextColor">@color/color_light_gray_tab_selected</item>
         <item name="tabIndicatorColor">@color/color_light_gray_tab_selected</item>
@@ -984,6 +1023,8 @@
         <item name="colorMaterial100">@color/color_black_theme_material_100</item>
         <item name="colorMaterial300">@color/color_black_theme_material_300</item>
         <item name="cardElevatedSurfaceColor">@color/color_black_theme_card_elevated</item>
+        <item name="popupMenuSurfaceColor">#202228</item>
+        <item name="popupMenuStrokeColor">#363A45</item>
         <item name="selectedColorPrimary">@color/white</item>
         <item name="fabColorBackground">@color/black</item>
         <item name="itemShapeFillColor">@color/color_black_theme_item_shape</item>
@@ -1008,6 +1049,8 @@
     </style>
 
     <style name="Theme.SagerNet.Dialog.White" parent="Theme.SagerNet.Dialog">
+        <item name="popupMenuSurfaceColor">#F5F6FA</item>
+        <item name="popupMenuStrokeColor">#D6DBE4</item>
         <item name="colorPrimary">@color/color_white_theme_accent</item>
         <item name="colorPrimaryDark">@color/color_white_theme_primary_dark</item>
         <item name="colorAccent">@color/color_white_theme_accent</item>
@@ -1025,6 +1068,8 @@
     </style>
 
     <style name="Theme.SagerNet.Dialog.LightGray" parent="Theme.SagerNet.Dialog">
+        <item name="popupMenuSurfaceColor">#F7F8FB</item>
+        <item name="popupMenuStrokeColor">#D3D8E2</item>
         <item name="colorPrimary">@color/color_light_gray_primary</item>
         <item name="colorPrimaryDark">@color/color_light_gray_primary_dark</item>
         <item name="colorAccent">@color/color_light_gray_accent</item>
@@ -1060,6 +1105,9 @@
         <item name="android:windowBackground">@color/black</item>
         <item name="colorSurface">@color/black</item>
         <item name="cardElevatedSurfaceColor">@color/color_amoled_card_elevated</item>
+        <item name="popupMenuSurfaceColor">#202228</item>
+        <item name="popupMenuStrokeColor">#363A45</item>
+        <item name="actionBarPopupTheme">@style/ThemeOverlay.SagerNet.Toolbar.Popup.Dark</item>
         <item name="android:textColorPrimary">@color/text_color_primary_black</item>
         <item name="android:textColorSecondary">@color/text_color_secondary_amoled</item>
         <item name="android:textColorTertiary">@color/color_amoled_text_tertiary</item>

@@ -51,6 +51,13 @@ class TelegramGroupedPreferenceDecoration(private val context: Context) : Recycl
 
     private val cardRect = RectF()
 
+    private class CachedGroupRippleDrawable(
+        val isFirst: Boolean,
+        val isLast: Boolean,
+        val rippleColor: Int,
+        mask: GradientDrawable,
+    ) : RippleDrawable(ColorStateList.valueOf(rippleColor), null, mask)
+
     override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView, state: RecyclerView.State) {
         val pos = parent.getChildAdapterPosition(view)
         if (pos == RecyclerView.NO_POSITION) return
@@ -89,7 +96,8 @@ class TelegramGroupedPreferenceDecoration(private val context: Context) : Recycl
 
             applyGroupRipple(view, isFirst, isLast)
 
-            view.minimumHeight = dp2px(48)
+            val minH = dp2px(48)
+            if (view.minimumHeight != minH) view.minimumHeight = minH
             val targetPadV = dp2px(4)
             if (view.paddingTop != targetPadV || view.paddingBottom != targetPadV) {
                 view.setPaddingRelative(view.paddingStart, targetPadV, view.paddingEnd, targetPadV)
@@ -113,6 +121,10 @@ class TelegramGroupedPreferenceDecoration(private val context: Context) : Recycl
 
     private fun applyGroupRipple(view: View, isFirst: Boolean, isLast: Boolean) {
         val rippleColor = context.getColorAttr(R.attr.colorControlHighlight)
+        val existing = view.background as? CachedGroupRippleDrawable
+        if (existing != null && existing.isFirst == isFirst && existing.isLast == isLast && existing.rippleColor == rippleColor) {
+            return
+        }
         val radii = FloatArray(8)
         if (isFirst && isLast) {
             radii.fill(cardRadius)
@@ -129,7 +141,7 @@ class TelegramGroupedPreferenceDecoration(private val context: Context) : Recycl
             cornerRadii = radii
             setColor(Color.WHITE)
         }
-        view.background = RippleDrawable(ColorStateList.valueOf(rippleColor), null, mask)
+        view.background = CachedGroupRippleDrawable(isFirst, isLast, rippleColor, mask)
     }
 
     override fun onDraw(c: Canvas, parent: RecyclerView, state: RecyclerView.State) {

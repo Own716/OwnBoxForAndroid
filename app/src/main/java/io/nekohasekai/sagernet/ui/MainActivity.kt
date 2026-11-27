@@ -103,7 +103,7 @@ class MainActivity : ThemedActivity(),
         binding.fab.initProgress(binding.fabProgress)
         binding.stats.onVisualBoundsChanged = {
             if (!isDestroyed && !isFinishing) {
-                applyBottomBarLayoutStyle()
+                syncFabPositionForBottomBar()
             }
         }
         val bottomFactor = UiScaleManager.bottomBarFactor()
@@ -1050,7 +1050,10 @@ class MainActivity : ThemedActivity(),
     private fun applyBottomBarLayoutStyle() {
         val style = DataStore.bottomBarStyle.coerceIn(0, 2)
         binding.stats.applyStyleMode(style)
+        syncFabPositionForBottomBar(style)
+    }
 
+    private fun syncFabPositionForBottomBar(style: Int = DataStore.bottomBarStyle.coerceIn(0, 2)) {
         val fabLp = binding.fab.layoutParams as? CoordinatorLayout.LayoutParams ?: return
         var lpChanged = false
 
@@ -1084,8 +1087,10 @@ class MainActivity : ThemedActivity(),
             if (binding.fab.customSize != FloatingActionButton.NO_CUSTOM_SIZE) {
                 binding.fab.customSize = FloatingActionButton.NO_CUSTOM_SIZE
             }
-            binding.fab.compatElevation = dp(6).toFloat()
-            binding.fabProgress.elevation = dp(7).toFloat()
+            val targetFabElev = dp(6).toFloat()
+            if (binding.fab.compatElevation != targetFabElev) binding.fab.compatElevation = targetFabElev
+            val targetProgElev = dp(7).toFloat()
+            if (binding.fabProgress.elevation != targetProgElev) binding.fabProgress.elevation = targetProgElev
             updateLp(
                 anchorId = R.id.stats,
                 anchorGravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL,
@@ -1114,8 +1119,10 @@ class MainActivity : ThemedActivity(),
             if (binding.fab.customSize != targetSize) {
                 binding.fab.customSize = targetSize
             }
-            binding.fab.compatElevation = dp(10).toFloat()
-            binding.fabProgress.elevation = dp(11).toFloat()
+            val targetFabElev = dp(10).toFloat()
+            if (binding.fab.compatElevation != targetFabElev) binding.fab.compatElevation = targetFabElev
+            val targetProgElev = dp(11).toFloat()
+            if (binding.fabProgress.elevation != targetProgElev) binding.fabProgress.elevation = targetProgElev
 
             val targetGravity = if (style == 0) Gravity.BOTTOM or Gravity.END else Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
             val targetRightMargin = when {
@@ -1180,7 +1187,7 @@ class MainActivity : ThemedActivity(),
             showWhenConnected,
             animate,
         )
-        applyBottomBarLayoutStyle()
+        syncFabPositionForBottomBar()
         binding.fab.animate().cancel()
         if (showControls) {
             binding.fab.translationX = 0f

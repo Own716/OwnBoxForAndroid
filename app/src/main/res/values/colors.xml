@@ -319,7 +319,9 @@
 
     <!-- 卡片默认细边框：约 12% 黑（低对比分隔线），夜间见 values-night/colors.xml -->
     <color name="card_stroke">#29000000</color>
-    <color name="popup_dropdown_stroke">#38000000</color>
+    <color name="popup_menu_surface">#F5F6FA</color>
+    <color name="popup_menu_stroke">#D6DBE4</color>
+    <color name="popup_dropdown_stroke">#D6DBE4</color>
 
 
     <!-- 立体卡片色调提升表面色（遵循 MD3 标准，统一采用中性表面色） -->

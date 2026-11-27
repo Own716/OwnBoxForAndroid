@@ -88,6 +88,10 @@ class StatsBar @JvmOverloads constructor(
     private var modernBtnRefresh: View? = null
 
     private var bottomBarStyle: Int = DataStore.bottomBarStyle
+    private var appliedStyleMode: Int = -1
+    private var lastThemeSignature: String = ""
+    private var modernCardDrawable: GradientDrawable? = null
+    private var modernPillDrawable: GradientDrawable? = null
     private var systemNavBottomInset: Int = 0
     private var originalNotchedBackground: Drawable? = null
     private var originalNotchedElevation: Float = 0f
@@ -163,30 +167,49 @@ class StatsBar @JvmOverloads constructor(
         if (!this::statusText.isInitialized) {
             if (isAttachedToWindow) initViews() else return
         }
+        if (appliedStyleMode == normalized) {
+            applyBottomBarMarginsAndPadding()
+            updateThemeColors(force = false)
+            return
+        }
+        appliedStyleMode = normalized
         if (normalized == 2) {
-            statsContentContainer?.visibility = View.VISIBLE
-            statsModernContainer?.visibility = View.GONE
+            if (statsContentContainer?.visibility != View.VISIBLE) {
+                statsContentContainer?.visibility = View.VISIBLE
+            }
+            if (statsModernContainer?.visibility != View.GONE) {
+                statsModernContainer?.visibility = View.GONE
+            }
         } else {
-            statsContentContainer?.visibility = View.GONE
-            statsModernContainer?.visibility = View.VISIBLE
+            if (statsContentContainer?.visibility != View.GONE) {
+                statsContentContainer?.visibility = View.GONE
+            }
+            if (statsModernContainer?.visibility != View.VISIBLE) {
+                statsModernContainer?.visibility = View.VISIBLE
+            }
             val isRightMode = normalized == 0
-            modernCenterSpace?.visibility = if (isRightMode) View.GONE else View.VISIBLE
-            modernLatencyPill?.visibility = if (isRightMode) View.VISIBLE else View.GONE
-            modernRightGroup?.visibility = if (isRightMode) View.GONE else View.VISIBLE
+            val spaceVis = if (isRightMode) View.GONE else View.VISIBLE
+            val pillVis = if (isRightMode) View.VISIBLE else View.GONE
+            val rightVis = if (isRightMode) View.GONE else View.VISIBLE
+            if (modernCenterSpace?.visibility != spaceVis) modernCenterSpace?.visibility = spaceVis
+            if (modernLatencyPill?.visibility != pillVis) modernLatencyPill?.visibility = pillVis
+            if (modernRightGroup?.visibility != rightVis) modernRightGroup?.visibility = rightVis
             statsModernContainer?.let { container ->
-                if (isRightMode) {
-                    container.setPaddingRelative(dp2px(18), dp2px(10), dp2px(66), dp2px(10))
-                    container.minimumHeight = dp2px(64)
-                } else {
-                    container.setPaddingRelative(dp2px(16), dp2px(9), dp2px(16), dp2px(9))
-                    container.minimumHeight = dp2px(60)
+                val padStart = dp2px(if (isRightMode) 18 else 16)
+                val padV = dp2px(if (isRightMode) 10 else 9)
+                val padEnd = dp2px(if (isRightMode) 66 else 16)
+                val minH = dp2px(if (isRightMode) 64 else 60)
+                if (container.paddingStart != padStart || container.paddingTop != padV || container.paddingEnd != padEnd || container.paddingBottom != padV) {
+                    container.setPaddingRelative(padStart, padV, padEnd, padV)
+                }
+                if (container.minimumHeight != minH) {
+                    container.minimumHeight = minH
                 }
             }
         }
         applyBottomBarMarginsAndPadding()
-        updateThemeColors()
+        updateThemeColors(force = true)
         updateStatusViews()
-        post { onVisualBoundsChanged?.invoke() }
     }
 
     private fun applyBottomBarMarginsAndPadding() {
@@ -399,11 +422,21 @@ class StatsBar @JvmOverloads constructor(
         }
     }
 
-    fun updateThemeColors() {
+    fun updateThemeColors(force: Boolean = false) {
         if (!this::statusText.isInitialized) return
         val currentContext = context ?: return
         val isBlack = Theme.isBlackTheme(currentContext)
         val isNight = Theme.usingNightMode(currentContext)
+        val isWhite = Theme.isWhiteTheme(currentContext)
+        val isLightGray = Theme.isLightGrayTheme(currentContext)
+        val primaryAttr = if (bottomBarStyle == 2) currentContext.getColorAttr(R.attr.colorPrimary) else 0
+        val sig = "$bottomBarStyle|$isBlack|$isNight|$isWhite|$isLightGray|$primaryAttr"
+        if (!force && sig == lastThemeSignature &&
+            (if (bottomBarStyle == 2) originalNotchedBackground == null || background === originalNotchedBackground else background === modernCardDrawable)
+        ) {
+            return
+        }
+        lastThemeSignature = sig
 
         if (bottomBarStyle == 2) {
             originalNotchedBackground?.let { orig ->
@@ -414,13 +447,13 @@ class StatsBar @JvmOverloads constructor(
             elevation = originalNotchedElevation
             if (isBlack) {
                 backgroundTintList = ColorStateList.valueOf(Color.BLACK)
-            } else if (Theme.isWhiteTheme(currentContext)) {
+            } else if (isWhite) {
                 backgroundTintList = ColorStateList.valueOf(Color.WHITE)
-            } else if (Theme.isLightGrayTheme(currentContext)) {
+            } else if (isLightGray) {
                 backgroundTintList = ColorStateList.valueOf(Color.parseColor("#F5F5F7"))
             }
             val effectiveBgColor = backgroundTintList?.defaultColor
-                ?: currentContext.getColorAttr(R.attr.colorPrimary)
+                ?: primaryAttr
 
             val isLightBg = ColorUtils.calculateLuminance(effectiveBgColor) > 0.45
 
@@ -462,13 +495,19 @@ class StatsBar @JvmOverloads constructor(
             backgroundTintList = null
             val radiusPx = dp2px(if (bottomBarStyle == 0) 33 else 24).toFloat()
             val strokePx = (0.9f * resources.displayMetrics.density).toInt().coerceAtLeast(1)
-            background = GradientDrawable().apply {
+            val cardDrawable = (modernCardDrawable ?: GradientDrawable().also { modernCardDrawable = it }).apply {
                 shape = GradientDrawable.RECTANGLE
                 cornerRadius = radiusPx
                 setColor(surfaceColor)
                 setStroke(strokePx, strokeColor)
             }
-            elevation = dp2px(6).toFloat()
+            if (background !== cardDrawable) {
+                background = cardDrawable
+            } else {
+                cardDrawable.invalidateSelf()
+            }
+            val targetElev = dp2px(6).toFloat()
+            if (elevation != targetElev) elevation = targetElev
 
             modernIpText?.setTextColor(primaryColor)
             modernTxText?.setTextColor(secondaryColor)
@@ -479,10 +518,15 @@ class StatsBar @JvmOverloads constructor(
 
             modernLatencyPill?.apply {
                 setTextColor(emeraldText)
-                background = GradientDrawable().apply {
+                val pillDrawable = (modernPillDrawable ?: GradientDrawable().also { modernPillDrawable = it }).apply {
                     shape = GradientDrawable.RECTANGLE
                     cornerRadius = dp2px(15).toFloat()
                     setColor(pillBg)
+                }
+                if (background !== pillDrawable) {
+                    background = pillDrawable
+                } else {
+                    pillDrawable.invalidateSelf()
                 }
             }
         }
@@ -667,6 +711,7 @@ class StatsBar @JvmOverloads constructor(
         animate().setListener(null).withEndAction(null).cancel()
         if (!animated || !isLaidOut || height <= 0) {
             syncHiddenPosition()
+            onVisualBoundsChanged?.invoke()
             return
         }
         isAnimatingVisibility = true
@@ -691,11 +736,11 @@ class StatsBar @JvmOverloads constructor(
         isAnimatingVisibility = false
         getBehavior().slideDown(this)
         animate().setListener(null).withEndAction(null).cancel()
-        alpha = 0f
-        isClickable = false
-        resetDisconnectedViews()
-        translationY = hiddenOffset()
-        onVisualBoundsChanged?.invoke()
+        if (alpha != 0f) alpha = 0f
+        if (isClickable) isClickable = false
+        if (pendingDisconnectedReset) resetDisconnectedViews()
+        val targetY = hiddenOffset()
+        if (translationY != targetY) translationY = targetY
     }
 
     private fun cancelPendingTransition() {

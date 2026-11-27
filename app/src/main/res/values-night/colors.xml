@@ -15,7 +15,9 @@
 
     <!-- 卡片默认细边框：约 12% 白 -->
     <color name="card_stroke">#29FFFFFF</color>
-    <color name="popup_dropdown_stroke">#38FFFFFF</color>
+    <color name="popup_menu_surface">#24262D</color>
+    <color name="popup_menu_stroke">#383C47</color>
+    <color name="popup_dropdown_stroke">#383C47</color>
 
 
     <!-- 路由规则类型颜色（夜间，稍浅） -->
