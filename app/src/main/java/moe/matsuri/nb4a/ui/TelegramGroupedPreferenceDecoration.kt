@@ -176,9 +176,9 @@ class TelegramGroupedPreferenceDecoration(private val context: Context) : Recycl
             val left = first.left.toFloat()
             val right = first.right.toFloat()
 
-            // 滚动到屏幕边缘时的平滑边界延展处理
-            val top = if (isGroupFirstOnScreen) first.top.toFloat() else (first.top.toFloat() - cardRadius * 2)
-            val bottom = if (isGroupLastOnScreen) last.bottom.toFloat() else (last.bottom.toFloat() + cardRadius * 2)
+            // 滚动到屏幕边缘时的平滑边界延展处理（同步子视图越界回弹位移，保持整卡一致不错位）
+            val top = (if (isGroupFirstOnScreen) first.top.toFloat() else (first.top.toFloat() - cardRadius * 2)) + first.translationY
+            val bottom = (if (isGroupLastOnScreen) last.bottom.toFloat() else (last.bottom.toFloat() + cardRadius * 2)) + last.translationY
 
             cardRect.set(left, top, right, bottom)
             c.drawRoundRect(cardRect, cardRadius, cardRadius, fillPaint)
@@ -240,7 +240,7 @@ class TelegramGroupedPreferenceDecoration(private val context: Context) : Recycl
 
             val isLast = pos == adapter.itemCount - 1 || adapter.getItem(pos + 1) is PreferenceCategory
             if (!isLast) {
-                val y = child.bottom.toFloat()
+                val y = child.bottom.toFloat() + child.translationY
                 val startX = child.left.toFloat() + insetStart
                 val endX = child.right.toFloat() - insetEnd
                 c.drawLine(startX, y, endX, y, dividerPaint)
@@ -267,22 +267,6 @@ class TelegramGroupedPreferenceDecoration(private val context: Context) : Recycl
             }
             io.nekohasekai.sagernet.ui.motion.SmoothMotion.run {
                 recyclerView.attachSmoothOverscroll()
-            }
-            if (recyclerView.getTag(R.id.motion_tag_press_attached) != true) {
-                recyclerView.setTag(R.id.motion_tag_press_attached, true)
-                recyclerView.addOnChildAttachStateChangeListener(object : RecyclerView.OnChildAttachStateChangeListener {
-                    override fun onChildViewAttachedToWindow(view: View) {
-                        val pos = recyclerView.getChildAdapterPosition(view)
-                        val adapter = recyclerView.adapter as? PreferenceGroupAdapter
-                        if (pos != RecyclerView.NO_POSITION && adapter != null && adapter.getItem(pos) !is PreferenceCategory) {
-                            io.nekohasekai.sagernet.ui.motion.SmoothMotion.run {
-                                view.attachSmoothPress(0.982f)
-                            }
-                        }
-                    }
-
-                    override fun onChildViewDetachedFromWindow(view: View) = Unit
-                })
             }
             // 避免重复添加
             for (i in 0 until recyclerView.itemDecorationCount) {

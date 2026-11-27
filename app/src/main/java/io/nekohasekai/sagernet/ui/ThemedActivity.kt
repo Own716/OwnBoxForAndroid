@@ -39,12 +39,21 @@ abstract class ThemedActivity : AppCompatActivity {
     private var lastNightTheme: Int = 0
     private var lastUsingNight: Boolean = false
     private var lastUiScaleSignature: String = ""
+    private var pendingRecreate: Boolean = false
+
+    fun requestRecreateOnce() {
+        if (pendingRecreate || isFinishing || isDestroyed) return
+        pendingRecreate = true
+        ActivityCompat.recreate(this)
+    }
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(UiScaleManager.wrapContext(newBase))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        Theme.applyNightTheme()
+
         lastUseSystemTheme = DataStore.useSystemTheme
         lastWallpaperColor = if (DataStore.useSystemTheme) Theme.getSystemWallpaperColor(this) else null
         lastAppTheme = DataStore.appTheme
@@ -52,7 +61,6 @@ abstract class ThemedActivity : AppCompatActivity {
         lastUsingNight = Theme.usingNightMode(this)
         lastUiScaleSignature = UiScaleManager.getSignature()
 
-        Theme.applyNightTheme()
         if (!isDialog) {
             Theme.apply(this)
         } else {
@@ -73,7 +81,7 @@ abstract class ThemedActivity : AppCompatActivity {
             WindowCompat.setDecorFitsSystemWindows(window, false)
 
             val insetController = WindowCompat.getInsetsController(window, window.decorView)
-            val isDark = Theme.isBlackTheme(this)
+            val isDark = Theme.isBlackTheme(this) || Theme.usingNightMode(this)
             val isLightSurface = !isDark && ColorUtils.calculateLuminance(getColorAttr(R.attr.colorSurface)) > 0.45
 
             insetController.isAppearanceLightStatusBars = isLightSurface
@@ -150,7 +158,8 @@ abstract class ThemedActivity : AppCompatActivity {
             lastNightTheme != DataStore.nightTheme ||
             lastUsingNight != currentUsingNight ||
             (this !is UiScaleSettingsActivity && lastUiScaleSignature != currentScaleSignature)) {
-            ActivityCompat.recreate(this)
+            Theme.applyNightTheme()
+            requestRecreateOnce()
         }
     }
 
@@ -178,9 +187,15 @@ abstract class ThemedActivity : AppCompatActivity {
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
 
-        if (newConfig.uiMode != uiMode) {
+        val nightMaskChanged =
+            (newConfig.uiMode and Configuration.UI_MODE_NIGHT_MASK) != (uiMode and Configuration.UI_MODE_NIGHT_MASK)
+        val effectiveNightChanged = Theme.usingNightMode(this) != lastUsingNight
+        if (nightMaskChanged || effectiveNightChanged || newConfig.uiMode != uiMode) {
             uiMode = newConfig.uiMode
-            ActivityCompat.recreate(this)
+            Theme.applyNightTheme()
+            if (nightMaskChanged || effectiveNightChanged) {
+                requestRecreateOnce()
+            }
         }
     }
 

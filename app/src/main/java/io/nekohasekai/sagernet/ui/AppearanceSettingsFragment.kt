@@ -111,21 +111,22 @@ class AppearanceSettingsFragment : PreferenceFragmentCompat() {
         }
 
         val appTheme = findPreference<ColorPickerPreference>(Key.APP_THEME)
+        val nightTheme = findPreference<SimpleMenuPreference>(Key.NIGHT_THEME)
         appTheme?.setOnPreferenceChangeListener { _, newValue ->
             DataStore.appTheme = (newValue as Number).toInt()
+            nightTheme?.value = DataStore.nightTheme.toString()
             Theme.applyNightTheme()
-            activity?.recreate()
+            (activity as? ThemedActivity)?.requestRecreateOnce() ?: activity?.recreate()
             true
         }
 
-        val nightTheme = findPreference<SimpleMenuPreference>(Key.NIGHT_THEME)
         nightTheme?.setOnPreferenceChangeListener { _, newTheme ->
             val mode = (newTheme as String).toInt()
             DataStore.nightTheme = mode
             Theme.currentNightMode = mode
             Theme.applyNightTheme()
             view?.post { notifyNotificationUpdate() }
-            activity?.recreate()
+            (activity as? ThemedActivity)?.requestRecreateOnce() ?: activity?.recreate()
             true
         }
 

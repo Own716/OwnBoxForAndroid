@@ -15,6 +15,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.core.view.children
 import androidx.core.view.doOnPreDraw
 import androidx.dynamicanimation.animation.DynamicAnimation
+import androidx.dynamicanimation.animation.FloatValueHolder
 import androidx.dynamicanimation.animation.SpringAnimation
 import androidx.dynamicanimation.animation.SpringForce
 import androidx.recyclerview.widget.RecyclerView
@@ -207,6 +208,21 @@ object SmoothMotion {
         attachSmoothPress(isCompactButton = scaleDown <= 0.935f)
     }
 
+    internal fun computeDampedOverscrollDp(rawPullDp: Float, maxDp: Float): Float {
+        if (rawPullDp == 0f || maxDp <= 0f) return 0f
+        val sign = if (rawPullDp >= 0f) 1f else -1f
+        val absDp = abs(rawPullDp)
+        val dampedDp = maxDp * (1f - 1f / (1f + ln(1f + absDp / 24f) * 1.15f))
+        return sign * dampedDp
+    }
+
+    fun View.resetSmoothPressState() {
+        (getTag(R.id.motion_tag_spring_x) as? SpringAnimation)?.cancel()
+        (getTag(R.id.motion_tag_spring_y) as? SpringAnimation)?.cancel()
+        scaleX = (getTag(R.id.motion_tag_base_sx) as? Float) ?: 1f
+        scaleY = (getTag(R.id.motion_tag_base_sy) as? Float) ?: 1f
+    }
+
     @SuppressLint("ClickableViewAccessibility")
     fun View.attachSmoothPress(isCompactButton: Boolean = false) {
         if (getTag(R.id.motion_tag_press_attached) == true) return
@@ -217,26 +233,39 @@ object SmoothMotion {
         var downRawX = 0f
         var downRawY = 0f
 
-        fun releaseSpring(baseX: Float, baseY: Float, kickVelocity: Boolean) {
+        fun releaseSpring(
+            baseX: Float,
+            baseY: Float,
+            kickVelocity: Boolean,
+            cancelledByScroll: Boolean = false,
+        ) {
             val p = params()
+            val dampX = if (cancelledByScroll) 1.0f else p.releaseDampingX
+            val stiffX = if (cancelledByScroll) 600f else p.releaseStiffnessX
+            val dampY = if (cancelledByScroll) 1.0f else p.releaseDampingY
+            val stiffY = if (cancelledByScroll) 600f else p.releaseStiffnessY
             springFor(
                 R.id.motion_tag_spring_x,
                 DynamicAnimation.SCALE_X,
                 baseX,
-                p.releaseDampingX,
-                p.releaseStiffnessX,
+                dampX,
+                stiffX,
             ).apply {
-                if (kickVelocity && p.releaseVelocity > 0f) setStartVelocity(p.releaseVelocity)
+                if (!cancelledByScroll && kickVelocity && p.releaseVelocity > 0f) {
+                    setStartVelocity(p.releaseVelocity)
+                }
                 start()
             }
             springFor(
                 R.id.motion_tag_spring_y,
                 DynamicAnimation.SCALE_Y,
                 baseY,
-                p.releaseDampingY,
-                p.releaseStiffnessY,
+                dampY,
+                stiffY,
             ).apply {
-                if (kickVelocity && p.releaseVelocity > 0f) setStartVelocity(-p.releaseVelocity * 0.6f)
+                if (!cancelledByScroll && kickVelocity && p.releaseVelocity > 0f) {
+                    setStartVelocity(-p.releaseVelocity * 0.6f)
+                }
                 start()
             }
         }
@@ -281,7 +310,7 @@ object SmoothMotion {
                         isPressedMotion = false
                         val baseX = (v.getTag(R.id.motion_tag_base_sx) as? Float) ?: 1f
                         val baseY = (v.getTag(R.id.motion_tag_base_sy) as? Float) ?: 1f
-                        releaseSpring(baseX, baseY, kickVelocity = false)
+                        releaseSpring(baseX, baseY, kickVelocity = false, cancelledByScroll = true)
                     }
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
@@ -289,10 +318,12 @@ object SmoothMotion {
                         isPressedMotion = false
                         val baseX = (v.getTag(R.id.motion_tag_base_sx) as? Float) ?: 1f
                         val baseY = (v.getTag(R.id.motion_tag_base_sy) as? Float) ?: 1f
+                        val isCancel = event.actionMasked == MotionEvent.ACTION_CANCEL
                         releaseSpring(
                             baseX,
                             baseY,
-                            kickVelocity = event.actionMasked == MotionEvent.ACTION_UP,
+                            kickVelocity = !isCancel,
+                            cancelledByScroll = isCancel,
                         )
                     }
                 }
@@ -556,40 +587,85 @@ object SmoothMotion {
         if (getTag(R.id.motion_tag_overscroll_attached) == true) return
         setTag(R.id.motion_tag_overscroll_attached, true)
 
-        val density = resources.displayMetrics.density
-        var rawPullDp = 0f
+        // Never shift RecyclerView.translationY itself, otherwise parent touch
+        // dispatch subtracts translationY and creates an oscillation loop.
+        translationY = 0f
 
-        fun updateTranslationFromPull() {
-            val p = params()
-            val maxDp = p.overscrollMaxDp
-            val sign = if (rawPullDp >= 0f) 1f else -1f
-            val absDp = abs(rawPullDp)
-            val dampedDp = maxDp * (1f - 1f / (1f + ln(1f + absDp / 24f) * 1.15f))
-            (getTag(R.id.motion_tag_spring_ty) as? SpringAnimation)?.cancel()
-            translationY = sign * dampedDp * density
+        val density = resources.displayMetrics.density
+        var topPullDistance = 0f
+        var bottomPullDistance = 0f
+        var overscrollOffsetPx = 0f
+        var overscrollSpring: SpringAnimation? = null
+
+        fun applyChildrenOffset(offsetPx: Float) {
+            overscrollOffsetPx = if (abs(offsetPx) < 0.1f) 0f else offsetPx
+            setTag(R.id.motion_tag_overscroll_offset, overscrollOffsetPx)
+            for (i in 0 until childCount) {
+                getChildAt(i).translationY = overscrollOffsetPx
+            }
+            invalidate()
+        }
+
+        addOnChildAttachStateChangeListener(object : RecyclerView.OnChildAttachStateChangeListener {
+            override fun onChildViewAttachedToWindow(view: View) {
+                if (overscrollOffsetPx != 0f) {
+                    view.translationY = overscrollOffsetPx
+                } else if (view.translationY != 0f) {
+                    view.translationY = 0f
+                }
+            }
+
+            override fun onChildViewDetachedFromWindow(view: View) {
+                if (view.translationY != 0f) {
+                    view.translationY = 0f
+                }
+            }
+        })
+
+        fun updateFromPullDistances() {
+            val netDistance = topPullDistance - bottomPullDistance
+            overscrollSpring?.cancel()
+            overscrollSpring = null
+            if (abs(netDistance) < 1e-4f) {
+                applyChildrenOffset(0f)
+                return
+            }
+            val heightPx = height.coerceAtLeast(300)
+            val rawPullDp = (netDistance * heightPx / density) * 0.62f
+            val dampedDp = computeDampedOverscrollDp(rawPullDp.coerceIn(-260f, 260f), params().overscrollMaxDp)
+            applyChildrenOffset(dampedDp * density)
         }
 
         fun springBack(velocityPxPerSec: Float = 0f) {
-            rawPullDp = 0f
-            if (abs(translationY) < 0.5f && abs(velocityPxPerSec) < 20f) {
-                translationY = 0f
+            topPullDistance = 0f
+            bottomPullDistance = 0f
+            overscrollSpring?.cancel()
+            overscrollSpring = null
+            if (abs(overscrollOffsetPx) < 0.5f && abs(velocityPxPerSec) < 20f) {
+                applyChildrenOffset(0f)
                 return
             }
             if (!isEnabled()) {
-                (getTag(R.id.motion_tag_spring_ty) as? SpringAnimation)?.cancel()
-                translationY = 0f
+                applyChildrenOffset(0f)
                 return
             }
             val p = params()
-            springFor(
-                R.id.motion_tag_spring_ty,
-                DynamicAnimation.TRANSLATION_Y,
-                0f,
-                p.overscrollDamping,
-                380f,
-            ).apply {
+            overscrollSpring = SpringAnimation(FloatValueHolder(overscrollOffsetPx)).apply {
+                spring = SpringForce(0f).apply {
+                    dampingRatio = p.overscrollDamping.coerceAtLeast(0.75f)
+                    stiffness = 380f
+                }
+                setStartValue(overscrollOffsetPx)
                 if (velocityPxPerSec != 0f) {
                     setStartVelocity(velocityPxPerSec.coerceIn(-2200f, 2200f))
+                }
+                addUpdateListener { _, value, _ ->
+                    applyChildrenOffset(value)
+                }
+                addEndListener { _, canceled, _, _ ->
+                    if (!canceled && topPullDistance == 0f && bottomPullDistance == 0f) {
+                        applyChildrenOffset(0f)
+                    }
                 }
                 start()
             }
@@ -601,40 +677,62 @@ object SmoothMotion {
                 if (!isVertical) {
                     return super.createEdgeEffect(view, direction)
                 }
-                val dirSign = if (direction == DIRECTION_TOP) 1f else -1f
+                val isTop = direction == DIRECTION_TOP
+                val dirSign = if (isTop) 1f else -1f
                 return object : EdgeEffect(view.context) {
-                    private var pulled = false
+                    override fun getDistance(): Float = if (isTop) topPullDistance else bottomPullDistance
 
-                    override fun isFinished(): Boolean = !pulled && abs(view.translationY) < 0.5f
+                    override fun onPullDistance(deltaDistance: Float, displacement: Float): Float {
+                        if (!isEnabled()) return 0f
+                        val cur = if (isTop) topPullDistance else bottomPullDistance
+                        val next = (cur + deltaDistance).coerceIn(0f, 2.0f)
+                        val consumed = next - cur
+                        if (consumed != 0f) {
+                            if (isTop) {
+                                topPullDistance = next
+                                if (next > 0f) bottomPullDistance = 0f
+                            } else {
+                                bottomPullDistance = next
+                                if (next > 0f) topPullDistance = 0f
+                            }
+                            updateFromPullDistances()
+                        }
+                        return consumed
+                    }
+
+                    override fun isFinished(): Boolean =
+                        getDistance() <= 0f && abs(overscrollOffsetPx) < 0.5f && overscrollSpring?.isRunning != true
 
                     override fun finish() {
-                        pulled = false
-                        rawPullDp = 0f
-                        if (view.translationY != 0f) springBack(0f)
+                        if (isTop) topPullDistance = 0f else bottomPullDistance = 0f
+                        if (topPullDistance <= 0f && bottomPullDistance <= 0f) {
+                            overscrollSpring?.cancel()
+                            overscrollSpring = null
+                            applyChildrenOffset(0f)
+                        }
                     }
 
                     override fun onPull(deltaDistance: Float) {
-                        onPull(deltaDistance, 0.5f)
+                        onPullDistance(deltaDistance, 0.5f)
                     }
 
                     override fun onPull(deltaDistance: Float, displacement: Float) {
-                        if (!isEnabled()) return
-                        pulled = true
-                        val heightPx = view.height.coerceAtLeast(300)
-                        rawPullDp += dirSign * (deltaDistance * heightPx / density) * 0.62f
-                        rawPullDp = rawPullDp.coerceIn(-260f, 260f)
-                        updateTranslationFromPull()
+                        onPullDistance(deltaDistance, displacement)
                     }
 
                     override fun onRelease() {
-                        if (!pulled && abs(view.translationY) < 0.5f) return
-                        pulled = false
-                        springBack(0f)
+                        if (getDistance() <= 0f && abs(overscrollOffsetPx) < 0.5f) return
+                        if (isTop) topPullDistance = 0f else bottomPullDistance = 0f
+                        if (topPullDistance <= 0f && bottomPullDistance <= 0f) {
+                            springBack(0f)
+                        } else {
+                            updateFromPullDistances()
+                        }
                     }
 
                     override fun onAbsorb(velocity: Int) {
                         if (!isEnabled()) return
-                        pulled = false
+                        if (isTop) topPullDistance = 0f else bottomPullDistance = 0f
                         val flingKick = dirSign * (velocity.coerceIn(0, 6000) * 0.16f)
                         springBack(flingKick)
                     }

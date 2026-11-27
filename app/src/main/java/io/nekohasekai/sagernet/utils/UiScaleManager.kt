@@ -119,7 +119,7 @@ object UiScaleManager {
             val uiFactor = globalPct / 100f
             val fontFactor = fontPct / 100f
 
-            val newConfig = Configuration(base.resources.configuration)
+            val newConfig = Configuration()
             newConfig.densityDpi = (baseDensityDpi * uiFactor).roundToInt().coerceIn(120, 960)
             newConfig.fontScale = (baseFontScale * fontFactor).coerceIn(0.5f, 2.0f)
             base.createConfigurationContext(newConfig)

@@ -119,11 +119,11 @@ class SagerNet : Application(),
             if (!Theme.isValidTheme(DataStore.appTheme)) {
                 DataStore.appTheme = Theme.LIGHT_GRAY
             }
+            Theme.applyNightTheme()
             Theme.apply(this)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && DataStore.useSystemTheme) {
                 com.google.android.material.color.DynamicColors.applyToActivitiesIfAvailable(this)
             }
-            Theme.applyNightTheme()
             AppLocale.apply()
             AppIconManager.init(this)
             DataStore.migrateSubscriptionUserAgents()

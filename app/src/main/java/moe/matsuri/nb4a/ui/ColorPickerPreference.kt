@@ -166,15 +166,20 @@ class ColorPickerPreference @JvmOverloads constructor(
             persistInt(themeId)
             DataStore.appTheme = themeId
             DataStore.useSystemTheme = (themeId == Theme.MONET)
-            if (themeId in setOf(Theme.WHITE, Theme.LIGHT_GRAY) && Theme.usingNightMode(context)) {
-                DataStore.nightTheme = 2
-                Theme.currentNightMode = 2
+            if (themeId in setOf(Theme.WHITE, Theme.LIGHT_GRAY) && DataStore.nightTheme == 1) {
+                val next = if (Theme.isSystemNight(context)) 2 else 0
+                DataStore.nightTheme = next
+                Theme.currentNightMode = next
+            } else if (themeId == Theme.BLACK && !Theme.usingNightMode(context)) {
+                DataStore.nightTheme = 1
+                Theme.currentNightMode = 1
             }
             Theme.applyNightTheme()
             dialog.dismiss()
-            callChangeListener(themeId)
-            (context as? Activity)?.let {
-                ActivityCompat.recreate(it)
+            if (!callChangeListener(themeId) || onPreferenceChangeListener == null) {
+                (context as? Activity)?.let {
+                    ActivityCompat.recreate(it)
+                }
             }
         }
 

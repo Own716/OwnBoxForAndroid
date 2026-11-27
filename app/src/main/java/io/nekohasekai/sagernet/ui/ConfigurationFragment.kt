@@ -917,7 +917,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         val count = slidingTabIndicator.childCount
         if (count == 0) return
         val innerMargin = dp2px(2)
-        val edgeMargin = dp2px(4)
+        val edgeMargin = dp2px(2)
         val tabFactor = UiScaleManager.tabBarFactor()
         val applyScale = tabFactor != 1.0f
         val targetTextSizeSp = 13f * tabFactor
@@ -1375,6 +1375,13 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
         }
         tabLayout.clipToOutline = true
+        val tabInnerInsetH = (dp2px(10) * tabFactor).toInt().coerceIn(dp2px(8), dp2px(14))
+        if (tabLayout.paddingLeft != tabInnerInsetH || tabLayout.paddingRight != tabInnerInsetH) {
+            tabLayout.setPadding(tabInnerInsetH, 0, tabInnerInsetH, 0)
+        }
+        tabLayout.clipToPadding = true
+        tabLayout.isHorizontalFadingEdgeEnabled = true
+        tabLayout.setFadingEdgeLength((dp2px(12) * tabFactor).toInt().coerceIn(dp2px(8), dp2px(16)))
         setupTopBarFloatingCapsules(
             fillColor = containerBgColor,
             strokeColor = containerStrokeColor,
@@ -4749,7 +4756,7 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             if (isAllGroupsTab) {
                 subscriptionCardGeneration.incrementAndGet()
-                card.isGone = true
+                bindNonSubscriptionCard(root, card, proxyGroup)
                 return
             }
 
@@ -4874,8 +4881,31 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
 
         private fun bindNonSubscriptionCard(root: View, card: MaterialCardView, currentGroup: ProxyGroup) {
-            // 非订阅组（如策略组/本地分组）隐藏空白占位卡片
-            card.isGone = true
+            val density = root.resources.displayMetrics.density
+            val isDark = Theme.isBlackTheme(root.context) || Theme.usingNightMode(root.context)
+            card.strokeWidth = (0.7f * density).toInt().coerceAtLeast(1)
+            card.strokeColor = Color.parseColor(if (isDark) "#1AFFFFFF" else "#12000000")
+
+            val tvTitle = root.findViewById<TextView>(R.id.tv_subscription_title)
+            val tvExpire = root.findViewById<TextView>(R.id.tv_expire_date)
+            val layoutTraffic = root.findViewById<View>(R.id.layout_traffic_details)
+            val tvNodeCount = root.findViewById<TextView>(R.id.tv_node_count)
+            val tvLastUpdated = root.findViewById<TextView>(R.id.tv_last_updated)
+            val btnUpdate = root.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_card_update)
+
+            val groupName = if (isAllGroupsTab) {
+                getString(R.string.group_tab_all)
+            } else {
+                currentGroup.displayName()
+            }
+            tvTitle?.text = groupName
+            tvExpire?.isGone = true
+            layoutTraffic?.isGone = true
+            tvLastUpdated?.isGone = true
+            btnUpdate?.isGone = true
+            val count = adapter?.configurationIdList?.size ?: 0
+            tvNodeCount?.text = "$count 个节点"
+            card.isVisible = true
         }
 
         private fun bindSubscriptionCardSnapshot(
@@ -4886,7 +4916,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             val currentGroup = snapshot.currentGroup
             val sub = currentGroup.subscription
             if (isAllGroupsTab || currentGroup.type != GroupType.SUBSCRIPTION || sub == null) {
-                card.isGone = true
+                bindNonSubscriptionCard(root, card, currentGroup)
                 return
             }
             val density = root.resources.displayMetrics.density
@@ -5277,9 +5307,20 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
 
             override fun onViewRecycled(holder: ConfigurationHolder) {
+                super.onViewRecycled(holder)
+                io.nekohasekai.sagernet.ui.motion.SmoothMotion.run {
+                    holder.itemView.resetSmoothPressState()
+                }
                 holder.lastSelfHasMiddleRow = null
                 holder.lastBoundTx = Long.MIN_VALUE
                 holder.lastBoundRx = Long.MIN_VALUE
+            }
+
+            override fun onViewDetachedFromWindow(holder: ConfigurationHolder) {
+                super.onViewDetachedFromWindow(holder)
+                io.nekohasekai.sagernet.ui.motion.SmoothMotion.run {
+                    holder.itemView.resetSmoothPressState()
+                }
             }
 
             override fun onViewAttachedToWindow(holder: ConfigurationHolder) {

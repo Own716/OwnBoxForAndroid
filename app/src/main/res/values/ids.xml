@@ -10,5 +10,6 @@
     <item name="motion_tag_base_sy" type="id" />
     <item name="motion_tag_press_attached" type="id" />
     <item name="motion_tag_overscroll_attached" type="id" />
+    <item name="motion_tag_overscroll_offset" type="id" />
     <item name="motion_tag_toolbar_hooked" type="id" />
 </resources>

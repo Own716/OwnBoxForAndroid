@@ -102,25 +102,13 @@ object Theme {
     }
 
     fun getTheme(context: Context = app): Int {
-        val themeId = DataStore.appTheme
-        if (themeId == BLACK) {
-            return R.style.Theme_SagerNet_Black
-        }
-        if (usingNightMode(context) && themeId in setOf(WHITE, LIGHT_GRAY)) {
-            return R.style.Theme_SagerNet_Black
-        }
-        return getTheme(themeId)
+        val effective = resolveEffectiveThemeId(DataStore.appTheme, usingNightMode(context))
+        return getTheme(effective)
     }
 
     fun getDialogTheme(context: Context = app): Int {
-        val themeId = DataStore.appTheme
-        if (themeId == BLACK) {
-            return R.style.Theme_SagerNet_Dialog_Black
-        }
-        if (usingNightMode(context) && themeId in setOf(WHITE, LIGHT_GRAY)) {
-            return R.style.Theme_SagerNet_Dialog_Black
-        }
-        return getDialogTheme(themeId)
+        val effective = resolveEffectiveThemeId(DataStore.appTheme, usingNightMode(context))
+        return getDialogTheme(effective)
     }
 
     fun getTheme(theme: Int): Int {
@@ -186,19 +174,48 @@ object Theme {
     }
 
     fun isSystemNight(context: Context = app): Boolean {
-        val ctxUiMode = (context as? android.app.Activity)?.resources?.configuration?.uiMode
-            ?: context.resources?.configuration?.uiMode
-        if (ctxUiMode != null && (ctxUiMode and Configuration.UI_MODE_NIGHT_MASK) != Configuration.UI_MODE_NIGHT_UNDEFINED) {
-            return (ctxUiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
-        }
         val sysUiMode = android.content.res.Resources.getSystem().configuration.uiMode
-        return (sysUiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        if ((sysUiMode and Configuration.UI_MODE_NIGHT_MASK) != Configuration.UI_MODE_NIGHT_UNDEFINED) {
+            return (sysUiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        }
+        val appUiMode = context.applicationContext?.resources?.configuration?.uiMode
+            ?: context.resources?.configuration?.uiMode
+        return appUiMode != null &&
+            (appUiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
     }
 
-    fun isWhiteTheme(context: Context = app): Boolean = !usingNightMode(context) && DataStore.appTheme == WHITE
-    fun isLightGrayTheme(context: Context = app): Boolean = !usingNightMode(context) && DataStore.appTheme == LIGHT_GRAY
+    fun isPowerSaveMode(context: Context = app): Boolean {
+        return runCatching {
+            val pm = context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+            pm?.isPowerSaveMode == true
+        }.getOrDefault(false)
+    }
+
+    internal fun resolveNightModeEnabled(
+        nightTheme: Int,
+        systemNight: Boolean,
+        powerSaveMode: Boolean,
+    ): Boolean = when (nightTheme) {
+        0 -> systemNight
+        1 -> true
+        2 -> false
+        else -> powerSaveMode
+    }
+
+    internal fun resolveEffectiveThemeId(appTheme: Int, nightActive: Boolean): Int = when {
+        nightActive && appTheme in setOf(BLACK, WHITE, LIGHT_GRAY) -> BLACK
+        !nightActive && appTheme == BLACK -> LIGHT_GRAY
+        else -> appTheme
+    }
+
+    fun isWhiteTheme(context: Context = app): Boolean =
+        resolveEffectiveThemeId(DataStore.appTheme, usingNightMode(context)) == WHITE
+
+    fun isLightGrayTheme(context: Context = app): Boolean =
+        resolveEffectiveThemeId(DataStore.appTheme, usingNightMode(context)) == LIGHT_GRAY
+
     fun isBlackTheme(context: Context = app): Boolean =
-        DataStore.appTheme == BLACK || (usingNightMode(context) && DataStore.appTheme in setOf(WHITE, LIGHT_GRAY))
+        resolveEffectiveThemeId(DataStore.appTheme, usingNightMode(context)) == BLACK
 
     fun getPrimaryColor(context: Context): Int {
         if (isBlackTheme(context)) {
@@ -237,25 +254,16 @@ object Theme {
     }
 
     fun usingNightMode(context: Context = app): Boolean {
-        if (DataStore.appTheme == BLACK) return true
-        return when (DataStore.nightTheme) {
-            1 -> true
-            2 -> false
-            else -> isSystemNight(context)
-        }
+        return resolveNightModeEnabled(
+            nightTheme = DataStore.nightTheme,
+            systemNight = isSystemNight(context),
+            powerSaveMode = isPowerSaveMode(context),
+        )
     }
 
     fun applyNightTheme() {
-        if (DataStore.appTheme == BLACK) {
-            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-            return
-        }
-        when (DataStore.nightTheme) {
-            0 -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
-            1 -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-            2 -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
-            else -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_AUTO_BATTERY)
-        }
+        currentNightMode = DataStore.nightTheme
+        AppCompatDelegate.setDefaultNightMode(getNightMode(DataStore.nightTheme))
     }
 
 }
