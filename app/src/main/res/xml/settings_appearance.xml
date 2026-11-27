@@ -196,6 +196,14 @@
             app:icon="@drawable/solar_slider_minimalistic_horizontal_linear"
             app:key="showBottomBar"
             app:title="@string/show_bottom_bar" />
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:defaultValue="0"
+            app:entries="@array/bottom_bar_style_entries"
+            app:entryValues="@array/bottom_bar_style_values"
+            app:icon="@drawable/solar_widget_5_linear"
+            app:key="bottomBarStyle"
+            app:title="@string/bottom_bar_style"
+            app:useSimpleSummaryProvider="true" />
         <SwitchPreferenceCompat
             app:defaultValue="true"
             app:icon="@drawable/solar_smartphone_vibration_linear"

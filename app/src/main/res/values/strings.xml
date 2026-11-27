@@ -980,8 +980,13 @@
     <string name="core_settings">Core Settings</string>
     <string name="mode_and_inbound_settings">Mode &amp; Inbound Settings</string>
     <string name="dns_settings">DNS Settings</string>
-    <string name="observatory_settings">Observatory Settings</string>
+    <string name="observatory_settings">Connectivity Check</string>
     <string name="advanced_settings">Advanced Settings</string>
+    <string name="test_node_latency">Test Node Latency</string>
+    <string name="bottom_bar_style">Bottom Control Bar Style</string>
+    <string name="bottom_bar_style_right">Floating Pill · Right Button</string>
+    <string name="bottom_bar_style_center">Floating Pill · Center Button</string>
+    <string name="bottom_bar_style_classic">Classic Notched Bar</string>
     <string name="widget_toggle">Tap to toggle connection</string>
     <string name="change_icon">Change app icon</string>
         <string name="app_icon_dynamic">Follow System (Default)</string>

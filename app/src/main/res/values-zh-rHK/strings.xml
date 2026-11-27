@@ -211,8 +211,13 @@
     <string name="core_settings">核心設定</string>
     <string name="mode_and_inbound_settings">模式與入站設定</string>
     <string name="dns_settings">DNS 設定</string>
-    <string name="observatory_settings">連線觀測設定 (Observatory)</string>
+    <string name="observatory_settings">連通性檢測</string>
     <string name="advanced_settings">進階設定</string>
+    <string name="test_node_latency">測試節點延遲</string>
+    <string name="bottom_bar_style">底部控制列樣式</string>
+    <string name="bottom_bar_style_right">懸浮一體 · 右側開關</string>
+    <string name="bottom_bar_style_center">懸浮一體 · 居中開關</string>
+    <string name="bottom_bar_style_classic">經典凹槽樣式</string>
     <string name="widget_toggle">点击切换连接</string>
     <string name="balancer_custom_url_sum">針對此負載均衡節點的獨立探測地址（留空使用全域預設）</string>
     <string name="balancer_interval">觀測間隔 (s)</string>

@@ -4,16 +4,21 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.drawable.Drawable
+import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
 import android.text.format.Formatter
 import android.util.AttributeSet
 import android.view.View
+import android.view.ViewOutlineProvider
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.widget.TooltipCompat
 import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.core.graphics.ColorUtils
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.bottomappbar.BottomAppBar
 import io.nekohasekai.sagernet.R
@@ -69,6 +74,26 @@ class StatsBar @JvmOverloads constructor(
     private lateinit var txText: TextView
     private lateinit var rxText: TextView
     private var btnIpDetail: View? = null
+
+    private var statsContentContainer: View? = null
+    private var statsModernContainer: View? = null
+    private var modernIpText: TextView? = null
+    private var modernTxText: TextView? = null
+    private var modernRxText: TextView? = null
+    private var modernCenterSpace: View? = null
+    private var modernLatencyPill: TextView? = null
+    private var modernRightGroup: View? = null
+    private var modernStatusTitleText: TextView? = null
+    private var modernStatusText: TextView? = null
+    private var modernBtnRefresh: View? = null
+
+    private var bottomBarStyle: Int = DataStore.bottomBarStyle
+    private var systemNavBottomInset: Int = 0
+    private var originalNotchedBackground: Drawable? = null
+    private var originalNotchedElevation: Float = 0f
+
+    var onVisualBoundsChanged: (() -> Unit)? = null
+
     private var baseStatusTextSizePx = 0f
     private var baseStatusTitleTextSizePx = 0f
     private var baseStatusIpTextSizePx = 0f
@@ -106,6 +131,89 @@ class StatsBar @JvmOverloads constructor(
     init {
         alpha = 0f
         isClickable = false
+        ViewCompat.setOnApplyWindowInsetsListener(this) { _, insets ->
+            val bars = insets.getInsets(
+                WindowInsetsCompat.Type.navigationBars() or WindowInsetsCompat.Type.displayCutout()
+            )
+            if (systemNavBottomInset != bars.bottom) {
+                systemNavBottomInset = bars.bottom
+                applyBottomBarMarginsAndPadding()
+                onVisualBoundsChanged?.invoke()
+            }
+            insets
+        }
+    }
+
+    fun isVisuallyShowing(): Boolean = shouldShow() && !scrollHidden
+
+    fun isConnectedAndAllowed(): Boolean = shouldShow()
+
+    fun isScrollHiddenState(): Boolean = scrollHidden
+
+    fun currentBottomMarginPx(): Int {
+        val lp = layoutParams as? MarginLayoutParams
+        return lp?.bottomMargin ?: if (bottomBarStyle == 2) 0 else (dp2px(12) + systemNavBottomInset)
+    }
+
+    fun currentNavBottomInsetPx(): Int = systemNavBottomInset
+
+    fun applyStyleMode(style: Int) {
+        val normalized = style.coerceIn(0, 2)
+        bottomBarStyle = normalized
+        if (!this::statusText.isInitialized) {
+            if (isAttachedToWindow) initViews() else return
+        }
+        if (normalized == 2) {
+            statsContentContainer?.visibility = View.VISIBLE
+            statsModernContainer?.visibility = View.GONE
+        } else {
+            statsContentContainer?.visibility = View.GONE
+            statsModernContainer?.visibility = View.VISIBLE
+            val isRightMode = normalized == 0
+            modernCenterSpace?.visibility = if (isRightMode) View.GONE else View.VISIBLE
+            modernLatencyPill?.visibility = if (isRightMode) View.VISIBLE else View.GONE
+            modernRightGroup?.visibility = if (isRightMode) View.GONE else View.VISIBLE
+            statsModernContainer?.let { container ->
+                if (isRightMode) {
+                    container.setPaddingRelative(dp2px(18), dp2px(10), dp2px(66), dp2px(10))
+                    container.minimumHeight = dp2px(64)
+                } else {
+                    container.setPaddingRelative(dp2px(16), dp2px(9), dp2px(16), dp2px(9))
+                    container.minimumHeight = dp2px(60)
+                }
+            }
+        }
+        applyBottomBarMarginsAndPadding()
+        updateThemeColors()
+        updateStatusViews()
+        post { onVisualBoundsChanged?.invoke() }
+    }
+
+    private fun applyBottomBarMarginsAndPadding() {
+        val lp = layoutParams as? MarginLayoutParams
+        if (bottomBarStyle == 2) {
+            if (paddingLeft != 0 || paddingTop != 0 || paddingRight != 0 || paddingBottom != systemNavBottomInset) {
+                setPadding(0, 0, 0, systemNavBottomInset)
+            }
+            if (lp != null && (lp.leftMargin != 0 || lp.rightMargin != 0 || lp.bottomMargin != 0)) {
+                lp.leftMargin = 0
+                lp.rightMargin = 0
+                lp.bottomMargin = 0
+                layoutParams = lp
+            }
+        } else {
+            if (paddingLeft != 0 || paddingTop != 0 || paddingRight != 0 || paddingBottom != 0) {
+                setPadding(0, 0, 0, 0)
+            }
+            val marginH = dp2px(14)
+            val marginB = dp2px(12) + systemNavBottomInset
+            if (lp != null && (lp.leftMargin != marginH || lp.rightMargin != marginH || lp.bottomMargin != marginB)) {
+                lp.leftMargin = marginH
+                lp.rightMargin = marginH
+                lp.bottomMargin = marginB
+                layoutParams = lp
+            }
+        }
     }
 
     private fun hiddenOffset(): Float {
@@ -152,6 +260,7 @@ class StatsBar @JvmOverloads constructor(
         if (transition != null) {
             pendingTransition = null
             applyTransition(transition)
+            onVisualBoundsChanged?.invoke()
             return
         }
         if (isAnimatingVisibility) {
@@ -163,6 +272,9 @@ class StatsBar @JvmOverloads constructor(
             translationY = 0f
             alpha = 1f
             isClickable = true
+        }
+        if (changed) {
+            onVisualBoundsChanged?.invoke()
         }
     }
 
@@ -179,6 +291,11 @@ class StatsBar @JvmOverloads constructor(
 
     private fun initViews() {
         if (!this::statusText.isInitialized) {
+            setContentInsetsAbsolute(0, 0)
+            setContentInsetsRelative(0, 0)
+            originalNotchedBackground = background
+            originalNotchedElevation = elevation
+
             statusText = findViewById(R.id.status)
             statusText.isSelected = true
             statusTitleText = findViewById(R.id.status_title)
@@ -188,6 +305,20 @@ class StatsBar @JvmOverloads constructor(
             txText = findViewById(R.id.tx)
             rxText = findViewById(R.id.rx)
             btnIpDetail = findViewById(R.id.btn_ip_detail)
+
+            statsContentContainer = findViewById(R.id.stats_content_container)
+            statsModernContainer = findViewById(R.id.stats_modern_container)
+            modernIpText = findViewById(R.id.modern_ip)
+            modernIpText?.isSelected = true
+            modernTxText = findViewById(R.id.modern_tx)
+            modernRxText = findViewById(R.id.modern_rx)
+            modernCenterSpace = findViewById(R.id.modern_center_space)
+            modernLatencyPill = findViewById(R.id.modern_latency_pill)
+            modernRightGroup = findViewById(R.id.modern_right_group)
+            modernStatusTitleText = findViewById(R.id.modern_status_title)
+            modernStatusText = findViewById(R.id.modern_status)
+            modernBtnRefresh = findViewById(R.id.modern_btn_refresh)
+
             baseStatusTextSizePx = statusText.textSize
             baseStatusTitleTextSizePx = statusTitleText.textSize
             baseStatusIpTextSizePx = statusIpText.textSize
@@ -249,43 +380,111 @@ class StatsBar @JvmOverloads constructor(
             rxText.setOnLongClickListener(onCardLongClick)
             btnIpDetail?.setOnClickListener(onCardClick)
             btnIpDetail?.setOnLongClickListener(onCardLongClick)
-            updateThemeColors()
+
+            listOfNotNull(
+                statsModernContainer,
+                modernIpText,
+                modernTxText,
+                modernRxText,
+                modernLatencyPill,
+                modernRightGroup,
+                modernStatusTitleText,
+                modernStatusText,
+                modernBtnRefresh,
+            ).forEach { v ->
+                v.setOnClickListener(onCardClick)
+                v.setOnLongClickListener(onCardLongClick)
+            }
+            applyStyleMode(DataStore.bottomBarStyle)
         }
     }
 
     fun updateThemeColors() {
         if (!this::statusText.isInitialized) return
         val currentContext = context ?: return
-        if (Theme.isBlackTheme(currentContext)) {
-            backgroundTintList = ColorStateList.valueOf(Color.BLACK)
-        } else if (Theme.isWhiteTheme(currentContext)) {
-            backgroundTintList = ColorStateList.valueOf(Color.WHITE)
-        } else if (Theme.isLightGrayTheme(currentContext)) {
-            backgroundTintList = ColorStateList.valueOf(Color.parseColor("#F5F5F7"))
-        }
-        val effectiveBgColor = backgroundTintList?.defaultColor
-            ?: currentContext.getColorAttr(R.attr.colorPrimary)
+        val isBlack = Theme.isBlackTheme(currentContext)
+        val isNight = Theme.usingNightMode(currentContext)
 
-        val isLightBg = ColorUtils.calculateLuminance(effectiveBgColor) > 0.45
+        if (bottomBarStyle == 2) {
+            originalNotchedBackground?.let { orig ->
+                if (background !== orig) background = orig
+            }
+            outlineProvider = ViewOutlineProvider.BOUNDS
+            clipToOutline = false
+            elevation = originalNotchedElevation
+            if (isBlack) {
+                backgroundTintList = ColorStateList.valueOf(Color.BLACK)
+            } else if (Theme.isWhiteTheme(currentContext)) {
+                backgroundTintList = ColorStateList.valueOf(Color.WHITE)
+            } else if (Theme.isLightGrayTheme(currentContext)) {
+                backgroundTintList = ColorStateList.valueOf(Color.parseColor("#F5F5F7"))
+            }
+            val effectiveBgColor = backgroundTintList?.defaultColor
+                ?: currentContext.getColorAttr(R.attr.colorPrimary)
 
-        if (isLightBg) {
-            val primaryTextColor = Color.parseColor("#1E293B")
-            val secondaryTextColor = Color.parseColor("#64748B")
-            txText.setTextColor(secondaryTextColor)
-            rxText.setTextColor(secondaryTextColor)
-            statusIpText.setTextColor(primaryTextColor)
-            statusTitleText.setTextColor(secondaryTextColor)
-            statusText.setTextColor(primaryTextColor)
-            (btnIpDetail as? ImageView)?.imageTintList = ColorStateList.valueOf(primaryTextColor)
+            val isLightBg = ColorUtils.calculateLuminance(effectiveBgColor) > 0.45
+
+            if (isLightBg) {
+                val primaryTextColor = Color.parseColor("#1E293B")
+                val secondaryTextColor = Color.parseColor("#64748B")
+                txText.setTextColor(secondaryTextColor)
+                rxText.setTextColor(secondaryTextColor)
+                statusIpText.setTextColor(primaryTextColor)
+                statusTitleText.setTextColor(secondaryTextColor)
+                statusText.setTextColor(primaryTextColor)
+                (btnIpDetail as? ImageView)?.imageTintList = ColorStateList.valueOf(primaryTextColor)
+            } else {
+                val primaryTextColor = Color.WHITE
+                val secondaryTextColor = Color.parseColor("#CCFFFFFF")
+                txText.setTextColor(secondaryTextColor)
+                rxText.setTextColor(secondaryTextColor)
+                statusIpText.setTextColor(primaryTextColor)
+                statusTitleText.setTextColor(secondaryTextColor)
+                statusText.setTextColor(primaryTextColor)
+                (btnIpDetail as? ImageView)?.imageTintList = ColorStateList.valueOf(primaryTextColor)
+            }
         } else {
-            val primaryTextColor = Color.WHITE
-            val secondaryTextColor = Color.parseColor("#CCFFFFFF")
-            txText.setTextColor(secondaryTextColor)
-            rxText.setTextColor(secondaryTextColor)
-            statusIpText.setTextColor(primaryTextColor)
-            statusTitleText.setTextColor(secondaryTextColor)
-            statusText.setTextColor(primaryTextColor)
-            (btnIpDetail as? ImageView)?.imageTintList = ColorStateList.valueOf(primaryTextColor)
+            val isDark = isBlack || isNight
+            val surfaceColor = when {
+                isBlack -> Color.parseColor("#141416")
+                isNight -> Color.parseColor("#1E1E22")
+                else -> Color.WHITE
+            }
+            val strokeColor = if (isDark) Color.parseColor("#24FFFFFF") else Color.parseColor("#16000000")
+            val primaryColor = if (isDark) Color.parseColor("#F3F4F6") else Color.parseColor("#121216")
+            val secondaryColor = if (isDark) Color.parseColor("#9CA3AF") else Color.parseColor("#6E6E77")
+            val emeraldText = if (isDark) Color.parseColor("#34D399") else Color.parseColor("#10A37F")
+            val pillBg = if (isDark) Color.parseColor("#2210A37F") else Color.parseColor("#EEF8F4")
+
+            if (originalNotchedBackground == null) {
+                originalNotchedBackground = background
+            }
+            backgroundTintList = null
+            val radiusPx = dp2px(if (bottomBarStyle == 0) 33 else 24).toFloat()
+            val strokePx = (0.9f * resources.displayMetrics.density).toInt().coerceAtLeast(1)
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = radiusPx
+                setColor(surfaceColor)
+                setStroke(strokePx, strokeColor)
+            }
+            elevation = dp2px(6).toFloat()
+
+            modernIpText?.setTextColor(primaryColor)
+            modernTxText?.setTextColor(secondaryColor)
+            modernRxText?.setTextColor(secondaryColor)
+            modernStatusTitleText?.setTextColor(secondaryColor)
+            modernStatusText?.setTextColor(emeraldText)
+            (modernBtnRefresh as? ImageView)?.imageTintList = ColorStateList.valueOf(secondaryColor)
+
+            modernLatencyPill?.apply {
+                setTextColor(emeraldText)
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = dp2px(15).toFloat()
+                    setColor(pillBg)
+                }
+            }
         }
     }
 
@@ -305,10 +504,17 @@ class StatsBar @JvmOverloads constructor(
             (btnIpDetail as? android.widget.ImageView)?.apply {
                 animate().rotationBy(360f).setDuration(400).start()
             }
+            (modernBtnRefresh as? android.widget.ImageView)?.apply {
+                animate().rotationBy(360f).setDuration(400).start()
+            }
             statusIpText.text = context.getString(R.string.landing_ip_querying)
             statusIpText.visibility = View.VISIBLE
+            modernIpText?.text = context.getString(R.string.landing_ip_querying)
             refreshLandingIp(forceRefresh = true)
         } else {
+            (modernBtnRefresh as? android.widget.ImageView)?.apply {
+                animate().rotationBy(360f).setDuration(400).start()
+            }
             btnIpDetail?.visibility = View.GONE
             statusIpText.visibility = View.GONE
         }
@@ -371,6 +577,7 @@ class StatsBar @JvmOverloads constructor(
         scrollHidden = wantHidden
         scrollAccumulatedDy = 0
         if (wantHidden) commitHidden(animated = true) else commitVisible(animated = true)
+        onVisualBoundsChanged?.invoke()
     }
 
     fun syncMainControls(
@@ -447,8 +654,10 @@ class StatsBar @JvmOverloads constructor(
                 } else {
                     syncHiddenPosition()
                 }
+                onVisualBoundsChanged?.invoke()
             }
             .start()
+        onVisualBoundsChanged?.invoke()
     }
 
     private fun commitHidden(animated: Boolean) {
@@ -472,8 +681,10 @@ class StatsBar @JvmOverloads constructor(
                 } else {
                     commitVisible(animated = false)
                 }
+                onVisualBoundsChanged?.invoke()
             }
             .start()
+        onVisualBoundsChanged?.invoke()
     }
 
     private fun syncHiddenPosition() {
@@ -484,6 +695,7 @@ class StatsBar @JvmOverloads constructor(
         isClickable = false
         resetDisconnectedViews()
         translationY = hiddenOffset()
+        onVisualBoundsChanged?.invoke()
     }
 
     private fun cancelPendingTransition() {
@@ -561,6 +773,36 @@ class StatsBar @JvmOverloads constructor(
                     }
                 )
             }
+            // 同步更新悬浮一体底栏文本
+            val modernIp = if (currentState == BaseService.State.Connected || DataStore.serviceState.connected) {
+                val cached = LandingIpManager.getCachedInfo()
+                when {
+                    DataStore.showLandingIp && cached != null && cached.ip.isNotBlank() ->
+                        "${cached.countryFlag} ${cached.countryCode} ${cached.ip}"
+                    DataStore.showLandingIp && LandingIpManager.isCurrentlyQuerying() ->
+                        context.getString(R.string.landing_ip_querying)
+                    DataStore.showLandingIp ->
+                        LandingIpManager.getProfileFallbackDisplay(DataStore.selectedProxy)
+                    else -> app.getString(R.string.vpn_connected)
+                }
+            } else {
+                app.getString(R.string.not_connected)
+            }
+            modernIpText?.text = modernIp
+
+            val isHttps = DataStore.connectionTestURL.startsWith("https://", ignoreCase = true)
+            val handshakeType = if (isHttps) "HTTPS" else "HTTP"
+            modernStatusTitleText?.text = "$handshakeType 延迟"
+
+            val latencyBadgeText = when {
+                customStatus != null -> customStatus.toString()
+                isTestingRealLatency -> context.getString(R.string.connection_test_testing)
+                latency > 0 -> "$latency ms"
+                else -> app.getString(R.string.vpn_connected)
+            }
+            modernLatencyPill?.text = latencyBadgeText
+            modernStatusText?.text = latencyBadgeText
+
             TooltipCompat.setTooltipText(this, statusText.text)
         }
     }
@@ -699,16 +941,16 @@ class StatsBar @JvmOverloads constructor(
     @SuppressLint("SetTextI18n")
     fun updateSpeed(txRate: Long, rxRate: Long) {
         runOnUi {
-            txText.text = "▲ ${
-                context.getString(
-                    R.string.speed, Formatter.formatFileSize(context, txRate)
-                )
-            }"
-            rxText.text = "▼ ${
-                context.getString(
-                    R.string.speed, Formatter.formatFileSize(context, rxRate)
-                )
-            }"
+            val txFormatted = context.getString(
+                R.string.speed, Formatter.formatFileSize(context, txRate)
+            )
+            val rxFormatted = context.getString(
+                R.string.speed, Formatter.formatFileSize(context, rxRate)
+            )
+            txText.text = "▲ $txFormatted"
+            rxText.text = "▼ $rxFormatted"
+            modernTxText?.text = "↑ $txFormatted"
+            modernRxText?.text = "↓ $rxFormatted"
         }
     }
 

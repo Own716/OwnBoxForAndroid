@@ -104,6 +104,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var enableClashAPI by configurationStore.boolean(Key.ENABLE_CLASH_API) { true }
     var enableConnectionsMonitor by configurationStore.boolean(Key.ENABLE_CONNECTIONS_MONITOR) { false }
     var showBottomBar by configurationStore.boolean(Key.SHOW_BOTTOM_BAR)
+    var bottomBarStyle by configurationStore.stringToInt(Key.BOTTOM_BAR_STYLE) { 0 }
     var confirmProfileDelete by configurationStore.boolean(Key.CONFIRM_PROFILE_DELETE) { true }
     var groupLayoutMode by configurationStore.stringToInt(Key.GROUP_LAYOUT_MODE) { 0 }
     var profileCardStyle by configurationStore.stringToInt(Key.PROFILE_CARD_STYLE) { 0 }

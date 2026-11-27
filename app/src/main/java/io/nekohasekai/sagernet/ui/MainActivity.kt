@@ -27,7 +27,9 @@ import android.widget.ScrollView
 import android.widget.TextView
 import androidx.activity.addCallback
 import androidx.annotation.IdRes
+import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.core.app.ActivityCompat
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.GravityCompat
@@ -99,6 +101,11 @@ class MainActivity : ThemedActivity(),
 
         binding = LayoutMainBinding.inflate(layoutInflater)
         binding.fab.initProgress(binding.fabProgress)
+        binding.stats.onVisualBoundsChanged = {
+            if (!isDestroyed && !isFinishing) {
+                applyBottomBarLayoutStyle()
+            }
+        }
         val bottomFactor = UiScaleManager.bottomBarFactor()
         if (bottomFactor != 1.0f) {
             binding.fab.scaleX = bottomFactor
@@ -271,6 +278,7 @@ class MainActivity : ThemedActivity(),
         }
 
         setContentView(binding.root)
+        applyBottomBarLayoutStyle()
         currentMainFragment =
             supportFragmentManager.findFragmentById(R.id.fragment_holder) as? ToolbarFragment
                 ?: currentMainFragment
@@ -327,6 +335,7 @@ class MainActivity : ThemedActivity(),
 
         checkClipboardOnResume()
         binding.stats.refreshDisplay()
+        applyBottomBarLayoutStyle()
         refreshNavMenu(DataStore.enableClashAPI, DataStore.enableConnectionsMonitor)
         updateProxyModeCard()
     }
@@ -1036,6 +1045,127 @@ class MainActivity : ThemedActivity(),
         )
     }
 
+    private var lastFabScrollTransY: Float = 0f
+
+    private fun applyBottomBarLayoutStyle() {
+        val style = DataStore.bottomBarStyle.coerceIn(0, 2)
+        binding.stats.applyStyleMode(style)
+
+        val fabLp = binding.fab.layoutParams as? CoordinatorLayout.LayoutParams ?: return
+        var lpChanged = false
+
+        fun updateLp(
+            anchorId: Int,
+            anchorGravity: Int,
+            gravity: Int,
+            leftMargin: Int,
+            rightMargin: Int,
+            bottomMargin: Int,
+        ) {
+            if (fabLp.anchorId != anchorId) {
+                fabLp.anchorId = anchorId
+                lpChanged = true
+            }
+            if (fabLp.anchorGravity != anchorGravity) {
+                fabLp.anchorGravity = anchorGravity
+                lpChanged = true
+            }
+            if (fabLp.gravity != gravity) {
+                fabLp.gravity = gravity
+                lpChanged = true
+            }
+            if (fabLp.leftMargin != leftMargin || fabLp.rightMargin != rightMargin || fabLp.bottomMargin != bottomMargin || fabLp.topMargin != 0) {
+                fabLp.setMargins(leftMargin, 0, rightMargin, bottomMargin)
+                lpChanged = true
+            }
+        }
+
+        if (style == 2) {
+            if (binding.fab.customSize != FloatingActionButton.NO_CUSTOM_SIZE) {
+                binding.fab.customSize = FloatingActionButton.NO_CUSTOM_SIZE
+            }
+            binding.fab.compatElevation = dp(6).toFloat()
+            binding.fabProgress.elevation = dp(7).toFloat()
+            updateLp(
+                anchorId = R.id.stats,
+                anchorGravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL,
+                gravity = Gravity.NO_GRAVITY,
+                leftMargin = 0,
+                rightMargin = 0,
+                bottomMargin = 0,
+            )
+            if (lastFabScrollTransY != 0f || binding.fab.translationY != 0f) {
+                lastFabScrollTransY = 0f
+                binding.fab.animate().cancel()
+                binding.fab.translationY = 0f
+                binding.fabProgress.translationY = 0f
+            }
+        } else {
+            val statsActive = binding.stats.isConnectedAndAllowed()
+            val statsScrollHidden = binding.stats.isScrollHiddenState()
+            val navInset = binding.stats.currentNavBottomInsetPx()
+            val statsBottom = binding.stats.currentBottomMarginPx()
+            val targetSize = when {
+                style == 0 && statsActive -> dp(46)
+                style == 0 -> dp(54)
+                statsActive -> dp(52)
+                else -> dp(56)
+            }
+            if (binding.fab.customSize != targetSize) {
+                binding.fab.customSize = targetSize
+            }
+            binding.fab.compatElevation = dp(10).toFloat()
+            binding.fabProgress.elevation = dp(11).toFloat()
+
+            val targetGravity = if (style == 0) Gravity.BOTTOM or Gravity.END else Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            val targetRightMargin = when {
+                style == 0 && statsActive -> dp(24)
+                style == 0 -> dp(20)
+                else -> 0
+            }
+            val statsHeight = binding.stats.height.takeIf { it > 0 } ?: dp(if (style == 0) 64 else 60)
+            val restBottom = dp(18) + navInset
+            val activeBottom = if (style == 0) {
+                statsBottom + ((statsHeight - targetSize) / 2).coerceAtLeast(dp(6))
+            } else {
+                statsBottom + statsHeight - dp(22)
+            }
+            val targetBottomMargin = if (statsActive) activeBottom else restBottom
+
+            updateLp(
+                anchorId = View.NO_ID,
+                anchorGravity = Gravity.NO_GRAVITY,
+                gravity = targetGravity,
+                leftMargin = 0,
+                rightMargin = targetRightMargin,
+                bottomMargin = targetBottomMargin,
+            )
+
+            val desiredTransY = if (statsActive && statsScrollHidden) {
+                (targetBottomMargin - restBottom).toFloat().coerceAtLeast(0f)
+            } else {
+                0f
+            }
+            if (kotlin.math.abs(lastFabScrollTransY - desiredTransY) > 0.5f) {
+                lastFabScrollTransY = desiredTransY
+                binding.fab.animate().cancel()
+                binding.fab.animate()
+                    .translationY(desiredTransY)
+                    .setDuration(180L)
+                    .start()
+                binding.fabProgress.animate().cancel()
+                binding.fabProgress.animate()
+                    .translationY(desiredTransY)
+                    .setDuration(180L)
+                    .start()
+            }
+        }
+
+        if (lpChanged) {
+            binding.fab.layoutParams = fabLp
+        }
+    }
+
     private fun syncMainControls(
         fragment: Any? = currentMainFragment
             ?: supportFragmentManager.findFragmentById(R.id.fragment_holder),
@@ -1050,9 +1180,9 @@ class MainActivity : ThemedActivity(),
             showWhenConnected,
             animate,
         )
+        applyBottomBarLayoutStyle()
         binding.fab.animate().cancel()
         if (showControls) {
-            binding.fab.translationY = 0f
             binding.fab.translationX = 0f
             binding.fab.show()
         } else {
@@ -1221,6 +1351,9 @@ class MainActivity : ThemedActivity(),
                 }
                 Key.SHOW_LANDING_IP -> {
                     binding.stats.refreshDisplay()
+                }
+                Key.BOTTOM_BAR_STYLE -> {
+                    applyBottomBarLayoutStyle()
                 }
                 Key.SHOW_BOTTOM_BAR -> {
                     syncMainControls(

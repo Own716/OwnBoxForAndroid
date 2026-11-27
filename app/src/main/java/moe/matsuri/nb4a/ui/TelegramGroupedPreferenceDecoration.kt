@@ -31,9 +31,9 @@ import io.nekohasekai.sagernet.utils.Theme
  */
 class TelegramGroupedPreferenceDecoration(private val context: Context) : RecyclerView.ItemDecoration() {
 
-    private val cardRadius = context.resources.getDimension(R.dimen.telegram_card_corner_radius)
-    private val strokeWidth = context.resources.getDimension(R.dimen.card_stroke_width)
-    private val marginHorizontal = context.resources.getDimensionPixelSize(R.dimen.telegram_card_margin_horizontal)
+    private val cardRadius = dp2px(18).toFloat()
+    private val strokeWidth = (0.7f * context.resources.displayMetrics.density).coerceAtLeast(1f)
+    private val marginHorizontal = dp2px(14)
 
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
@@ -64,9 +64,19 @@ class TelegramGroupedPreferenceDecoration(private val context: Context) : Recycl
             outRect.bottom = dp2px(2)
             view.background = null
 
-            // 动态染色分类小标题
+            // 动态染色分类小标题（中性主题采用柔和灰，其余主题保持主题主色）
             val titleView = view.findViewById<TextView>(android.R.id.title)
-            titleView?.setTextColor(Theme.getPrimaryColor(context))
+            val isNeutralTheme = Theme.isWhiteTheme(context) || Theme.isLightGrayTheme(context) || Theme.isBlackTheme(context)
+            val headerColor = if (isNeutralTheme) {
+                if (Theme.isBlackTheme(context) || Theme.usingNightMode(context)) {
+                    Color.parseColor("#9CA3AF")
+                } else {
+                    Color.parseColor("#6E6E77")
+                }
+            } else {
+                Theme.getPrimaryColor(context)
+            }
+            titleView?.setTextColor(headerColor)
         } else {
             outRect.left = marginHorizontal
             outRect.right = marginHorizontal
@@ -126,8 +136,18 @@ class TelegramGroupedPreferenceDecoration(private val context: Context) : Recycl
         val adapter = parent.adapter as? PreferenceGroupAdapter ?: return
         if (parent.childCount == 0) return
 
-        val surfaceColor = context.getColorAttr(R.attr.cardElevatedSurfaceColor)
-        val strokeColor = ContextCompat.getColor(context, R.color.card_stroke)
+        val isBlack = Theme.isBlackTheme(context)
+        val isNight = Theme.usingNightMode(context)
+        val surfaceColor = when {
+            isBlack -> Color.parseColor("#141416")
+            isNight -> Color.parseColor("#1E1E22")
+            else -> Color.WHITE
+        }
+        val strokeColor = when {
+            isBlack -> Color.parseColor("#18FFFFFF")
+            isNight -> Color.parseColor("#16FFFFFF")
+            else -> Color.parseColor("#0F000000")
+        }
 
         fillPaint.color = surfaceColor
         strokePaint.color = strokeColor
@@ -188,7 +208,13 @@ class TelegramGroupedPreferenceDecoration(private val context: Context) : Recycl
 
     override fun onDrawOver(c: Canvas, parent: RecyclerView, state: RecyclerView.State) {
         val adapter = parent.adapter as? PreferenceGroupAdapter ?: return
-        dividerPaint.color = ContextCompat.getColor(context, R.color.card_stroke)
+        val isBlack = Theme.isBlackTheme(context)
+        val isNight = Theme.usingNightMode(context)
+        dividerPaint.color = when {
+            isBlack -> Color.parseColor("#16FFFFFF")
+            isNight -> Color.parseColor("#14FFFFFF")
+            else -> Color.parseColor("#0F000000")
+        }
 
         val insetStart = dp2px(60).toFloat()
         val insetEnd = dp2px(16).toFloat()
@@ -212,13 +238,20 @@ class TelegramGroupedPreferenceDecoration(private val context: Context) : Recycl
 
     companion object {
         fun applyTo(recyclerView: RecyclerView) {
+            val ctx = recyclerView.context
+            val bgColor = when {
+                Theme.isBlackTheme(ctx) -> Color.BLACK
+                Theme.usingNightMode(ctx) -> Color.parseColor("#121212")
+                else -> Color.parseColor("#F5F5F7")
+            }
+            recyclerView.setBackgroundColor(bgColor)
             // 避免重复添加
             for (i in 0 until recyclerView.itemDecorationCount) {
                 if (recyclerView.getItemDecorationAt(i) is TelegramGroupedPreferenceDecoration) {
                     return
                 }
             }
-            recyclerView.addItemDecoration(TelegramGroupedPreferenceDecoration(recyclerView.context))
+            recyclerView.addItemDecoration(TelegramGroupedPreferenceDecoration(ctx))
         }
     }
 }

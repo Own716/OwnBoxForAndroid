@@ -38,6 +38,7 @@ import androidx.appcompat.widget.Toolbar
 import androidx.core.graphics.ColorUtils
 import androidx.core.graphics.drawable.DrawableCompat
 import androidx.core.net.toUri
+import androidx.core.view.MenuCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isGone
@@ -565,6 +566,29 @@ class ConfigurationFragment @JvmOverloads constructor(
         lastStyledSortMenuColor = primaryColor
     }
 
+    private fun styleDangerMenuItem(menu: Menu, itemId: Int, isDark: Boolean) {
+        val item = menu.findItem(itemId) ?: return
+        item.icon = null
+        val rawTitle = item.title?.toString() ?: return
+        val dangerColor = Color.parseColor(if (isDark) "#FF6B6B" else "#E03838")
+        item.title = SpannableString(rawTitle).apply {
+            setSpan(ForegroundColorSpan(dangerColor), 0, length, SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+    }
+
+    private fun styleActionMiscMenu() {
+        if (!isToolbarInitialized) return
+        val sub = toolbar.menu.findItem(R.id.action_misc)?.subMenu ?: return
+        MenuCompat.setGroupDividerEnabled(sub, true)
+        for (i in 0 until sub.size()) {
+            sub.getItem(i).icon = null
+        }
+        val ctx = context ?: return
+        val isDark = Theme.isBlackTheme(ctx) || Theme.usingNightMode(ctx)
+        styleDangerMenuItem(sub, R.id.action_connection_test_delete_unavailable, isDark)
+        styleDangerMenuItem(sub, R.id.action_clear_traffic_statistics, isDark)
+    }
+
     private fun tintMenuIcons(menu: Menu, color: Int) {
         for (i in 0 until menu.size()) {
             val item = menu.getItem(i)
@@ -846,6 +870,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             toolbar.menu.findItem(R.id.action_connection_test_clear_results)?.setTitle(R.string.connection_test_clear_results)
             toolbar.menu.findItem(R.id.action_connection_test_delete_unavailable)?.setTitle(R.string.connection_test_delete_unavailable)
         }
+        styleActionMiscMenu()
     }
 
     private fun showSoftKeyboard(view: View?) {
@@ -1067,31 +1092,14 @@ class ConfigurationFragment @JvmOverloads constructor(
         val rootView = view ?: return
         val toolbarContainer = rootView.findViewById<View>(R.id.toolbar_container) ?: return
         val capsulesBgView = rootView.findViewById<View>(R.id.toolbar_capsules_bg) ?: return
-        val density = resources.displayMetrics.density
 
         topBarContainerRef = toolbarContainer
         topBarTitleViewRef = rootView.findViewById(R.id.toolbar_title_view)
 
-        val drawable = topBarCapsulesDrawable?.apply {
-            updateStyle(
-                fillColor = fillColor,
-                strokeColor = strokeColor,
-                strokeWidthPx = 0.9f * density,
-                shadowBaseColor = shadowBaseColor,
-                isDark = isDark,
-            )
-        } ?: DualFloatingCapsulesDrawable(
-            fillColor = fillColor,
-            strokeColor = strokeColor,
-            strokeWidthPx = 0.9f * density,
-            isDark = isDark,
-            density = density,
-            shadowBaseColor = shadowBaseColor,
-        ).also { topBarCapsulesDrawable = it }
-
-        if (capsulesBgView.background !== drawable) {
-            capsulesBgView.background = drawable
-        }
+        // 顶栏去外框胶囊：隐藏胶囊底托并清空背景，保留居中与防遮挡对齐监听
+        topBarCapsulesDrawable = null
+        capsulesBgView.background = null
+        capsulesBgView.visibility = View.GONE
 
         if (topBarLayoutChangeListener == null || topBarToolbarLayoutTarget !== toolbar) {
             topBarLayoutChangeListener?.let { oldListener ->
@@ -1113,7 +1121,7 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     private fun updateTopBarCapsulesBounds() {
         val toolbarContainer = topBarContainerRef ?: view?.findViewById<View>(R.id.toolbar_container) ?: return
-        val drawable = topBarCapsulesDrawable ?: return
+        val drawable = topBarCapsulesDrawable
         if (!isToolbarInitialized) return
 
         val cw = toolbarContainer.width
@@ -1226,7 +1234,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             }
         }
 
-        drawable.updateCapsules(
+        drawable?.updateCapsules(
             leftL = if (leftR > leftL) leftL else 0f,
             leftT = if (leftR > leftL) capTop else 0f,
             leftR = if (leftR > leftL) leftR else 0f,
@@ -1588,6 +1596,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         if (!select) {
             toolbar.inflateMenu(R.menu.add_profile_menu)
             styleSortAndLayoutHeaders(toolbar.menu)
+            styleActionMiscMenu()
             toolbar.setOnMenuItemClickListener(this)
             tintMenuIcons(toolbar.menu, primaryTextColor)
             adjustToolbarActionButtons()
@@ -2102,6 +2111,14 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
         latestStrategySnapshot = snap
         card.visibility = View.VISIBLE
+        card.strokeWidth = 0
+        card.setCardBackgroundColor(
+            when {
+                Theme.isBlackTheme(context) -> Color.parseColor("#18181D")
+                Theme.usingNightMode(context) -> Color.parseColor("#24262D")
+                else -> Color.parseColor("#EDEFF3")
+            }
+        )
 
         val currentMember = snap.members.firstOrNull { it.pinned }
             ?: snap.members.firstOrNull { it.active }
@@ -4727,7 +4744,7 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             if (isAllGroupsTab) {
                 subscriptionCardGeneration.incrementAndGet()
-                bindNonSubscriptionCard(root, card, proxyGroup)
+                card.isGone = true
                 return
             }
 
@@ -4852,26 +4869,8 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
 
         private fun bindNonSubscriptionCard(root: View, card: MaterialCardView, currentGroup: ProxyGroup) {
-            val tvTitle = root.findViewById<TextView>(R.id.tv_subscription_title)
-            val tvExpire = root.findViewById<TextView>(R.id.tv_expire_date)
-            val layoutTraffic = root.findViewById<View>(R.id.layout_traffic_details)
-            val tvNodeCount = root.findViewById<TextView>(R.id.tv_node_count)
-            val tvLastUpdated = root.findViewById<TextView>(R.id.tv_last_updated)
-            val btnUpdate = root.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_card_update)
-
-            val groupName = if (isAllGroupsTab) {
-                getString(R.string.group_tab_all)
-            } else {
-                currentGroup.displayName()
-            }
-            tvTitle?.text = groupName
-            tvExpire?.isGone = true
-            layoutTraffic?.isGone = true
-            tvLastUpdated?.isGone = true
-            btnUpdate?.isGone = true
-            val count = adapter?.configurationIdList?.size ?: 0
-            tvNodeCount?.text = "$count 个节点"
-            card.isVisible = true
+            // 非订阅组（如策略组/本地分组）隐藏空白占位卡片
+            card.isGone = true
         }
 
         private fun bindSubscriptionCardSnapshot(
@@ -4882,9 +4881,13 @@ class ConfigurationFragment @JvmOverloads constructor(
             val currentGroup = snapshot.currentGroup
             val sub = currentGroup.subscription
             if (isAllGroupsTab || currentGroup.type != GroupType.SUBSCRIPTION || sub == null) {
-                bindNonSubscriptionCard(root, card, currentGroup)
+                card.isGone = true
                 return
             }
+            val density = root.resources.displayMetrics.density
+            val isDark = Theme.isBlackTheme(root.context) || Theme.usingNightMode(root.context)
+            card.strokeWidth = (0.7f * density).toInt().coerceAtLeast(1)
+            card.strokeColor = Color.parseColor(if (isDark) "#1AFFFFFF" else "#12000000")
 
             val tvTitle = root.findViewById<TextView>(R.id.tv_subscription_title)
             val tvExpire = root.findViewById<TextView>(R.id.tv_expire_date)
@@ -5827,9 +5830,25 @@ class ConfigurationFragment @JvmOverloads constructor(
             private fun showNodeCascadingMenu(anchor: View, proxyEntity: ProxyEntity) {
                 if (select) return
                 activeNodePopupMenu?.dismiss()
-                val popup = PopupMenu(requireContext(), anchor, Gravity.END)
+                val ctx = requireContext()
+                var effectiveAnchor = anchor
+                var gravity = Gravity.END
+                if (anchor === itemView) {
+                    val loc = IntArray(2)
+                    anchor.getLocationOnScreen(loc)
+                    val screenH = anchor.resources.displayMetrics.heightPixels
+                    if (loc[1] + anchor.height + dp2px(260) > screenH - dp2px(96)) {
+                        effectiveAnchor = itemView.findViewById<View>(R.id.container) ?: anchor
+                        gravity = Gravity.END or Gravity.TOP
+                    }
+                }
+                val popup = PopupMenu(ctx, effectiveAnchor, gravity)
                 activeNodePopupMenu = popup
                 popup.menuInflater.inflate(R.menu.profile_share_menu, popup.menu)
+                MenuCompat.setGroupDividerEnabled(popup.menu, true)
+                for (i in 0 until popup.menu.size()) {
+                    popup.menu.getItem(i).icon = null
+                }
 
                 val hasStd = proxyEntity.haveStandardLink()
                 val hasLink = proxyEntity.haveLink()
@@ -5848,6 +5867,9 @@ class ConfigurationFragment @JvmOverloads constructor(
 
                 if (select) {
                     popup.menu.removeItem(R.id.action_delete)
+                } else {
+                    val isDark = Theme.isBlackTheme(ctx) || Theme.usingNightMode(ctx)
+                    styleDangerMenuItem(popup.menu, R.id.action_delete, isDark)
                 }
 
                 popup.setOnMenuItemClickListener(this)
@@ -6100,12 +6122,20 @@ class ConfigurationFragment @JvmOverloads constructor(
                     val primary = ctx.getColorAttr(R.attr.colorPrimary)
                     selectedIndicator.isVisible = false
                     card.cardElevation = 0f
-                    card.strokeWidth = ctx.resources.getDimensionPixelSize(
-                        if (selected) R.dimen.card_stroke_width_selected
-                        else R.dimen.card_stroke_width
-                    )
-                    card.strokeColor =
-                        if (selected) primary else ctx.getColour(R.color.card_stroke)
+                    if (selected) {
+                        card.strokeWidth = ctx.resources.getDimensionPixelSize(
+                            R.dimen.card_stroke_width_selected
+                        )
+                        card.strokeColor = primary
+                    } else {
+                        card.strokeWidth = (0.7f * ctx.resources.displayMetrics.density).toInt().coerceAtLeast(1)
+                        val softStroke = when {
+                            Theme.isBlackTheme(ctx) || Theme.usingNightMode(ctx) -> Color.parseColor("#18FFFFFF")
+                            Theme.isWhiteTheme(ctx) -> Color.parseColor("#14000000")
+                            else -> Color.parseColor("#0F000000")
+                        }
+                        card.strokeColor = softStroke
+                    }
                 } else {
                     selectedIndicator.isVisible = selected
                     card.strokeWidth = 0
