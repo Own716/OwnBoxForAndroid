@@ -856,4 +856,17 @@
         <item>br</item>
     </string-array>
 
+    <string-array name="motion_effect_entries">
+        <item>@string/motion_effect_off</item>
+        <item>@string/motion_effect_minimal</item>
+        <item>@string/motion_effect_smooth</item>
+        <item>@string/motion_effect_lively</item>
+    </string-array>
+    <string-array name="motion_effect_values" translatable="false">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+    </string-array>
+
 </resources>

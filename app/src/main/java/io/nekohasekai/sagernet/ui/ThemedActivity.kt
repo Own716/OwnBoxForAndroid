@@ -1,10 +1,12 @@
 package io.nekohasekai.sagernet.ui
 
 import android.content.Context
+import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
@@ -149,6 +151,27 @@ abstract class ThemedActivity : AppCompatActivity {
             lastUsingNight != currentUsingNight ||
             (this !is UiScaleSettingsActivity && lastUiScaleSignature != currentScaleSignature)) {
             ActivityCompat.recreate(this)
+        }
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
+        io.nekohasekai.sagernet.ui.motion.TouchOriginTracker.recordTouchEvent(ev)
+        return super.dispatchTouchEvent(ev)
+    }
+
+    @Suppress("DEPRECATION")
+    override fun startActivityForResult(intent: Intent?, requestCode: Int, options: Bundle?) {
+        super.startActivityForResult(intent, requestCode, options)
+        if (!isDialog && io.nekohasekai.sagernet.ui.motion.SmoothMotion.isEnabled()) {
+            overridePendingTransition(R.anim.smooth_activity_enter, R.anim.smooth_activity_exit)
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    override fun finish() {
+        super.finish()
+        if (!isDialog && io.nekohasekai.sagernet.ui.motion.SmoothMotion.isEnabled()) {
+            overridePendingTransition(R.anim.smooth_activity_close_enter, R.anim.smooth_activity_close_exit)
         }
     }
 

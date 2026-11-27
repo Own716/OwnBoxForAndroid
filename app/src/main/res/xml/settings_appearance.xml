@@ -204,6 +204,14 @@
             app:key="bottomBarStyle"
             app:title="@string/bottom_bar_style"
             app:useSimpleSummaryProvider="true" />
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:defaultValue="2"
+            app:entries="@array/motion_effect_entries"
+            app:entryValues="@array/motion_effect_values"
+            app:icon="@drawable/solar_bolt_circle_linear"
+            app:key="motionEffectLevel"
+            app:title="@string/motion_effect_level"
+            app:useSimpleSummaryProvider="true" />
         <SwitchPreferenceCompat
             app:defaultValue="true"
             app:icon="@drawable/solar_smartphone_vibration_linear"

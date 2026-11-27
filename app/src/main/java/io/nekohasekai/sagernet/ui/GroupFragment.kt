@@ -63,6 +63,9 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
         groupAdapter = GroupAdapter()
         GroupManager.addListener(groupAdapter)
         groupListView.adapter = groupAdapter
+        io.nekohasekai.sagernet.ui.motion.SmoothMotion.run {
+            groupListView.attachSmoothOverscroll()
+        }
 
         undoManager = UndoSnackbarManager(activity, groupAdapter)
 

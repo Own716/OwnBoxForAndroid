@@ -2,4 +2,13 @@
 <resources>
     <item name="nav_settings" type="id" />
     <item name="nav_about" type="id" />
+    <item name="motion_tag_spring_x" type="id" />
+    <item name="motion_tag_spring_y" type="id" />
+    <item name="motion_tag_spring_tx" type="id" />
+    <item name="motion_tag_spring_ty" type="id" />
+    <item name="motion_tag_base_sx" type="id" />
+    <item name="motion_tag_base_sy" type="id" />
+    <item name="motion_tag_press_attached" type="id" />
+    <item name="motion_tag_overscroll_attached" type="id" />
+    <item name="motion_tag_toolbar_hooked" type="id" />
 </resources>

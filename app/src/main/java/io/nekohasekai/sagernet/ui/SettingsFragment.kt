@@ -62,14 +62,16 @@ class SettingsFragment : ToolbarFragment(R.layout.layout_config_settings),
         fragment.arguments = Bundle(extras).apply {
             putCharSequence(AppearanceSettingsFragment.ARG_TITLE, title)
         }
-        childFragmentManager.beginTransaction()
-            .setCustomAnimations(
+        val tx = childFragmentManager.beginTransaction()
+        if (io.nekohasekai.sagernet.ui.motion.SmoothMotion.isEnabled()) {
+            tx.setCustomAnimations(
                 R.anim.fragment_open_enter,
                 R.anim.fragment_open_exit,
                 R.anim.fragment_close_enter,
                 R.anim.fragment_close_exit
             )
-            .setReorderingAllowed(true)
+        }
+        tx.setReorderingAllowed(true)
             .replace(R.id.settings, fragment)
             .addToBackStack(null)
             .commitAllowingStateLoss()

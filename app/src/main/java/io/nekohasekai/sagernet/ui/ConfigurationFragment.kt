@@ -661,6 +661,9 @@ class ConfigurationFragment @JvmOverloads constructor(
                 child.scaleType = ImageView.ScaleType.CENTER_INSIDE
                 child.scaleX = navScale
                 child.scaleY = navScale
+                io.nekohasekai.sagernet.ui.motion.SmoothMotion.run {
+                    child.attachSmoothPress(0.90f)
+                }
             } else if (child is ActionMenuView) {
                 child.clipChildren = false
                 child.clipToPadding = false
@@ -1581,6 +1584,10 @@ class ConfigurationFragment @JvmOverloads constructor(
 
         groupPager.adapter = adapter
         groupPager.offscreenPageLimit = 2
+        io.nekohasekai.sagernet.ui.motion.SmoothMotion.run {
+            groupPager.attachSmoothPageTransformer()
+            tabLayout.attachSmoothTabPop()
+        }
 
         val primaryTextColor = requireContext().getColorAttr(android.R.attr.textColorPrimary)
         if (!select) {
@@ -4704,6 +4711,9 @@ class ConfigurationFragment @JvmOverloads constructor(
             configurationListView.adapter = adapter
             (configurationListView.itemAnimator as? SimpleItemAnimator)?.supportsChangeAnimations = false
             configurationListView.setItemViewCacheSize(20)
+            io.nekohasekai.sagernet.ui.motion.SmoothMotion.run {
+                configurationListView.attachSmoothOverscroll()
+            }
             configurationListView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
                 override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
                     if (newState == RecyclerView.SCROLL_STATE_IDLE) {
@@ -5916,6 +5926,9 @@ class ConfigurationFragment @JvmOverloads constructor(
 
             init {
                 applyCardScale()
+                io.nekohasekai.sagernet.ui.motion.SmoothMotion.run {
+                    card.attachSmoothPress(0.978f)
+                }
                 dragHandle.setOnTouchListener { v, event ->
                     if (event.actionMasked == MotionEvent.ACTION_DOWN) {
                         if (DataStore.hapticFeedback) v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)

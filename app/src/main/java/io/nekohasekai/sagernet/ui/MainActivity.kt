@@ -101,6 +101,10 @@ class MainActivity : ThemedActivity(),
 
         binding = LayoutMainBinding.inflate(layoutInflater)
         binding.fab.initProgress(binding.fabProgress)
+        io.nekohasekai.sagernet.ui.motion.SmoothMotion.run {
+            binding.fab.attachSmoothPress(0.92f)
+            binding.stats.attachSmoothPress(0.975f)
+        }
         binding.stats.onVisualBoundsChanged = {
             if (!isDestroyed && !isFinishing) {
                 syncFabPositionForBottomBar()
@@ -196,6 +200,10 @@ class MainActivity : ThemedActivity(),
             } else {
                 displayFragmentWithId(R.id.nav_about)
             }
+        }
+        io.nekohasekai.sagernet.ui.motion.SmoothMotion.run {
+            drawerSettingsButton.attachSmoothPress(0.95f)
+            drawerAboutButton.attachSmoothPress(0.94f)
         }
         ViewCompat.setOnApplyWindowInsetsListener(drawerRoot) { view, insets ->
             val systemBars = insets.getInsets(
@@ -754,6 +762,9 @@ class MainActivity : ThemedActivity(),
                 marginStart = titleGap
             })
             row.setOnClickListener { onNavigationItemSelected(item) }
+            io.nekohasekai.sagernet.ui.motion.SmoothMotion.run {
+                row.attachSmoothPress(0.97f)
+            }
             drawerMenuItems.addView(row, rowParams)
         }
         drawerMenuItems.post { drawerMenuScroll.requestLayout() }
@@ -1033,9 +1044,13 @@ class MainActivity : ThemedActivity(),
 
     @SuppressLint("CommitTransaction")
     fun displayFragment(fragment: ToolbarFragment) {
+        val hadPrevious = currentMainFragment != null
         currentMainFragment = fragment
-        supportFragmentManager.beginTransaction()
-            .replace(R.id.fragment_holder, fragment)
+        val tx = supportFragmentManager.beginTransaction()
+        if (hadPrevious && io.nekohasekai.sagernet.ui.motion.SmoothMotion.isEnabled()) {
+            tx.setCustomAnimations(R.anim.smooth_page_enter, R.anim.smooth_page_exit)
+        }
+        tx.replace(R.id.fragment_holder, fragment)
             .commitAllowingStateLoss()
         binding.drawerLayout.closeDrawers()
         syncMainControls(
@@ -1446,6 +1461,7 @@ class MainActivity : ThemedActivity(),
     }
 
     fun hideMenuScrim(token: Any? = null) {
+        moe.matsuri.nb4a.ui.MenuScrimHelper.dismissActive()
         if (token != null && activeMenuToken != null && token != activeMenuToken) {
             return
         }

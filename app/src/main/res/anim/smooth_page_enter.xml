@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:interpolator="@interpolator/ios_smooth_out">
+    <alpha
+        android:duration="170"
+        android:fromAlpha="0.0"
+        android:toAlpha="1.0" />
+    <scale
+        android:duration="230"
+        android:fromXScale="0.975"
+        android:fromYScale="0.975"
+        android:pivotX="50%"
+        android:pivotY="50%"
+        android:toXScale="1.0"
+        android:toYScale="1.0" />
+    <translate
+        android:duration="230"
+        android:fromYDelta="2.5%p"
+        android:toYDelta="0" />
+</set>

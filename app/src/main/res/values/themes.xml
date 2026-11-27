@@ -210,8 +210,14 @@
         <item name="android:textStyle">bold</item>
     </style>
 
+    <style name="SmoothDialogAnimation">
+        <item name="android:windowEnterAnimation">@anim/smooth_dialog_enter</item>
+        <item name="android:windowExitAnimation">@anim/smooth_dialog_exit</item>
+    </style>
+
     <style name="ThemeOverlay.MaterialComponents.MaterialAlertDialog.SagerNet">
         <item name="shapeAppearanceOverlay">@style/ShapeAppearanceOverlay.SagerNet.Dialog</item>
+        <item name="android:windowAnimationStyle">@style/SmoothDialogAnimation</item>
         <item name="buttonBarPositiveButtonStyle">
             @style/Widget.MaterialComponents.Button.TextButton.Dialog.Primary
         </item>
@@ -558,6 +564,7 @@
 
     <style name="ThemeOverlay.SagerNet.AlertDialog" parent="ThemeOverlay.MaterialComponents.MaterialAlertDialog.SagerNet">
         <item name="android:windowBackground">@drawable/bg_dialog</item>
+        <item name="android:windowAnimationStyle">@style/SmoothDialogAnimation</item>
     </style>
 
     <style name="Theme.SagerNet.Pink_SSR" parent="Theme.SagerNet">

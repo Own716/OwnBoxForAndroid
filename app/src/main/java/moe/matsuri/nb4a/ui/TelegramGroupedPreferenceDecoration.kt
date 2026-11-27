@@ -257,6 +257,25 @@ class TelegramGroupedPreferenceDecoration(private val context: Context) : Recycl
                 else -> Color.parseColor("#F5F5F7")
             }
             recyclerView.setBackgroundColor(bgColor)
+            io.nekohasekai.sagernet.ui.motion.SmoothMotion.run {
+                recyclerView.attachSmoothOverscroll()
+            }
+            if (recyclerView.getTag(R.id.motion_tag_press_attached) != true) {
+                recyclerView.setTag(R.id.motion_tag_press_attached, true)
+                recyclerView.addOnChildAttachStateChangeListener(object : RecyclerView.OnChildAttachStateChangeListener {
+                    override fun onChildViewAttachedToWindow(view: View) {
+                        val pos = recyclerView.getChildAdapterPosition(view)
+                        val adapter = recyclerView.adapter as? PreferenceGroupAdapter
+                        if (pos != RecyclerView.NO_POSITION && adapter != null && adapter.getItem(pos) !is PreferenceCategory) {
+                            io.nekohasekai.sagernet.ui.motion.SmoothMotion.run {
+                                view.attachSmoothPress(0.982f)
+                            }
+                        }
+                    }
+
+                    override fun onChildViewDetachedFromWindow(view: View) = Unit
+                })
+            }
             // 避免重复添加
             for (i in 0 until recyclerView.itemDecorationCount) {
                 if (recyclerView.getItemDecorationAt(i) is TelegramGroupedPreferenceDecoration) {

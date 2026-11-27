@@ -105,6 +105,7 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var enableConnectionsMonitor by configurationStore.boolean(Key.ENABLE_CONNECTIONS_MONITOR) { false }
     var showBottomBar by configurationStore.boolean(Key.SHOW_BOTTOM_BAR)
     var bottomBarStyle by configurationStore.stringToInt(Key.BOTTOM_BAR_STYLE) { 0 }
+    var motionEffectLevel by configurationStore.stringToInt(Key.MOTION_EFFECT_LEVEL) { 2 }
     var confirmProfileDelete by configurationStore.boolean(Key.CONFIRM_PROFILE_DELETE) { true }
     var groupLayoutMode by configurationStore.stringToInt(Key.GROUP_LAYOUT_MODE) { 0 }
     var profileCardStyle by configurationStore.stringToInt(Key.PROFILE_CARD_STYLE) { 0 }

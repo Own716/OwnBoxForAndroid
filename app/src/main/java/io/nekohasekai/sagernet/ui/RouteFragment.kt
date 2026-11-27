@@ -159,6 +159,9 @@ class RouteFragment : ToolbarFragment(R.layout.layout_route), Toolbar.OnMenuItem
         ruleAdapter = RuleAdapter()
         ProfileManager.addListener(ruleAdapter)
         ruleListView.adapter = ruleAdapter
+        io.nekohasekai.sagernet.ui.motion.SmoothMotion.run {
+            ruleListView.attachSmoothOverscroll()
+        }
         undoManager = UndoSnackbarManager(activity, ruleAdapter)
 
         ItemTouchHelper(object : ItemTouchHelper.SimpleCallback(ItemTouchHelper.UP or ItemTouchHelper.DOWN, ItemTouchHelper.START) {
