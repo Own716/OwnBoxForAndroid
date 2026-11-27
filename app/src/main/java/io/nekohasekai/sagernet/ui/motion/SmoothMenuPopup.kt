@@ -10,6 +10,8 @@ import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
+import android.os.Handler
+import android.os.Looper
 import android.text.TextUtils
 import android.util.TypedValue
 import android.view.Gravity
@@ -38,6 +40,8 @@ import io.nekohasekai.sagernet.ui.motion.SmoothMotion.attachSmoothPress
  * - In-place submenu morphing & unified single-choice preference picker
  */
 object SmoothMenuPopup {
+
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     class Handle internal constructor(
         private val dismissAction: () -> Unit,
@@ -68,8 +72,17 @@ object SmoothMenuPopup {
         menu: Menu,
         gravity: Int = Gravity.END,
         onItemSelected: ((MenuItem) -> Boolean)? = null,
+        preferDirectCallback: Boolean = false,
         onDismiss: (() -> Unit)? = null,
-    ): Handle? = showFromMenuInternal(context, anchor, menu, gravity, onItemSelected, onDismiss)
+    ): Handle? = showFromMenuInternal(
+        context = context,
+        anchor = anchor,
+        menu = menu,
+        anchorGravity = gravity,
+        onItemSelected = onItemSelected,
+        preferDirectCallback = preferDirectCallback,
+        onDismiss = onDismiss,
+    )
 
     fun showSingleChoice(
         context: Context,
@@ -113,6 +126,7 @@ object SmoothMenuPopup {
         val padV = (10f * density).toInt()
         val pillMarginH = (8f * density).toInt()
         val pillMarginV = (2f * density).toInt()
+        var actionDispatched = false
 
         for (index in entries.indices) {
             val isSelected = index == selectedIndex
@@ -142,8 +156,10 @@ object SmoothMenuPopup {
                 background = RippleDrawable(ColorStateList.valueOf(rippleColor), itemBg, mask)
                 attachSmoothPress(isCompactButton = false)
                 setOnClickListener {
+                    if (actionDispatched) return@setOnClickListener
+                    actionDispatched = true
                     popup.dismiss()
-                    card.post { onSelect(index) }
+                    mainHandler.post { onSelect(index) }
                 }
             }
 
@@ -209,6 +225,7 @@ object SmoothMenuPopup {
         menu: Menu,
         anchorGravity: Int,
         onItemSelected: ((MenuItem) -> Boolean)?,
+        preferDirectCallback: Boolean,
         onDismiss: (() -> Unit)?,
     ): Handle? {
         if (!anchor.isAttachedToWindow) return null
@@ -322,14 +339,22 @@ object SmoothMenuPopup {
         }
 
         lateinit var renderCurrentLevel: (slideDir: Int) -> Unit
+        var actionDispatched = false
 
-        fun dispatchLeafClick(item: MenuItem) {
+        fun dispatchLeafClick(levelMenu: Menu, item: MenuItem) {
+            if (actionDispatched) return
+            actionDispatched = true
             popup.dismiss()
-            card.post {
-                val handledByMenu = runCatching {
-                    val m = item.javaClass.getMethod("invoke")
-                    (m.invoke(item) as? Boolean) == true
-                }.getOrDefault(false)
+            mainHandler.post {
+                if (preferDirectCallback && onItemSelected != null) {
+                    onItemSelected.invoke(item)
+                    return@post
+                }
+                val handledByMenu = if (item.itemId != Menu.NONE) {
+                    runCatching { levelMenu.performIdentifierAction(item.itemId, 0) }.getOrDefault(false)
+                } else {
+                    false
+                }
                 if (!handledByMenu) {
                     onItemSelected?.invoke(item)
                 }
@@ -428,7 +453,7 @@ object SmoothMenuPopup {
                                 stack.add(MenuLevel(backTitle = item.title, menu = sub))
                                 renderCurrentLevel(1)
                             } else {
-                                dispatchLeafClick(item)
+                                dispatchLeafClick(level.menu, item)
                             }
                         }
                     }

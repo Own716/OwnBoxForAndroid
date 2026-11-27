@@ -3,6 +3,7 @@ package io.nekohasekai.sagernet.ui
 import android.content.Intent
 import android.os.Bundle
 import android.text.format.Formatter
+import android.view.Gravity
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
@@ -590,7 +591,13 @@ class GroupFragment : ToolbarFragment(R.layout.layout_group),
                     popup.menu.removeItem(R.id.action_share_subscription)
                 }
                 popup.setOnMenuItemClickListener(this)
-                moe.matsuri.nb4a.ui.MenuScrimHelper.showPopupMenuWithScrim(popup, activity)
+                moe.matsuri.nb4a.ui.MenuScrimHelper.showPopupMenuWithScrim(
+                    popup = popup,
+                    activity = activity,
+                    anchor = it,
+                    gravity = Gravity.END,
+                    onItemSelected = this,
+                )
             }
 
             if (proxyGroup.id in GroupUpdater.updating) {

@@ -597,7 +597,7 @@ class ConfigurationFragment @JvmOverloads constructor(
             applyActionMenuSpacing(v)
             updateTopBarCapsulesBounds()
             (activity as? MainActivity)?.let { main ->
-                moe.matsuri.nb4a.ui.MenuScrimHelper.hookActionMenuView(toolbar, v, main)
+                moe.matsuri.nb4a.ui.MenuScrimHelper.hookActionMenuView(toolbar, v, main, this)
             }
         }
     }
@@ -672,7 +672,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                 child.addOnLayoutChangeListener(actionMenuLayoutListener)
                 applyActionMenuSpacing(child)
                 (activity as? MainActivity)?.let { main ->
-                    moe.matsuri.nb4a.ui.MenuScrimHelper.hookActionMenuView(toolbar, child, main)
+                    moe.matsuri.nb4a.ui.MenuScrimHelper.hookActionMenuView(toolbar, child, main, this)
                 }
             }
         }
@@ -697,7 +697,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                     child.addOnLayoutChangeListener(actionMenuLayoutListener)
                     applyActionMenuSpacing(child)
                     (activity as? MainActivity)?.let { main ->
-                        moe.matsuri.nb4a.ui.MenuScrimHelper.hookActionMenuView(toolbar, child, main)
+                        moe.matsuri.nb4a.ui.MenuScrimHelper.hookActionMenuView(toolbar, child, main, this)
                     }
                 }
             }
@@ -3282,8 +3282,10 @@ class ConfigurationFragment @JvmOverloads constructor(
                 batchDelete()
                 return true
             }
+
+            else -> return false
         }
-        return false
+        return true
     }
 
     fun confirmSpeedTest(targetProfileIds: Set<Long>? = null) {
@@ -5876,7 +5878,13 @@ class ConfigurationFragment @JvmOverloads constructor(
                 }
 
                 popup.setOnMenuItemClickListener(this)
-                moe.matsuri.nb4a.ui.MenuScrimHelper.showPopupMenuWithScrim(popup, activity) {
+                moe.matsuri.nb4a.ui.MenuScrimHelper.showPopupMenuWithScrim(
+                    popup = popup,
+                    activity = activity,
+                    anchor = effectiveAnchor,
+                    gravity = gravity,
+                    onItemSelected = this,
+                ) {
                     if (activeNodePopupMenu === popup) {
                         activeNodePopupMenu = null
                     }
@@ -6101,7 +6109,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                 val popup = PopupMenu(requireContext(), anchor)
                 popup.menuInflater.inflate(R.menu.double_column_item_menu, popup.menu)
                 if (select) popup.menu.removeItem(R.id.action_delete)
-                popup.setOnMenuItemClickListener { menuItem ->
+                val listener = PopupMenu.OnMenuItemClickListener { menuItem ->
                     when (menuItem.itemId) {
                         R.id.action_edit -> {
                             anchor.context.startActivity(
@@ -6122,7 +6130,14 @@ class ConfigurationFragment @JvmOverloads constructor(
                         else -> false
                     }
                 }
-                moe.matsuri.nb4a.ui.MenuScrimHelper.showPopupMenuWithScrim(popup, activity)
+                popup.setOnMenuItemClickListener(listener)
+                moe.matsuri.nb4a.ui.MenuScrimHelper.showPopupMenuWithScrim(
+                    popup = popup,
+                    activity = activity,
+                    anchor = anchor,
+                    gravity = Gravity.END,
+                    onItemSelected = listener,
+                )
             }
 
             private fun applySelected(selected: Boolean) {

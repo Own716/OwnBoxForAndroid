@@ -45,3 +45,7 @@
 -dontwarn org.openjsse.javax.net.ssl.SSLSocket
 -dontwarn org.openjsse.net.ssl.OpenJSSE
 -dontwarn java.beans.PropertyVetoException
+
+-keepclassmembers class androidx.appcompat.view.menu.MenuBuilder {
+    public boolean performIdentifierAction(int, int);
+}

@@ -14,12 +14,14 @@ import io.nekohasekai.sagernet.ui.MainActivity
 import io.nekohasekai.sagernet.ui.motion.SmoothMenuPopup
 import io.nekohasekai.sagernet.ui.motion.SmoothMotion
 import io.nekohasekai.sagernet.ui.motion.SmoothMotion.attachSmoothPress
+import java.util.WeakHashMap
 
 object MenuScrimHelper {
 
     const val TOOLBAR_TOKEN = "toolbar_menu"
 
     private var activeHandle: SmoothMenuPopup.Handle? = null
+    private val toolbarListeners = WeakHashMap<Toolbar, Toolbar.OnMenuItemClickListener>()
 
     fun dismissActive() {
         activeHandle?.dismiss()
@@ -29,31 +31,35 @@ object MenuScrimHelper {
     fun showPopupMenuWithScrim(
         popup: PopupMenu,
         activity: Activity?,
-        onDismiss: (() -> Unit)? = null
+        anchor: View? = null,
+        gravity: Int = Gravity.END,
+        onItemSelected: PopupMenu.OnMenuItemClickListener? = null,
+        onDismiss: (() -> Unit)? = null,
     ) {
         (activity as? MainActivity)?.hideMenuScrim()
         dismissActive()
 
-        if (SmoothMotion.isEnabled()) {
-            val anchor = findFieldValue(popup, "mAnchor") as? View
-            val listener = findFieldValue(popup, "mMenuItemClickListener") as? PopupMenu.OnMenuItemClickListener
-            val ctx = activity ?: anchor?.context
-            if (ctx != null && anchor != null && anchor.isAttachedToWindow) {
-                val handle = SmoothMenuPopup.showFromMenu(
-                    context = ctx,
-                    anchor = anchor,
-                    menu = popup.menu,
-                    gravity = Gravity.END,
-                    onItemSelected = { item -> listener?.onMenuItemClick(item) ?: false },
-                    onDismiss = {
+        if (SmoothMotion.isEnabled() && anchor != null && onItemSelected != null && anchor.isAttachedToWindow) {
+            val ctx = activity ?: anchor.context
+            var handleRef: SmoothMenuPopup.Handle? = null
+            val handle = SmoothMenuPopup.showFromMenu(
+                context = ctx,
+                anchor = anchor,
+                menu = popup.menu,
+                gravity = gravity,
+                onItemSelected = { item -> onItemSelected.onMenuItemClick(item) },
+                preferDirectCallback = true,
+                onDismiss = {
+                    if (activeHandle === handleRef) {
                         activeHandle = null
-                        onDismiss?.invoke()
-                    },
-                )
-                if (handle != null) {
-                    activeHandle = handle
-                    return
-                }
+                    }
+                    onDismiss?.invoke()
+                },
+            )
+            if (handle != null) {
+                handleRef = handle
+                activeHandle = handle
+                return
             }
         }
 
@@ -98,18 +104,33 @@ object MenuScrimHelper {
     }
 
     @Suppress("UNUSED_PARAMETER")
-    fun hookToolbar(toolbar: Toolbar, activity: MainActivity) {
+    fun hookToolbar(
+        toolbar: Toolbar,
+        activity: MainActivity,
+        onMenuItemClick: Toolbar.OnMenuItemClickListener? = null,
+    ) {
+        if (onMenuItemClick != null) {
+            toolbarListeners[toolbar] = onMenuItemClick
+        }
         toolbar.post {
             for (i in 0 until toolbar.childCount) {
                 val child = toolbar.getChildAt(i)
                 if (child is ActionMenuView) {
-                    hookActionMenuView(toolbar, child, activity)
+                    hookActionMenuView(toolbar, child, activity, onMenuItemClick)
                 }
             }
         }
     }
 
-    fun hookActionMenuView(toolbar: Toolbar, amv: ActionMenuView, activity: MainActivity) {
+    fun hookActionMenuView(
+        toolbar: Toolbar,
+        amv: ActionMenuView,
+        activity: MainActivity,
+        onMenuItemClick: Toolbar.OnMenuItemClickListener? = null,
+    ) {
+        if (onMenuItemClick != null) {
+            toolbarListeners[toolbar] = onMenuItemClick
+        }
         for (i in 0 until amv.childCount) {
             val btn = amv.getChildAt(i)
             if (btn is SearchView) continue
@@ -131,14 +152,24 @@ object MenuScrimHelper {
                         return@setOnClickListener
                     }
                     dismissActive()
+                    var handleRef: SmoothMenuPopup.Handle? = null
                     val handle = SmoothMenuPopup.showFromMenu(
                         context = activity,
                         anchor = view,
                         menu = sub,
                         gravity = Gravity.END,
-                        onDismiss = { activeHandle = null },
+                        onItemSelected = { item ->
+                            toolbarListeners[toolbar]?.onMenuItemClick(item) ?: false
+                        },
+                        preferDirectCallback = false,
+                        onDismiss = {
+                            if (activeHandle === handleRef) {
+                                activeHandle = null
+                            }
+                        },
                     )
                     if (handle != null) {
+                        handleRef = handle
                         activeHandle = handle
                     } else {
                         (view as? View.OnClickListener)?.onClick(view)

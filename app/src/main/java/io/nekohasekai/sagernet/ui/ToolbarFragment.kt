@@ -79,7 +79,11 @@ open class ToolbarFragment : Fragment {
                 toolbar.overflowIcon = tinted
             }
             (activity as? MainActivity)?.let { main ->
-                moe.matsuri.nb4a.ui.MenuScrimHelper.hookToolbar(toolbar, main)
+                moe.matsuri.nb4a.ui.MenuScrimHelper.hookToolbar(
+                    toolbar,
+                    main,
+                    this as? Toolbar.OnMenuItemClickListener,
+                )
             }
         }
         val appbar = view.findViewById<AppBarLayout?>(R.id.appbar)
