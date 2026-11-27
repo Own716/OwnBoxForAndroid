@@ -566,16 +566,6 @@ class ConfigurationFragment @JvmOverloads constructor(
         lastStyledSortMenuColor = primaryColor
     }
 
-    private fun styleDangerMenuItem(menu: Menu, itemId: Int, isDark: Boolean) {
-        val item = menu.findItem(itemId) ?: return
-        item.icon = null
-        val rawTitle = item.title?.toString() ?: return
-        val dangerColor = Color.parseColor(if (isDark) "#FF6B6B" else "#E03838")
-        item.title = SpannableString(rawTitle).apply {
-            setSpan(ForegroundColorSpan(dangerColor), 0, length, SPAN_EXCLUSIVE_EXCLUSIVE)
-        }
-    }
-
     private fun styleActionMiscMenu() {
         if (!isToolbarInitialized) return
         val sub = toolbar.menu.findItem(R.id.action_misc)?.subMenu ?: return
@@ -6701,4 +6691,14 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
     }
 
+}
+
+private fun styleDangerMenuItem(menu: Menu, itemId: Int, isDark: Boolean) {
+    val item = menu.findItem(itemId) ?: return
+    item.icon = null
+    val rawTitle = item.title?.toString() ?: return
+    val dangerColor = Color.parseColor(if (isDark) "#FF6B6B" else "#E03838")
+    item.title = SpannableString(rawTitle).apply {
+        setSpan(ForegroundColorSpan(dangerColor), 0, length, SPAN_EXCLUSIVE_EXCLUSIVE)
+    }
 }
