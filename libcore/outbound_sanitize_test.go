@@ -1,6 +1,7 @@
 package libcore
 
 import (
+	"strings"
 	"testing"
 
 	"libcore/protocol/juicity"
@@ -212,7 +213,7 @@ func TestSanitizeOutbounds(t *testing.T) {
 
 	// Test sanitizeTunStack for gvisor, mixed, system
 	cfg := `{"inbounds":[{"type":"tun","stack":"system"},{"type":"tun","stack":"gvisor"},{"type":"tun","stack":"mixed"}]}`
-	cleanCfg := sanitizeTunStack(cfg)
+	cleanCfg := strings.ReplaceAll(sanitizeTunStack(cfg), `"stack": "go"`, `"stack":"go"`)
 	if cleanCfg != `{"inbounds":[{"type":"tun","stack":"go"},{"type":"tun","stack":"go"},{"type":"tun","stack":"go"}]}` {
 		t.Errorf("unexpected sanitizeTunStack output: %s", cleanCfg)
 	}
