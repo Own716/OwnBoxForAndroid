@@ -4,7 +4,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
         android:id="@+id/action_live_clear"
-        android:icon="@drawable/baseline_delete_sweep_24"
+        android:icon="@drawable/ic_action_reset_chart_24"
         android:title="@string/live_graph_clear"
         app:showAsAction="ifRoom" />
     <item

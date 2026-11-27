@@ -379,18 +379,24 @@
                             android:src="@drawable/ic_baseline_refresh_24"
                             app:tint="?android:attr/textColorSecondary" />
 
-                        <ImageView
+                        <com.google.android.material.button.MaterialButton
                             android:id="@+id/btn_stats_clear"
-                            android:layout_width="34dp"
+                            style="@style/Widget.MaterialComponents.Button.TextButton"
+                            android:layout_width="wrap_content"
                             android:layout_height="34dp"
                             android:layout_marginStart="2dp"
-                            android:background="?android:attr/selectableItemBackgroundBorderless"
-                            android:clickable="true"
-                            android:contentDescription="@string/traffic_stats_clear"
-                            android:focusable="true"
-                            android:padding="6dp"
-                            android:src="@drawable/baseline_delete_sweep_24"
-                            app:tint="?android:attr/textColorSecondary" />
+                            android:insetTop="0dp"
+                            android:insetBottom="0dp"
+                            android:minWidth="0dp"
+                            android:paddingHorizontal="8dp"
+                            android:text="@string/traffic_stats_clear_short"
+                            android:textAllCaps="false"
+                            android:textColor="?android:attr/textColorSecondary"
+                            android:textSize="12sp"
+                            app:icon="@drawable/ic_baseline_delete_24"
+                            app:iconPadding="4dp"
+                            app:iconSize="16dp"
+                            app:iconTint="?android:attr/textColorSecondary" />
 
                     </LinearLayout>
 
@@ -628,6 +634,15 @@
                         </LinearLayout>
 
                     </LinearLayout>
+
+                    <!-- Daily Trend Stacked Bar Chart (shown in By Date mode) -->
+                    <io.nekohasekai.sagernet.widget.DailyBarChartView
+                        android:id="@+id/daily_bar_chart"
+                        android:layout_width="match_parent"
+                        android:layout_height="112dp"
+                        android:layout_marginTop="10dp"
+                        android:visibility="gone"
+                        tools:visibility="visible" />
 
                     <!-- Dimension Switcher -->
                     <com.google.android.material.button.MaterialButtonToggleGroup

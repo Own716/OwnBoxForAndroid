@@ -337,32 +337,37 @@ class BaseService {
             return LiveStatsRecorder.batch(session, afterSerial)
         }
 
-        override fun flushTrafficStats() {
-            val currentData = data
-            if (currentData != null && currentData.state == State.Connected) {
-                currentData.proxy?.box?.let { box ->
-                    runCatching { box.drainAppTrafficDeltaJSON() }.getOrNull()?.let { json ->
-                        TrafficStatsRecorder.recordAppDeltasJson(json)
-                    }
+        private fun drainActiveBoxAppTraffic() {
+            val currentData = data ?: return
+            if (currentData.state != State.Connected) return
+            currentData.proxy?.box?.let { box ->
+                runCatching { box.drainAppTrafficDeltaJSON() }.getOrNull()?.let { json ->
+                    TrafficStatsRecorder.recordAppDeltasJson(json)
                 }
             }
+        }
+
+        override fun flushTrafficStats() {
+            drainActiveBoxAppTraffic()
             TrafficStatsRecorder.flushToDb(force = true)
         }
 
         override fun getSessionTrafficStatsJson(): String {
-            val currentData = data
-            if (currentData != null && currentData.state == State.Connected) {
-                currentData.proxy?.box?.let { box ->
-                    runCatching { box.drainAppTrafficDeltaJSON() }.getOrNull()?.let { json ->
-                        TrafficStatsRecorder.recordAppDeltasJson(json)
-                    }
-                }
-            }
+            drainActiveBoxAppTraffic()
             return TrafficStatsRecorder.getSessionJson()
+        }
+
+        override fun getPendingTrafficStatsJson(): String {
+            drainActiveBoxAppTraffic()
+            return TrafficStatsRecorder.getPendingJson()
         }
 
         override fun clearSessionTrafficStats() {
             TrafficStatsRecorder.clearSession()
+        }
+
+        override fun deleteProfileTrafficStats(profileId: Long) {
+            TrafficStatsRecorder.removeProfile(profileId)
         }
 
         fun stateChanged(s: State, msg: String?) = launch {

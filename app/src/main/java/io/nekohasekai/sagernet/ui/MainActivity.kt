@@ -1077,6 +1077,18 @@ class MainActivity : ThemedActivity(),
         binding.stats.onListScrolled(scrollDy)
     }
 
+    fun openConnectionsWithSearch(query: String) {
+        val fragment = ConnectionsFragment().apply {
+            if (query.isNotBlank()) {
+                arguments = Bundle().apply {
+                    putString(ConnectionsFragment.ARG_INITIAL_SEARCH, query)
+                }
+            }
+        }
+        displayFragment(fragment)
+        setCheckedItem(R.id.nav_connections)
+    }
+
     fun displayFragmentWithId(@IdRes id: Int): Boolean {
         when (id) {
             R.id.nav_configuration -> {

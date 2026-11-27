@@ -1,5 +1,6 @@
 package io.nekohasekai.sagernet.ui
 
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
@@ -24,6 +25,7 @@ import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.SagerNet
+import io.nekohasekai.sagernet.aidl.ISagerNetService
 import io.nekohasekai.sagernet.aidl.LiveStatsBatch
 import io.nekohasekai.sagernet.bg.BaseService
 import io.nekohasekai.sagernet.bg.LiveSeries
@@ -35,6 +37,7 @@ import io.nekohasekai.sagernet.databinding.LayoutLiveGraphsBinding
 import io.nekohasekai.sagernet.databinding.LayoutLiveLegendRowBinding
 import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.getColorAttr
+import io.nekohasekai.sagernet.widget.DailyBarChartView
 import io.nekohasekai.sagernet.widget.ListListener
 import io.nekohasekai.sagernet.widget.LiveChartView
 import kotlinx.coroutines.Dispatchers
@@ -42,6 +45,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.util.Locale
 
 /**
  * Throne-style real-time traffic & core process graphs paired with a 3-dimension
@@ -86,17 +90,43 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
         val totalBytes: Long,
         val primaryBarBytes: Long,
         val secondaryBarBytes: Long,
+        val dimension: StatsDimension,
+        val profileId: Long = 0L,
+        val packageName: String = "",
+        val uid: Int = -1,
+        val proxyRx: Long = 0L,
+        val proxyTx: Long = 0L,
+        val directRx: Long = 0L,
+        val directTx: Long = 0L,
     )
 
     private data class LoadedStats(
         val summary: TrafficStatsDb.TrafficSummary,
         val rows: List<DisplayRow>,
+        val trendBars: List<DailyBarChartView.BarItem>,
+    )
+
+    private data class MutableAppAgg(
+        val appKey: String,
+        var uid: Int,
+        var packageName: String,
+        var proxyRx: Long,
+        var proxyTx: Long,
+        var directRx: Long,
+        var directTx: Long,
+    )
+
+    private data class MutableProfileAgg(
+        val profileId: Long,
+        var profileName: String,
+        var profileType: String,
+        var rx: Long,
+        var tx: Long,
     )
 
     companion object {
         private const val POLL_MS = 500L
         private const val STATS_REFRESH_TICKS = 10 // ~5s
-        private const val SPARKLINE_MS = 60_000L
         private const val STALE_MS = 3000L
         private const val COLLAPSED_ROW_LIMIT = 15
 
@@ -122,6 +152,7 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
     private val legend = ArrayList<LegendRow>()
     private val hiddenRows = LinkedHashSet<String>()
     private val hiddenColumns = LinkedHashSet<String>()
+    private val rowPool = ArrayList<ItemTrafficStatRowBinding>()
     private var range = 1
     private var smooth = true
     private var showMarkers = true
@@ -136,7 +167,7 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
     private var statsTickCounter = 0
 
     private val appCache = LruCache<String, AppVisual>(128)
-    private var lastLoadedStats = LoadedStats(TrafficStatsDb.TrafficSummary(), emptyList())
+    private var lastLoadedStats = LoadedStats(TrafficStatsDb.TrafficSummary(), emptyList(), emptyList())
 
     private val charts
         get() = listOf(
@@ -161,6 +192,7 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
         ViewCompat.setOnApplyWindowInsetsListener(binding.liveScroll, ListListener)
 
         legend.clear()
+        rowPool.clear()
         hiddenRows.clear()
         hiddenColumns.clear()
         hiddenRows.addAll(DataStore.liveGraphHiddenRows)
@@ -225,9 +257,6 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
             compact = true,
         )
         for (chart in charts) chart.data = LiveHistory.series
-        for (chart in listOf(binding.liveCpuChart, binding.liveRamChart, binding.liveConnectionsChart)) {
-            chart.windowMs = SPARKLINE_MS
-        }
 
         for (row in rows) {
             val item = LayoutLiveLegendRowBinding.inflate(layoutInflater, binding.liveLegend, true)
@@ -276,7 +305,7 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
                     statsTickCounter++
                     if (statsTickCounter >= STATS_REFRESH_TICKS) {
                         statsTickCounter = 0
-                        refreshStatsTable()
+                        refreshStatsTable(forceFlush = false)
                     }
                     delay(POLL_MS)
                 }
@@ -320,6 +349,11 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
     // ------------------------------------------------------------------------------------------------ stats card
 
     private fun setupStatsCard() {
+        statsPeriod = StatsPeriod.values().getOrElse(DataStore.trafficStatsPeriod) { StatsPeriod.TODAY }
+        statsDimension = StatsDimension.values().getOrElse(DataStore.trafficStatsDimension) { StatsDimension.DAILY }
+        sortField = SortField.values().getOrElse(DataStore.trafficStatsSortField) { SortField.TOTAL }
+        sortDescending = DataStore.trafficStatsSortDesc
+
         binding.dotSummaryProxy.background = dot(proxyColor, filled = true)
         binding.dotSummaryDirect.background = dot(directColor, filled = true)
         binding.summaryBarProxy.setBackgroundColor(proxyColor)
@@ -327,7 +361,7 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
 
         binding.btnStatsRefresh.setOnClickListener {
             viewLifecycleOwner.lifecycleScope.launch {
-                refreshStatsTable()
+                refreshStatsTable(forceFlush = true)
             }
         }
 
@@ -335,6 +369,14 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
             confirmClearStats()
         }
 
+        val initialPeriodId = when (statsPeriod) {
+            StatsPeriod.SESSION -> R.id.chip_period_session
+            StatsPeriod.TODAY -> R.id.chip_period_today
+            StatsPeriod.LAST_7D -> R.id.chip_period_7d
+            StatsPeriod.LAST_30D -> R.id.chip_period_30d
+            StatsPeriod.ALL -> R.id.chip_period_all
+        }
+        binding.statsPeriodChips.check(initialPeriodId)
         binding.statsPeriodChips.setOnCheckedStateChangeListener { _, checkedIds ->
             val checkedId = checkedIds.firstOrNull() ?: return@setOnCheckedStateChangeListener
             val nextPeriod = when (checkedId) {
@@ -347,14 +389,20 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
             }
             if (nextPeriod != statsPeriod) {
                 statsPeriod = nextPeriod
+                DataStore.trafficStatsPeriod = nextPeriod.ordinal
                 statsExpanded = false
                 viewLifecycleOwner.lifecycleScope.launch {
-                    refreshStatsTable()
+                    refreshStatsTable(forceFlush = false)
                 }
             }
         }
 
-        binding.statsDimensionGroup.check(R.id.btn_dim_daily)
+        val initialDimId = when (statsDimension) {
+            StatsDimension.DAILY -> R.id.btn_dim_daily
+            StatsDimension.PROFILE -> R.id.btn_dim_profile
+            StatsDimension.APP -> R.id.btn_dim_app
+        }
+        binding.statsDimensionGroup.check(initialDimId)
         binding.statsDimensionGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (!isChecked) return@addOnButtonCheckedListener
             val nextDim = when (checkedId) {
@@ -365,13 +413,41 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
             }
             if (nextDim != statsDimension) {
                 statsDimension = nextDim
+                DataStore.trafficStatsDimension = nextDim.ordinal
                 statsExpanded = false
                 sortField = SortField.TOTAL
                 sortDescending = true
+                DataStore.trafficStatsSortField = sortField.ordinal
+                DataStore.trafficStatsSortDesc = sortDescending
                 updateTableHeaders()
                 viewLifecycleOwner.lifecycleScope.launch {
-                    refreshStatsTable()
+                    refreshStatsTable(forceFlush = false)
                 }
+            }
+        }
+
+        binding.dailyBarChart.onBarSelected = { bar ->
+            val match = lastLoadedStats.rows.firstOrNull { it.key == bar.day }
+            if (match != null) {
+                showRowDetailDialog(match)
+            } else if (bar.totalBytes > 0L) {
+                showRowDetailDialog(
+                    DisplayRow(
+                        key = bar.day,
+                        title = formatDayLabel(bar.day),
+                        subtitle = "",
+                        icon = null,
+                        showIcon = false,
+                        col1Bytes = bar.proxyBytes,
+                        col2Bytes = bar.directBytes,
+                        totalBytes = bar.totalBytes,
+                        primaryBarBytes = bar.proxyBytes,
+                        secondaryBarBytes = bar.directBytes,
+                        dimension = StatsDimension.DAILY,
+                        proxyRx = bar.proxyBytes,
+                        directRx = bar.directBytes,
+                    )
+                )
             }
         }
 
@@ -394,6 +470,8 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
             sortField = target
             sortDescending = true
         }
+        DataStore.trafficStatsSortField = sortField.ordinal
+        DataStore.trafficStatsSortDesc = sortDescending
         updateTableHeaders()
         renderStatsRows(lastLoadedStats)
     }
@@ -434,32 +512,43 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
         binding.tvTableColTotal.setTextColor(if (sortField == SortField.TOTAL) primaryColor else secondaryColor)
     }
 
-    private suspend fun refreshStatsTable() {
+    private suspend fun refreshStatsTable(forceFlush: Boolean) {
         val period = statsPeriod
         val dimension = statsDimension
         val service = (activity as? MainActivity)?.connection?.service
 
         val loaded = withContext(Dispatchers.IO) {
-            loadStats(period, dimension, service)
+            loadStats(period, dimension, service, forceFlush)
         }
         if (!isAdded) return
         lastLoadedStats = loaded
         renderStatsSummary(loaded.summary)
+        renderTrendChart(loaded.trendBars)
         renderStatsRows(loaded)
     }
 
     private fun loadStats(
         period: StatsPeriod,
         dimension: StatsDimension,
-        service: io.nekohasekai.sagernet.aidl.ISagerNetService?,
+        service: ISagerNetService?,
+        forceFlush: Boolean,
     ): LoadedStats {
         if (period == StatsPeriod.SESSION) {
             return loadSessionStats(dimension, service)
         }
 
-        if (DataStore.serviceState.connected) {
-            runCatching { service?.flushTrafficStats() }
+        var pendingRoot: JSONObject? = null
+        if (DataStore.serviceState.connected && service != null) {
+            if (forceFlush) {
+                runCatching { service.flushTrafficStats() }
+            } else {
+                val pendingRaw = runCatching { service.pendingTrafficStatsJson }.getOrNull().orEmpty()
+                if (pendingRaw.isNotBlank()) {
+                    pendingRoot = runCatching { JSONObject(pendingRaw) }.getOrNull()
+                }
+            }
         }
+
         val sinceDay = when (period) {
             StatsPeriod.TODAY -> TrafficStatsDb.formatDay()
             StatsPeriod.LAST_7D -> TrafficStatsDb.dayDaysAgo(6)
@@ -467,75 +556,247 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
             StatsPeriod.ALL, StatsPeriod.SESSION -> null
         }
 
-        val summary = TrafficStatsDb.querySummary(sinceDay)
+        val pendingDay = pendingRoot?.optString("day", TrafficStatsDb.formatDay()).orEmpty()
+        val includePending = pendingRoot != null && (sinceDay == null || pendingDay >= sinceDay)
+
+        val dbSummary = TrafficStatsDb.querySummary(sinceDay)
+        val sumObj = if (includePending) pendingRoot?.optJSONObject("summary") else null
+        val summary = TrafficStatsDb.TrafficSummary(
+            proxyRx = dbSummary.proxyRx + (sumObj?.optLong("proxyRx", 0L) ?: 0L),
+            proxyTx = dbSummary.proxyTx + (sumObj?.optLong("proxyTx", 0L) ?: 0L),
+            directRx = dbSummary.directRx + (sumObj?.optLong("directRx", 0L) ?: 0L),
+            directTx = dbSummary.directTx + (sumObj?.optLong("directTx", 0L) ?: 0L),
+        )
+
+        var trendBars: List<DailyBarChartView.BarItem> = emptyList()
         val rows: List<DisplayRow> = when (dimension) {
-            StatsDimension.DAILY -> TrafficStatsDb.queryDailyRows(sinceDay).map { r ->
-                DisplayRow(
-                    key = r.day,
-                    title = formatDayLabel(r.day),
-                    subtitle = "",
-                    icon = null,
-                    showIcon = false,
-                    col1Bytes = r.totalProxy,
-                    col2Bytes = r.totalDirect,
-                    totalBytes = r.totalAll,
-                    primaryBarBytes = r.totalProxy,
-                    secondaryBarBytes = r.totalDirect,
-                )
-            }
-
-            StatsDimension.PROFILE -> TrafficStatsDb.queryProfileRows(sinceDay).map { r ->
-                DisplayRow(
-                    key = "profile:${r.profileId}",
-                    title = r.profileName.ifBlank { getString(R.string.traffic_stats_unknown_profile) },
-                    subtitle = r.profileType,
-                    icon = null,
-                    showIcon = false,
-                    col1Bytes = r.rx,
-                    col2Bytes = r.tx,
-                    totalBytes = r.total,
-                    primaryBarBytes = r.rx,
-                    secondaryBarBytes = r.tx,
-                )
-            }
-
-            StatsDimension.APP -> TrafficStatsDb.queryAppRows(sinceDay).map { r ->
-                val visual = resolveAppVisual(r.appKey, r.packageName, r.uid)
-                val sub = if (r.packageName.isNotBlank() && r.packageName != visual.label) {
-                    r.packageName
-                } else {
-                    ""
+            StatsDimension.DAILY -> {
+                val dailyMap = LinkedHashMap<String, TrafficStatsDb.DailyRow>()
+                for (r in TrafficStatsDb.queryDailyRows(sinceDay)) {
+                    dailyMap[r.day] = r
                 }
-                DisplayRow(
-                    key = "app:${r.appKey}",
-                    title = visual.label,
-                    subtitle = sub,
-                    icon = visual.icon,
-                    showIcon = true,
-                    col1Bytes = r.totalProxy,
-                    col2Bytes = r.totalDirect,
-                    totalBytes = r.totalAll,
-                    primaryBarBytes = r.totalProxy,
-                    secondaryBarBytes = r.totalDirect,
+                if (includePending && sumObj != null && pendingDay.isNotBlank()) {
+                    val pRx = sumObj.optLong("proxyRx", 0L)
+                    val pTx = sumObj.optLong("proxyTx", 0L)
+                    val dRx = sumObj.optLong("directRx", 0L)
+                    val dTx = sumObj.optLong("directTx", 0L)
+                    if (pRx + pTx + dRx + dTx > 0L) {
+                        val existing = dailyMap[pendingDay]
+                        dailyMap[pendingDay] = TrafficStatsDb.DailyRow(
+                            day = pendingDay,
+                            proxyRx = (existing?.proxyRx ?: 0L) + pRx,
+                            proxyTx = (existing?.proxyTx ?: 0L) + pTx,
+                            directRx = (existing?.directRx ?: 0L) + dRx,
+                            directTx = (existing?.directTx ?: 0L) + dTx,
+                        )
+                    }
+                }
+                val mergedDaily = dailyMap.values.filter { it.totalAll > 0L }.sortedByDescending { it.day }
+                trendBars = buildTrendBars(period, dailyMap)
+                mergedDaily.map { r ->
+                    DisplayRow(
+                        key = r.day,
+                        title = formatDayLabel(r.day),
+                        subtitle = if (r.day == TrafficStatsDb.formatDay() || r.day == TrafficStatsDb.dayDaysAgo(1)) r.day else "",
+                        icon = null,
+                        showIcon = false,
+                        col1Bytes = r.totalProxy,
+                        col2Bytes = r.totalDirect,
+                        totalBytes = r.totalAll,
+                        primaryBarBytes = r.totalProxy,
+                        secondaryBarBytes = r.totalDirect,
+                        dimension = StatsDimension.DAILY,
+                        proxyRx = r.proxyRx,
+                        proxyTx = r.proxyTx,
+                        directRx = r.directRx,
+                        directTx = r.directTx,
+                    )
+                }
+            }
+
+            StatsDimension.PROFILE -> {
+                val profileMap = LinkedHashMap<Long, MutableProfileAgg>()
+                for (r in TrafficStatsDb.queryProfileRows(sinceDay)) {
+                    profileMap[r.profileId] = MutableProfileAgg(
+                        r.profileId, r.profileName, r.profileType, r.rx, r.tx
+                    )
+                }
+                if (includePending) {
+                    val pArr = pendingRoot?.optJSONArray("profiles")
+                    if (pArr != null) {
+                        for (i in 0 until pArr.length()) {
+                            val o = pArr.optJSONObject(i) ?: continue
+                            val id = o.optLong("profileId", 0L)
+                            val rx = o.optLong("rx", 0L)
+                            val tx = o.optLong("tx", 0L)
+                            if (id <= 0L || rx + tx <= 0L) continue
+                            val name = o.optString("profileName", "")
+                            val type = o.optString("profileType", "")
+                            val cur = profileMap[id]
+                            if (cur == null) {
+                                profileMap[id] = MutableProfileAgg(id, name, type, rx, tx)
+                            } else {
+                                if (name.isNotBlank()) cur.profileName = name
+                                if (type.isNotBlank()) cur.profileType = type
+                                cur.rx += rx
+                                cur.tx += tx
+                            }
+                        }
+                    }
+                }
+                profileMap.values
+                    .filter { it.rx + it.tx > 0L }
+                    .map { r ->
+                        DisplayRow(
+                            key = "profile:${r.profileId}",
+                            title = r.profileName.ifBlank { getString(R.string.traffic_stats_unknown_profile) },
+                            subtitle = r.profileType,
+                            icon = null,
+                            showIcon = false,
+                            col1Bytes = r.rx,
+                            col2Bytes = r.tx,
+                            totalBytes = r.rx + r.tx,
+                            primaryBarBytes = r.rx,
+                            secondaryBarBytes = r.tx,
+                            dimension = StatsDimension.PROFILE,
+                            profileId = r.profileId,
+                            proxyRx = r.rx,
+                            proxyTx = r.tx,
+                        )
+                    }
+            }
+
+            StatsDimension.APP -> {
+                val appMap = LinkedHashMap<String, MutableAppAgg>()
+                for (r in TrafficStatsDb.queryAppRows(sinceDay)) {
+                    appMap[r.appKey] = MutableAppAgg(
+                        r.appKey, r.uid, r.packageName, r.proxyRx, r.proxyTx, r.directRx, r.directTx
+                    )
+                }
+                if (includePending) {
+                    val aArr = pendingRoot?.optJSONArray("apps")
+                    if (aArr != null) {
+                        for (i in 0 until aArr.length()) {
+                            val o = aArr.optJSONObject(i) ?: continue
+                            val appKey = o.optString("appKey", "")
+                            if (appKey.isBlank()) continue
+                            val uid = o.optInt("uid", -1)
+                            val pkg = o.optString("packageName", "")
+                            val pRx = o.optLong("proxyRx", 0L)
+                            val pTx = o.optLong("proxyTx", 0L)
+                            val dRx = o.optLong("directRx", 0L)
+                            val dTx = o.optLong("directTx", 0L)
+                            if (pRx + pTx + dRx + dTx <= 0L) continue
+                            val cur = appMap[appKey]
+                            if (cur == null) {
+                                appMap[appKey] = MutableAppAgg(appKey, uid, pkg, pRx, pTx, dRx, dTx)
+                            } else {
+                                if (uid >= 0) cur.uid = uid
+                                if (pkg.isNotBlank()) cur.packageName = pkg
+                                cur.proxyRx += pRx
+                                cur.proxyTx += pTx
+                                cur.directRx += dRx
+                                cur.directTx += dTx
+                            }
+                        }
+                    }
+                }
+                appMap.values
+                    .filter { it.proxyRx + it.proxyTx + it.directRx + it.directTx > 0L }
+                    .map { r ->
+                        val pTotal = r.proxyRx + r.proxyTx
+                        val dTotal = r.directRx + r.directTx
+                        val visual = resolveAppVisual(r.appKey, r.packageName, r.uid)
+                        val sub = if (r.packageName.isNotBlank() && r.packageName != visual.label) {
+                            r.packageName
+                        } else {
+                            ""
+                        }
+                        DisplayRow(
+                            key = "app:${r.appKey}",
+                            title = visual.label,
+                            subtitle = sub,
+                            icon = visual.icon,
+                            showIcon = true,
+                            col1Bytes = pTotal,
+                            col2Bytes = dTotal,
+                            totalBytes = pTotal + dTotal,
+                            primaryBarBytes = pTotal,
+                            secondaryBarBytes = dTotal,
+                            dimension = StatsDimension.APP,
+                            packageName = r.packageName,
+                            uid = r.uid,
+                            proxyRx = r.proxyRx,
+                            proxyTx = r.proxyTx,
+                            directRx = r.directRx,
+                            directTx = r.directTx,
+                        )
+                    }
+            }
+        }
+        return LoadedStats(summary, rows, trendBars)
+    }
+
+    private fun buildTrendBars(
+        period: StatsPeriod,
+        dailyMap: Map<String, TrafficStatsDb.DailyRow>,
+    ): List<DailyBarChartView.BarItem> {
+        if (period == StatsPeriod.SESSION || period == StatsPeriod.TODAY) {
+            return emptyList()
+        }
+        val windowDays = when (period) {
+            StatsPeriod.LAST_7D -> 7
+            StatsPeriod.LAST_30D -> 30
+            StatsPeriod.ALL -> 30
+            else -> return emptyList()
+        }
+        val today = TrafficStatsDb.formatDay()
+        if (period == StatsPeriod.ALL) {
+            val recent = dailyMap.values.filter { it.totalAll > 0L }.sortedBy { it.day }.takeLast(30)
+            if (recent.size < 2) return emptyList()
+            return recent.map { r ->
+                DailyBarChartView.BarItem(
+                    day = r.day,
+                    shortLabel = if (r.day == today) getString(R.string.traffic_stats_period_today) else r.day.substringAfter('-'),
+                    proxyBytes = r.totalProxy,
+                    directBytes = r.totalDirect,
                 )
             }
         }
-        return LoadedStats(summary, rows)
+
+        var hasAnyData = false
+        val list = ArrayList<DailyBarChartView.BarItem>(windowDays)
+        for (ago in (windowDays - 1) downTo 0) {
+            val day = TrafficStatsDb.dayDaysAgo(ago)
+            val r = dailyMap[day]
+            val pBytes = r?.totalProxy ?: 0L
+            val dBytes = r?.totalDirect ?: 0L
+            if (pBytes + dBytes > 0L) hasAnyData = true
+            list.add(
+                DailyBarChartView.BarItem(
+                    day = day,
+                    shortLabel = if (day == today) getString(R.string.traffic_stats_period_today) else day.substringAfter('-'),
+                    proxyBytes = pBytes,
+                    directBytes = dBytes,
+                )
+            )
+        }
+        return if (hasAnyData) list else emptyList()
     }
 
     private fun loadSessionStats(
         dimension: StatsDimension,
-        service: io.nekohasekai.sagernet.aidl.ISagerNetService?,
+        service: ISagerNetService?,
     ): LoadedStats {
         if (!DataStore.serviceState.connected || service == null) {
-            return LoadedStats(TrafficStatsDb.TrafficSummary(), emptyList())
+            return LoadedStats(TrafficStatsDb.TrafficSummary(), emptyList(), emptyList())
         }
-        val raw = runCatching { service.getSessionTrafficStatsJson() }.getOrNull().orEmpty()
+        val raw = runCatching { service.sessionTrafficStatsJson }.getOrNull().orEmpty()
         if (raw.isBlank()) {
-            return LoadedStats(TrafficStatsDb.TrafficSummary(), emptyList())
+            return LoadedStats(TrafficStatsDb.TrafficSummary(), emptyList(), emptyList())
         }
         val root = runCatching { JSONObject(raw) }.getOrNull()
-            ?: return LoadedStats(TrafficStatsDb.TrafficSummary(), emptyList())
+            ?: return LoadedStats(TrafficStatsDb.TrafficSummary(), emptyList(), emptyList())
         val sumObj = root.optJSONObject("summary")
         val summary = TrafficStatsDb.TrafficSummary(
             proxyRx = sumObj?.optLong("proxyRx", 0L) ?: 0L,
@@ -560,6 +821,11 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
                         totalBytes = summary.totalAll,
                         primaryBarBytes = summary.totalProxy,
                         secondaryBarBytes = summary.totalDirect,
+                        dimension = StatsDimension.DAILY,
+                        proxyRx = summary.proxyRx,
+                        proxyTx = summary.proxyTx,
+                        directRx = summary.directRx,
+                        directTx = summary.directTx,
                     )
                 )
             }
@@ -572,10 +838,11 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
                         val rx = o.optLong("rx", 0L)
                         val tx = o.optLong("tx", 0L)
                         if (rx + tx <= 0L) continue
+                        val pid = o.optLong("profileId", 0L)
                         val name = o.optString("profileName", "")
                         add(
                             DisplayRow(
-                                key = "profile:${o.optLong("profileId")}",
+                                key = "profile:$pid",
                                 title = name.ifBlank { getString(R.string.traffic_stats_unknown_profile) },
                                 subtitle = o.optString("profileType", ""),
                                 icon = null,
@@ -585,6 +852,10 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
                                 totalBytes = rx + tx,
                                 primaryBarBytes = rx,
                                 secondaryBarBytes = tx,
+                                dimension = StatsDimension.PROFILE,
+                                profileId = pid,
+                                proxyRx = rx,
+                                proxyTx = tx,
                             )
                         )
                     }
@@ -620,13 +891,20 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
                                 totalBytes = all,
                                 primaryBarBytes = pTotal,
                                 secondaryBarBytes = dTotal,
+                                dimension = StatsDimension.APP,
+                                packageName = pkg,
+                                uid = uid,
+                                proxyRx = pRx,
+                                proxyTx = pTx,
+                                directRx = dRx,
+                                directTx = dTx,
                             )
                         )
                     }
                 }
             }
         }
-        return LoadedStats(summary, rows)
+        return LoadedStats(summary, rows, emptyList())
     }
 
     private fun renderStatsSummary(summary: TrafficStatsDb.TrafficSummary) {
@@ -648,6 +926,14 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
         setWeight(binding.summaryBarEmpty, emptyWeight)
     }
 
+    private fun renderTrendChart(trendBars: List<DailyBarChartView.BarItem>) {
+        val showTrend = statsDimension == StatsDimension.DAILY && trendBars.isNotEmpty()
+        binding.dailyBarChart.isVisible = showTrend
+        if (showTrend) {
+            binding.dailyBarChart.setData(trendBars, proxyColor, directColor)
+        }
+    }
+
     private fun renderStatsRows(loaded: LoadedStats) {
         val sorted = when (sortField) {
             SortField.COL1 -> if (sortDescending) {
@@ -667,8 +953,8 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
             }
         }
 
-        binding.statsTableRows.removeAllViews()
         if (sorted.isEmpty()) {
+            for (rb in rowPool) rb.root.isVisible = false
             binding.tvStatsEmpty.isVisible = true
             binding.btnStatsExpand.isVisible = false
             return
@@ -684,8 +970,15 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
         val ctx = requireContext()
 
         for (i in 0 until visibleCount) {
+            val rowBinding = if (i < rowPool.size) {
+                rowPool[i]
+            } else {
+                ItemTrafficStatRowBinding.inflate(layoutInflater, binding.statsTableRows, true).also {
+                    rowPool.add(it)
+                }
+            }
+            rowBinding.root.isVisible = true
             val item = sorted[i]
-            val rowBinding = ItemTrafficStatRowBinding.inflate(layoutInflater, binding.statsTableRows, true)
             if (item.showIcon) {
                 rowBinding.statIcon.isVisible = true
                 rowBinding.statIcon.setImageDrawable(item.icon)
@@ -704,12 +997,16 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
             val sWeight = item.secondaryBarBytes / maxTotal
             val restWeight = (1f - pWeight - sWeight).coerceAtLeast(0f)
             rowBinding.statBarPrimary.setBackgroundColor(proxyColor)
-            rowBinding.statBarSecondary.setBackgroundColor(
-                if (statsDimension == StatsDimension.PROFILE) directColor else directColor
-            )
+            rowBinding.statBarSecondary.setBackgroundColor(directColor)
             setWeight(rowBinding.statBarPrimary, pWeight)
             setWeight(rowBinding.statBarSecondary, sWeight)
             setWeight(rowBinding.statBarRest, restWeight)
+
+            rowBinding.root.setOnClickListener { showRowDetailDialog(item) }
+        }
+
+        for (i in visibleCount until rowPool.size) {
+            rowPool[i].root.isVisible = false
         }
 
         if (sorted.size > COLLAPSED_ROW_LIMIT) {
@@ -724,6 +1021,101 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
         }
     }
 
+    private fun showRowDetailDialog(item: DisplayRow) {
+        val ctx = requireContext()
+        val message = buildString {
+            if (item.subtitle.isNotBlank()) {
+                append(item.subtitle).append("\n\n")
+            }
+            append(getString(R.string.traffic_stats_summary_total)).append(": ")
+            append(Formatter.formatFileSize(ctx, item.totalBytes)).append('\n')
+
+            when (item.dimension) {
+                StatsDimension.DAILY, StatsDimension.APP -> {
+                    val pTotal = item.proxyRx + item.proxyTx
+                    val dTotal = item.directRx + item.directTx
+                    val pct = if (item.totalBytes > 0L) pTotal * 100.0 / item.totalBytes else 0.0
+                    append('\n')
+                    append(getString(R.string.live_graph_proxy)).append(": ")
+                    append(Formatter.formatFileSize(ctx, pTotal))
+                    append(" (↓ ").append(Formatter.formatFileSize(ctx, item.proxyRx))
+                    append("  ↑ ").append(Formatter.formatFileSize(ctx, item.proxyTx)).append(")\n")
+
+                    append(getString(R.string.live_graph_direct)).append(": ")
+                    append(Formatter.formatFileSize(ctx, dTotal))
+                    append(" (↓ ").append(Formatter.formatFileSize(ctx, item.directRx))
+                    append("  ↑ ").append(Formatter.formatFileSize(ctx, item.directTx)).append(")\n")
+
+                    append(getString(R.string.traffic_stats_detail_share)).append(": ")
+                    append(String.format(Locale.US, "%.1f%%", pct))
+                }
+
+                StatsDimension.PROFILE -> {
+                    val totalProxy = lastLoadedStats.summary.totalProxy
+                    val pct = if (totalProxy > 0L) item.totalBytes * 100.0 / totalProxy else 0.0
+                    append("↓ ").append(getString(R.string.live_graph_down)).append(": ")
+                    append(Formatter.formatFileSize(ctx, item.proxyRx)).append('\n')
+                    append("↑ ").append(getString(R.string.live_graph_up)).append(": ")
+                    append(Formatter.formatFileSize(ctx, item.proxyTx)).append('\n')
+                    append(getString(R.string.traffic_stats_detail_share)).append(": ")
+                    append(String.format(Locale.US, "%.1f%%", pct))
+                }
+            }
+        }
+
+        val builder = MaterialAlertDialogBuilder(ctx)
+            .setTitle(item.title)
+            .setMessage(message)
+
+        if (item.showIcon && item.icon != null) {
+            builder.setIcon(item.icon)
+        }
+
+        when (item.dimension) {
+            StatsDimension.APP -> {
+                val pkgQuery = item.packageName.takeIf { it.isNotBlank() && !it.contains('/') }
+                val connQuery = pkgQuery ?: if (item.uid > 0) item.uid.toString() else ""
+                if (connQuery.isNotBlank() && DataStore.enableConnectionsMonitor && DataStore.serviceState.connected) {
+                    builder.setPositiveButton(R.string.traffic_stats_action_connections) { _, _ ->
+                        (activity as? MainActivity)?.openConnectionsWithSearch(connQuery)
+                    }
+                }
+                if (pkgQuery != null) {
+                    builder.setNeutralButton(R.string.traffic_stats_action_per_app) { _, _ ->
+                        startActivity(
+                            Intent(ctx, AppManagerActivity::class.java)
+                                .putExtra(AppManagerActivity.EXTRA_SEARCH_QUERY, pkgQuery)
+                        )
+                    }
+                }
+                builder.setNegativeButton(android.R.string.ok, null)
+            }
+
+            StatsDimension.PROFILE -> {
+                if (item.profileId > 0L) {
+                    builder.setNeutralButton(R.string.traffic_stats_action_clear_node) { _, _ ->
+                        viewLifecycleOwner.lifecycleScope.launch {
+                            val service = (activity as? MainActivity)?.connection?.service
+                            withContext(Dispatchers.IO) {
+                                runCatching { service?.deleteProfileTrafficStats(item.profileId) }
+                                TrafficStatsDb.deleteProfileStats(item.profileId)
+                            }
+                            if (isAdded) {
+                                refreshStatsTable(forceFlush = false)
+                            }
+                        }
+                    }
+                }
+                builder.setPositiveButton(android.R.string.ok, null)
+            }
+
+            StatsDimension.DAILY -> {
+                builder.setPositiveButton(android.R.string.ok, null)
+            }
+        }
+        builder.show()
+    }
+
     private fun confirmClearStats() {
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(R.string.traffic_stats_clear_title)
@@ -736,7 +1128,7 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
                         TrafficStatsDb.clearAll()
                     }
                     if (isAdded) {
-                        refreshStatsTable()
+                        refreshStatsTable(forceFlush = false)
                     }
                 }
             }
@@ -830,14 +1222,21 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
 
     private fun applyState() {
         val selected = RANGES[range]
+        val windowMs = selected.seconds * 1000L
+        val tickMs = selected.tickSeconds * 1000L
         binding.liveTrafficChart.apply {
-            windowMs = selected.seconds * 1000L
-            tickMs = selected.tickSeconds * 1000L
+            this.windowMs = windowMs
+            this.tickMs = tickMs
             smooth = this@LiveGraphsFragment.smooth
             showMarkers = this@LiveGraphsFragment.showMarkers
             hiddenRows = this@LiveGraphsFragment.hiddenRows.toSet()
             hiddenColumns = this@LiveGraphsFragment.hiddenColumns.toSet()
             invalidate()
+        }
+        for (spark in listOf(binding.liveCpuChart, binding.liveRamChart, binding.liveConnectionsChart)) {
+            spark.windowMs = windowMs
+            spark.smooth = smooth
+            spark.invalidate()
         }
         val downOn = COLUMN_DOWN !in hiddenColumns
         val upOn = COLUMN_UP !in hiddenColumns

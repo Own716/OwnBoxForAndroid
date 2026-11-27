@@ -21,6 +21,7 @@ import (
 	"runtime"
 	"runtime/debug"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -337,6 +338,7 @@ type BoxInstance struct {
 
 	appTrafficMu sync.Mutex
 	appConnSeen  map[uuid.UUID]appConnTrafficMark
+	appPending   map[appTrafficKey]*appTrafficDeltaItem
 }
 
 func (b *BoxInstance) urlTestTrace(stage string, format string, args ...any) {
@@ -1030,12 +1032,20 @@ func (b *BoxInstance) ClearClosedConnections() {
 	if b == nil || b.trafficManager == nil {
 		return
 	}
+	b.appTrafficMu.Lock()
+	b.collectAppTrafficDeltasLocked()
+	b.appTrafficMu.Unlock()
 	b.trafficManager.Clear()
 }
 
 type appConnTrafficMark struct {
 	up   int64
 	down int64
+}
+
+type appTrafficKey struct {
+	pkg string
+	uid int32
 }
 
 type appTrafficDeltaItem struct {
@@ -1048,6 +1058,19 @@ type appTrafficDeltaItem struct {
 }
 
 func (b *BoxInstance) GetCoreMemoryBytes() int64 {
+	if data, err := os.ReadFile("/proc/self/status"); err == nil {
+		for _, line := range strings.Split(string(data), "\n") {
+			if strings.HasPrefix(line, "VmRSS:") {
+				fields := strings.Fields(strings.TrimPrefix(line, "VmRSS:"))
+				if len(fields) >= 1 {
+					if kb, parseErr := strconv.ParseInt(fields[0], 10, 64); parseErr == nil && kb > 0 {
+						return kb * 1024
+					}
+				}
+				break
+			}
+		}
+	}
 	var ms runtime.MemStats
 	runtime.ReadMemStats(&ms)
 	return int64(ms.HeapInuse + ms.StackInuse)
@@ -1057,6 +1080,10 @@ func (b *BoxInstance) GetActiveConnectionCount() int32 {
 	if b == nil || b.trafficManager == nil {
 		return 0
 	}
+	b.appTrafficMu.Lock()
+	b.collectAppTrafficDeltasLocked()
+	b.appTrafficMu.Unlock()
+
 	var count int32
 	for _, m := range b.trafficManager.Connections() {
 		if m == nil || m.OutboundType == constant.TypeDNS {
@@ -1067,25 +1094,21 @@ func (b *BoxInstance) GetActiveConnectionCount() int32 {
 	return count
 }
 
-func (b *BoxInstance) DrainAppTrafficDeltaJSON() string {
+func (b *BoxInstance) collectAppTrafficDeltasLocked() {
 	if b == nil || b.trafficManager == nil {
-		return ""
+		return
 	}
 	conns := b.trafficManager.Connections()
 	closedConns := b.trafficManager.ClosedConnections()
 
-	b.appTrafficMu.Lock()
-	defer b.appTrafficMu.Unlock()
 	if b.appConnSeen == nil {
 		b.appConnSeen = make(map[uuid.UUID]appConnTrafficMark)
 	}
+	if b.appPending == nil {
+		b.appPending = make(map[appTrafficKey]*appTrafficDeltaItem)
+	}
 
 	seenNow := make(map[uuid.UUID]struct{}, len(conns)+len(closedConns))
-	type appKey struct {
-		pkg string
-		uid int32
-	}
-	agg := make(map[appKey]*appTrafficDeltaItem)
 
 	processConn := func(m *trafficcontrol.TrackerMetadata) {
 		if m == nil || m.OutboundType == constant.TypeDNS {
@@ -1138,14 +1161,14 @@ func (b *BoxInstance) DrainAppTrafficDeltaJSON() string {
 			}
 		}
 
-		key := appKey{pkg: pkg, uid: uid}
-		entry := agg[key]
+		key := appTrafficKey{pkg: pkg, uid: uid}
+		entry := b.appPending[key]
 		if entry == nil {
 			entry = &appTrafficDeltaItem{
 				PackageName: pkg,
 				Uid:         uid,
 			}
-			agg[key] = entry
+			b.appPending[key] = entry
 		}
 
 		isDirect := strings.EqualFold(m.Outbound, "bypass") ||
@@ -1172,13 +1195,29 @@ func (b *BoxInstance) DrainAppTrafficDeltaJSON() string {
 			delete(b.appConnSeen, id)
 		}
 	}
+}
 
-	if len(agg) == 0 {
+func (b *BoxInstance) DrainAppTrafficDeltaJSON() string {
+	if b == nil || b.trafficManager == nil {
 		return ""
 	}
-	items := make([]appTrafficDeltaItem, 0, len(agg))
-	for _, item := range agg {
-		items = append(items, *item)
+	b.appTrafficMu.Lock()
+	b.collectAppTrafficDeltasLocked()
+	if len(b.appPending) == 0 {
+		b.appTrafficMu.Unlock()
+		return ""
+	}
+	items := make([]appTrafficDeltaItem, 0, len(b.appPending))
+	for _, item := range b.appPending {
+		if item.ProxyDown > 0 || item.ProxyUp > 0 || item.DirectDown > 0 || item.DirectUp > 0 {
+			items = append(items, *item)
+		}
+	}
+	b.appPending = make(map[appTrafficKey]*appTrafficDeltaItem)
+	b.appTrafficMu.Unlock()
+
+	if len(items) == 0 {
+		return ""
 	}
 	data, err := json.Marshal(items)
 	if err != nil {

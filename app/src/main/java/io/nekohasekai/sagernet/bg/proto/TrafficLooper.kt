@@ -164,6 +164,7 @@ class TrafficLooper
             idMap[memberId]?.ignore = true
         }
 
+        val wasSwitch = oldData != null && selectorNowId > 0L && selectorNowId != id
         selectorNowFakeTag = newData.tag
         selectorNowId = id
         newData.apply {
@@ -174,6 +175,16 @@ class TrafficLooper
         // If new proxy is balancer, set new members to ignore = false
         balancerMembers?.get(id)?.forEach { memberId ->
             idMap[memberId]?.ignore = false
+        }
+
+        if (wasSwitch) {
+            val switchedName = currentConfig?.trafficMap?.values?.asSequence()
+                ?.flatten()
+                ?.firstOrNull { it.id == id }
+                ?.displayName()
+                ?: runCatching { SagerDatabase.proxyDao.getById(id)?.displayName() }.getOrNull()
+                ?: ""
+            LiveStatsRecorder.switched(switchedName)
         }
     }
 
@@ -384,21 +395,63 @@ class TrafficLooper
 
                 TrafficStatsRecorder.recordTrafficDelta(dProxyRx, dProxyTx, dDirectRx, dDirectTx)
 
+                val balancerParentIds = balancerMemberMap.keys
+                val memberParentName = HashMap<Long, String>()
+                balancerMemberMap.forEach { (bId, mIds) ->
+                    val parentName = currentConfig.trafficMap.values.asSequence()
+                        .flatten()
+                        .firstOrNull { it.id == bId }
+                        ?.displayName()
+                        .orEmpty()
+                    if (parentName.isNotBlank()) {
+                        for (mId in mIds) {
+                            if (mId != bId && mId !in balancerParentIds) {
+                                memberParentName[mId] = parentName
+                            }
+                        }
+                    }
+                }
+
                 idMap.forEach { (id, item) ->
-                    if (id > 0L && id !in balancerMemberIds) {
+                    if (id > 0L) {
                         val curRx = (item.rx - item.rxBase).coerceAtLeast(0L)
                         val curTx = (item.tx - item.txBase).coerceAtLeast(0L)
+                        val targetRx: Long
+                        val targetTx: Long
+                        if (id in balancerParentIds) {
+                            var membersCurRx = 0L
+                            var membersCurTx = 0L
+                            for (mId in balancerMemberMap[id].orEmpty()) {
+                                if (mId != id && mId !in balancerParentIds) {
+                                    val mItem = idMap[mId] ?: continue
+                                    membersCurRx += (mItem.rx - mItem.rxBase).coerceAtLeast(0L)
+                                    membersCurTx += (mItem.tx - mItem.txBase).coerceAtLeast(0L)
+                                }
+                            }
+                            targetRx = (curRx - membersCurRx).coerceAtLeast(0L)
+                            targetTx = (curTx - membersCurTx).coerceAtLeast(0L)
+                        } else {
+                            targetRx = curRx
+                            targetTx = curTx
+                        }
                         val prev = prevProfileBytes[id]
-                        val dRx = if (prev == null) curRx else if (curRx >= prev.first) curRx - prev.first else 0L
-                        val dTx = if (prev == null) curTx else if (curTx >= prev.second) curTx - prev.second else 0L
-                        prevProfileBytes[id] = curRx to curTx
+                        val dRx = if (prev == null) targetRx else if (targetRx >= prev.first) targetRx - prev.first else 0L
+                        val dTx = if (prev == null) targetTx else if (targetTx >= prev.second) targetTx - prev.second else 0L
+                        prevProfileBytes[id] = targetRx to targetTx
                         if (dRx > 0L || dTx > 0L) {
                             val meta = profileMetaCache.getOrPut(id) {
                                 val cachedEnt = currentConfig.trafficMap.values.asSequence()
                                     .flatten()
                                     .firstOrNull { it.id == id }
                                     ?: SagerDatabase.proxyDao.getById(id)
-                                cachedEnt?.displayName().orEmpty() to cachedEnt?.displayType().orEmpty()
+                                val baseType = cachedEnt?.displayType().orEmpty()
+                                val parentName = memberParentName[id]
+                                val displayTypeWithParent = when {
+                                    !parentName.isNullOrBlank() && baseType.isNotBlank() -> "$baseType · $parentName"
+                                    !parentName.isNullOrBlank() -> parentName
+                                    else -> baseType
+                                }
+                                cachedEnt?.displayName().orEmpty() to displayTypeWithParent
                             }
                             TrafficStatsRecorder.recordProfileDelta(id, meta.first, meta.second, dRx, dTx)
                         }
@@ -465,6 +518,9 @@ class TrafficLooper
                 }
                 if (ActiveOutboundTracker.checkAndUpdate(data)) {
                     LandingIpManager.clearCache()
+                    val leafName = ActiveOutboundTracker.getActiveLeafNodeDisplay(proxy.profile)
+                        ?: proxy.profile.displayName()
+                    LiveStatsRecorder.switched(leafName)
                     val newTitle = ActiveOutboundTracker.formatNotificationTitle(proxy.profile)
                     proxy.displayProfileName = newTitle
                     data.notification?.refresh(newTitle)

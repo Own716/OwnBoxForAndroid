@@ -51,6 +51,8 @@ import kotlin.coroutines.coroutineContext
 
 class AppManagerActivity : ThemedActivity() {
     companion object {
+        const val EXTRA_SEARCH_QUERY = "search_query"
+
         @SuppressLint("StaticFieldLeak")
         private var instance: AppManagerActivity? = null
         private const val SWITCH = "switch"
@@ -327,6 +329,12 @@ class AppManagerActivity : ThemedActivity() {
         binding.showSystemApps.setOnCheckedChangeListener { _, isChecked ->
             sysApps = isChecked
             appsAdapter.filter.filter(binding.search.text?.toString() ?: "")
+        }
+
+        intent?.getStringExtra(EXTRA_SEARCH_QUERY)?.takeIf { it.isNotBlank() }?.let { initialQuery ->
+            sysApps = true
+            binding.showSystemApps.isChecked = true
+            binding.search.setText(initialQuery)
         }
 
         instance = this

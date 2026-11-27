@@ -1689,7 +1689,7 @@
     <string name="live_graph_smooth">Smooth lines</string>
     <string name="live_graph_events">Profile events</string>
     <string name="live_graph_show_all">Show all lines</string>
-    <string name="live_graph_clear">Clear history</string>
+    <string name="live_graph_clear">Reset live chart</string>
     <string name="live_graph_core_title">Core process</string>
     <string name="live_graph_core">Core</string>
     <string name="live_graph_cpu">CPU</string>
@@ -1718,4 +1718,9 @@
     <string name="traffic_stats_collapse">Collapse</string>
     <string name="traffic_stats_unknown_profile">Deleted Profile</string>
     <string name="traffic_stats_system_app">System &amp; Core</string>
+    <string name="traffic_stats_clear_short">Clear</string>
+    <string name="traffic_stats_detail_share">Proxy Share</string>
+    <string name="traffic_stats_action_connections">View Connections</string>
+    <string name="traffic_stats_action_per_app">Per-App Proxy</string>
+    <string name="traffic_stats_action_clear_node">Clear Node Stats</string>
 </resources>

@@ -1610,7 +1610,7 @@
     <string name="live_graph_smooth">平滑线条</string>
     <string name="live_graph_events">配置事件</string>
     <string name="live_graph_show_all">显示所有线条</string>
-    <string name="live_graph_clear">清除历史</string>
+    <string name="live_graph_clear">重置实时曲线</string>
     <string name="live_graph_core_title">核心进程</string>
     <string name="live_graph_core">核心</string>
     <string name="live_graph_cpu">CPU</string>
@@ -1639,4 +1639,9 @@
     <string name="traffic_stats_collapse">收起列表</string>
     <string name="traffic_stats_unknown_profile">已删除节点</string>
     <string name="traffic_stats_system_app">系统与内核</string>
+    <string name="traffic_stats_clear_short">清空</string>
+    <string name="traffic_stats_detail_share">代理占比</string>
+    <string name="traffic_stats_action_connections">查看连接</string>
+    <string name="traffic_stats_action_per_app">分应用代理</string>
+    <string name="traffic_stats_action_clear_node">清除该节点记录</string>
 </resources>

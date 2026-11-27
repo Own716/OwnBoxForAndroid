@@ -119,6 +119,17 @@ object LiveStatsRecorder {
         addMarker(now, if (switched) LiveStatsBatch.MARKER_SWITCHED else LiveStatsBatch.MARKER_STARTED, name)
     }
 
+    @Synchronized
+    fun switched(name: String) {
+        if (name.isBlank()) return
+        val now = SystemClock.elapsedRealtime()
+        val last = markers.lastOrNull()
+        if (last != null && last.text == name && now - last.t < 2000L) return
+        settleRestart(now)
+        restartedAt = 0L
+        addMarker(now, LiveStatsBatch.MARKER_SWITCHED, name)
+    }
+
     /** [restart]: true when replacing core in place (switch or reload). */
     @Synchronized
     fun stopped(restart: Boolean) {

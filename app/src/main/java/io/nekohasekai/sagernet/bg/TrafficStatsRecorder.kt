@@ -159,6 +159,13 @@ object TrafficStatsRecorder {
     }
 
     @Synchronized
+    fun removeProfile(profileId: Long) {
+        if (profileId <= 0L) return
+        pendingProfiles.remove(profileId)
+        sessionProfiles.remove(profileId)
+    }
+
+    @Synchronized
     fun clearSession() {
         pendingDaily = TrafficStatsDb.DailyDelta()
         pendingProfiles.clear()
@@ -170,17 +177,31 @@ object TrafficStatsRecorder {
     }
 
     @Synchronized
+    fun getPendingJson(): String {
+        return buildStatsJson(pendingDay, pendingDaily, pendingProfiles.values, pendingApps.values)
+    }
+
+    @Synchronized
     fun getSessionJson(): String {
+        return buildStatsJson(sessionDay, sessionSummary, sessionProfiles.values, sessionApps.values)
+    }
+
+    private fun buildStatsJson(
+        day: String,
+        summary: TrafficStatsDb.DailyDelta,
+        profiles: Collection<TrafficStatsDb.ProfileDelta>,
+        apps: Collection<TrafficStatsDb.AppDelta>,
+    ): String {
         val root = JSONObject()
-        root.put("day", sessionDay)
+        root.put("day", day)
         root.put("summary", JSONObject().apply {
-            put("proxyRx", sessionSummary.proxyRx)
-            put("proxyTx", sessionSummary.proxyTx)
-            put("directRx", sessionSummary.directRx)
-            put("directTx", sessionSummary.directTx)
+            put("proxyRx", summary.proxyRx)
+            put("proxyTx", summary.proxyTx)
+            put("directRx", summary.directRx)
+            put("directTx", summary.directTx)
         })
         val pArr = JSONArray()
-        for (p in sessionProfiles.values) {
+        for (p in profiles) {
             if (p.rx + p.tx <= 0L) continue
             pArr.put(JSONObject().apply {
                 put("profileId", p.profileId)
@@ -193,7 +214,7 @@ object TrafficStatsRecorder {
         root.put("profiles", pArr)
 
         val aArr = JSONArray()
-        for (a in sessionApps.values) {
+        for (a in apps) {
             if (a.proxyRx + a.proxyTx + a.directRx + a.directTx <= 0L) continue
             aArr.put(JSONObject().apply {
                 put("appKey", a.appKey)

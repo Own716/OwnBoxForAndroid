@@ -28,5 +28,7 @@ interface ISagerNetService {
   LiveStatsBatch liveStats(long session, long afterSerial);
   void flushTrafficStats();
   String getSessionTrafficStatsJson();
+  String getPendingTrafficStatsJson();
   void clearSessionTrafficStats();
+  void deleteProfileTrafficStats(long profileId);
 }

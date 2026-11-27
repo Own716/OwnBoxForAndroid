@@ -643,6 +643,11 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var liveGraphHiddenRows by configurationStore.stringSet("liveGraphHiddenRows") { emptySet() }
     var liveGraphHiddenDirs by configurationStore.int("liveGraphHiddenDirs") { 0 }
 
+    var trafficStatsPeriod by configurationStore.int("trafficStatsPeriod") { 1 }
+    var trafficStatsDimension by configurationStore.int("trafficStatsDimension") { 0 }
+    var trafficStatsSortField by configurationStore.int("trafficStatsSortField") { 2 }
+    var trafficStatsSortDesc by configurationStore.boolean("trafficStatsSortDesc") { true }
+
     override fun onPreferenceDataStoreChanged(store: PreferenceDataStore, key: String) {
     }
 }

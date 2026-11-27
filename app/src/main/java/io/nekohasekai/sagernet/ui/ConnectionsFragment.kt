@@ -107,6 +107,7 @@ class ConnectionsFragment : ToolbarFragment(R.layout.layout_connections) {
     )
 
     companion object {
+        const val ARG_INITIAL_SEARCH = "initial_search"
         private const val FILTER_ALL = "ALL"
         private const val FILTER_PROXY = "PROXY"
         private const val FILTER_DIRECT = "DIRECT"
@@ -299,6 +300,10 @@ class ConnectionsFragment : ToolbarFragment(R.layout.layout_connections) {
 
         rebuildFilterChipsIfNeeded()
         updateTabActionUi()
+        arguments?.getString(ARG_INITIAL_SEARCH)?.takeIf { it.isNotBlank() }?.let { initialQuery ->
+            etSearch.setText(initialQuery)
+            arguments?.remove(ARG_INITIAL_SEARCH)
+        }
     }
 
     override fun onResume() {

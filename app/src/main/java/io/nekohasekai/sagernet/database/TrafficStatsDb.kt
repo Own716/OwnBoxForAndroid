@@ -245,6 +245,17 @@ object TrafficStatsDb {
     }
 
     @Synchronized
+    fun deleteProfileStats(profileId: Long) {
+        if (profileId <= 0L) return
+        try {
+            val db = helper.writableDatabase
+            db.delete("daily_profile_traffic", "profile_id = ?", arrayOf(profileId.toString()))
+        } catch (t: Throwable) {
+            Logs.w("TrafficStatsDb deleteProfileStats failed", t)
+        }
+    }
+
+    @Synchronized
     fun clearAll() {
         try {
             val db = helper.writableDatabase
