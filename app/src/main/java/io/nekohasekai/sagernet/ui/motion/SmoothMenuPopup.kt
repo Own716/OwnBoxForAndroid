@@ -68,6 +68,15 @@ object SmoothMenuPopup {
         gravity: Int = Gravity.END,
         onItemSelected: ((MenuItem) -> Boolean)? = null,
         onDismiss: (() -> Unit)? = null,
+    ): Handle? = showFromMenuInternal(context, anchor, menu, gravity, onItemSelected, onDismiss)
+
+    private fun showFromMenuInternal(
+        context: Context,
+        anchor: View,
+        menu: Menu,
+        anchorGravity: Int,
+        onItemSelected: ((MenuItem) -> Boolean)?,
+        onDismiss: (() -> Unit)?,
     ): Handle? {
         if (!anchor.isAttachedToWindow) return null
         val entries = collectVisibleEntries(menu)
@@ -474,13 +483,13 @@ object SmoothMenuPopup {
         val statusPad = (34f * density).toInt()
         val bottomPad = (20f * density).toInt()
 
-        val preferRight = (gravity and Gravity.END) == Gravity.END ||
-            (gravity and Gravity.RIGHT) == Gravity.RIGHT ||
+        val preferRight = (anchorGravity and Gravity.END) == Gravity.END ||
+            (anchorGravity and Gravity.RIGHT) == Gravity.RIGHT ||
             (anchorLoc[0] + anchor.width * 0.5f > dm.widthPixels * 0.5f)
         val rawX = if (preferRight) anchorLoc[0] + anchor.width - measuredW else anchorLoc[0]
         val clampedX = rawX.coerceIn(marginH, (dm.widthPixels - measuredW - marginH).coerceAtLeast(marginH))
 
-        val preferTop = (gravity and Gravity.TOP) == Gravity.TOP
+        val preferTop = (anchorGravity and Gravity.TOP) == Gravity.TOP
         val spaceBelow = dm.heightPixels - bottomPad - (anchorLoc[1] + anchor.height)
         val spaceAbove = anchorLoc[1] - statusPad
         val openAbove = if (preferTop) spaceAbove >= measuredH * 0.6f || spaceAbove > spaceBelow

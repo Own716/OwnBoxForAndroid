@@ -160,7 +160,7 @@ abstract class ThemedActivity : AppCompatActivity {
     }
 
     @Suppress("DEPRECATION")
-    override fun startActivityForResult(intent: Intent?, requestCode: Int, options: Bundle?) {
+    override fun startActivityForResult(intent: Intent, requestCode: Int, options: Bundle?) {
         super.startActivityForResult(intent, requestCode, options)
         if (!isDialog && io.nekohasekai.sagernet.ui.motion.SmoothMotion.isEnabled()) {
             overridePendingTransition(R.anim.smooth_activity_enter, R.anim.smooth_activity_exit)
