@@ -36,6 +36,13 @@ class DailyBarChartView @JvmOverloads constructor(
     }
 
     var onBarSelected: ((BarItem) -> Unit)? = null
+    var highlightedDay: String? = null
+        set(value) {
+            if (field != value) {
+                field = value
+                invalidate()
+            }
+        }
 
     private var items: List<BarItem> = emptyList()
     private var proxyColor: Int = 0xFF2A78D6.toInt()
@@ -138,7 +145,12 @@ class DailyBarChartView @JvmOverloads constructor(
                     rectTmp.set(left, barTop, right, directBottom)
                     canvas.drawRoundRect(rectTmp, radius, radius, barPaint)
                 }
-                if (i == selectedIndex) {
+                val isHighlighted = if (selectedIndex >= 0) {
+                    i == selectedIndex
+                } else {
+                    highlightedDay != null && item.day == highlightedDay
+                }
+                if (isHighlighted) {
                     rectTmp.set(left - 1.5f * density, barTop - 1.5f * density, right + 1.5f * density, plotBottom)
                     canvas.drawRoundRect(rectTmp, radius, radius, selectPaint)
                 }

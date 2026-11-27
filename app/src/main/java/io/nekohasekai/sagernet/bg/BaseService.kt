@@ -57,6 +57,7 @@ class BaseService {
         var networkSwitchRetryAttempts = 0
         @Volatile var isSmartStopped = false
         @Volatile var smartStopReason: String? = null
+        @Volatile var isRestarting = false
         var smartAutoStopController: SmartAutoStopController? = null
 
         var lastScreenOffTime = 0L
@@ -211,6 +212,9 @@ class BaseService {
                 callbacks.register(cb)
             }
             callbackIdMap[cb] = id
+            if (id == SagerConnection.CONNECTION_ID_MAIN_ACTIVITY_FOREGROUND) {
+                data?.proxy?.looper?.triggerWakeup()
+            }
         }
 
         private val broadcastMutex = Mutex()
@@ -333,8 +337,25 @@ class BaseService {
             runCatching { box.clearClosedConnections() }
         }
 
+        private var lastPssReadAtMs = 0L
+        private var cachedPssBytes = 0L
+
         override fun liveStats(session: Long, afterSerial: Long): LiveStatsBatch {
             return LiveStatsRecorder.batch(session, afterSerial)
+        }
+
+        override fun getServicePssBytes(): Long {
+            val currentData = data ?: return 0L
+            if (currentData.state != State.Connected) return 0L
+            val now = SystemClock.elapsedRealtime()
+            if (cachedPssBytes > 0L && now - lastPssReadAtMs < 4500L) {
+                return cachedPssBytes
+            }
+            val pssKb = Debug.getPss()
+            val bytes = if (pssKb > 0L) pssKb * 1024L else 0L
+            lastPssReadAtMs = now
+            cachedPssBytes = bytes
+            return bytes
         }
 
         private fun drainActiveBoxAppTraffic() {
@@ -433,6 +454,7 @@ class BaseService {
                             proxy.displayProfileName = newTitle
                             runOnDefaultDispatcher {
                                 proxy.looper?.selectMain(newProfileId)
+                                proxy.looper?.triggerWakeup()
                                 data.notification?.refresh(newTitle)
                                 data.binder.broadcast { cb ->
                                     cb.cbSelectorUpdate(newProfileId)
@@ -607,6 +629,7 @@ class BaseService {
                 return
             }
             this as Service
+            data.isRestarting = restart
 
             data.changeState(State.Stopping)
             val originalMessage = msg
@@ -635,7 +658,6 @@ class BaseService {
                 }
 
                 try {
-                    ActiveOutboundTracker.reset()
                     data.notification?.destroy()
                 } catch (error: Throwable) {
                     recordCleanupFailure("notification-destroy", error)
@@ -649,6 +671,8 @@ class BaseService {
                     killProcesses()?.let { recordCleanupFailure("process-cleanup", it) }
                 } catch (error: Throwable) {
                     recordCleanupFailure("process-cleanup-boundary", error)
+                } finally {
+                    runCatching { ActiveOutboundTracker.reset() }
                 }
 
                 try {
@@ -660,6 +684,7 @@ class BaseService {
                 } finally {
                     data.closeReceiverRegistered = false
                     data.proxy = null
+                    data.isRestarting = false
                 }
 
                 cleanupError?.let { error ->
@@ -702,6 +727,7 @@ class BaseService {
         fun smartSuspend(matchedLabel: String) {
             if (data.state != State.Connecting && data.state != State.Connected) return
             this as Service
+            data.isRestarting = false
             data.isSmartStopped = true
             data.smartStopReason = matchedLabel
             val fallbackTitle = (data.proxy?.profile ?: SagerDatabase.proxyDao.getById(DataStore.selectedProxy))

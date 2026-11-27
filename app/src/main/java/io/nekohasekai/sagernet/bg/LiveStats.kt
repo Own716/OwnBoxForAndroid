@@ -63,7 +63,7 @@ object LiveStatsRecorder {
     const val CAPACITY = 600
 
     /** A tick later than this follows a background/doze pause: restart baseline instead of plotting an average. */
-    private const val GAP_MS = 2500L
+    private const val GAP_MS = 20_000L
 
     /** A start within this of an in-place restart is recorded as a switch marker. */
     private const val SWITCH_MS = 30_000L
@@ -83,6 +83,7 @@ object LiveStatsRecorder {
     private var lastTick = 0L
     private var lastCpuMs = 0L
     private var restartedAt = 0L
+    private var currentNodeName = ""
 
     /** Record one tick of the running core; rates are in bytes/sec. */
     @Synchronized
@@ -112,22 +113,66 @@ object LiveStatsRecorder {
 
     @Synchronized
     fun started(name: String) {
+        val clean = name.trim()
         val now = SystemClock.elapsedRealtime()
         settleRestart(now)
         val switched = restartedAt > 0L
         restartedAt = 0L
-        addMarker(now, if (switched) LiveStatsBatch.MARKER_SWITCHED else LiveStatsBatch.MARKER_STARTED, name)
+        val prev = currentNodeName
+        if (clean.isNotEmpty()) currentNodeName = clean
+        if (switched) {
+            if (prev.isNotEmpty() && clean.isNotEmpty() && prev == clean) return
+            val payload = if (prev.isNotEmpty() && clean.isNotEmpty() && prev != clean) "$prev\t$clean" else clean
+            if (payload.isNotEmpty()) addMarker(now, LiveStatsBatch.MARKER_SWITCHED, payload)
+        } else {
+            addMarker(now, LiveStatsBatch.MARKER_STARTED, clean)
+        }
     }
 
     @Synchronized
-    fun switched(name: String) {
-        if (name.isBlank()) return
+    fun switched(toName: String, fromName: String = "") {
+        val cleanTo = toName.trim()
+        if (cleanTo.isEmpty()) return
         val now = SystemClock.elapsedRealtime()
+        val effectiveFrom = fromName.trim().ifEmpty { currentNodeName }
+        if (effectiveFrom == cleanTo) {
+            currentNodeName = cleanTo
+            return
+        }
+        currentNodeName = cleanTo
+        val payload = if (effectiveFrom.isNotEmpty()) "$effectiveFrom\t$cleanTo" else cleanTo
         val last = markers.lastOrNull()
-        if (last != null && last.text == name && now - last.t < 2000L) return
+        if (last != null && last.kind == LiveStatsBatch.MARKER_SWITCHED && last.text == payload && now - last.t < 1500L) return
         settleRestart(now)
         restartedAt = 0L
-        addMarker(now, LiveStatsBatch.MARKER_SWITCHED, name)
+        addMarker(now, LiveStatsBatch.MARKER_SWITCHED, payload)
+    }
+
+    @Synchronized
+    fun updateCurrentLeafOnInit(groupName: String, leafName: String) {
+        val cleanLeaf = leafName.trim()
+        if (cleanLeaf.isEmpty()) return
+        val cleanGroup = groupName.trim()
+        val now = SystemClock.elapsedRealtime()
+        currentNodeName = cleanLeaf
+        val idx = markers.lastIndex
+        if (idx >= 0 && now - markers[idx].t <= 5000L) {
+            val last = markers[idx]
+            if (last.kind == LiveStatsBatch.MARKER_STARTED && (last.text.isEmpty() || last.text == cleanGroup)) {
+                val merged = if (cleanGroup.isNotEmpty() && !cleanGroup.contains(cleanLeaf)) "$cleanGroup · $cleanLeaf" else cleanLeaf
+                markers[idx] = Marker(last.t, last.kind, merged)
+            } else if (last.kind == LiveStatsBatch.MARKER_SWITCHED) {
+                val parts = last.text.split('\t', limit = 2)
+                if (parts.size == 2 && parts[1] == cleanGroup) {
+                    val from = parts[0]
+                    if (from != cleanLeaf) {
+                        markers[idx] = Marker(last.t, last.kind, "$from\t$cleanLeaf")
+                    }
+                } else if (parts.size == 1 && parts[0] == cleanGroup) {
+                    markers[idx] = Marker(last.t, last.kind, cleanLeaf)
+                }
+            }
+        }
     }
 
     /** [restart]: true when replacing core in place (switch or reload). */
@@ -136,7 +181,12 @@ object LiveStatsRecorder {
         val now = SystemClock.elapsedRealtime()
         if (restartedAt > 0L) addMarker(restartedAt, LiveStatsBatch.MARKER_STOPPED, "")
         restartedAt = 0L
-        if (restart) restartedAt = now else addMarker(now, LiveStatsBatch.MARKER_STOPPED, "")
+        if (restart) {
+            restartedAt = now
+        } else {
+            currentNodeName = ""
+            addMarker(now, LiveStatsBatch.MARKER_STOPPED, "")
+        }
     }
 
     @Synchronized
@@ -167,6 +217,7 @@ object LiveStatsRecorder {
         if (restartedAt > 0L && now - restartedAt > SWITCH_MS) {
             addMarker(restartedAt, LiveStatsBatch.MARKER_STOPPED, "")
             restartedAt = 0L
+            currentNodeName = ""
         }
     }
 

@@ -1680,6 +1680,7 @@
     <string name="live_graph_stopped">Stopped</string>
     <string name="live_graph_started">Started %1$s</string>
     <string name="live_graph_switched">Switched to %1$s</string>
+    <string name="live_graph_switched_from_to">Switched %1$s → %2$s</string>
     <string name="live_graph_peak">peak of %1$d s</string>
     <string name="live_graph_waiting">Waiting for traffic</string>
     <string name="live_graph_waiting_body">The graph fills in once a second while a profile is running.</string>
@@ -1690,11 +1691,12 @@
     <string name="live_graph_events">Profile events</string>
     <string name="live_graph_show_all">Show all lines</string>
     <string name="live_graph_clear">Reset live chart</string>
-    <string name="live_graph_core_title">Core process</string>
+    <string name="live_graph_core_title">Core &amp; Service</string>
     <string name="live_graph_core">Core</string>
-    <string name="live_graph_cpu">CPU</string>
-    <string name="live_graph_ram">RAM</string>
-    <string name="live_graph_connections">Connections</string>
+    <string name="live_graph_cpu">Service CPU</string>
+    <string name="live_graph_ram">Core Memory</string>
+    <string name="live_graph_ram_with_pss">%1$s (Service %2$s)</string>
+    <string name="live_graph_connections">Active Connections</string>
     <string name="traffic_stats_title">Traffic Statistics</string>
     <string name="traffic_stats_refresh">Refresh statistics</string>
     <string name="traffic_stats_clear">Clear statistics</string>

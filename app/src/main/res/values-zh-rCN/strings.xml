@@ -1601,6 +1601,7 @@
     <string name="live_graph_stopped">已停止</string>
     <string name="live_graph_started">已启动 %1$s</string>
     <string name="live_graph_switched">已切换到 %1$s</string>
+    <string name="live_graph_switched_from_to">已切换：%1$s → %2$s</string>
     <string name="live_graph_peak">%1$d 秒峰值</string>
     <string name="live_graph_waiting">等待流量</string>
     <string name="live_graph_waiting_body">配置运行期间，图表每秒更新一次。</string>
@@ -1611,11 +1612,12 @@
     <string name="live_graph_events">配置事件</string>
     <string name="live_graph_show_all">显示所有线条</string>
     <string name="live_graph_clear">重置实时曲线</string>
-    <string name="live_graph_core_title">核心进程</string>
-    <string name="live_graph_core">核心</string>
-    <string name="live_graph_cpu">CPU</string>
-    <string name="live_graph_ram">内存</string>
-    <string name="live_graph_connections">连接</string>
+    <string name="live_graph_core_title">内核与后台服务</string>
+    <string name="live_graph_core">内核</string>
+    <string name="live_graph_cpu">后台 CPU</string>
+    <string name="live_graph_ram">内核内存</string>
+    <string name="live_graph_ram_with_pss">%1$s（后台总计 %2$s）</string>
+    <string name="live_graph_connections">活跃连接</string>
     <string name="traffic_stats_title">流量统计</string>
     <string name="traffic_stats_refresh">刷新统计</string>
     <string name="traffic_stats_clear">清空统计</string>

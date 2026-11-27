@@ -11,6 +11,7 @@ import io.nekohasekai.sagernet.bg.SagerConnection
 import io.nekohasekai.sagernet.bg.TrafficStatsRecorder
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProfileManager
+import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.database.SagerDatabase
 import io.nekohasekai.sagernet.fmt.TAG_BYPASS
 import io.nekohasekai.sagernet.fmt.TAG_PROXY
@@ -71,7 +72,7 @@ class TrafficLooper
             }
             TrafficStatsRecorder.flushToDb(force = true)
         }
-        LiveStatsRecorder.stopped(restart = data.notification != null)
+        LiveStatsRecorder.stopped(restart = data.isRestarting)
         // finally traffic post
         if (!DataStore.profileTrafficStatistics) return
         withStateLock {
@@ -112,7 +113,10 @@ class TrafficLooper
     }
 
     fun start() {
-        LiveStatsRecorder.started(data.proxy?.profile?.displayName().orEmpty())
+        val startName = data.proxy?.profile?.let { prof ->
+            ActiveOutboundTracker.getActiveLeafNodeDisplay(prof) ?: prof.displayName()
+        }.orEmpty()
+        LiveStatsRecorder.started(startName)
         TrafficStatsRecorder.onSessionStart()
         job = sc.launch { loop() }
     }
@@ -164,7 +168,8 @@ class TrafficLooper
             idMap[memberId]?.ignore = true
         }
 
-        val wasSwitch = oldData != null && selectorNowId > 0L && selectorNowId != id
+        val prevId = selectorNowId
+        val wasSwitch = oldData != null && prevId > 0L && prevId != id
         selectorNowFakeTag = newData.tag
         selectorNowId = id
         newData.apply {
@@ -178,13 +183,17 @@ class TrafficLooper
         }
 
         if (wasSwitch) {
-            val switchedName = currentConfig?.trafficMap?.values?.asSequence()
-                ?.flatten()
-                ?.firstOrNull { it.id == id }
-                ?.displayName()
-                ?: runCatching { SagerDatabase.proxyDao.getById(id)?.displayName() }.getOrNull()
-                ?: ""
-            LiveStatsRecorder.switched(switchedName)
+            fun resolveDisplay(targetId: Long): String =
+                currentConfig?.trafficMap?.values?.asSequence()
+                    ?.flatten()
+                    ?.firstOrNull { it.id == targetId }
+                    ?.displayName()
+                    ?: runCatching { SagerDatabase.proxyDao.getById(targetId)?.displayName() }.getOrNull()
+                    ?: ""
+            LiveStatsRecorder.switched(
+                toName = resolveDisplay(id),
+                fromName = resolveDisplay(prevId),
+            )
         }
     }
 
@@ -516,11 +525,17 @@ class TrafficLooper
                         }
                     }
                 }
+                val prevLeafId = ActiveOutboundTracker.activeLeafProfileId
+                val prevLeafName = ActiveOutboundTracker.activeLeafProfileName
                 if (ActiveOutboundTracker.checkAndUpdate(data)) {
                     LandingIpManager.clearCache()
                     val leafName = ActiveOutboundTracker.getActiveLeafNodeDisplay(proxy.profile)
                         ?: proxy.profile.displayName()
-                    LiveStatsRecorder.switched(leafName)
+                    if (prevLeafId <= 0L && proxy.profile.type == ProxyEntity.TYPE_BALANCER) {
+                        LiveStatsRecorder.updateCurrentLeafOnInit(proxy.profile.displayName(), leafName)
+                    } else {
+                        LiveStatsRecorder.switched(toName = leafName, fromName = prevLeafName)
+                    }
                     val newTitle = ActiveOutboundTracker.formatNotificationTitle(proxy.profile)
                     proxy.displayProfileName = newTitle
                     data.notification?.refresh(newTitle)

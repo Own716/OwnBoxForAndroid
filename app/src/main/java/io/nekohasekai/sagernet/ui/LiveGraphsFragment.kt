@@ -168,6 +168,7 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
 
     private val appCache = LruCache<String, AppVisual>(128)
     private var lastLoadedStats = LoadedStats(TrafficStatsDb.TrafficSummary(), emptyList(), emptyList())
+    private var bgProcessPssBytes = 0L
 
     private val charts
         get() = listOf(
@@ -292,6 +293,20 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
             }
         }
 
+        var syncingScrub = false
+        for (chart in charts) {
+            chart.onScrubChanged = { active, timeMs ->
+                if (!syncingScrub) {
+                    syncingScrub = true
+                    for (other in charts) {
+                        if (other !== chart) other.setExternalAnchor(active, timeMs)
+                    }
+                    render()
+                    syncingScrub = false
+                }
+            }
+        }
+
         setupStatsCard()
         applyState()
         render()
@@ -358,12 +373,6 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
         binding.dotSummaryDirect.background = dot(directColor, filled = true)
         binding.summaryBarProxy.setBackgroundColor(proxyColor)
         binding.summaryBarDirect.setBackgroundColor(directColor)
-
-        binding.btnStatsRefresh.setOnClickListener {
-            viewLifecycleOwner.lifecycleScope.launch {
-                refreshStatsTable(forceFlush = true)
-            }
-        }
 
         binding.btnStatsClear.setOnClickListener {
             confirmClearStats()
@@ -517,10 +526,17 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
         val dimension = statsDimension
         val service = (activity as? MainActivity)?.connection?.service
 
-        val loaded = withContext(Dispatchers.IO) {
-            loadStats(period, dimension, service, forceFlush)
+        val (loaded, pssBytes) = withContext(Dispatchers.IO) {
+            val stats = loadStats(period, dimension, service, forceFlush)
+            val pss = if (DataStore.serviceState == BaseService.State.Connected && service != null) {
+                runCatching { service.servicePssBytes }.getOrDefault(0L)
+            } else {
+                0L
+            }
+            stats to pss
         }
         if (!isAdded) return
+        bgProcessPssBytes = pssBytes
         lastLoadedStats = loaded
         renderStatsSummary(loaded.summary)
         renderTrendChart(loaded.trendBars)
@@ -571,18 +587,15 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
         var trendBars: List<DailyBarChartView.BarItem> = emptyList()
         val rows: List<DisplayRow> = when (dimension) {
             StatsDimension.DAILY -> {
-                val dailyMap = LinkedHashMap<String, TrafficStatsDb.DailyRow>()
-                for (r in TrafficStatsDb.queryDailyRows(sinceDay)) {
-                    dailyMap[r.day] = r
-                }
-                if (includePending && sumObj != null && pendingDay.isNotBlank()) {
+                fun mergePendingInto(map: MutableMap<String, TrafficStatsDb.DailyRow>, allowDay: Boolean) {
+                    if (!allowDay || sumObj == null || pendingDay.isBlank()) return
                     val pRx = sumObj.optLong("proxyRx", 0L)
                     val pTx = sumObj.optLong("proxyTx", 0L)
                     val dRx = sumObj.optLong("directRx", 0L)
                     val dTx = sumObj.optLong("directTx", 0L)
                     if (pRx + pTx + dRx + dTx > 0L) {
-                        val existing = dailyMap[pendingDay]
-                        dailyMap[pendingDay] = TrafficStatsDb.DailyRow(
+                        val existing = map[pendingDay]
+                        map[pendingDay] = TrafficStatsDb.DailyRow(
                             day = pendingDay,
                             proxyRx = (existing?.proxyRx ?: 0L) + pRx,
                             proxyTx = (existing?.proxyTx ?: 0L) + pTx,
@@ -591,8 +604,27 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
                         )
                     }
                 }
+
+                val dailyMap = LinkedHashMap<String, TrafficStatsDb.DailyRow>()
+                for (r in TrafficStatsDb.queryDailyRows(sinceDay)) {
+                    dailyMap[r.day] = r
+                }
+                mergePendingInto(dailyMap, includePending)
+
+                val trendDailyMap = if (period == StatsPeriod.TODAY) {
+                    val sevenSince = TrafficStatsDb.dayDaysAgo(6)
+                    LinkedHashMap<String, TrafficStatsDb.DailyRow>().apply {
+                        for (r in TrafficStatsDb.queryDailyRows(sevenSince)) {
+                            this[r.day] = r
+                        }
+                        mergePendingInto(this, pendingRoot != null && pendingDay >= sevenSince)
+                    }
+                } else {
+                    dailyMap
+                }
+
                 val mergedDaily = dailyMap.values.filter { it.totalAll > 0L }.sortedByDescending { it.day }
-                trendBars = buildTrendBars(period, dailyMap)
+                trendBars = buildTrendBars(period, trendDailyMap)
                 mergedDaily.map { r ->
                     DisplayRow(
                         key = r.day,
@@ -741,11 +773,11 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
         period: StatsPeriod,
         dailyMap: Map<String, TrafficStatsDb.DailyRow>,
     ): List<DailyBarChartView.BarItem> {
-        if (period == StatsPeriod.SESSION || period == StatsPeriod.TODAY) {
+        if (period == StatsPeriod.SESSION) {
             return emptyList()
         }
         val windowDays = when (period) {
-            StatsPeriod.LAST_7D -> 7
+            StatsPeriod.TODAY, StatsPeriod.LAST_7D -> 7
             StatsPeriod.LAST_30D -> 30
             StatsPeriod.ALL -> 30
             else -> return emptyList()
@@ -913,9 +945,9 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
         binding.tvSummaryProxy.text = Formatter.formatFileSize(ctx, summary.totalProxy)
         binding.tvSummaryDirect.text = Formatter.formatFileSize(ctx, summary.totalDirect)
         binding.tvSummaryProxyDetail.text =
-            "↓ ${Formatter.formatShortFileSize(ctx, summary.proxyRx)}  ↑ ${Formatter.formatShortFileSize(ctx, summary.proxyTx)}"
+            "↓ ${Formatter.formatFileSize(ctx, summary.proxyRx)}  ↑ ${Formatter.formatFileSize(ctx, summary.proxyTx)}"
         binding.tvSummaryDirectDetail.text =
-            "↓ ${Formatter.formatShortFileSize(ctx, summary.directRx)}  ↑ ${Formatter.formatShortFileSize(ctx, summary.directTx)}"
+            "↓ ${Formatter.formatFileSize(ctx, summary.directRx)}  ↑ ${Formatter.formatFileSize(ctx, summary.directTx)}"
 
         val total = summary.totalAll.toFloat().coerceAtLeast(1f)
         val pWeight = if (summary.totalAll > 0L) summary.totalProxy / total else 0f
@@ -930,6 +962,7 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
         val showTrend = statsDimension == StatsDimension.DAILY && trendBars.isNotEmpty()
         binding.dailyBarChart.isVisible = showTrend
         if (showTrend) {
+            binding.dailyBarChart.highlightedDay = if (statsPeriod == StatsPeriod.TODAY) TrafficStatsDb.formatDay() else null
             binding.dailyBarChart.setData(trendBars, proxyColor, directColor)
         }
     }
@@ -1137,7 +1170,7 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
     }
 
     private fun formatCellBytes(context: android.content.Context, bytes: Long): String {
-        return if (bytes <= 0L) "0 B" else Formatter.formatShortFileSize(context, bytes)
+        return if (bytes <= 0L) "0 B" else Formatter.formatFileSize(context, bytes)
     }
 
     private fun formatDayLabel(day: String): String {
@@ -1302,17 +1335,41 @@ class LiveGraphsFragment : ToolbarFragment(R.layout.layout_live_graphs), Toolbar
         } else {
             -1
         }
-        fun show(view: TextView, field: Int, axis: LiveChartView.Axis) {
-            val v = if (last < 0) Float.NaN else series.value(field, last)
+        val scrubbing = charts.any { it.isScrubActive }
+        fun valueOf(chart: LiveChartView, field: Int): Float {
+            return if (scrubbing) {
+                chart.scrubbedValueForField(field)
+            } else if (last >= 0) {
+                series.value(field, last)
+            } else {
+                Float.NaN
+            }
+        }
+        fun show(view: TextView, chart: LiveChartView, field: Int, axis: LiveChartView.Axis) {
+            val v = valueOf(chart, field)
             view.text = if (v.isNaN()) "—" else axis.format(v.toDouble())
         }
         for (item in legend) {
-            show(item.binding.liveLegendDown, item.row.fields[0], rateAxis)
-            show(item.binding.liveLegendUp, item.row.fields[1], rateAxis)
+            show(item.binding.liveLegendDown, binding.liveTrafficChart, item.row.fields[0], rateAxis)
+            show(item.binding.liveLegendUp, binding.liveTrafficChart, item.row.fields[1], rateAxis)
         }
-        show(binding.liveCpuValue, LiveStatsBatch.CPU, percentAxis)
-        show(binding.liveRamValue, LiveStatsBatch.MEMORY, bytesAxis)
-        show(binding.liveConnectionsValue, LiveStatsBatch.CONNECTIONS, countAxis)
+        show(binding.liveCpuValue, binding.liveCpuChart, LiveStatsBatch.CPU, percentAxis)
+        val ramVal = valueOf(binding.liveRamChart, LiveStatsBatch.MEMORY)
+        binding.liveRamValue.text = if (ramVal.isNaN()) {
+            "—"
+        } else {
+            val coreStr = bytesAxis.format(ramVal.toDouble())
+            if (!scrubbing && running && bgProcessPssBytes > 0L) {
+                getString(
+                    R.string.live_graph_ram_with_pss,
+                    coreStr,
+                    Formatter.formatShortFileSize(requireContext(), bgProcessPssBytes),
+                )
+            } else {
+                coreStr
+            }
+        }
+        show(binding.liveConnectionsValue, binding.liveConnectionsChart, LiveStatsBatch.CONNECTIONS, countAxis)
     }
 }
 

@@ -20,8 +20,8 @@ import (
 	"regexp"
 	"runtime"
 	"runtime/debug"
+	"runtime/metrics"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -1182,21 +1182,26 @@ type appTrafficDeltaItem struct {
 }
 
 func (b *BoxInstance) GetCoreMemoryBytes() int64 {
-	if data, err := os.ReadFile("/proc/self/status"); err == nil {
-		for _, line := range strings.Split(string(data), "\n") {
-			if strings.HasPrefix(line, "VmRSS:") {
-				fields := strings.Fields(strings.TrimPrefix(line, "VmRSS:"))
-				if len(fields) >= 1 {
-					if kb, parseErr := strconv.ParseInt(fields[0], 10, 64); parseErr == nil && kb > 0 {
-						return kb * 1024
-					}
-				}
-				break
-			}
+	samples := [2]metrics.Sample{
+		{Name: "/memory/classes/total:bytes"},
+		{Name: "/memory/classes/heap/released:bytes"},
+	}
+	metrics.Read(samples[:])
+	if samples[0].Value.Kind() == metrics.KindUint64 {
+		total := samples[0].Value.Uint64()
+		var released uint64
+		if samples[1].Value.Kind() == metrics.KindUint64 {
+			released = samples[1].Value.Uint64()
+		}
+		if total > released {
+			return int64(total - released)
 		}
 	}
 	var ms runtime.MemStats
 	runtime.ReadMemStats(&ms)
+	if ms.Sys > ms.HeapReleased {
+		return int64(ms.Sys - ms.HeapReleased)
+	}
 	return int64(ms.HeapInuse + ms.StackInuse)
 }
 

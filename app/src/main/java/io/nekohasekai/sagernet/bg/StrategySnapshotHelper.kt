@@ -143,7 +143,19 @@ object StrategySnapshotHelper {
             }
         }
 
+        val prevLeafId = ActiveOutboundTracker.activeLeafProfileId
+        val prevLeafName = ActiveOutboundTracker.activeLeafProfileName
         val updated = ActiveOutboundTracker.checkAndUpdate(data)
+        if (updated) {
+            val leafName = ActiveOutboundTracker.getActiveLeafNodeDisplay(proxy.profile)
+                ?: proxy.profile.displayName()
+            if (prevLeafId <= 0L && proxy.profile.type == ProxyEntity.TYPE_BALANCER) {
+                LiveStatsRecorder.updateCurrentLeafOnInit(proxy.profile.displayName(), leafName)
+            } else {
+                LiveStatsRecorder.switched(toName = leafName, fromName = prevLeafName)
+            }
+            proxy.looper?.triggerWakeup()
+        }
         val newTitle = if (updated) {
             ActiveOutboundTracker.formatNotificationTitle(proxy.profile).also {
                 proxy.displayProfileName = it

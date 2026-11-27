@@ -148,33 +148,49 @@
                             android:layout_height="1dp"
                             android:layout_weight="1" />
 
-                        <TextView
-                            android:id="@+id/live_column_down"
+                        <FrameLayout
                             android:layout_width="88dp"
-                            android:layout_height="30dp"
-                            android:background="?attr/selectableItemBackground"
-                            android:clickable="true"
-                            android:drawablePadding="6dp"
-                            android:focusable="true"
-                            android:gravity="center_vertical|end"
-                            android:singleLine="true"
-                            android:textAppearance="?android:attr/textAppearanceSmall"
-                            android:textColor="?android:attr/textColorSecondary"
-                            tools:text="↓ 下载" />
+                            android:layout_height="30dp">
 
-                        <TextView
-                            android:id="@+id/live_column_up"
+                            <TextView
+                                android:id="@+id/live_column_down"
+                                android:layout_width="wrap_content"
+                                android:layout_height="match_parent"
+                                android:layout_gravity="end|center_vertical"
+                                android:background="?attr/selectableItemBackground"
+                                android:clickable="true"
+                                android:drawablePadding="5dp"
+                                android:focusable="true"
+                                android:gravity="center_vertical"
+                                android:paddingHorizontal="4dp"
+                                android:singleLine="true"
+                                android:textAppearance="?android:attr/textAppearanceSmall"
+                                android:textColor="?android:attr/textColorSecondary"
+                                tools:text="↓ 下载" />
+
+                        </FrameLayout>
+
+                        <FrameLayout
                             android:layout_width="88dp"
-                            android:layout_height="30dp"
-                            android:background="?attr/selectableItemBackground"
-                            android:clickable="true"
-                            android:drawablePadding="6dp"
-                            android:focusable="true"
-                            android:gravity="center_vertical|end"
-                            android:singleLine="true"
-                            android:textAppearance="?android:attr/textAppearanceSmall"
-                            android:textColor="?android:attr/textColorSecondary"
-                            tools:text="↑ 上传" />
+                            android:layout_height="30dp">
+
+                            <TextView
+                                android:id="@+id/live_column_up"
+                                android:layout_width="wrap_content"
+                                android:layout_height="match_parent"
+                                android:layout_gravity="end|center_vertical"
+                                android:background="?attr/selectableItemBackground"
+                                android:clickable="true"
+                                android:drawablePadding="5dp"
+                                android:focusable="true"
+                                android:gravity="center_vertical"
+                                android:paddingHorizontal="4dp"
+                                android:singleLine="true"
+                                android:textAppearance="?android:attr/textAppearanceSmall"
+                                android:textColor="?android:attr/textColorSecondary"
+                                tools:text="↑ 上传" />
+
+                        </FrameLayout>
 
                     </LinearLayout>
 
@@ -366,18 +382,6 @@
                             android:textAppearance="?android:attr/textAppearanceMedium"
                             android:textColor="?android:attr/textColorPrimary"
                             android:textStyle="bold" />
-
-                        <ImageView
-                            android:id="@+id/btn_stats_refresh"
-                            android:layout_width="34dp"
-                            android:layout_height="34dp"
-                            android:background="?android:attr/selectableItemBackgroundBorderless"
-                            android:clickable="true"
-                            android:contentDescription="@string/traffic_stats_refresh"
-                            android:focusable="true"
-                            android:padding="6dp"
-                            android:src="@drawable/ic_baseline_refresh_24"
-                            app:tint="?android:attr/textColorSecondary" />
 
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/btn_stats_clear"

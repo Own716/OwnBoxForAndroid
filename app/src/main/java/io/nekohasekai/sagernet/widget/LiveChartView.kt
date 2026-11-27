@@ -86,7 +86,7 @@ class LiveChartView @JvmOverloads constructor(context: Context, attrs: Attribute
 
     companion object {
         /** A newer point than this is the current one: the window ends at it rather than now. */
-        private const val FRESH_MS = 2500L
+        private const val FRESH_MS = 3500L
         private const val MAX_GRID_LINES = 24
         private const val CARD_ROW = 0
         private const val CARD_TOTAL = 1
@@ -398,6 +398,39 @@ class LiveChartView @JvmOverloads constructor(context: Context, attrs: Attribute
         invalidate()
     }
 
+    var onScrubChanged: ((Boolean, Long) -> Unit)? = null
+
+    val isScrubActive: Boolean
+        get() = anchorSet && ap >= 0
+
+    fun scrubbedValueForField(field: Int): Float {
+        if (!valid || !anchorSet || ap < 0 || ap >= nb) return Float.NaN
+        for (j in 0 until ns) {
+            if (seriesField[j] == field) return valueAt(ap, j)
+        }
+        return Float.NaN
+    }
+
+    fun setExternalAnchor(active: Boolean, timeMs: Long) {
+        if (!active) {
+            if (anchorSet) {
+                anchorSet = false
+                ap = -1
+                apSeries = -1
+                invalidate()
+            }
+            return
+        }
+        if (!anchorSet || anchorT != timeMs) {
+            anchorSet = true
+            anchorT = timeMs
+            if (valid && nb > 0) {
+                resolveAnchor(fromDraw = false)
+            }
+            invalidate()
+        }
+    }
+
     // ------------------------------------------------------------------------------------------------ state
 
     private val plot = RectF()
@@ -512,7 +545,7 @@ class LiveChartView @JvmOverloads constructor(context: Context, attrs: Attribute
 
     private fun buildBuckets(series: LiveSeries, perPoint: Boolean) {
         val nc = columns.size
-        val gapMs = (pointIntervalMs * 2.5).toLong()
+        val gapMs = max(20_000L, (pointIntervalMs * 2.5).toLong())
         var prevT = 0L
         var i = max(0, series.lowerBound(viewStart - kms) - 1)
         while (i < series.size) {
@@ -755,25 +788,71 @@ class LiveChartView @JvmOverloads constructor(context: Context, attrs: Attribute
         }
     }
 
+    private var lane0Count = 0
+    private var lane1Count = 0
+    private val lane0Left = FloatArray(128)
+    private val lane0Right = FloatArray(128)
+    private val lane1Left = FloatArray(128)
+    private val lane1Right = FloatArray(128)
+
+    private fun fitsInLane(leftArr: FloatArray, rightArr: FloatArray, count: Int, l: Float, r: Float): Boolean {
+        if (count >= leftArr.size) return false
+        for (i in 0 until count) {
+            if (l < rightArr[i] && r > leftArr[i]) return false
+        }
+        return true
+    }
+
     private fun layoutMarkers() {
         markerCount = 0
-        var lastRight = Float.NEGATIVE_INFINITY
         for (m in 0 until markers.size) {
             val marker = markers[m]
             if (marker.t < viewStart || marker.t > viewEnd) continue
             val x = xOf(marker.t)
             val text = flagText(marker)
-            val w = ceil(pSmall.measureText(text)) + dp(12f)
-            var fx = x + dp(3f)
-            if (fx + w > plot.right) fx = x - dp(3f) - w
             if (markerCount == markerItems.size) markerItems.add(MarkerItem())
             val item = markerItems[markerCount++]
             item.x = x.roundToInt().toFloat()
             item.text = text
-            item.hasFlag = fx >= plot.left && fx >= lastRight + dp(4f)
-            if (item.hasFlag) {
-                lastRight = fx + w
-                item.flag.set(fx, plot.top + dp(2f), fx + w, plot.top + dp(2f) + flagH)
+            item.hasFlag = false
+        }
+
+        lane0Count = 0
+        lane1Count = 0
+        val pad = dp(4f)
+        val lane0Top = plot.top + dp(2f)
+        val lane1Top = lane0Top + flagH + dp(3f)
+        val allowLane1 = lane1Top + flagH <= plot.bottom - dp(8f)
+
+        // Prioritize newest events first so rapid switches never get hidden by older labels.
+        for (k in markerCount - 1 downTo 0) {
+            val item = markerItems[k]
+            val w = ceil(pSmall.measureText(item.text)) + dp(12f)
+            var fx = item.x + dp(3f)
+            if (fx + w > plot.right) fx = item.x - dp(3f) - w
+            if (fx < plot.left) fx = plot.left
+            if (fx + w > plot.right) continue
+
+            val checkL = fx - pad
+            val checkR = fx + w + pad
+            val yTop = when {
+                fitsInLane(lane0Left, lane0Right, lane0Count, checkL, checkR) -> {
+                    lane0Left[lane0Count] = fx
+                    lane0Right[lane0Count] = fx + w
+                    lane0Count++
+                    lane0Top
+                }
+                allowLane1 && fitsInLane(lane1Left, lane1Right, lane1Count, checkL, checkR) -> {
+                    lane1Left[lane1Count] = fx
+                    lane1Right[lane1Count] = fx + w
+                    lane1Count++
+                    lane1Top
+                }
+                else -> Float.NaN
+            }
+            if (!yTop.isNaN()) {
+                item.hasFlag = true
+                item.flag.set(fx, yTop, fx + w, yTop + flagH)
             }
         }
     }
@@ -807,8 +886,22 @@ class LiveChartView @JvmOverloads constructor(context: Context, attrs: Attribute
         LiveStatsBatch.MARKER_STARTED -> "▶︎ " +
             if (note) context.getString(R.string.live_graph_started, marker.text) else shortName(marker.text)
 
-        LiveStatsBatch.MARKER_SWITCHED -> "⇄ " +
-            if (note) context.getString(R.string.live_graph_switched, marker.text) else shortName(marker.text)
+        LiveStatsBatch.MARKER_SWITCHED -> {
+            val parts = marker.text.split('\t', limit = 2)
+            if (parts.size == 2 && parts[0].isNotBlank() && parts[1].isNotBlank()) {
+                if (note) {
+                    "⇄ " + context.getString(
+                        R.string.live_graph_switched_from_to,
+                        shortName(parts[0], 18),
+                        shortName(parts[1], 18),
+                    )
+                } else {
+                    "⇄ ${shortName(parts[0], 8)} → ${shortName(parts[1], 8)}"
+                }
+            } else {
+                "⇄ " + if (note) context.getString(R.string.live_graph_switched, marker.text) else shortName(marker.text, 12)
+            }
+        }
 
         else -> "■ $stoppedText"
     }
@@ -1185,13 +1278,16 @@ class LiveChartView @JvmOverloads constructor(context: Context, attrs: Attribute
     }
 
     /** The crosshair stays on its moment as the window moves, and on its line while that has a value there. */
-    private fun resolveAnchor() {
+    private fun resolveAnchor(fromDraw: Boolean = true) {
         ap = -1
         apSeries = -1
         if (!anchorSet || nb == 0) return
         val index = nearestByTime(anchorT)
         if (abs(bucketTx[index] - anchorT) > kms || bucketX[index] < plot.left) {
             anchorSet = false
+            if (fromDraw) {
+                post { if (!anchorSet) onScrubChanged?.invoke(false, 0L) }
+            }
             return
         }
         val nc = columns.size
@@ -1216,7 +1312,10 @@ class LiveChartView @JvmOverloads constructor(context: Context, attrs: Attribute
         anchorT = bucketTx[bucket]
         anchorRow = seriesRow[j]
         anchorColumn = seriesColumn[j]
+        ap = bucket
+        apSeries = j
         invalidate()
+        onScrubChanged?.invoke(true, anchorT)
     }
 
     /** A tap shows the crosshair at that moment and the next tap hides it; a horizontal drag scrubs. */
@@ -1244,7 +1343,10 @@ class LiveChartView @JvmOverloads constructor(context: Context, attrs: Attribute
                 if (!scrubbing) {
                     if (hadAnchor) {
                         anchorSet = false
+                        ap = -1
+                        apSeries = -1
                         invalidate()
+                        onScrubChanged?.invoke(false, 0L)
                     } else {
                         pointAt(event.x, event.y)
                     }

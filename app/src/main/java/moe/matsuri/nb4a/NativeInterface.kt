@@ -12,6 +12,7 @@ import android.os.SystemClock
 import androidx.annotation.RequiresApi
 import io.nekohasekai.sagernet.SagerNet
 import io.nekohasekai.sagernet.bg.ActiveOutboundTracker
+import io.nekohasekai.sagernet.bg.LiveStatsRecorder
 import io.nekohasekai.sagernet.bg.ServiceNotification
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProfileManager
@@ -354,7 +355,13 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
                 if (isBalancer) {
                     val memberMap = runCatching { data.proxy?.safeConfig?.balancerMemberMap?.get(activeProfile.id) }.getOrNull()
                     if (memberMap != null && id in memberMap) {
+                        val prevLeafId = ActiveOutboundTracker.activeLeafProfileId
+                        val prevLeafName = ActiveOutboundTracker.activeLeafProfileName
                         ActiveOutboundTracker.updateActiveLeaf(id, ent.displayName())
+                        if (prevLeafId != id) {
+                            LiveStatsRecorder.switched(toName = ent.displayName(), fromName = prevLeafName)
+                            data.proxy?.looper?.triggerWakeup()
+                        }
                         LandingIpManager.clearCache()
                         val newTitle = ActiveOutboundTracker.formatNotificationTitle(activeProfile!!)
                         data.proxy?.displayProfileName = newTitle
@@ -373,6 +380,7 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
                 data.proxy?.apply {
                     profile = ent
                     looper?.selectMain(id)
+                    looper?.triggerWakeup()
                     displayProfileName = ActiveOutboundTracker.formatNotificationTitle(ent)
                     data.notification?.refresh(displayProfileName)
                 }
