@@ -117,8 +117,11 @@ class BatchMultiSelectContractTest {
     fun configurationHolder_doesNotEnterBatchModeOnLongClickWhenNotInBatchMode() {
         val content = sourceFile("src/main/java/io/nekohasekai/sagernet/ui/ConfigurationFragment.kt").readText()
 
-        // Verify that view.setOnLongClickListener does not call enterBatchMode
-        val longClickSection = content.substringAfter("view.setOnLongClickListener").substringBefore("private fun selectProfile")
+        // Verify that ConfigurationHolder's view.setOnLongClickListener does not call enterBatchMode
+        val longClickSection = content
+            .substringAfter("view.isLongClickable = true")
+            .substringAfter("view.setOnLongClickListener")
+            .substringBefore("private fun selectProfile")
         assertFalse(
             "Long clicking a card when not in batch mode must NOT enter batch mode",
             longClickSection.contains("enterBatchMode()")
