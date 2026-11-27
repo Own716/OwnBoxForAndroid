@@ -1,6 +1,6 @@
 module libcore
 
-go 1.25.5
+go 1.26.11
 
 require (
 	// 与 Throne 2e7182b9ea99947a409fee30f74df83752ab763c 的测速基线一致。
@@ -11,19 +11,19 @@ require (
 	github.com/gofrs/uuid/v5 v5.5.1
 	github.com/miekg/dns v1.1.72
 	github.com/oschwald/maxminddb-golang v1.13.1
-	github.com/sagernet/quic-go v0.61.0-sing-box-mod.12
-	github.com/sagernet/sing v0.9.7-0.20261023115510-03a6cce64bf7
+	github.com/sagernet/quic-go v0.66.0-sing-box-mod.1
+	github.com/sagernet/sing v0.9.7-0.20261125122036-9b11dbe28a7d
 	// 版本唯一来源是 ../nb4a.properties 的 SINGBOX_VERSION；此处仅为 Go
 	// module graph 所需占位值，实际源码始终由下方 replace 指向 CI 检出的官方 tag。
 	github.com/sagernet/sing-box v0.0.0
-	github.com/sagernet/sing-quic v0.7.2-0.20261020082049-7e0a5869a5f4
-	github.com/sagernet/sing-tun v0.9.7-0.20261023115453-611d83b7a57b
-	github.com/sagernet/sing-vmess v0.2.9-0.20261019223527-a0c58542bd9d
+	github.com/sagernet/sing-quic v0.7.2-0.20261126024618-27f15a98d9c9
+	github.com/sagernet/sing-tun v0.9.7-0.20261126024559-1a13df1ac21f
+	github.com/sagernet/sing-vmess v0.2.9-0.20261124075649-4acc92a6f6c6
 	github.com/ulikunitz/xz v0.5.15
-	golang.org/x/crypto v0.54.0 // indirect
+	golang.org/x/crypto v0.59.0 // indirect
 	golang.org/x/mobile v0.0.0-20231108233038-35478a0c49da
-	golang.org/x/net v0.57.0
-	golang.org/x/sys v0.47.0
+	golang.org/x/net v0.63.0
+	golang.org/x/sys v0.50.0
 )
 
 require (
@@ -61,7 +61,7 @@ require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/mdlayher/netlink v1.11.2 // indirect
 	github.com/mdlayher/socket v0.6.0 // indirect
-	github.com/metacubex/utls v1.8.7 // indirect
+	github.com/metacubex/utls v1.9.0-alpha.1 // indirect
 	github.com/mholt/acmez/v3 v3.1.6 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/sagernet/bbolt v0.0.0-20260915102804-500ee1e84832 // indirect

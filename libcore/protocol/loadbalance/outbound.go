@@ -262,8 +262,8 @@ func NewLoadBalance(ctx context.Context, router adapter.Router, logger log.Conte
 	return lb, nil
 }
 
-func (s *LoadBalance) References() []string {
-	return s.tags
+func (s *LoadBalance) References() ([]string, []string) {
+	return s.tags, nil
 }
 
 func (s *LoadBalance) All() []string {

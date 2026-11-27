@@ -244,6 +244,129 @@ func sanitizeOutbounds(outbounds []option.Outbound) {
 	}
 }
 
+func ruleActionRefs(action option.RuleAction) (outboundTag, serverTag string) {
+	switch action.Action {
+	case "", constant.RuleActionTypeRoute:
+		outboundTag = action.RouteOptions.Outbound
+	case constant.RuleActionTypeBypass:
+		outboundTag = action.BypassOptions.Outbound
+	case constant.RuleActionTypeResolve:
+		serverTag = action.ResolveOptions.Server
+	}
+	return outboundTag, serverTag
+}
+
+func dnsRuleActionServerTag(action option.DNSRuleAction) string {
+	switch action.Action {
+	case "", constant.RuleActionTypeRoute:
+		return action.RouteOptions.Server
+	case constant.RuleActionTypeEvaluate:
+		return action.EvaluateOptions.Server
+	}
+	return ""
+}
+
+// sanitizeConfigOptions clears deprecated TUN stack settings and prunes stale
+// outbound/DNS server references so v1.15.0-alpha.14 startup validation does not abort.
+func sanitizeConfigOptions(options *option.Options) {
+	if options == nil {
+		return
+	}
+	for i := range options.Inbounds {
+		if tunOpt, ok := options.Inbounds[i].Options.(*option.TunInboundOptions); ok && tunOpt != nil {
+			tunOpt.Stack = ""
+		}
+	}
+
+	validOutbounds := make(map[string]bool, len(options.Outbounds)+len(options.Endpoints)+1)
+	for i, ep := range options.Endpoints {
+		tag := ep.Tag
+		if tag == "" {
+			tag = F.ToString(i)
+		}
+		validOutbounds[tag] = true
+	}
+	for i, ob := range options.Outbounds {
+		tag := ob.Tag
+		if tag == "" {
+			tag = F.ToString(i)
+		}
+		validOutbounds[tag] = true
+	}
+	if len(options.Outbounds) == 0 && len(options.Endpoints) == 0 {
+		validOutbounds["direct"] = true
+	}
+
+	validDNSServers := make(map[string]bool)
+	if options.DNS != nil && len(options.DNS.Servers) > 0 {
+		for i, srv := range options.DNS.Servers {
+			tag := srv.Tag
+			if tag == "" {
+				tag = F.ToString(i)
+			}
+			validDNSServers[tag] = true
+		}
+	} else {
+		validDNSServers["local"] = true
+	}
+
+	if options.DNS != nil {
+		if options.DNS.Final != "" && !validDNSServers[options.DNS.Final] {
+			log.Printf("sanitizeConfigOptions: clear missing dns.final=%q", options.DNS.Final)
+			options.DNS.Final = ""
+		}
+		if len(options.DNS.Rules) > 0 {
+			keptDNSRules := options.DNS.Rules[:0]
+			for i, rule := range options.DNS.Rules {
+				var action option.DNSRuleAction
+				switch rule.Type {
+				case "", constant.RuleTypeDefault:
+					action = rule.DefaultOptions.DNSRuleAction
+				case constant.RuleTypeLogical:
+					action = rule.LogicalOptions.DNSRuleAction
+				}
+				server := dnsRuleActionServerTag(action)
+				if server != "" && !validDNSServers[server] {
+					log.Printf("sanitizeConfigOptions: drop dns.rules[%d] referencing missing server=%q", i, server)
+					continue
+				}
+				keptDNSRules = append(keptDNSRules, rule)
+			}
+			options.DNS.Rules = keptDNSRules
+		}
+	}
+
+	if options.Route != nil {
+		if options.Route.Final != "" && !validOutbounds[options.Route.Final] {
+			log.Printf("sanitizeConfigOptions: clear missing route.final=%q", options.Route.Final)
+			options.Route.Final = ""
+		}
+		if len(options.Route.Rules) > 0 {
+			keptRouteRules := options.Route.Rules[:0]
+			for i, rule := range options.Route.Rules {
+				var action option.RuleAction
+				switch rule.Type {
+				case "", constant.RuleTypeDefault:
+					action = rule.DefaultOptions.RuleAction
+				case constant.RuleTypeLogical:
+					action = rule.LogicalOptions.RuleAction
+				}
+				outboundTag, serverTag := ruleActionRefs(action)
+				if outboundTag != "" && !validOutbounds[outboundTag] {
+					log.Printf("sanitizeConfigOptions: drop route.rules[%d] referencing missing outbound=%q", i, outboundTag)
+					continue
+				}
+				if serverTag != "" && !validDNSServers[serverTag] {
+					log.Printf("sanitizeConfigOptions: drop route.rules[%d] referencing missing dns server=%q", i, serverTag)
+					continue
+				}
+				keptRouteRules = append(keptRouteRules, rule)
+			}
+			options.Route.Rules = keptRouteRules
+		}
+	}
+}
+
 type boxLifecycleState uint8
 
 const (
@@ -421,6 +544,7 @@ func newSingBoxInstance(config string, localTransport LocalDNSTransport, platfor
 	// Hysteria2 空密码 obfs、TUIC stream/relay 冲突、WireGuard detour/listen_port 冲突、Snell 缺失版本等），
 	// 无论上层配置或自定义 JSON 如何输入，彻底杜绝内核出站初始化阶段产生致命异常中断服务。
 	sanitizeOutbounds(options.Outbounds)
+	sanitizeConfigOptions(&options)
 
 	// 官方内核不支持 fork 私有的 "geoip:xxx"/"geosite:xxx" 伪路径 local rule-set，
 	// 这里预处理：从 geoip.db/geosite.db 生成 .srs 缓存并改写为真实路径。

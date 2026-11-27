@@ -156,8 +156,8 @@ func (s *URLTest) AttachConnection(closer io.Closer) func() {
 	return s.group.interruptGroup.Add(closer, true)
 }
 
-func (s *URLTest) References() []string {
-	return s.tags
+func (s *URLTest) References() ([]string, []string) {
+	return s.tags, nil
 }
 
 func (s *URLTest) URLTest(ctx context.Context) (map[string]uint16, error) {

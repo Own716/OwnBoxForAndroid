@@ -241,3 +241,110 @@ func TestSanitizeOutboundsClearsNetworkStrategyWhenBindInterfaceSet(t *testing.T
 		t.Errorf("expected NetworkStrategy to be cleared when BindInterface is set, got %+v", *hy2Opt.NetworkStrategy)
 	}
 }
+
+func TestSanitizeConfigOptions(t *testing.T) {
+	options := &option.Options{
+		Inbounds: []option.Inbound{
+			{
+				Type: "tun",
+				Tag:  "tun-in",
+				Options: &option.TunInboundOptions{
+					Stack: "go",
+				},
+			},
+		},
+		Outbounds: []option.Outbound{
+			{Type: "direct", Tag: "direct"},
+			{Type: "vless", Tag: "proxy"},
+		},
+		DNS: &option.DNSOptions{
+			RawDNSOptions: option.RawDNSOptions{
+				Servers: []option.DNSServerOptions{
+					{Type: "local", Tag: "local-dns"},
+				},
+				Final: "missing-dns",
+				Rules: []option.DNSRule{
+					{
+						Type: constant.RuleTypeDefault,
+						DefaultOptions: option.DefaultDNSRule{
+							DNSRuleAction: option.DNSRuleAction{
+								Action: constant.RuleActionTypeRoute,
+								RouteOptions: option.DNSRouteActionOptions{
+									Server: "local-dns",
+								},
+							},
+						},
+					},
+					{
+						Type: constant.RuleTypeDefault,
+						DefaultOptions: option.DefaultDNSRule{
+							DNSRuleAction: option.DNSRuleAction{
+								Action: constant.RuleActionTypeEvaluate,
+								EvaluateOptions: option.DNSEvaluateActionOptions{
+									Server: "orphan-dns",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Route: &option.RouteOptions{
+			Final: "missing-outbound",
+			Rules: []option.Rule{
+				{
+					Type: constant.RuleTypeDefault,
+					DefaultOptions: option.DefaultRule{
+						RuleAction: option.RuleAction{
+							Action: constant.RuleActionTypeRoute,
+							RouteOptions: option.RouteActionOptions{
+								Outbound: "proxy",
+							},
+						},
+					},
+				},
+				{
+					Type: constant.RuleTypeDefault,
+					DefaultOptions: option.DefaultRule{
+						RuleAction: option.RuleAction{
+							Action: constant.RuleActionTypeBypass,
+							BypassOptions: option.RouteActionOptions{
+								Outbound: "orphan-out",
+							},
+						},
+					},
+				},
+				{
+					Type: constant.RuleTypeLogical,
+					LogicalOptions: option.LogicalRule{
+						RuleAction: option.RuleAction{
+							Action: constant.RuleActionTypeResolve,
+							ResolveOptions: option.RouteActionResolve{
+								Server: "orphan-dns",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	sanitizeConfigOptions(options)
+
+	tunOpt := options.Inbounds[0].Options.(*option.TunInboundOptions)
+	if tunOpt.Stack != "" {
+		t.Errorf("expected tun Stack to be cleared, got %q", tunOpt.Stack)
+	}
+	if options.DNS.Final != "" {
+		t.Errorf("expected missing dns.final to be cleared, got %q", options.DNS.Final)
+	}
+	if len(options.DNS.Rules) != 1 || options.DNS.Rules[0].DefaultOptions.RouteOptions.Server != "local-dns" {
+		t.Errorf("expected only valid DNS rule to remain, got %+v", options.DNS.Rules)
+	}
+	if options.Route.Final != "" {
+		t.Errorf("expected missing route.final to be cleared, got %q", options.Route.Final)
+	}
+	if len(options.Route.Rules) != 1 || options.Route.Rules[0].DefaultOptions.RouteOptions.Outbound != "proxy" {
+		t.Errorf("expected only valid route rule to remain, got %+v", options.Route.Rules)
+	}
+}

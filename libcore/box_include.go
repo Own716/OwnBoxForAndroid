@@ -43,7 +43,6 @@ import (
 
 	"libcore/protocol/autoselect"
 	customDirect "libcore/protocol/direct"
-	h2http "libcore/protocol/http"
 	"libcore/protocol/juicity"
 	"libcore/protocol/loadbalance"
 	"libcore/protocol/mieru"
@@ -92,9 +91,6 @@ func nekoboxAndroidOutboundRegistry() *outbound.Registry {
 
 	socks.RegisterOutbound(registry)
 	http.RegisterOutbound(registry)
-	// 覆盖 sing-box 的 http outbound：TLS 下默认 ALPN ["h2","http/1.1"]，
-	// 协商到 h2 时走 HTTP/2 CONNECT（兼容 h2-only HTTPS 代理节点）。
-	h2http.RegisterOutbound(registry)
 	shadowsocks.RegisterOutbound(registry)
 	snell.RegisterOutbound(registry)
 	vmess.RegisterOutbound(registry)

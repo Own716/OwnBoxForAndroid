@@ -192,8 +192,8 @@ func (g *AutoSelect) All() []string {
 	return append([]string(nil), g.tags...)
 }
 
-func (g *AutoSelect) References() []string {
-	return append([]string(nil), g.tags...)
+func (g *AutoSelect) References() ([]string, []string) {
+	return append([]string(nil), g.tags...), nil
 }
 
 func (g *AutoSelect) Now() string {
