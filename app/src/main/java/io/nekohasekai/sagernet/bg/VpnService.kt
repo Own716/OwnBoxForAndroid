@@ -16,6 +16,7 @@ import io.nekohasekai.sagernet.fmt.LOCALHOST
 import io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean
 import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.ui.VpnRequestActivity
+import io.nekohasekai.sagernet.utils.NetworkIPv6Detector
 import io.nekohasekai.sagernet.utils.Subnet
 import android.net.VpnService as BaseVpnService
 
