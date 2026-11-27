@@ -79,7 +79,7 @@ dependencies {
     implementation("com.google.code.gson:gson:2.9.0")
 
     implementation("com.github.jenly1314:zxing-lite:2.1.1")
-    implementation("com.blacksquircle.ui:editorkit:2.6.0")
+    implementation("com.blacksquircle.ui:editorkit:2.9.0")
     implementation("com.blacksquircle.ui:language-base:2.6.0")
     implementation("com.blacksquircle.ui:language-json:2.6.0")
 
