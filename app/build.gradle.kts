@@ -76,7 +76,7 @@ dependencies {
     implementation("androidx.work:work-multiprocess:2.8.1")
 
     implementation("com.google.android.material:material:1.8.0")
-    implementation("com.google.code.gson:gson:2.9.0")
+    implementation("com.google.code.gson:gson:2.15.0")
 
     implementation("com.github.jenly1314:zxing-lite:2.1.1")
     implementation("com.blacksquircle.ui:editorkit:2.6.0")
