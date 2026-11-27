@@ -24,6 +24,11 @@
         android:id="@+id/misc"
         android:checkableBehavior="single">
         <item
+            android:id="@+id/nav_dashboard"
+            android:icon="@drawable/ic_dashboard"
+            android:title="@string/menu_dashboard"
+            android:visible="false" />
+        <item
             android:id="@+id/nav_diagnostics"
             android:icon="@drawable/ic_baseline_health_and_safety_24"
             android:title="@string/menu_diagnostics" />
@@ -33,10 +38,9 @@
             android:title="@string/menu_connections"
             android:visible="false" />
         <item
-            android:id="@+id/nav_apps"
-            android:icon="@drawable/ic_navigation_apps"
-            android:title="@string/proxied_apps"
-            android:visible="false" />
+            android:id="@+id/nav_live_graphs"
+            android:icon="@drawable/ic_baseline_show_chart_24"
+            android:title="@string/menu_traffic_charts" />
         <item
             android:id="@+id/nav_tools"
             android:icon="@drawable/baseline_construction_24"
@@ -46,13 +50,10 @@
             android:icon="@drawable/ic_baseline_bug_report_24"
             android:title="@string/menu_log" />
         <item
-            android:id="@+id/nav_live_graphs"
-            android:icon="@drawable/ic_baseline_show_chart_24"
-            android:title="@string/menu_traffic_charts" />
-        <item
-            android:id="@+id/nav_dashboard"
-            android:icon="@drawable/ic_dashboard"
-            android:title="@string/menu_dashboard" />
+            android:id="@+id/nav_apps"
+            android:icon="@drawable/ic_navigation_apps"
+            android:title="@string/proxied_apps"
+            android:visible="false" />
     </group>
 
     <group
