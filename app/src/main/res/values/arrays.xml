@@ -612,10 +612,31 @@
 
     <string-array name="mtu_select">
         <item>1360</item>
-        <item>1380</item>
         <item>1400</item>
+        <item>1420</item>
+        <item>1480</item>
         <item>1500</item>
         <item>9000</item>
+    </string-array>
+
+    <string-array name="mtu_select_entries">
+        <item>1360</item>
+        <item>1400 (推荐)</item>
+        <item>1420</item>
+        <item>1480</item>
+        <item>1500</item>
+        <item>9000</item>
+        <item>自定义输入 (1280–9000)…</item>
+    </string-array>
+
+    <string-array name="mtu_select_values">
+        <item>1360</item>
+        <item>1400</item>
+        <item>1420</item>
+        <item>1480</item>
+        <item>1500</item>
+        <item>9000</item>
+        <item>__custom__</item>
     </string-array>
 
     <string-array name="mux_select_init" />

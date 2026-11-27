@@ -38,9 +38,10 @@ type prober struct {
 	history    *singUrltest.HistoryStorage
 	pauseMgr   pause.Manager
 	logger     log.Logger
-	link       string
-	getOutFn   func(tag string) adapter.Outbound
-	onSwitchFn func()
+	link        string
+	getOutFn    func(tag string) adapter.Outbound
+	onSwitchFn  func()
+	onPersistFn func()
 
 	// Injectable hooks for deterministic unit testing
 	probeFn             func(ctx context.Context, tag string) (uint16, error)
@@ -158,11 +159,25 @@ func (p *prober) Start(parent context.Context) {
 	// Suppress immediate startup interface-update echoes so cold start only probes once.
 	p.lastInterfaceAt = now
 	p.nextCheckAt = now.Add(p.cfg.checkInterval)
+	closeCh := p.closeCh
+	initialDelay := 600 * time.Millisecond
+	if p.scorer != nil && p.scorer.hasWarmState() {
+		initialDelay = 1000 * time.Millisecond
+	}
 	p.mu.Unlock()
 
 	p.startSchedulers(ctx)
 
 	go func() {
+		timer := time.NewTimer(initialDelay)
+		defer timer.Stop()
+		select {
+		case <-closeCh:
+			return
+		case <-ctx.Done():
+			return
+		case <-timer.C:
+		}
 		p.runProbeBatch(ctx, p.allTargets(), time.Time{})
 	}()
 }
@@ -438,6 +453,9 @@ func (p *prober) runProbeBatch(ctx context.Context, targets []string, now time.T
 	}
 	if switched && p.onSwitchFn != nil {
 		p.onSwitchFn()
+	}
+	if p.onPersistFn != nil {
+		p.onPersistFn()
 	}
 	return delays
 }

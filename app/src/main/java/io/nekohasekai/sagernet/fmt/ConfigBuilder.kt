@@ -270,9 +270,11 @@ internal fun buildAutoSelectOutbound(
     memberTags: List<String>,
     customTag: String? = null,
     defaultTestUrl: String? = null,
+    cacheKey: String = "",
 ): Outbound_AutoSelectOptions = Outbound_AutoSelectOptions().apply {
     type = "autoselect"
     tag = customTag?.takeIf { it.isNotBlank() } ?: TAG_PROXY
+    cache_key = cacheKey.takeIf { it.isNotBlank() }
 
     val initialDelays = HashMap<String, Int>()
     memberEntities.forEachIndexed { idx, member ->
@@ -428,9 +430,15 @@ internal class ChainGraphContext(
     private val isGroupDisabled: (Long) -> Boolean = { gid ->
         if (SagerNet.isInitialized()) DataStore.isGroupDisabled(gid) else false
     },
+    private val forExport: Boolean = false,
 ) {
     var nextCustomChainId: Long = -1L
     var mainChainBalancerId: Long = 0L
+    private val disabledGroupCache = HashMap<Long, Boolean>()
+
+    private fun isGroupDisabledCached(gid: Long): Boolean {
+        return disabledGroupCache.getOrPut(gid) { isGroupDisabled(gid) }
+    }
 
     fun readableTag(name_: String): String {
         var name = name_
@@ -536,7 +544,7 @@ internal class ChainGraphContext(
                 landingProxyId = balancerLandingEntity?.id ?: 0L,
                 groupProfilesProvider = getByGroup,
                 entitiesByIdsProvider = getEntities,
-                isGroupDisabled = isGroupDisabled,
+                isGroupDisabled = ::isGroupDisabledCached,
             )
             val memberEntities = if (!balancerBean.isPriorityMode()) {
                 BalancerMemberResolver.sortForColdStart(resolvedResult.members)
@@ -566,7 +574,12 @@ internal class ChainGraphContext(
                 }
                 outboundTagProfileMap[memberTag] = member.id
                 memberTag
-            }.ifEmpty { listOf(TAG_DIRECT) }
+            }.ifEmpty {
+                if (!forExport) {
+                    throw IllegalStateException("策略组「${entity.displayName()}」未匹配到任何可用节点，请检查筛选条件")
+                }
+                listOf(TAG_DIRECT)
+            }
 
             val balancerTag = readableTag(entity.displayName())
             val balancerOutbound = buildAutoSelectOutbound(
@@ -574,6 +587,7 @@ internal class ChainGraphContext(
                 memberEntities = memberEntities,
                 memberTags = memberTags,
                 customTag = balancerTag,
+                cacheKey = "group_${entity.id}",
             )
             outbounds.add(balancerOutbound)
             trafficMap[balancerTag] = listOf(entity)
@@ -828,7 +842,9 @@ internal class ChainGraphContext(
                     }
                 }
 
-                if (needGlobal && SagerNet.isInitialized() && DataStore.enableTLSFragment) {
+                if ((needGlobal || (index == profileList.lastIndex && externalDetour.isNullOrBlank())) &&
+                    SagerNet.isInitialized() && DataStore.enableTLSFragment
+                ) {
                     val outboundMap = currentOutbound.asMap()
                     val tlsOptions = outboundMap["tls"] as? Map<*, *>
                     if (tlsOptions?.get("enabled") == true) {
@@ -837,11 +853,14 @@ internal class ChainGraphContext(
                             val num = (first?.toLongOrNull() ?: 20L).coerceIn(1L, 1000L)
                             "${num}ms"
                         }
-                        currentOutbound._hack_config_map["tls"] = mapOf(
-                            "fragment" to true,
-                            "record_fragment" to true,
-                            "fragment_fallback_delay" to delay
-                        )
+                        val mergedTls = LinkedHashMap<String, Any?>()
+                        tlsOptions.forEach { (k, v) ->
+                            if (k is String) mergedTls[k] = v
+                        }
+                        mergedTls["fragment"] = true
+                        mergedTls["record_fragment"] = true
+                        mergedTls["fragment_fallback_delay"] = delay
+                        currentOutbound._hack_config_map["tls"] = mergedTls
                     }
                 }
             }
@@ -1448,9 +1467,8 @@ fun buildConfig(
                 cache_file = CacheFile().apply {
                     enabled = true
                     path = "../cache/cache.db"
-                    // if (DataStore.enableClashAPI) {
                     store_fakeip = true
-                    // }
+                    store_dns = true
                 }
 
                 if (DataStore.enableClashAPI || DataStore.allowAccess) {
@@ -1478,6 +1496,8 @@ fun buildConfig(
             servers = mutableListOf()
             rules = mutableListOf()
             independent_cache = true
+            cache_capacity = 8192L
+            optimistic = true
         }
 
         fun autoDnsDomainStrategy(s: String, isProxied: Boolean = false): String? {
@@ -1558,7 +1578,11 @@ fun buildConfig(
         route = RouteOptions().apply {
             auto_detect_interface = true
             override_android_vpn = true
-            find_process = true
+            find_process = !forTest && (
+                (isVPN && !DataStore.globalMode) ||
+                    extraRules.any { it.packages.isNotEmpty() } ||
+                    DataStore.enableClashAPI
+                )
             rules = mutableListOf()
             rule_set = mutableListOf()
 
@@ -1605,6 +1629,7 @@ fun buildConfig(
             groupCache = groupCache,
             externalIndexMap = externalIndexMap,
             domainListDNSDirectForce = domainListDNSDirectForce,
+            forExport = forExport,
         )
 
         fun buildChain(
@@ -2252,25 +2277,30 @@ fun buildConfig(
 
             // Telegram 官方数据中心（DC 1~5）及核心媒体 CDN 纯 IP 段
             val telegramDcIps = listOf(
+                "91.105.192.0/23",
                 "91.108.4.0/22",
                 "91.108.8.0/22",
                 "91.108.12.0/22",
                 "91.108.16.0/22",
                 "91.108.20.0/22",
                 "91.108.56.0/22",
+                "95.161.64.0/20",
                 "149.154.160.0/20",
+                "185.76.151.0/24",
+                "2001:67c:4e8::/48",
+                "2001:b28:f23c::/46",
                 "2001:b88::/32",
-                "2001:67c:4e8::/48"
+                "2a0a:f280::/32"
             )
 
             // 2. sing-box 1.13+：sniff（必须置于所有域名规则之前，否则直连/海外域名规则匹配时流量尚未完成域名嗅探）
-            // 显式指定 timeout = "100ms" 与 sniffer = ["tls", "http", "quic"]，并通过 ip_cidr + invert 跳过 Telegram 纯 IP MTProto 流量嗅探
+            // 显式指定 timeout = "35ms" 与 sniffer = ["tls", "http", "quic"]，并通过 ip_cidr + invert 跳过 Telegram 纯 IP MTProto 流量嗅探
             if (needSniff) {
                 topRouteRules.add(Rule_DefaultOptions().apply {
                     ip_cidr = telegramDcIps
                     invert = true
                     action = "sniff"
-                    timeout = "100ms"
+                    timeout = "35ms"
                     sniffer = listOf("tls", "http", "quic")
                 })
             }
@@ -2574,7 +2604,7 @@ fun buildConfig(
         }
 
         ConfigBuildResult(
-            gson.toJson(configMap),
+            if (forExport) gson.toJson(configMap) else moe.matsuri.nb4a.utils.JavaUtil.compactGson.toJson(configMap),
             externalIndexMap,
             proxy.id,
             trafficMap,

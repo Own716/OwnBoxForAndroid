@@ -152,7 +152,9 @@ object DataStore : OnPreferenceDataStoreChangeListener {
     var blockQuic by configurationStore.boolean(Key.BLOCK_QUIC) { true }
     var resolveDestination by configurationStore.boolean(Key.RESOLVE_DESTINATION)
 
-    var mtu by configurationStore.stringToInt(Key.MTU) { 1360 }
+    var mtu by configurationStore.stringToInt(Key.MTU) { 1400 }
+
+    var serviceConnectedPersisted by configurationStore.boolean("service_connected_persisted") { false }
 
     var bypassLan by configurationStore.boolean(Key.BYPASS_LAN)
     var bypassLanInCore by configurationStore.boolean(Key.BYPASS_LAN_IN_CORE)
@@ -326,6 +328,13 @@ object DataStore : OnPreferenceDataStoreChangeListener {
         }
         if (configurationStore.getString(Key.SMART_ROUTE_COUNTRY) == null) {
             smartRouteCountry = "cn"
+        }
+        if (!configurationStore.getBoolean("migrated_default_mtu_1400", false)) {
+            val rawMtu = configurationStore.getString(Key.MTU)?.trim()
+            if (rawMtu.isNullOrEmpty() || rawMtu == "1360") {
+                configurationStore.putString(Key.MTU, "1400")
+            }
+            configurationStore.putBoolean("migrated_default_mtu_1400", true)
         }
     }
 

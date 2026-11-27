@@ -40,10 +40,12 @@ type AutoSelectOptions struct {
 	FallbackAutoRevert        *bool              `json:"fallback_auto_revert,omitempty"`
 	FallbackMaxFails          int                `json:"fallback_max_fails,omitempty"`
 	ProbeTimeoutMs            int                `json:"probe_timeout_ms,omitempty"`
+	CacheKey                  string             `json:"cache_key,omitempty"`
 }
 
 type normalizedConfig struct {
 	url                  string
+	cacheKey             string
 	selectionMode        string
 	balanceEnabled       bool
 	balanceMode          string
@@ -134,6 +136,7 @@ func (o AutoSelectOptions) normalized() normalizedConfig {
 
 	return normalizedConfig{
 		url:                  o.URL,
+		cacheKey:             o.CacheKey,
 		selectionMode:        selectionMode,
 		balanceEnabled:       balanceEnabled,
 		balanceMode:          balanceMode,

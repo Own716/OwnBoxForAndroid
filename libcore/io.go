@@ -16,22 +16,33 @@ func Unxz(archive string, path string) error {
 	if err != nil {
 		return err
 	}
+	defer i.Close()
 	r, err := xz.NewReader(i)
 	if err != nil {
-		i.Close()
 		return err
 	}
-	o, err := os.Create(path)
+	tmpPath := path + ".tmp"
+	_ = os.Remove(tmpPath)
+	o, err := os.Create(tmpPath)
 	if err != nil {
-		i.Close()
 		return err
 	}
 	_, err = io.Copy(o, r)
-	_ = i.Close()
-	if closeErr := o.Close(); err == nil {
+	if syncErr := o.Sync(); err == nil && syncErr != nil {
+		err = syncErr
+	}
+	if closeErr := o.Close(); err == nil && closeErr != nil {
 		err = closeErr
 	}
-	return err
+	if err != nil {
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	if renameErr := os.Rename(tmpPath, path); renameErr != nil {
+		_ = os.Remove(tmpPath)
+		return renameErr
+	}
+	return nil
 }
 
 func Unzip(archive string, path string) error {

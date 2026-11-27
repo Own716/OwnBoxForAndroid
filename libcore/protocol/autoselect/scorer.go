@@ -35,6 +35,7 @@ type scorer struct {
 	rotationIndex int
 	lastRotateAt  time.Time
 	connCounter   atomic.Uint64
+	warmRestored  bool
 }
 
 func newScorer(order []string, cfg normalizedConfig) *scorer {
@@ -181,6 +182,70 @@ func (s *scorer) activeTagSnapshot() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.activeTag
+}
+
+func (s *scorer) restorePersisted(activeTag string, delays map[string]uint16, now time.Time) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if now.IsZero() {
+		now = time.Now()
+	}
+	restoredAny := false
+	for tag, delay := range delays {
+		if delay == 0 {
+			continue
+		}
+		if st, ok := s.members[tag]; ok {
+			st.checkCount++
+			st.lastCheckedAt = now
+			st.consecutiveFails = 0
+			st.available = true
+			st.lastDelay = delay
+			st.lastError = ""
+			restoredAny = true
+		}
+	}
+	if activeTag != "" {
+		if st, ok := s.members[activeTag]; ok && (st.available || len(delays) == 0) {
+			s.activeTag = activeTag
+			s.lastSwitchAt = now
+			s.switchReason = "cached resume"
+			restoredAny = true
+		}
+	}
+	if restoredAny {
+		s.warmRestored = true
+	}
+	return restoredAny
+}
+
+func (s *scorer) hasWarmState() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.warmRestored || s.activeTag != ""
+}
+
+func (s *scorer) hasAnyVerifiedHealthy() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, st := range s.members {
+		if st.available && st.lastDelay > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *scorer) exportState() (string, map[string]uint16) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	delays := make(map[string]uint16, len(s.members))
+	for tag, st := range s.members {
+		if st.available && st.lastDelay > 0 {
+			delays[tag] = st.lastDelay
+		}
+	}
+	return s.activeTag, delays
 }
 
 func (s *scorer) evaluate(now time.Time, passive *passiveTracker) (string, string) {

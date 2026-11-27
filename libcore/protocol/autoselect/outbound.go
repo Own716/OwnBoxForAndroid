@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -99,13 +100,38 @@ func NewAutoSelect(ctx context.Context, router adapter.Router, logger log.Contex
 	}
 
 	g.resolveOutboundsLocked()
-	if len(options.InitialDelays) > 0 {
-		now := g.now()
-		for tag, delay := range options.InitialDelays {
+	now := g.now()
+	validMembers := make(map[string]bool, len(options.Outbounds))
+	for _, memberTag := range options.Outbounds {
+		if memberTag != "" {
+			validMembers[memberTag] = true
+		}
+	}
+
+	persistedLoaded := false
+	if persisted, ok := loadPersistedGroupState(cfg.cacheKey, now); ok {
+		persistedLoaded = g.scorer.restorePersisted(persisted.ActiveTag, persisted.Delays, now)
+		if history != nil {
+			for memberTag, delay := range persisted.Delays {
+				if delay > 0 && validMembers[memberTag] {
+					history.StoreURLTestHistory(memberTag, &adapter.URLTestHistory{
+						Time:  now,
+						Delay: delay,
+					})
+				}
+			}
+		}
+		if g.passive != nil && len(persisted.Sites) > 0 {
+			g.passive.ImportSites(persisted.Sites, validMembers, now)
+		}
+	}
+
+	if !persistedLoaded && len(options.InitialDelays) > 0 {
+		for memberTag, delay := range options.InitialDelays {
 			if delay > 0 {
-				g.scorer.recordSample(tag, delay, nil, now)
+				g.scorer.recordSample(memberTag, delay, nil, now)
 				if history != nil {
-					history.StoreURLTestHistory(tag, &adapter.URLTestHistory{
+					history.StoreURLTestHistory(memberTag, &adapter.URLTestHistory{
 						Time:  now,
 						Delay: delay,
 					})
@@ -113,11 +139,31 @@ func NewAutoSelect(ctx context.Context, router adapter.Router, logger log.Contex
 			}
 		}
 	}
-	g.scorer.evaluate(g.now(), g.passive)
+
+	// Fill any remaining un-seeded members from sing-box's runtime HistoryStorage.
+	if history != nil {
+		seededDelays := make(map[string]uint16)
+		for _, memberTag := range options.Outbounds {
+			if h := history.LoadURLTestHistory(memberTag); h != nil && h.Delay > 0 && now.Sub(h.Time) <= persistedMaxAge {
+				seededDelays[memberTag] = h.Delay
+			}
+		}
+		if len(seededDelays) > 0 && g.scorer.activeTagSnapshot() == "" {
+			g.scorer.restorePersisted("", seededDelays, now)
+		}
+	}
+
+	if g.scorer.activeTagSnapshot() == "" {
+		g.scorer.evaluate(now, g.passive)
+	}
 
 	pauseMgr := service.FromContext[pause.Manager](ctx)
 	g.prober = newProber(cfg, g.scorer, g.passive, history, pauseMgr, logger, g.outboundByTag)
-	g.prober.onSwitchFn = g.handleSwitchInterrupt
+	g.prober.onSwitchFn = func() {
+		g.handleSwitchInterrupt()
+		go g.saveState()
+	}
+	g.prober.onPersistFn = g.saveState
 	return g, nil
 }
 
@@ -175,7 +221,29 @@ func (g *AutoSelect) Start(stage adapter.StartStage, _ *adapter.Scope) error {
 	return nil
 }
 
+func (g *AutoSelect) saveState() {
+	if g == nil || g.cfg.cacheKey == "" || g.scorer == nil {
+		return
+	}
+	activeTag, delays := g.scorer.exportState()
+	now := g.now()
+	var sites []persistedSiteRecord
+	if g.passive != nil {
+		sites = g.passive.ExportSites(now)
+	}
+	if activeTag == "" && len(delays) == 0 && len(sites) == 0 {
+		return
+	}
+	savePersistedGroupState(g.cfg.cacheKey, persistedGroupState{
+		ActiveTag: activeTag,
+		Delays:    delays,
+		Sites:     sites,
+		SavedAtMs: now.UnixMilli(),
+	})
+}
+
 func (g *AutoSelect) Close() error {
+	g.saveState()
 	if g.prober != nil {
 		g.prober.Close()
 	}
@@ -246,6 +314,7 @@ func (g *AutoSelect) PinOutbound(tag string) bool {
 		g.dialFailMu.Unlock()
 	}
 	g.handleSwitchInterrupt()
+	go g.saveState()
 	if g.history != nil {
 		g.history.NotifyUpdated()
 	}
@@ -276,21 +345,194 @@ func (g *AutoSelect) siteHostFromContext(ctx context.Context, destination M.Sock
 	return ""
 }
 
+func withAttemptTimeout(ctx context.Context, apply bool) (context.Context, context.CancelFunc) {
+	if !apply {
+		return ctx, nil
+	}
+	if deadline, hasDeadline := ctx.Deadline(); !hasDeadline || time.Until(deadline) > defaultFastFailoverTimeout {
+		return context.WithTimeout(ctx, defaultFastFailoverTimeout)
+	}
+	return ctx, nil
+}
+
+func (g *AutoSelect) wrapDialConn(ctx context.Context, conn net.Conn, tag, siteHost string) net.Conn {
+	g.resetDialFail(tag)
+	if g.cfg.learnFromConnections && g.passive != nil {
+		nodeTag := tag
+		destHost := siteHost
+		conn = newPassiveConn(conn, func(ttfb time.Duration) {
+			g.passive.RecordSuccess(nodeTag, destHost, ttfb)
+		}, func() {
+			g.onPassiveFailure(nodeTag, destHost)
+		}, g.nowFn)
+	}
+	if g.interruptGroup != nil {
+		conn = g.interruptGroup.NewConn(conn, interrupt.IsExternalConnectionFromContext(ctx))
+	}
+	return conn
+}
+
+func (g *AutoSelect) wrapDialPacketConn(ctx context.Context, pConn net.PacketConn, tag, siteHost string) net.PacketConn {
+	g.resetDialFail(tag)
+	if g.cfg.learnFromConnections && g.passive != nil {
+		nodeTag := tag
+		destHost := siteHost
+		pConn = newPassivePacketConn(pConn, func(ttfb time.Duration) {
+			g.passive.RecordSuccess(nodeTag, destHost, ttfb)
+		}, func() {
+			g.onPassiveFailure(nodeTag, destHost)
+		}, g.nowFn)
+	}
+	if g.interruptGroup != nil {
+		pConn = g.interruptGroup.NewPacketConn(pConn, interrupt.IsExternalConnectionFromContext(ctx))
+	}
+	return pConn
+}
+
+type dialRaceCandidate struct {
+	tag string
+	ob  adapter.Outbound
+}
+
+func (g *AutoSelect) dialColdStartRace(
+	ctx context.Context,
+	network string,
+	destination M.Socksaddr,
+	candidates []dialRaceCandidate,
+	siteHost string,
+	now time.Time,
+) (net.Conn, error) {
+	type raceResult struct {
+		tag  string
+		conn net.Conn
+		err  error
+	}
+	raceCtx, cancelRace := context.WithCancel(ctx)
+	results := make(chan raceResult, len(candidates))
+	var wg sync.WaitGroup
+
+	for i, cand := range candidates {
+		wg.Add(1)
+		go func(idx int, c dialRaceCandidate) {
+			defer wg.Done()
+			if idx > 0 {
+				timer := time.NewTimer(time.Duration(idx) * 150 * time.Millisecond)
+				select {
+				case <-raceCtx.Done():
+					timer.Stop()
+					return
+				case <-timer.C:
+				}
+			}
+			if raceCtx.Err() != nil {
+				return
+			}
+			attemptCtx, cancelAttempt := withAttemptTimeout(raceCtx, len(candidates) > 1)
+			conn, err := c.ob.DialContext(attemptCtx, network, destination)
+			if cancelAttempt != nil {
+				cancelAttempt()
+			}
+			if err != nil && raceCtx.Err() != nil {
+				if conn != nil {
+					_ = conn.Close()
+				}
+				return
+			}
+			results <- raceResult{tag: c.tag, conn: conn, err: err}
+		}(i, cand)
+	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	var lastErr error
+	for res := range results {
+		if res.err == nil && res.conn != nil {
+			cancelRace()
+			go func() {
+				for late := range results {
+					if late.conn != nil {
+						_ = late.conn.Close()
+					}
+				}
+			}()
+			g.scorer.recordSample(res.tag, 50, nil, now)
+			return g.wrapDialConn(ctx, res.conn, res.tag, siteHost), nil
+		}
+		if res.err != nil {
+			lastErr = res.err
+			if ctx.Err() == nil {
+				g.onDialAttemptFailed(res.tag, siteHost, now)
+			}
+		}
+	}
+	cancelRace()
+	return nil, lastErr
+}
+
 func (g *AutoSelect) DialContext(ctx context.Context, network string, destination M.Socksaddr) (net.Conn, error) {
 	g.Touch()
 	if ctx == nil {
 		ctx = g.ctx
 	}
+	destination = customUrltest.RewriteSniffedDestination(ctx, destination)
 	now := g.now()
 	siteHost := g.siteHostFromContext(ctx, destination)
 	candidates := g.scorer.candidateOrder(normalizeSiteKey(siteHost), now, g.passive)
-	maxAttempts := 1 + defaultMaxDialRetries
+	maxAttempts := len(candidates)
+	if maxAttempts > 6 {
+		maxAttempts = 6
+	}
 	if g.PinnedOutbound() != "" {
 		maxAttempts = 1
 	}
 
 	var lastErr error
 	attempts := 0
+	// Happy-Eyeballs cold-start race across top 3 candidates when no node is verified yet.
+	if g.PinnedOutbound() == "" && !g.scorer.hasAnyVerifiedHealthy() && len(candidates) >= 2 {
+		raceCandidates := make([]dialRaceCandidate, 0, 3)
+		for _, tag := range candidates {
+			ob := g.outboundByTag(tag)
+			if ob == nil || !common.Contains(ob.Network(), network) {
+				continue
+			}
+			raceCandidates = append(raceCandidates, dialRaceCandidate{tag: tag, ob: ob})
+			if len(raceCandidates) >= 3 || len(raceCandidates) >= maxAttempts {
+				break
+			}
+		}
+		if len(raceCandidates) >= 2 {
+			conn, err := g.dialColdStartRace(ctx, network, destination, raceCandidates, siteHost, now)
+			if err == nil && conn != nil {
+				return conn, nil
+			}
+			if err != nil {
+				lastErr = err
+			}
+			if ctx.Err() != nil {
+				if lastErr != nil {
+					return nil, lastErr
+				}
+				return nil, ctx.Err()
+			}
+			racedSet := make(map[string]bool, len(raceCandidates))
+			for _, rc := range raceCandidates {
+				racedSet[rc.tag] = true
+			}
+			remaining := make([]string, 0, len(candidates))
+			for _, tag := range candidates {
+				if !racedSet[tag] {
+					remaining = append(remaining, tag)
+				}
+			}
+			candidates = remaining
+			attempts = len(raceCandidates)
+		}
+	}
+
 	for _, tag := range candidates {
 		if attempts >= maxAttempts {
 			break
@@ -307,33 +549,13 @@ func (g *AutoSelect) DialContext(ctx context.Context, network string, destinatio
 		}
 		attempts++
 
-		attemptCtx := ctx
-		var cancel context.CancelFunc
-		if attempts < maxAttempts && len(candidates) > 1 {
-			if _, hasDeadline := ctx.Deadline(); !hasDeadline {
-				attemptCtx, cancel = context.WithTimeout(ctx, defaultFastFailoverTimeout)
-			}
-		}
-
+		attemptCtx, cancel := withAttemptTimeout(ctx, attempts < maxAttempts && len(candidates) > 1)
 		conn, err := ob.DialContext(attemptCtx, network, destination)
 		if cancel != nil {
 			cancel()
 		}
 		if err == nil {
-			g.resetDialFail(tag)
-			if g.cfg.learnFromConnections && g.passive != nil {
-				nodeTag := tag
-				destHost := siteHost
-				conn = newPassiveConn(conn, func(ttfb time.Duration) {
-					g.passive.RecordSuccess(nodeTag, destHost, ttfb)
-				}, func() {
-					g.onPassiveFailure(nodeTag, destHost)
-				}, g.nowFn)
-			}
-			if g.interruptGroup != nil {
-				conn = g.interruptGroup.NewConn(conn, interrupt.IsExternalConnectionFromContext(ctx))
-			}
-			return conn, nil
+			return g.wrapDialConn(ctx, conn, tag, siteHost), nil
 		}
 
 		lastErr = err
@@ -353,10 +575,15 @@ func (g *AutoSelect) ListenPacket(ctx context.Context, destination M.Socksaddr) 
 	if ctx == nil {
 		ctx = g.ctx
 	}
+	origDest := destination
+	destination = customUrltest.RewriteSniffedDestination(ctx, destination)
 	now := g.now()
 	siteHost := g.siteHostFromContext(ctx, destination)
 	candidates := g.scorer.candidateOrder(normalizeSiteKey(siteHost), now, g.passive)
-	maxAttempts := 1 + defaultMaxDialRetries
+	maxAttempts := len(candidates)
+	if maxAttempts > 6 {
+		maxAttempts = 6
+	}
 	if g.PinnedOutbound() != "" {
 		maxAttempts = 1
 	}
@@ -379,22 +606,16 @@ func (g *AutoSelect) ListenPacket(ctx context.Context, destination M.Socksaddr) 
 		}
 		attempts++
 
-		pConn, err := ob.ListenPacket(ctx, destination)
+		attemptCtx, cancel := withAttemptTimeout(ctx, attempts < maxAttempts && len(candidates) > 1)
+		pConn, err := ob.ListenPacket(attemptCtx, destination)
+		if err != nil && destination != origDest && strings.Contains(err.Error(), "domain destination is not supported") {
+			pConn, err = ob.ListenPacket(attemptCtx, origDest)
+		}
+		if cancel != nil {
+			cancel()
+		}
 		if err == nil {
-			g.resetDialFail(tag)
-			if g.cfg.learnFromConnections && g.passive != nil {
-				nodeTag := tag
-				destHost := siteHost
-				pConn = newPassivePacketConn(pConn, func(ttfb time.Duration) {
-					g.passive.RecordSuccess(nodeTag, destHost, ttfb)
-				}, func() {
-					g.onPassiveFailure(nodeTag, destHost)
-				}, g.nowFn)
-			}
-			if g.interruptGroup != nil {
-				pConn = g.interruptGroup.NewPacketConn(pConn, interrupt.IsExternalConnectionFromContext(ctx))
-			}
-			return pConn, nil
+			return g.wrapDialPacketConn(ctx, pConn, tag, siteHost), nil
 		}
 
 		lastErr = err

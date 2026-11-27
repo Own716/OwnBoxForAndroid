@@ -1,20 +1,24 @@
 package io.nekohasekai.sagernet.utils
 
+import io.nekohasekai.sagernet.Key
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.ktx.USER_AGENT
 import io.nekohasekai.sagernet.ktx.isIpAddress
-import io.nekohasekai.sagernet.ktx.tryProxyOutbound
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import libcore.Libcore
-import moe.matsuri.nb4a.utils.Util
+import okhttp3.Credentials
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import org.json.JSONObject
 import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.net.Proxy
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 
 data class ConnectionIpGeo(
     val ip: String,
@@ -271,78 +275,99 @@ object LandingIpManager {
         return "$flag $region (点击重试)"
     }
 
-    private fun createHttpClient(): libcore.HTTPClient {
-        return Libcore.newHttpClient().apply {
-            modernTLS()
-            tryProxyOutbound()
+    private val strictBaseClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(3500L, TimeUnit.MILLISECONDS)
+            .readTimeout(3500L, TimeUnit.MILLISECONDS)
+            .writeTimeout(3500L, TimeUnit.MILLISECONDS)
+            .build()
+    }
+
+    private fun buildStrictProxyOkHttpClient(): OkHttpClient? {
+        if (!DataStore.serviceState.connected) return null
+        val builder = strictBaseClient.newBuilder()
+        if (!DataStore.mixedInboundDisabled) {
+            val mixedPort = DataStore.mixedPort
+            if (mixedPort <= 0) return null
+            if (DataStore.mixedInboundNeedsAuth) {
+                val credential = Credentials.basic(DataStore.mixedUsername, DataStore.mixedPassword)
+                builder.proxy(Proxy(Proxy.Type.HTTP, InetSocketAddress("127.0.0.1", mixedPort)))
+                builder.proxyAuthenticator { _, response ->
+                    if (response.request.header("Proxy-Authorization") != null) {
+                        null
+                    } else {
+                        response.request.newBuilder()
+                            .header("Proxy-Authorization", credential)
+                            .build()
+                    }
+                }
+            } else {
+                builder.proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", mixedPort)))
+            }
+        } else if (DataStore.serviceMode != Key.MODE_VPN) {
+            return null
+        }
+        return builder.build()
+    }
+
+    private fun executeStrictGet(url: String, ua: String): String? {
+        val client = buildStrictProxyOkHttpClient() ?: return null
+        val req = Request.Builder()
+            .url(url)
+            .header("User-Agent", ua)
+            .build()
+        return client.newCall(req).execute().use { resp ->
+            if (!resp.isSuccessful) return@use null
+            resp.body?.string()
         }
     }
 
     // 第一步：快速解析真实出口 IP 地址（多源快速嗅探）
     private fun fetchRawEgressIp(ua: String): Pair<String, String>? {
         // 1. 优先尝试 Cloudflare Anycast trace（全球边缘节点，100ms 极速响应）
-        var client: libcore.HTTPClient? = null
         try {
-            client = createHttpClient()
-            val req = client.newRequest().apply {
-                setURL("https://cloudflare.com/cdn-cgi/trace")
-                setUserAgent(ua)
-            }
-            val resp = req.execute()
-            val body = Util.getStringBox(resp.contentString)
-            var ip = ""
-            var loc = ""
-            for (line in body.lines()) {
-                val trimmed = line.trim()
-                if (trimmed.startsWith("ip=")) ip = trimmed.substring(3).trim()
-                else if (trimmed.startsWith("loc=")) loc = trimmed.substring(4).trim().uppercase()
-            }
-            if (ip.isNotBlank()) {
-                return Pair(ip, loc)
+            val body = executeStrictGet("https://cloudflare.com/cdn-cgi/trace", ua)
+            if (!body.isNullOrBlank()) {
+                var ip = ""
+                var loc = ""
+                for (line in body.lines()) {
+                    val trimmed = line.trim()
+                    if (trimmed.startsWith("ip=")) ip = trimmed.substring(3).trim()
+                    else if (trimmed.startsWith("loc=")) loc = trimmed.substring(4).trim().uppercase()
+                }
+                if (ip.isNotBlank()) {
+                    return Pair(ip, loc)
+                }
             }
         } catch (_: Throwable) {
-        } finally {
-            runCatching { client?.close() }
         }
 
         // 2. 备选尝试 ip.sb
         try {
-            client = createHttpClient()
-            val req = client.newRequest().apply {
-                setURL("https://api.ip.sb/geoip")
-                setUserAgent(ua)
-            }
-            val resp = req.execute()
-            val body = Util.getStringBox(resp.contentString)
-            val json = JSONObject(body)
-            val ip = json.optString("ip").trim()
-            if (ip.isNotBlank()) {
-                val cc = json.optString("country_code").uppercase()
-                return Pair(ip, cc)
+            val body = executeStrictGet("https://api.ip.sb/geoip", ua)
+            if (!body.isNullOrBlank()) {
+                val json = JSONObject(body)
+                val ip = json.optString("ip").trim()
+                if (ip.isNotBlank()) {
+                    val cc = json.optString("country_code").uppercase()
+                    return Pair(ip, cc)
+                }
             }
         } catch (_: Throwable) {
-        } finally {
-            runCatching { client?.close() }
         }
 
         // 3. 备选尝试 ident.me (JSON)
         try {
-            client = createHttpClient()
-            val req = client.newRequest().apply {
-                setURL("https://ident.me/json")
-                setUserAgent(ua)
-            }
-            val resp = req.execute()
-            val body = Util.getStringBox(resp.contentString)
-            val json = JSONObject(body)
-            val ip = json.optString("ip").trim()
-            if (ip.isNotBlank()) {
-                val cc = json.optString("country_code", json.optString("cc")).uppercase()
-                return Pair(ip, cc)
+            val body = executeStrictGet("https://ident.me/json", ua)
+            if (!body.isNullOrBlank()) {
+                val json = JSONObject(body)
+                val ip = json.optString("ip").trim()
+                if (ip.isNotBlank()) {
+                    val cc = json.optString("country_code", json.optString("cc")).uppercase()
+                    return Pair(ip, cc)
+                }
             }
         } catch (_: Throwable) {
-        } finally {
-            runCatching { client?.close() }
         }
 
         return null
@@ -350,15 +375,8 @@ object LandingIpManager {
 
     // 第二步：向 iplocate.io 查询 IP 质量与详细信息（对齐 FlClash _fromIpLocate）
     private fun fetchFromIpLocate(rawIp: String, fallbackCc: String, ua: String, startTime: Long): LandingIpInfo? {
-        var client: libcore.HTTPClient? = null
         try {
-            client = createHttpClient()
-            val req = client.newRequest().apply {
-                setURL("https://iplocate.io/api/lookup/$rawIp")
-                setUserAgent(ua)
-            }
-            val resp = req.execute()
-            val body = Util.getStringBox(resp.contentString)
+            val body = executeStrictGet("https://iplocate.io/api/lookup/$rawIp", ua) ?: return null
             val json = JSONObject(body)
             val ip = json.optString("ip", rawIp).trim()
             if (ip.isBlank()) return null
@@ -442,23 +460,17 @@ object LandingIpManager {
                 isHosting = (typeLabel == "机房"),
             )
         } catch (_: Throwable) {
-        } finally {
-            runCatching { client?.close() }
         }
         return null
     }
 
     // 备选第二步：向 ip-api.com 查询 IP 质量与归属（对齐 FlClash _fromIpApiCom）
     private fun fetchFromIpApiCom(rawIp: String, fallbackCc: String, ua: String, startTime: Long): LandingIpInfo? {
-        var client: libcore.HTTPClient? = null
         try {
-            client = createHttpClient()
-            val req = client.newRequest().apply {
-                setURL("http://ip-api.com/json/$rawIp?fields=status,country,countryCode,regionName,city,isp,org,as,mobile,proxy,hosting")
-                setUserAgent(ua)
-            }
-            val resp = req.execute()
-            val body = Util.getStringBox(resp.contentString)
+            val body = executeStrictGet(
+                "http://ip-api.com/json/$rawIp?fields=status,country,countryCode,regionName,city,isp,org,as,mobile,proxy,hosting",
+                ua
+            ) ?: return null
             val json = JSONObject(body)
             if (json.optString("status") == "success") {
                 val isHosting = json.optBoolean("hosting", false)
@@ -525,23 +537,14 @@ object LandingIpManager {
                 )
             }
         } catch (_: Throwable) {
-        } finally {
-            runCatching { client?.close() }
         }
         return null
     }
 
     // 备选第三步：向 api.ipquery.io 查询 IP 质量与归属（对齐 FlClash _fromIpQuery）
     private fun fetchFromIpQueryIo(rawIp: String, fallbackCc: String, ua: String, startTime: Long): LandingIpInfo? {
-        var client: libcore.HTTPClient? = null
         try {
-            client = createHttpClient()
-            val req = client.newRequest().apply {
-                setURL("https://api.ipquery.io/$rawIp?format=json")
-                setUserAgent(ua)
-            }
-            val resp = req.execute()
-            val body = Util.getStringBox(resp.contentString)
+            val body = executeStrictGet("https://api.ipquery.io/$rawIp?format=json", ua) ?: return null
             val json = JSONObject(body)
             val ip = json.optString("ip", rawIp).trim()
             if (ip.isBlank()) return null
@@ -616,8 +619,6 @@ object LandingIpManager {
                 isHosting = isDatacenter,
             )
         } catch (_: Throwable) {
-        } finally {
-            runCatching { client?.close() }
         }
         return null
     }

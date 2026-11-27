@@ -271,6 +271,17 @@ class VpnService : BaseVpnService(),
         return conn!!.fd
     }
 
+    fun notifyUnderlyingNetworkReady() {
+        updateUnderlyingNetwork()
+        runCatching {
+            val active = SagerNet.underlyingNetwork ?: SagerNet.connectivity.activeNetwork
+            val link = active?.let { SagerNet.connectivity.getLinkProperties(it) }
+            if (link != null) {
+                NetworkIPv6Detector.syncToCore(link)
+            }
+        }
+    }
+
     fun updateUnderlyingNetwork(builder: Builder? = null) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
             val networks = SagerNet.underlyingNetwork?.let { arrayOf(it) }

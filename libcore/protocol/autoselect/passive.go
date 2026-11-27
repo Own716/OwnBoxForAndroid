@@ -10,6 +10,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/sagernet/sing/common/buf"
+	"github.com/sagernet/sing/common/bufio"
+	M "github.com/sagernet/sing/common/metadata"
+	N "github.com/sagernet/sing/common/network"
 	"golang.org/x/net/publicsuffix"
 )
 
@@ -239,6 +243,55 @@ func (p *passiveTracker) ClearLearned() {
 	p.siteAvoid = make(map[avoidKey]time.Time)
 }
 
+func (p *passiveTracker) ExportSites(now time.Time) []persistedSiteRecord {
+	if p == nil || p.siteStickyTTL <= 0 {
+		return nil
+	}
+	if now.IsZero() {
+		now = p.now()
+	}
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	out := make([]persistedSiteRecord, 0, p.siteList.Len())
+	for el := p.siteList.Front(); el != nil; el = el.Next() {
+		entry := el.Value.(*siteEntry)
+		if now.Sub(entry.updatedAt) < p.siteStickyTTL {
+			out = append(out, persistedSiteRecord{
+				SiteKey:     entry.siteKey,
+				NodeTag:     entry.nodeTag,
+				UpdatedAtMs: entry.updatedAt.UnixMilli(),
+			})
+		}
+	}
+	return out
+}
+
+func (p *passiveTracker) ImportSites(records []persistedSiteRecord, validMembers map[string]bool, now time.Time) {
+	if p == nil || p.siteStickyTTL <= 0 || len(records) == 0 {
+		return
+	}
+	if now.IsZero() {
+		now = p.now()
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	// Iterate in reverse so earlier entries (most recent) end up at the front.
+	for i := len(records) - 1; i >= 0; i-- {
+		rec := records[i]
+		if rec.SiteKey == "" || rec.NodeTag == "" {
+			continue
+		}
+		if validMembers != nil && !validMembers[rec.NodeTag] {
+			continue
+		}
+		updatedAt := time.UnixMilli(rec.UpdatedAtMs)
+		if rec.UpdatedAtMs <= 0 || now.Sub(updatedAt) >= p.siteStickyTTL {
+			continue
+		}
+		p.rememberSiteLocked(rec.SiteKey, rec.NodeTag, updatedAt)
+	}
+}
+
 func (p *passiveTracker) rememberSiteLocked(siteKey, nodeTag string, now time.Time) {
 	if el, ok := p.siteMap[siteKey]; ok {
 		entry := el.Value.(*siteEntry)
@@ -307,9 +360,11 @@ func normalizeSiteKey(raw string) string {
 }
 
 // passiveConn intercepts initial Write/Read traffic to capture TTFB and unanswered failures,
-// and releases zero-copy fast path once a response has arrived.
+// supporting zero-copy ExtendedConn / ReadWaiter / VectorisedWriter fast paths and releasing
+// direct replacement once a response has arrived.
 type passiveConn struct {
 	conn         net.Conn
+	ext          N.ExtendedConn
 	onSuccess    func(ttfb time.Duration)
 	onFail       func()
 	nowFn        func() time.Time
@@ -326,15 +381,21 @@ func newPassiveConn(conn net.Conn, onSuccess func(time.Duration), onFail func(),
 	}
 	return &passiveConn{
 		conn:      conn,
+		ext:       bufio.NewExtendedConn(conn),
 		onSuccess: onSuccess,
 		onFail:    onFail,
 		nowFn:     nowFn,
 	}
 }
 
-func (c *passiveConn) Read(b []byte) (int, error) {
-	n, err := c.conn.Read(b)
-	if n > 0 && c.responded.CompareAndSwap(false, true) {
+func (c *passiveConn) recordUplink() {
+	if c.written.CompareAndSwap(false, true) {
+		c.firstWriteNs.CompareAndSwap(0, c.nowFn().UnixNano())
+	}
+}
+
+func (c *passiveConn) recordDownlink(hasBytes bool, err error) {
+	if hasBytes && c.responded.CompareAndSwap(false, true) {
 		var ttfb time.Duration
 		if fw := c.firstWriteNs.Load(); fw > 0 {
 			ttfb = time.Duration(c.nowFn().UnixNano() - fw)
@@ -346,18 +407,81 @@ func (c *passiveConn) Read(b []byte) (int, error) {
 			c.onSuccess(ttfb)
 		}
 	} else if err != nil && c.written.Load() && !c.responded.Load() {
-		if err != io.EOF || n == 0 {
+		if err != io.EOF || !hasBytes {
 			c.reportFailureOnce()
 		}
 	}
+}
+
+func (c *passiveConn) Read(b []byte) (int, error) {
+	n, err := c.conn.Read(b)
+	c.recordDownlink(n > 0, err)
 	return n, err
 }
 
 func (c *passiveConn) Write(b []byte) (int, error) {
-	if len(b) > 0 && c.written.CompareAndSwap(false, true) {
-		c.firstWriteNs.CompareAndSwap(0, c.nowFn().UnixNano())
+	if len(b) > 0 {
+		c.recordUplink()
 	}
 	return c.conn.Write(b)
+}
+
+func (c *passiveConn) ReadBuffer(buffer *buf.Buffer) error {
+	err := c.ext.ReadBuffer(buffer)
+	c.recordDownlink(buffer != nil && buffer.Len() > 0, err)
+	return err
+}
+
+func (c *passiveConn) WriteBuffer(buffer *buf.Buffer) error {
+	if buffer != nil && buffer.Len() > 0 {
+		c.recordUplink()
+	}
+	return c.ext.WriteBuffer(buffer)
+}
+
+func (c *passiveConn) CreateReadWaiter() (N.ReadWaiter, bool) {
+	waiter, ok := bufio.CreateReadWaiter(c.conn)
+	if !ok {
+		return nil, false
+	}
+	return &passiveReadWaiter{
+		ReadWaiter: waiter,
+		passive:    c,
+	}, true
+}
+
+func (c *passiveConn) CreateVectorisedWriter() (N.VectorisedWriter, bool) {
+	writer, ok := bufio.CreateVectorisedWriter(c.conn)
+	if !ok {
+		return nil, false
+	}
+	return &passiveVectorisedWriter{
+		VectorisedWriter: writer,
+		passive:          c,
+	}, true
+}
+
+type passiveReadWaiter struct {
+	N.ReadWaiter
+	passive *passiveConn
+}
+
+func (w *passiveReadWaiter) WaitReadBuffer() (*buf.Buffer, error) {
+	buffer, err := w.ReadWaiter.WaitReadBuffer()
+	w.passive.recordDownlink(buffer != nil && buffer.Len() > 0, err)
+	return buffer, err
+}
+
+type passiveVectorisedWriter struct {
+	N.VectorisedWriter
+	passive *passiveConn
+}
+
+func (w *passiveVectorisedWriter) WriteVectorised(buffers []*buf.Buffer) error {
+	if buf.LenMulti(buffers) > 0 {
+		w.passive.recordUplink()
+	}
+	return w.VectorisedWriter.WriteVectorised(buffers)
 }
 
 func (c *passiveConn) Close() error {
@@ -383,9 +507,11 @@ func (c *passiveConn) Upstream() any                      { return c.conn }
 func (c *passiveConn) ReaderReplaceable() bool            { return c.responded.Load() }
 func (c *passiveConn) WriterReplaceable() bool            { return c.written.Load() && c.responded.Load() }
 
-// passivePacketConn mirrors passiveConn monitoring for UDP packet connections.
+// passivePacketConn mirrors passiveConn monitoring for UDP packet connections
+// while preserving sing N.NetPacketConn ReadPacket/WritePacket zero-copy support.
 type passivePacketConn struct {
-	net.PacketConn
+	N.NetPacketConn
+	origConn     net.PacketConn
 	onSuccess    func(ttfb time.Duration)
 	onFail       func()
 	nowFn        func() time.Time
@@ -400,16 +526,16 @@ func newPassivePacketConn(conn net.PacketConn, onSuccess func(time.Duration), on
 		nowFn = time.Now
 	}
 	return &passivePacketConn{
-		PacketConn: conn,
-		onSuccess:  onSuccess,
-		onFail:     onFail,
-		nowFn:      nowFn,
+		NetPacketConn: bufio.NewPacketConn(conn),
+		origConn:      conn,
+		onSuccess:     onSuccess,
+		onFail:        onFail,
+		nowFn:         nowFn,
 	}
 }
 
-func (c *passivePacketConn) ReadFrom(p []byte) (int, net.Addr, error) {
-	n, addr, err := c.PacketConn.ReadFrom(p)
-	if n > 0 && c.responded.CompareAndSwap(false, true) {
+func (c *passivePacketConn) recordDownlink() {
+	if c.responded.CompareAndSwap(false, true) {
 		var ttfb time.Duration
 		if fw := c.firstWriteNs.Load(); fw > 0 {
 			ttfb = time.Duration(c.nowFn().UnixNano() - fw)
@@ -421,23 +547,51 @@ func (c *passivePacketConn) ReadFrom(p []byte) (int, net.Addr, error) {
 			c.onSuccess(ttfb)
 		}
 	}
+}
+
+func (c *passivePacketConn) recordUplink() {
+	if c.written.CompareAndSwap(false, true) {
+		c.firstWriteNs.CompareAndSwap(0, c.nowFn().UnixNano())
+	}
+}
+
+func (c *passivePacketConn) ReadFrom(p []byte) (int, net.Addr, error) {
+	n, addr, err := c.NetPacketConn.ReadFrom(p)
+	if n > 0 {
+		c.recordDownlink()
+	}
 	return n, addr, err
 }
 
 func (c *passivePacketConn) WriteTo(p []byte, addr net.Addr) (int, error) {
-	if len(p) > 0 && c.written.CompareAndSwap(false, true) {
-		c.firstWriteNs.CompareAndSwap(0, c.nowFn().UnixNano())
+	if len(p) > 0 {
+		c.recordUplink()
 	}
-	return c.PacketConn.WriteTo(p, addr)
+	return c.NetPacketConn.WriteTo(p, addr)
+}
+
+func (c *passivePacketConn) ReadPacket(buffer *buf.Buffer) (M.Socksaddr, error) {
+	dest, err := c.NetPacketConn.ReadPacket(buffer)
+	if err == nil && buffer != nil && buffer.Len() > 0 {
+		c.recordDownlink()
+	}
+	return dest, err
+}
+
+func (c *passivePacketConn) WritePacket(buffer *buf.Buffer, destination M.Socksaddr) error {
+	if buffer != nil && buffer.Len() > 0 {
+		c.recordUplink()
+	}
+	return c.NetPacketConn.WritePacket(buffer, destination)
 }
 
 func (c *passivePacketConn) Close() error {
 	if c.written.Load() && !c.responded.Load() && c.reported.CompareAndSwap(false, true) && c.onFail != nil {
 		c.onFail()
 	}
-	return c.PacketConn.Close()
+	return c.NetPacketConn.Close()
 }
 
-func (c *passivePacketConn) Upstream() any           { return c.PacketConn }
+func (c *passivePacketConn) Upstream() any           { return c.origConn }
 func (c *passivePacketConn) ReaderReplaceable() bool { return c.responded.Load() }
 func (c *passivePacketConn) WriterReplaceable() bool { return c.written.Load() && c.responded.Load() }

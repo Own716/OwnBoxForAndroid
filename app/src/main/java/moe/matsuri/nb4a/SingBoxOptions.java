@@ -24,7 +24,6 @@ public class SingBoxOptions {
 
     private static final Gson gsonSingbox = new GsonBuilder()
             .registerTypeHierarchyAdapter(SingBoxOption.class, new SingBoxOptionSerializer())
-            .setPrettyPrinting()
             .setNumberToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE)
             .setObjectToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE)
             .setLenient()
@@ -328,6 +327,10 @@ public class SingBoxOptions {
 
         public Boolean independent_cache;
 
+        public Long cache_capacity;
+
+        public Boolean optimistic;
+
         // End of public DNSClientOptions ;
 
     }
@@ -395,6 +398,8 @@ public class SingBoxOptions {
         public Boolean enabled;
 
         public Boolean store_fakeip;
+
+        public Boolean store_dns;
 
         public String path;
 
@@ -4675,6 +4680,8 @@ public class SingBoxOptions {
         public Integer fallback_max_fails;
 
         public Integer probe_timeout_ms;
+
+        public String cache_key;
 
     }
 

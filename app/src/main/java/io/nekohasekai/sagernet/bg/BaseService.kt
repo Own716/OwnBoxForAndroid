@@ -58,6 +58,7 @@ class BaseService {
         @Volatile var isSmartStopped = false
         @Volatile var smartStopReason: String? = null
         @Volatile var isRestarting = false
+        @Volatile var manualStopRequested = false
         var smartAutoStopController: SmartAutoStopController? = null
 
         var lastScreenOffTime = 0L
@@ -169,6 +170,7 @@ class BaseService {
             if (state == s && msg == null) return
             state = s
             DataStore.serviceState = s
+            runCatching { DataStore.serviceConnectedPersisted = (s == State.Connected) }
             binder.stateChanged(s, msg)
             runCatching { io.nekohasekai.sagernet.widget.OwnBoxWidgetProvider.updateWidgets(SagerNet.application) }
             if (s == State.Stopping || s == State.Stopped || s == State.Idle) {
@@ -601,12 +603,15 @@ class BaseService {
             DataStore.vpnService = null
             DataStore.mixedInboundAuthed = false
             if (!restart) {
+                data.manualStopRequested = true
                 data.cacheRecoveryAttempts = 0
                 data.networkSwitchRetryAttempts = 0
                 data.isSmartStopped = false
                 data.smartStopReason = null
                 runCatching { data.smartAutoStopController?.stop() }
                 data.smartAutoStopController = null
+            } else {
+                data.manualStopRequested = false
             }
 
             val serviceId = Integer.toHexString(System.identityHashCode(data))
@@ -622,6 +627,10 @@ class BaseService {
                     "hasMessage=${msg != null} caller=$caller"
             )
             if (data.state == State.Stopping) {
+                if (!restart) {
+                    data.isRestarting = false
+                    data.manualStopRequested = true
+                }
                 Logs.i(
                     "ServiceStopTrace serviceId=$serviceId proxyId=$proxyId " +
                         "stage=ignored-already-stopping"
@@ -708,8 +717,9 @@ class BaseService {
 
                 try {
                     // stop the service if nothing has bound to it
-                    if (restart) {
+                    if (restart && !data.manualStopRequested) {
                         delay(100)
+                        data.state = State.Stopped
                         startRunner()
                     } else {
                         stopSelf()
@@ -845,18 +855,21 @@ class BaseService {
                         }
                         NativeInterface.clearInterfaceCache()
                         if (data.state == State.Connecting) {
+                            if (data.manualStopRequested || data.isSmartStopped) {
+                                return@start
+                            }
                             Logs.i("Network changed during Connecting state: cancelling old handshake and retrying on new network")
-                            data.connectingJob?.cancel()
+                            val staleJob = data.connectingJob
                             data.connectingJob = null
+                            staleJob?.cancel()
+                            val staleProxy = data.proxy
+                            data.proxy = null
+                            runOnDefaultDispatcher {
+                                runCatching { staleProxy?.close() }
+                            }
+                            data.state = State.Stopped
                             startRunner()
                             return@start
-                        }
-                        if (DataStore.networkChangeResetConnections) {
-                            try {
-                                Libcore.resetAllConnections(true)
-                            } catch (e: Exception) {
-                                Logs.w(e)
-                            }
                         }
                     }
                 }
@@ -947,23 +960,26 @@ class BaseService {
             }
             data.smartAutoStopController?.start()
 
+            data.manualStopRequested = false
             data.changeState(State.Connecting)
             data.connectingJob = runOnMainDispatcher {
                 try {
                     data.notification = createNotification(ActiveOutboundTracker.formatNotificationTitle(profile))
 
-                    Executable.killAll()    // clean up old processes
-                    preInit()
-                    proxy.init()
-                    DataStore.currentProfile = profile.id
+                    withContext(Dispatchers.Default) {
+                        Executable.killAll()    // clean up old processes (skips /proc scan unless external plugins ran)
+                        preInit()
+                        proxy.init()
+                        DataStore.currentProfile = profile.id
 
-                    proxy.processes = GuardedProcessPool {
-                        Logs.w(it)
-                        stopRunner(false, it.readableMessage)
+                        proxy.processes = GuardedProcessPool {
+                            Logs.w(it)
+                            stopRunner(false, it.readableMessage)
+                        }
+
+                        startProcesses()
                     }
-
-                    startProcesses()
-                    if (data.isSmartStopped) {
+                    if (data.isSmartStopped || data.manualStopRequested) {
                         killProcesses()
                         data.proxy = null
                         return@runOnMainDispatcher
@@ -972,7 +988,8 @@ class BaseService {
                     data.cacheRecoveryAttempts = 0
                     data.networkSwitchRetryAttempts = 0
 
-                    DataStore.vpnService?.updateUnderlyingNetwork()
+                    (this@Interface as? VpnService)?.notifyUnderlyingNetworkReady()
+                        ?: DataStore.vpnService?.updateUnderlyingNetwork()
                     if (DataStore.ipv6Mode == IPv6Mode.ONLY &&
                         !NetworkIPv6Detector.inspectDefaultPhysicalNetwork().hasPublicIPv6
                     ) {
@@ -985,7 +1002,7 @@ class BaseService {
                     lateInit()
                 } catch (_: CancellationException) { // if the job was cancelled, it is canceller's responsibility to call stopRunner
                 } catch (_: UnknownHostException) {
-                    if (data.networkSwitchRetryAttempts < 3) {
+                    if (data.networkSwitchRetryAttempts < 3 && !data.manualStopRequested && !data.isSmartStopped) {
                         data.networkSwitchRetryAttempts++
                         Logs.w("Network switch / transient DNS failure in startRunner: retrying in 600ms (attempt ${data.networkSwitchRetryAttempts}/3)...")
                         runCatching {
@@ -995,7 +1012,10 @@ class BaseService {
                         }
                         data.proxy = null
                         delay(600)
-                        startRunner()
+                        if (!data.manualStopRequested && !data.isSmartStopped) {
+                            data.state = State.Stopped
+                            startRunner()
+                        }
                         return@runOnMainDispatcher
                     }
                     stopRunner(false, getString(R.string.invalid_server))
@@ -1012,7 +1032,7 @@ class BaseService {
                             msg.contains("freelist", ignoreCase = true) ||
                             (msg.contains("cache.db", ignoreCase = true) && msg.contains("panic", ignoreCase = true))
 
-                    if (isCacheCorrupt && data.cacheRecoveryAttempts < 1) {
+                    if (isCacheCorrupt && data.cacheRecoveryAttempts < 1 && !data.manualStopRequested && !data.isSmartStopped) {
                         data.cacheRecoveryAttempts++
                         Logs.w("Auto-recovery: detected corrupted cache database ($msg). Purging cache.db and retrying once...")
                         deleteCorruptedCacheDb()
@@ -1023,7 +1043,10 @@ class BaseService {
                         }
                         data.proxy = null
                         delay(200)
-                        startRunner()
+                        if (!data.manualStopRequested && !data.isSmartStopped) {
+                            data.state = State.Stopped
+                            startRunner()
+                        }
                         return@runOnMainDispatcher
                     }
                     data.cacheRecoveryAttempts = 0
@@ -1035,7 +1058,7 @@ class BaseService {
                             msg.contains("i/o timeout", ignoreCase = true) ||
                             msg.contains("timed out", ignoreCase = true) ||
                             msg.contains("connection reset", ignoreCase = true)
-                    if (isNetworkTransient && data.networkSwitchRetryAttempts < 3) {
+                    if (isNetworkTransient && data.networkSwitchRetryAttempts < 3 && !data.manualStopRequested && !data.isSmartStopped) {
                         data.networkSwitchRetryAttempts++
                         Logs.w("Network transient failure in startRunner ($msg): retrying in 600ms (attempt ${data.networkSwitchRetryAttempts}/3)...")
                         runCatching {
@@ -1045,7 +1068,10 @@ class BaseService {
                         }
                         data.proxy = null
                         delay(600)
-                        startRunner()
+                        if (!data.manualStopRequested && !data.isSmartStopped) {
+                            data.state = State.Stopped
+                            startRunner()
+                        }
                         return@runOnMainDispatcher
                     }
 

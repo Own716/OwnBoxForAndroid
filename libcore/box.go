@@ -503,7 +503,7 @@ func newSingBoxInstance(config string, localTransport LocalDNSTransport, platfor
 	// create box context
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx = box.Context(ctx,
-		nekoboxAndroidInboundRegistry(), nekoboxAndroidOutboundRegistry(), nekoboxAndroidEndpointRegistry(),
+		nekoboxAndroidInboundRegistry(), wrapOutboundRegistry(nekoboxAndroidOutboundRegistry()), nekoboxAndroidEndpointRegistry(),
 		nekoboxAndroidDNSTransportRegistry(localTransport), nekoboxAndroidServiceRegistry(),
 		nekoboxAndroidCertificateProviderRegistry(),
 	)
@@ -545,6 +545,9 @@ func newSingBoxInstance(config string, localTransport LocalDNSTransport, platfor
 	// 无论上层配置或自定义 JSON 如何输入，彻底杜绝内核出站初始化阶段产生致命异常中断服务。
 	sanitizeOutbounds(options.Outbounds)
 	sanitizeConfigOptions(&options)
+	if platformLog {
+		urltest.SetSniffOverrideEnabled(configHasSniffRule(&options))
+	}
 
 	// 官方内核不支持 fork 私有的 "geoip:xxx"/"geosite:xxx" 伪路径 local rule-set，
 	// 这里预处理：从 geoip.db/geosite.db 生成 .srs 缓存并改写为真实路径。
@@ -665,6 +668,9 @@ func (b *BoxInstance) Start() (err error) {
 			}
 			b.urlTestTrace("box-start", "ok elapsed=%s", time.Since(started))
 			b.lifecycleTrace("start", "success state=%s elapsed=%s", b.state, time.Since(started))
+			if !b.isURLTest {
+				go b.warmUpMainTunnel()
+			}
 		}
 	}()
 	defer device.DeferPanicToError("box.Start", func(err_ error) { err = err_ })
@@ -742,6 +748,28 @@ func (b *BoxInstance) Sleep() {
 		b.pauseManager.DevicePause()
 	}
 	// _ = b.Box.Router().ResetNetwork()
+}
+
+func (b *BoxInstance) warmUpMainTunnel() {
+	if b == nil || b.Box == nil {
+		return
+	}
+	if b.dnsRouter == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3500*time.Millisecond)
+	defer cancel()
+	// Concurrently pre-warm DoH & remote proxy tunnel (without polling UI) so first browser/app request hits a warm TLS/H2 session.
+	var wg sync.WaitGroup
+	for _, host := range []string{"www.gstatic.com", "cp.cloudflare.com"} {
+		domain := host
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, _ = b.dnsRouter.Lookup(ctx, domain, adapter.DNSQueryOptions{})
+		}()
+	}
+	wg.Wait()
 }
 
 func (b *BoxInstance) Wake() {

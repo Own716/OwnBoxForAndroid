@@ -14,6 +14,11 @@ import (
 )
 
 func extractAssets() {
+	assetsExtractMu.Lock()
+	defer func() {
+		markAssetsExtractionDone()
+		assetsExtractMu.Unlock()
+	}()
 	useOfficialAssets := intfNB4A.UseOfficialAssets()
 
 	extract := func(name string) {
@@ -160,13 +165,21 @@ func extractAssetName(name string, useOfficialAssets bool) error {
 
 	} // TODO normal file
 
-	o, err := os.Create(dir + version)
+	verTmp := dir + version + ".tmp"
+	_ = os.Remove(verTmp)
+	o, err := os.Create(verTmp)
 	if err != nil {
 		return fmt.Errorf("create version: %v", err)
 	}
 	_, err = io.WriteString(o, assetVersion)
-	o.Close()
-	return err
+	if closeErr := o.Close(); err == nil && closeErr != nil {
+		err = closeErr
+	}
+	if err != nil {
+		_ = os.Remove(verTmp)
+		return err
+	}
+	return os.Rename(verTmp, dir+version)
 }
 
 func extractAsset(i asset.File, path string) error {

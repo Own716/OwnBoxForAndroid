@@ -390,6 +390,17 @@ object BalancerMemberResolver {
         }
     }
 
+    private fun isInformationalPlaceholderName(name: String): Boolean {
+        if (name.isBlank()) return false
+        val lower = name.lowercase()
+        val keywords = arrayOf(
+            "剩余流量", "到期", "过期", "套餐", "官网", "网址", "群组", "频道",
+            "重置", "维护", "公告", "通知", "客服", "续费", "更新订阅", "距离下次",
+            "expire", "traffic", "reset", "website", "channel"
+        )
+        return keywords.any { lower.contains(it) }
+    }
+
     /**
      * Orders strategy members for cold-start latency strategies so healthy lowest-ping nodes
      * take index 0 before the first background URLTest probe completes.
@@ -398,10 +409,12 @@ object BalancerMemberResolver {
         if (entities.size <= 1) return entities
         return entities.sortedWith(
             compareBy<ProxyEntity> { entity ->
+                val isPlaceholder = entity.ping <= 0 && isInformationalPlaceholderName(entity.displayName())
                 when {
                     entity.status == 1 && entity.ping > 0 -> 0
                     entity.status != 2 && entity.status != 3 && entity.status >= 0 && entity.ping > 0 -> 1
-                    entity.status != 2 && entity.status != 3 && entity.status >= 0 -> 2
+                    entity.status != 2 && entity.status != 3 && entity.status >= 0 && !isPlaceholder -> 2
+                    isPlaceholder -> 4
                     else -> 3
                 }
             }.thenBy { entity ->

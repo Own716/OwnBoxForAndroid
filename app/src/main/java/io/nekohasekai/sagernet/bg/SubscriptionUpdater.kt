@@ -21,6 +21,15 @@ object SubscriptionUpdater {
 
     private const val WORK_NAME = "SubscriptionUpdater"
 
+    private fun isServiceConnectedAcrossProcesses(): Boolean {
+        if (DataStore.serviceState.connected) return true
+        if (!DataStore.serviceConnectedPersisted) return false
+        return runCatching {
+            io.nekohasekai.sagernet.SagerNet.activity.runningAppProcesses
+                ?.any { it.processName.endsWith(":bg") } == true
+        }.getOrDefault(false)
+    }
+
     suspend fun reconfigureUpdater() {
         val workManager = try {
             WorkManager.getInstance(app)
@@ -98,7 +107,7 @@ object SubscriptionUpdater {
 
                 if (onlyIfConnected) {
                     subscriptions = subscriptions.filter { it.subscription?.updateWhenConnectedOnly == true }
-                } else if (!DataStore.serviceState.connected) {
+                } else if (!isServiceConnectedAcrossProcesses()) {
                     subscriptions = subscriptions.filter { it.subscription?.updateWhenConnectedOnly != true }
                 }
 
@@ -133,7 +142,7 @@ object SubscriptionUpdater {
                 return Result.failure()
             }
 
-            if (!DataStore.serviceState.connected) {
+            if (!isServiceConnectedAcrossProcesses()) {
                 Logs.d("SubscriptionUpdater: proxy not connected, filtering updateWhenConnectedOnly")
                 subscriptions = subscriptions.filter { it.subscription?.updateWhenConnectedOnly != true }
             }

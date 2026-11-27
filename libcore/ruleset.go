@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/sagernet/sing-box/common/srs"
 	C "github.com/sagernet/sing-box/constant"
@@ -49,6 +50,7 @@ func parseGeoRuleSetPath(path string) (code string, isGeoIP bool, legacy bool, o
 }
 
 func prepareLocalGeoRuleSets(ruleSets []option.RuleSet) error {
+	waitAssetsExtraction(4 * time.Second)
 	for i := range ruleSets {
 		rs := &ruleSets[i]
 		if rs.Type != C.RuleSetTypeLocal {
@@ -65,16 +67,16 @@ func prepareLocalGeoRuleSets(ruleSets []option.RuleSet) error {
 			dbName = geositeDat
 		}
 
-		// 官方格式优先：已存在的官方 .srs 文件或 srs 缓存文件直接使用
+		// 官方格式优先：已存在的官方 .srs 文件或有效非空 srs 缓存文件直接使用
 		if !legacy {
 			baseName := fmt.Sprintf("%s-%s.srs", dbName[:len(dbName)-3], code)
 			officialPath := filepath.Join(externalAssetsPath, baseName)
 			cachedSrsPath := filepath.Join(externalAssetsPath, "srs", baseName)
-			if info, err := os.Stat(officialPath); err == nil && info.Size() > 0 {
+			if isPopulatedSRSFile(officialPath) {
 				rs.LocalOptions.Path = officialPath
 				continue
 			}
-			if info, err := os.Stat(cachedSrsPath); err == nil && info.Size() > 0 {
+			if isPopulatedSRSFile(cachedSrsPath) {
 				rs.LocalOptions.Path = cachedSrsPath
 				continue
 			}
@@ -182,9 +184,9 @@ func convertGeoRuleSetToSRS(tag string, code string, dbPath string, isGeoIP bool
 	safeTag := strings.NewReplacer(":", "_", "/", "_", "\\", "_").Replace(tag)
 	dst := filepath.Join(dir, safeTag+".srs")
 
-	// 缓存复用：.srs 比 db 新则无需重建
+	// 缓存复用：.srs 比 db 新且本身有效非空时才复用
 	if dbInfo, err := os.Stat(dbPath); err == nil {
-		if srsInfo, err := os.Stat(dst); err == nil && srsInfo.ModTime().After(dbInfo.ModTime()) {
+		if srsInfo, err := os.Stat(dst); err == nil && srsInfo.ModTime().After(dbInfo.ModTime()) && isPopulatedSRSFile(dst) {
 			return dst, nil
 		}
 	}
@@ -196,19 +198,31 @@ func convertGeoRuleSetToSRS(tag string, code string, dbPath string, isGeoIP bool
 	} else {
 		rules, err = loadGeoSiteRules(dbPath, code)
 	}
-	if err != nil {
-		log.Printf("Warning: failed to load %s rule code '%s' from %s: %v, writing empty SRS fallback", tag, code, dbPath, err)
+	targetPath := dst
+	if err != nil || len(rules) == 0 {
+		log.Printf("Warning: failed to load %s rule code '%s' from %s: %v, using temporary empty SRS fallback", tag, code, dbPath, err)
 		rules = []option.HeadlessRule{}
+		// 读取 db 失败或空规则时不覆盖持久缓存 dst，避免坏占位污染后续连接
+		targetPath = filepath.Join(dir, safeTag+".empty.srs")
 	}
 
-	file, err := os.Create(dst)
+	tmpPath := targetPath + ".tmp"
+	_ = os.Remove(tmpPath)
+	file, err := os.Create(tmpPath)
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
 	err = srs.Write(file, option.PlainRuleSet{Rules: rules}, C.RuleSetVersionCurrent)
+	if closeErr := file.Close(); err == nil && closeErr != nil {
+		err = closeErr
+	}
 	if err != nil {
+		_ = os.Remove(tmpPath)
 		return "", err
 	}
-	return dst, nil
+	if err := os.Rename(tmpPath, targetPath); err != nil {
+		_ = os.Remove(tmpPath)
+		return "", err
+	}
+	return targetPath, nil
 }

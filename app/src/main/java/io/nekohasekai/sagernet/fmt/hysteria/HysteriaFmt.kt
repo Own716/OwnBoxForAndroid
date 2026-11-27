@@ -355,9 +355,13 @@ fun buildSingBoxOutboundHysteriaBean(bean: HysteriaBean): SingBoxOptions.SingBox
             }
             if (bean.streamReceiveWindow != null && bean.streamReceiveWindow > 0) {
                 stream_receive_window = bean.streamReceiveWindow.toLong()
+            } else {
+                stream_receive_window = 16L * 1024L * 1024L
             }
             if (bean.connectionReceiveWindow != null && bean.connectionReceiveWindow > 0) {
                 connection_receive_window = bean.connectionReceiveWindow.toLong()
+            } else {
+                connection_receive_window = 64L * 1024L * 1024L
             }
             bbr_profile = "standard"
 

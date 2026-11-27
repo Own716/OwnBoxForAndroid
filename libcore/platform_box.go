@@ -10,6 +10,7 @@ import (
 	"net/netip"
 	"os"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -258,6 +259,24 @@ func (w *boxPlatformInterfaceWrapper) UsePlatformConnectionOwnerFinder() bool {
 	return true
 }
 
+var uidPackageCache sync.Map
+
+func lookupCachedPackageNameByUid(uid int32) string {
+	if uid <= 0 {
+		return ""
+	}
+	if cached, ok := uidPackageCache.Load(uid); ok {
+		if name, okStr := cached.(string); okStr {
+			return name
+		}
+	}
+	packageName, _ := intfBox.PackageNameByUid(uid)
+	if packageName != "" {
+		uidPackageCache.Store(uid, packageName)
+	}
+	return packageName
+}
+
 // FindConnectionOwner 即旧接口的 process.Searcher（FindProcessInfo）。
 func (w *boxPlatformInterfaceWrapper) FindConnectionOwner(request *adapter.FindConnectionOwnerRequest) (*adapter.ConnectionOwner, error) {
 	var uid int32
@@ -294,7 +313,7 @@ func (w *boxPlatformInterfaceWrapper) FindConnectionOwner(request *adapter.FindC
 			return nil, err
 		}
 	}
-	packageName, _ := intfBox.PackageNameByUid(uid)
+	packageName := lookupCachedPackageNameByUid(uid)
 	var packageNames []string
 	if packageName != "" {
 		packageNames = []string{packageName}

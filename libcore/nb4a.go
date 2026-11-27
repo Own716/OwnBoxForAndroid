@@ -9,7 +9,9 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
+	"time"
 	_ "unsafe"
 
 	"log"
@@ -18,7 +20,32 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-//go:linkname resourcePaths github.com/sagernet/sing-box/constant.resourcePaths
+var (
+	assetsExtractMu     sync.Mutex
+	assetsExtractOnce   sync.Once
+	assetsExtractDone   atomic.Bool
+	assetsExtractNotify = make(chan struct{})
+	assetsExtractScheduled atomic.Bool
+)
+
+func markAssetsExtractionDone() {
+	assetsExtractDone.Store(true)
+	assetsExtractOnce.Do(func() {
+		close(assetsExtractNotify)
+	})
+}
+
+func waitAssetsExtraction(timeout time.Duration) {
+	if !assetsExtractScheduled.Load() || assetsExtractDone.Load() {
+		return
+	}
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case <-assetsExtractNotify:
+	case <-timer.C:
+	}
+}
 var (
 	resourcePaths     []string
 	protectSocketPath string
@@ -92,6 +119,9 @@ func InitCore(process, cachePath, internalAssets, externalAssets string,
 	setupLog(int(maxLogSizeKb)*1024, filepath.Join(cachePath, "neko.log"), isBgProcess, !logEnable)
 
 	// Set up some component
+	if isBgProcess {
+		assetsExtractScheduled.Store(true)
+	}
 	go func() {
 		defer device.DeferPanicToError("InitCore-go", func(err error) { log.Println(err) })
 		device.GoDebug(process)
@@ -145,9 +175,9 @@ func sendFdToProtect(fd int, path string) error {
 }
 
 const (
-	defaultBalancedMemoryLimitMiB int64 = 256
+	defaultBalancedMemoryLimitMiB int64 = 384
 	minBalancedMemoryLimitMiB     int64 = 96
-	maxBalancedMemoryLimitMiB     int64 = 512
+	maxBalancedMemoryLimitMiB     int64 = 768
 )
 
 var balancedMemoryLimitBytes int64 = defaultBalancedMemoryLimitMiB * 1024 * 1024

@@ -370,6 +370,7 @@ func dialURLTestWithFailover[T any](
 }
 
 func (s *URLTest) DialContext(ctx context.Context, network string, destination M.Socksaddr) (net.Conn, error) {
+	destination = RewriteSniffedDestination(ctx, destination)
 	netName := N.NetworkName(network)
 	if netName != N.NetworkTCP && netName != N.NetworkUDP {
 		s.group.Touch()
@@ -389,17 +390,27 @@ func (s *URLTest) DialContext(ctx context.Context, network string, destination M
 }
 
 func (s *URLTest) ListenPacket(ctx context.Context, destination M.Socksaddr) (net.PacketConn, error) {
-	return dialURLTestWithFailover(
+	origDest := destination
+	rewritten := RewriteSniffedDestination(ctx, destination)
+	conn, err := dialURLTestWithFailover(
 		s,
 		ctx,
 		N.NetworkUDP,
 		func(attemptCtx context.Context, outbound adapter.Outbound) (net.PacketConn, error) {
-			return outbound.ListenPacket(attemptCtx, destination)
+			pConn, pErr := outbound.ListenPacket(attemptCtx, rewritten)
+			if pErr != nil && rewritten != origDest && strings.Contains(pErr.Error(), "domain destination is not supported") {
+				return outbound.ListenPacket(attemptCtx, origDest)
+			}
+			return pConn, pErr
 		},
 		func(conn net.PacketConn) net.PacketConn {
 			return s.wrapPacketConn(ctx, conn)
 		},
 	)
+	if err != nil {
+		return nil, err
+	}
+	return conn, nil
 }
 
 func (s *URLTest) NewConnection(ctx context.Context, conn net.Conn, metadata adapter.InboundContext, onClose N.CloseHandlerFunc) {

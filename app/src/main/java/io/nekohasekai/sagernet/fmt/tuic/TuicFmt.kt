@@ -76,7 +76,7 @@ fun buildSingBoxOutboundTuicBean(bean: TuicBean): SingBoxOptions.Outbound_TUICOp
         server_port = bean.serverPort
         uuid = bean.uuid
         password = bean.token
-        congestion_control = bean.congestionController
+        congestion_control = bean.congestionController.takeIf { it.isNotBlank() } ?: "bbr"
         when (bean.udpRelayMode) {
             "quic" -> udp_relay_mode = "quic"
         }

@@ -342,11 +342,11 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
             Logs.d("other selector: $selectorTag")
             return
         }
-        Libcore.resetAllConnections(true)
         DataStore.baseService?.apply {
             runOnDefaultDispatcher {
                 val id = data.proxy!!.config.profileTagMap
                     .filterValues { it == tag }.keys.firstOrNull() ?: -1
+                if (id <= 0L) return@runOnDefaultDispatcher
                 val ent = SagerDatabase.proxyDao.getById(id) ?: return@runOnDefaultDispatcher
 
                 val activeProfile = data.proxy?.profile
@@ -356,12 +356,13 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
                     val memberMap = runCatching { data.proxy?.safeConfig?.balancerMemberMap?.get(activeProfile.id) }.getOrNull()
                     if (memberMap != null && id in memberMap) {
                         val prevLeafId = ActiveOutboundTracker.activeLeafProfileId
+                        if (prevLeafId == id) {
+                            return@runOnDefaultDispatcher
+                        }
                         val prevLeafName = ActiveOutboundTracker.activeLeafProfileName
                         ActiveOutboundTracker.updateActiveLeaf(id, ent.displayName())
-                        if (prevLeafId != id) {
-                            LiveStatsRecorder.switched(toName = ent.displayName(), fromName = prevLeafName)
-                            data.proxy?.looper?.triggerWakeup()
-                        }
+                        LiveStatsRecorder.switched(toName = ent.displayName(), fromName = prevLeafName)
+                        data.proxy?.looper?.triggerWakeup()
                         LandingIpManager.clearCache()
                         val newTitle = ActiveOutboundTracker.formatNotificationTitle(activeProfile!!)
                         data.proxy?.displayProfileName = newTitle
@@ -375,6 +376,9 @@ class NativeInterface : BoxPlatformInterface, NB4AInterface {
                     return@runOnDefaultDispatcher
                 }
 
+                if (data.proxy?.profile?.id == id && DataStore.currentProfile == id) {
+                    return@runOnDefaultDispatcher
+                }
                 // traffic & title
                 LandingIpManager.clearCache()
                 data.proxy?.apply {

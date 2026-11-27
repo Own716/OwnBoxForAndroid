@@ -354,9 +354,28 @@ object ServiceDiagnosticsManager {
                 .writeTimeout(timeoutSec, TimeUnit.SECONDS)
         }
 
-        val mixedPort = DataStore.mixedPort
-        if (mixedPort > 0) {
-            builder.proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", mixedPort.toInt())))
+        if (!DataStore.mixedInboundDisabled) {
+            val mixedPort = DataStore.mixedPort
+            if (mixedPort > 0) {
+                if (DataStore.mixedInboundNeedsAuth) {
+                    builder.proxy(Proxy(Proxy.Type.HTTP, InetSocketAddress("127.0.0.1", mixedPort)))
+                    val credential = okhttp3.Credentials.basic(
+                        DataStore.mixedUsername,
+                        DataStore.mixedPassword
+                    )
+                    builder.proxyAuthenticator { _, response ->
+                        if (response.request.header("Proxy-Authorization") != null) {
+                            null
+                        } else {
+                            response.request.newBuilder()
+                                .header("Proxy-Authorization", credential)
+                                .build()
+                        }
+                    }
+                } else {
+                    builder.proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", mixedPort)))
+                }
+            }
         }
         return builder.build()
     }

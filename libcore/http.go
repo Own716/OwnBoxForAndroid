@@ -142,17 +142,14 @@ func (c *httpClient) TrySocks5(port int32, username string, password string) {
 	c.trySocks5 = true
 }
 
-// TryBoxOutbound 经当前 main box 默认 outbound 拨号。
+// TryBoxOutbound 经当前 main box 默认 outbound 拨号（严格失败闭合，绝不静默回退物理直连）。
 // 用于 disableMixedInbound（纯 TUN）场景：VPN 应用自身流量默认不进 tun，
 // 不能再走 127.0.0.1:mixedPort（入站已不存在），必须显式经节点出站。
 func (c *httpClient) TryBoxOutbound() {
 	c.h1h2Transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
 		b := mainInstance
 		if b == nil || b.Box == nil {
-			if c.tryH3Direct {
-				return nil, errors.New("box not running")
-			}
-			return new(net.Dialer).DialContext(ctx, network, addr)
+			return nil, errors.New("box not running")
 		}
 		outbound := b.Outbound().Default()
 		if outbound == nil {

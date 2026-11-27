@@ -37,6 +37,10 @@ jobs:
       - name: Native Build
         if: steps.cache.outputs.cache-hit != 'true'
         run: ./run lib core
+      - name: Run LibCore Unit Tests
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          cd libcore && go test -tags='with_conntrack,with_quic,with_wireguard,with_utls,with_clash_api' ./protocol/urltest/... ./protocol/autoselect/... .
       - name: Verify LibCore AAR
         run: |
           test -s app/libs/libcore.aar
@@ -114,7 +118,7 @@ jobs:
 
           export LOCAL_PROPERTIES="${{ secrets.LOCAL_PROPERTIES }}"
           ./run init action gradle
-          ./gradlew app:assemblePreviewRelease
+          ./gradlew app:testPreviewDebugUnitTest app:assemblePreviewRelease
 
           APK=$(find app/build/outputs/apk -name '*arm64-v8a*.apk' | head -n 1)
           if [ -n "$APK" ]; then

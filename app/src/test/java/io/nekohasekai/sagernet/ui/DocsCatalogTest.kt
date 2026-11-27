@@ -102,7 +102,7 @@ class DocsCatalogTest {
     @Test
     fun catalogReflectsLatestV261124FeaturesAndDefaults() {
         val joined = allTextBlobs().joinToString("\n")
-        assertTrue("Expected default MTU 1360", joined.contains("1360"))
+        assertTrue("Expected default MTU 1400", joined.contains("1400"))
         assertTrue("Expected default balancer tolerance 30 ms", joined.contains("30 ms"))
         assertTrue("Expected default speed test simple download + 8000ms", joined.contains("简单下载") && joined.contains("8000"))
         assertTrue("Expected fallback strategy coverage", joined.contains("故障转移"))

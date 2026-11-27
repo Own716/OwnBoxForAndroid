@@ -1011,6 +1011,7 @@ func (c *trackedConn) SyscallConn() (syscall.RawConn, error) {
 }
 
 func (s *LoadBalance) DialContext(ctx context.Context, network string, destination M.Socksaddr) (net.Conn, error) {
+	destination = urltestPkg.RewriteSniffedDestination(ctx, destination)
 	s.Touch()
 	pinnedIdx := s.pinnedIndex()
 	var indices []int
@@ -1131,6 +1132,8 @@ func (c *trackedPacketConn) SyscallConn() (syscall.RawConn, error) {
 }
 
 func (s *LoadBalance) ListenPacket(ctx context.Context, destination M.Socksaddr) (net.PacketConn, error) {
+	origDest := destination
+	destination = urltestPkg.RewriteSniffedDestination(ctx, destination)
 	s.Touch()
 	pinnedIdx := s.pinnedIndex()
 	var indices []int
@@ -1175,9 +1178,15 @@ func (s *LoadBalance) ListenPacket(ctx context.Context, destination M.Socksaddr)
 			}
 			candidateCtx, cancel := context.WithTimeout(ctx, timeout)
 			conn, err = candidate.ListenPacket(candidateCtx, destination)
+			if err != nil && destination != origDest && strings.Contains(err.Error(), "domain destination is not supported") {
+				conn, err = candidate.ListenPacket(candidateCtx, origDest)
+			}
 			cancel()
 		} else {
 			conn, err = candidate.ListenPacket(ctx, destination)
+			if err != nil && destination != origDest && strings.Contains(err.Error(), "domain destination is not supported") {
+				conn, err = candidate.ListenPacket(ctx, origDest)
+			}
 		}
 		if err == nil {
 			s.lastSelectedIdx.Store(int32(idx))

@@ -16,12 +16,15 @@ import java.net.Socket
  */
 fun HTTPClient.tryProxyOutbound() {
     if (!io.nekohasekai.sagernet.database.DataStore.mixedInboundDisabled) {
+        val needsAuth = io.nekohasekai.sagernet.database.DataStore.mixedInboundNeedsAuth
+        val user = if (needsAuth) io.nekohasekai.sagernet.database.DataStore.mixedUsername else ""
+        val pass = if (needsAuth) io.nekohasekai.sagernet.database.DataStore.mixedPassword else ""
         trySocks5(
             io.nekohasekai.sagernet.database.DataStore.mixedPort,
-            io.nekohasekai.sagernet.database.DataStore.mixedInboundUser,
-            io.nekohasekai.sagernet.database.DataStore.mixedInboundPass
+            user,
+            pass
         )
-    } else {
+    } else if (io.nekohasekai.sagernet.SagerNet.application.isBgProcess) {
         tryBoxOutbound()
     }
 }

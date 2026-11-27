@@ -34,7 +34,7 @@ class VpnSettingsFragment : BaseSettingsPreferenceFragment() {
         findPreference<Preference>(Key.STRICT_ROUTE)?.onPreferenceChangeListener = reloadListener
         findPreference<Preference>(Key.BYPASS_LAN)?.onPreferenceChangeListener = reloadListener
         findPreference<Preference>(Key.BYPASS_LAN_IN_CORE)?.onPreferenceChangeListener = reloadListener
-        findPreference<Preference>(Key.MTU)?.onPreferenceChangeListener = restartListener
+        findPreference<Preference>(Key.MTU)?.onPreferenceChangeListener = reloadListener
 
         findPreference<SimpleMenuPreference>(Key.TUN_IMPLEMENTATION)?.apply {
             summaryProvider = null

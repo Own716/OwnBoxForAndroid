@@ -13,7 +13,17 @@ object Executable {
         "libtrojan.so", "libtrojan-go.so", "libnaive.so", "libtuic.so", "libhysteria.so"
     )
 
+    @Volatile
+    private var hasExternalPluginLaunched = false
+
+    fun markExternalPluginLaunched() {
+        hasExternalPluginLaunched = true
+    }
+
     fun killAll(alsoKillBg: Boolean = false) {
+        if (!alsoKillBg && !hasExternalPluginLaunched) {
+            return
+        }
         // kill bg may fail
         for (process in File("/proc").listFiles { _, name -> name.isDigitsOnly() } ?: return) {
             val exe = File(

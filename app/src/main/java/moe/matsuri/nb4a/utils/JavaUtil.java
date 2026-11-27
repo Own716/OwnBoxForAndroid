@@ -197,4 +197,11 @@ public class JavaUtil {
             .disableHtmlEscaping()
             .create();
 
+    public static final Gson compactGson = new GsonBuilder()
+            .setNumberToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE)
+            .setObjectToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE)
+            .setLenient()
+            .disableHtmlEscaping()
+            .create();
+
 }

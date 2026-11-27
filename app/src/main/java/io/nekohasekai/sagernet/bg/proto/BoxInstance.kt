@@ -214,6 +214,9 @@ abstract class BoxInstance(
     }
 
     override fun launch() {
+        if (pluginConfigs.isNotEmpty()) {
+            io.nekohasekai.sagernet.bg.Executable.markExternalPluginLaunched()
+        }
         launchExternal()
         Logs.i(
             "BoxLifecycleTrace androidId=$diagnosticId profileId=${profile.id} " +

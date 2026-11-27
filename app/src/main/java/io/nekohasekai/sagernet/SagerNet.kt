@@ -191,9 +191,9 @@ class SagerNet : Application(),
         if (totalMemBytes <= 0L) return 256
         val totalMiB = totalMemBytes / (1024L * 1024L)
         return when {
-            totalMiB <= 3072L -> 128
-            totalMiB <= 6144L -> 256
-            else -> 384
+            totalMiB <= 4096L -> 192
+            totalMiB <= 8192L -> 384
+            else -> 512
         }
     }
 

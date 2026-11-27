@@ -109,12 +109,24 @@ object PackageCache {
             return
         }
         if (!registerd.get()) {
+            if (SagerNet.application.isBgProcess) {
+                register()
+                return
+            }
             register()
             return
         }
         runBlocking {
-            loaded.withLock {
-                // just await
+            if (SagerNet.application.isBgProcess) {
+                kotlinx.coroutines.withTimeoutOrNull(2000L) {
+                    loaded.withLock {
+                        // await background init with bounded timeout in :bg
+                    }
+                }
+            } else {
+                loaded.withLock {
+                    // just await
+                }
             }
         }
     }

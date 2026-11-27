@@ -126,6 +126,9 @@ object DefaultNetworkListener {
         @Volatile
         private var lastKnownPublicIPv6: Boolean? = null
 
+        @Volatile
+        private var lastKnownInterfaceName: String? = null
+
         private fun cancelPendingUpdate() {
             pendingUpdateRunnable?.let {
                 callbackHandler.removeCallbacks(it)
@@ -139,6 +142,7 @@ object DefaultNetworkListener {
             lastUpdateTime = SystemClock.elapsedRealtime()
             val lp = runCatching { SagerNet.connectivity.getLinkProperties(network) }.getOrNull()
             lastKnownPublicIPv6 = lp?.let { NetworkIPv6Detector.inspectLinkProperties(it).hasPublicIPv6 }
+            lastKnownInterfaceName = lp?.interfaceName
             if (lp != null) {
                 NetworkIPv6Detector.syncToCore(lp)
             }
@@ -149,10 +153,19 @@ object DefaultNetworkListener {
         override fun onLinkPropertiesChanged(network: Network, linkProperties: LinkProperties) {
             if (lastUpdateNetwork != null && lastUpdateNetwork != network) return
             val hasPublicIPv6 = NetworkIPv6Detector.inspectLinkProperties(linkProperties).hasPublicIPv6
-            if (lastKnownPublicIPv6 == hasPublicIPv6) return
+            val newIfaceName = linkProperties.interfaceName
+            val ipv6Changed = lastKnownPublicIPv6 != hasPublicIPv6
+            val ifaceChanged = !newIfaceName.isNullOrBlank() && lastKnownInterfaceName != newIfaceName
+            if (!ipv6Changed && !ifaceChanged) return
             lastKnownPublicIPv6 = hasPublicIPv6
+            if (!newIfaceName.isNullOrBlank()) {
+                lastKnownInterfaceName = newIfaceName
+            }
             NetworkIPv6Detector.syncToCore(linkProperties)
-            Logs.i("DefaultNetworkListener onLinkPropertiesChanged network=$network hasPublicIPv6=$hasPublicIPv6")
+            Logs.i("DefaultNetworkListener onLinkPropertiesChanged network=$network iface=$newIfaceName hasPublicIPv6=$hasPublicIPv6")
+            if (ifaceChanged && lastUpdateNetwork == network) {
+                runBlocking { networkActor.send(NetworkMessage.Update(network)) }
+            }
         }
 
         override fun onCapabilitiesChanged(
@@ -183,6 +196,7 @@ object DefaultNetworkListener {
             lastUpdateNetwork = null
             lastUpdateTime = 0L
             lastKnownPublicIPv6 = null
+            lastKnownInterfaceName = null
             Logs.d("DefaultNetworkListener onLost enter network=$network thread=${Thread.currentThread().name}")
             runBlocking { networkActor.send(NetworkMessage.Lost(network)) }
         }
