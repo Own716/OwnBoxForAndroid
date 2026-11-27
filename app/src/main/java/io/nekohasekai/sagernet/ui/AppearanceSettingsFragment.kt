@@ -34,6 +34,8 @@ import io.nekohasekai.sagernet.utils.UiScaleManager
 import moe.matsuri.nb4a.ui.ColorPickerPreference
 import moe.matsuri.nb4a.ui.SimpleMenuPreference
 import moe.matsuri.nb4a.ui.TelegramGroupedPreferenceDecoration
+import io.nekohasekai.sagernet.ui.motion.MotionIntensityDialog
+import io.nekohasekai.sagernet.ui.motion.SmoothMotion.showSmooth
 
 class AppearanceSettingsFragment : PreferenceFragmentCompat() {
 
@@ -46,6 +48,7 @@ class AppearanceSettingsFragment : PreferenceFragmentCompat() {
         setDividerHeight(0)
         listView.clipToPadding = false
         listView.setPadding(0, dp2px(8), 0, dp2px(120))
+        view.setBackgroundColor(TelegramGroupedPreferenceDecoration.resolvedBgColor(view.context))
         TelegramGroupedPreferenceDecoration.applyTo(listView)
     }
 
@@ -87,6 +90,16 @@ class AppearanceSettingsFragment : PreferenceFragmentCompat() {
                 needReload()
                 true
             }
+        }
+
+        val motionPref = findPreference<Preference>(Key.MOTION_EFFECT_LEVEL)
+        motionPref?.summary = MotionIntensityDialog.formatSummary(requireContext(), DataStore.motionEffectLevel)
+        motionPref?.setOnPreferenceClickListener {
+            MotionIntensityDialog.show(requireContext()) { lvl ->
+                DataStore.motionEffectLevel = lvl
+                motionPref.summary = MotionIntensityDialog.formatSummary(requireContext(), lvl)
+            }
+            true
         }
 
         findPreference<Preference>("uiScaleSettings")?.apply {
@@ -243,7 +256,7 @@ class AppearanceSettingsFragment : PreferenceFragmentCompat() {
                     )
                 )
                 .setPositiveButton(android.R.string.ok, null)
-                .show()
+                .showSmooth()
             true
         }
 
@@ -295,6 +308,8 @@ class AppearanceSettingsFragment : PreferenceFragmentCompat() {
 
     override fun onResume() {
         super.onResume()
+        findPreference<Preference>(Key.MOTION_EFFECT_LEVEL)?.summary =
+            MotionIntensityDialog.formatSummary(requireContext(), DataStore.motionEffectLevel)
         findPreference<Preference>("uiScaleSettings")?.summary = UiScaleManager.formatSummary()
         if (::notificationPermission.isInitialized) {
             notificationPermission.setSummary(

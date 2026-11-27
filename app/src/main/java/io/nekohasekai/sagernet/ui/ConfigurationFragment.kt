@@ -1560,6 +1560,9 @@ class ConfigurationFragment @JvmOverloads constructor(
             tabLayout.isFocusableInTouchMode = false
         }
         cardStrategyStatus = view.findViewById(R.id.card_strategy_status)
+        io.nekohasekai.sagernet.ui.motion.SmoothMotion.run {
+            cardStrategyStatus?.attachSmoothPress(isCompactButton = false)
+        }
         strategyStatusIcon = view.findViewById(R.id.strategy_status_icon)
         strategyStatusText = view.findViewById(R.id.strategy_status_text)
         strategyStatusDelay = view.findViewById(R.id.strategy_status_delay)
@@ -5927,7 +5930,10 @@ class ConfigurationFragment @JvmOverloads constructor(
             init {
                 applyCardScale()
                 io.nekohasekai.sagernet.ui.motion.SmoothMotion.run {
-                    card.attachSmoothPress(0.978f)
+                    card.attachSmoothPress(isCompactButton = false)
+                    editButton.attachSmoothPress(isCompactButton = true)
+                    removeButton.attachSmoothPress(isCompactButton = true)
+                    doubleColumnMenuButton.attachSmoothPress(isCompactButton = true)
                 }
                 dragHandle.setOnTouchListener { v, event ->
                     if (event.actionMasked == MotionEvent.ACTION_DOWN) {
@@ -6083,7 +6089,9 @@ class ConfigurationFragment @JvmOverloads constructor(
                         .setMessage(R.string.delete_confirm_prompt)
                         .setPositiveButton(R.string.yes) { _, _ -> removeAction() }
                         .setNegativeButton(R.string.no, null)
-                        .show()
+                        .let { builder ->
+                            io.nekohasekai.sagernet.ui.motion.SmoothMotion.run { builder.showSmooth() }
+                        }
                 } else {
                     removeAction()
                 }

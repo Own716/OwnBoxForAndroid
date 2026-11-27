@@ -23,6 +23,8 @@ import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.utils.LandingIpInfo
 import io.nekohasekai.sagernet.utils.LandingIpManager
 import io.nekohasekai.sagernet.utils.Theme
+import io.nekohasekai.sagernet.ui.motion.SmoothMotion.attachSmoothPress
+import io.nekohasekai.sagernet.ui.motion.SmoothMotion.showSmooth
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -165,11 +167,13 @@ object LandingIpBottomSheet {
         tvIpAddress.setOnClickListener(copyListener)
 
         // Close button
+        btnClose.attachSmoothPress(isCompactButton = true)
         btnClose.setOnClickListener {
             dialog.dismiss()
         }
 
         // Refresh button
+        btnRefresh.attachSmoothPress(isCompactButton = true)
         btnRefresh.setOnClickListener {
             val rotate = RotateAnimation(
                 0f, 360f,
@@ -204,6 +208,6 @@ object LandingIpBottomSheet {
             }
         }
 
-        dialog.show()
+        dialog.showSmooth()
     }
 }

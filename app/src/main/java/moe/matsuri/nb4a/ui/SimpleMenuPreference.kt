@@ -31,6 +31,7 @@ import androidx.preference.DropDownPreference
 import androidx.preference.PreferenceViewHolder
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.ktx.getColorAttr
+import io.nekohasekai.sagernet.ui.motion.SmoothMenuPopup
 
 /**
  * Bend [DropDownPreference] to support
@@ -46,15 +47,40 @@ open class SimpleMenuPreference
 ) : DropDownPreference(context!!, attrs, defStyleAttr, defStyleRes) {
 
     private lateinit var mAdapter: SimpleMenuAdapter
+    private var boundAnchorView: View? = null
 
     override fun onBindViewHolder(holder: PreferenceViewHolder) {
         super.onBindViewHolder(holder)
+        boundAnchorView = holder.itemView
         val mSpinner = holder.itemView.findViewById<Spinner>(R.id.spinner) ?: return
         mSpinner.layoutParams?.width = ViewGroup.LayoutParams.WRAP_CONTENT
         mSpinner.setPopupBackgroundResource(R.drawable.bg_spinner_dropdown)
         if (::mAdapter.isInitialized) {
             mAdapter.currentPosition = findIndexOfValue(value)
         }
+    }
+
+    override fun onClick() {
+        val anchor = boundAnchorView
+        val entryLabels = entries
+        val values = entryValues
+        if (anchor != null && anchor.isAttachedToWindow && !entryLabels.isNullOrEmpty() && !values.isNullOrEmpty()) {
+            val selectedIdx = findIndexOfValue(value)
+            SmoothMenuPopup.showSingleChoice(
+                context = context,
+                anchor = anchor,
+                entries = entryLabels,
+                selectedIndex = selectedIdx,
+                onSelect = { idx ->
+                    val newVal = values[idx].toString()
+                    if (callChangeListener(newVal)) {
+                        value = newVal
+                    }
+                },
+            )
+            return
+        }
+        super.onClick()
     }
 
     override fun createAdapter(): ArrayAdapter<CharSequence?> {

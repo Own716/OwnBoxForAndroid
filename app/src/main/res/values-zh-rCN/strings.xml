@@ -1652,8 +1652,17 @@
     <string name="traffic_stats_action_per_app">分应用代理</string>
     <string name="traffic_stats_action_clear_node">清除该节点记录</string>
     <string name="motion_effect_level">灵动过渡动效</string>
-    <string name="motion_effect_off">关闭</string>
-    <string name="motion_effect_minimal">极简顺滑</string>
-    <string name="motion_effect_smooth">丝滑轻弹（推荐）</string>
-    <string name="motion_effect_lively">灵动 Q 弹</string>
+    <string name="motion_picker_hint">点击下方阶梯柱可当场感受不同档位的回弹力度</string>
+    <string name="motion_turn_off_btn">关闭过渡动效</string>
+    <string name="motion_level_0">关闭</string>
+    <string name="motion_level_1">微柔</string>
+    <string name="motion_level_2">紧致</string>
+    <string name="motion_level_3">标准 Q 弹（推荐）</string>
+    <string name="motion_level_4">灵动果冻</string>
+    <string name="motion_level_5">拉满超 Q 弹</string>
+    <string name="motion_step_1">1档</string>
+    <string name="motion_step_2">2档</string>
+    <string name="motion_step_3">3档</string>
+    <string name="motion_step_4">4档</string>
+    <string name="motion_step_5">5档</string>
 </resources>

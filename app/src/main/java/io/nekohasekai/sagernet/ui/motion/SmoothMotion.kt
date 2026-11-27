@@ -4,16 +4,23 @@ import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.graphics.Canvas
 import android.os.Build
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
+import android.view.ViewGroup
 import android.view.animation.PathInterpolator
 import android.widget.EdgeEffect
+import androidx.appcompat.app.AlertDialog
+import androidx.core.view.children
+import androidx.core.view.doOnPreDraw
 import androidx.dynamicanimation.animation.DynamicAnimation
 import androidx.dynamicanimation.animation.SpringAnimation
 import androidx.dynamicanimation.animation.SpringForce
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
+import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.tabs.TabLayout
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.database.DataStore
@@ -22,19 +29,27 @@ import kotlin.math.hypot
 import kotlin.math.ln
 
 /**
- * High-damping spring physics engine for OwnBox.
- * Designed for crisp iOS-like tactile response that settles cleanly in one smooth motion
- * without back-and-forth wobble.
+ * 6-level (0 = Off, 1..5 stepped intensity) spring physics & origin motion engine.
  */
 object SmoothMotion {
 
     data class MotionParams(
-        val releaseDamping: Float,
-        val releaseStiffness: Float,
+        val pressCardScaleX: Float,
+        val pressCardScaleY: Float,
+        val pressBtnScale: Float,
+        val releaseDampingX: Float,
+        val releaseStiffnessX: Float,
+        val releaseDampingY: Float,
+        val releaseStiffnessY: Float,
+        val releaseVelocity: Float,
+        val popupStartScaleX: Float,
+        val popupStartScaleY: Float,
         val popupDamping: Float,
         val popupStiffness: Float,
+        val popupCollapseScale: Float,
+        val popupCollapseDurationMs: Long,
+        val overscrollMaxDp: Float,
         val overscrollDamping: Float,
-        val pressScaleMultiplier: Float,
     )
 
     val smoothOutInterpolator = PathInterpolator(0.22f, 1.0f, 0.36f, 1.0f)
@@ -44,36 +59,109 @@ object SmoothMotion {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !ValueAnimator.areAnimatorsEnabled()) {
             return 0
         }
-        return runCatching { DataStore.motionEffectLevel }.getOrDefault(2).coerceIn(0, 3)
+        return runCatching { DataStore.motionEffectLevel }.getOrDefault(3).coerceIn(0, 5)
     }
 
     fun isEnabled(): Boolean = level() > 0
 
-    fun params(lvl: Int = level()): MotionParams = when (lvl.coerceIn(0, 3)) {
+    fun params(lvl: Int = level()): MotionParams = when (lvl.coerceIn(1, 5)) {
         1 -> MotionParams(
-            releaseDamping = 1.0f,
-            releaseStiffness = 640f,
+            pressCardScaleX = 0.976f,
+            pressCardScaleY = 0.976f,
+            pressBtnScale = 0.93f,
+            releaseDampingX = 1.0f,
+            releaseStiffnessX = 560f,
+            releaseDampingY = 1.0f,
+            releaseStiffnessY = 560f,
+            releaseVelocity = 0f,
+            popupStartScaleX = 0.62f,
+            popupStartScaleY = 0.58f,
             popupDamping = 1.0f,
-            popupStiffness = 580f,
+            popupStiffness = 520f,
+            popupCollapseScale = 0.65f,
+            popupCollapseDurationMs = 125L,
+            overscrollMaxDp = 24f,
             overscrollDamping = 1.0f,
-            pressScaleMultiplier = 0.5f,
+        )
+        2 -> MotionParams(
+            pressCardScaleX = 0.960f,
+            pressCardScaleY = 0.964f,
+            pressBtnScale = 0.90f,
+            releaseDampingX = 0.82f,
+            releaseStiffnessX = 500f,
+            releaseDampingY = 0.84f,
+            releaseStiffnessY = 520f,
+            releaseVelocity = 0f,
+            popupStartScaleX = 0.48f,
+            popupStartScaleY = 0.44f,
+            popupDamping = 0.82f,
+            popupStiffness = 470f,
+            popupCollapseScale = 0.50f,
+            popupCollapseDurationMs = 140L,
+            overscrollMaxDp = 38f,
+            overscrollDamping = 0.90f,
         )
         3 -> MotionParams(
-            releaseDamping = 0.74f,
-            releaseStiffness = 480f,
-            popupDamping = 0.76f,
-            popupStiffness = 480f,
-            overscrollDamping = 0.86f,
-            pressScaleMultiplier = 1.35f,
+            pressCardScaleX = 0.942f,
+            pressCardScaleY = 0.950f,
+            pressBtnScale = 0.86f,
+            releaseDampingX = 0.66f,
+            releaseStiffnessX = 430f,
+            releaseDampingY = 0.70f,
+            releaseStiffnessY = 450f,
+            releaseVelocity = 0.5f,
+            popupStartScaleX = 0.38f,
+            popupStartScaleY = 0.32f,
+            popupDamping = 0.70f,
+            popupStiffness = 420f,
+            popupCollapseScale = 0.38f,
+            popupCollapseDurationMs = 160L,
+            overscrollMaxDp = 54f,
+            overscrollDamping = 0.80f,
+        )
+        4 -> MotionParams(
+            pressCardScaleX = 0.922f,
+            pressCardScaleY = 0.938f,
+            pressBtnScale = 0.82f,
+            releaseDampingX = 0.54f,
+            releaseStiffnessX = 380f,
+            releaseDampingY = 0.58f,
+            releaseStiffnessY = 350f,
+            releaseVelocity = 1.1f,
+            popupStartScaleX = 0.30f,
+            popupStartScaleY = 0.24f,
+            popupDamping = 0.58f,
+            popupStiffness = 380f,
+            popupCollapseScale = 0.32f,
+            popupCollapseDurationMs = 175L,
+            overscrollMaxDp = 72f,
+            overscrollDamping = 0.70f,
         )
         else -> MotionParams(
-            releaseDamping = 0.86f,
-            releaseStiffness = 560f,
-            popupDamping = 0.86f,
-            popupStiffness = 540f,
-            overscrollDamping = 0.94f,
-            pressScaleMultiplier = 1.0f,
+            pressCardScaleX = 0.895f,
+            pressCardScaleY = 0.920f,
+            pressBtnScale = 0.76f,
+            releaseDampingX = 0.43f,
+            releaseStiffnessX = 330f,
+            releaseDampingY = 0.47f,
+            releaseStiffnessY = 300f,
+            releaseVelocity = 1.8f,
+            popupStartScaleX = 0.22f,
+            popupStartScaleY = 0.16f,
+            popupDamping = 0.48f,
+            popupStiffness = 340f,
+            popupCollapseScale = 0.25f,
+            popupCollapseDurationMs = 185L,
+            overscrollMaxDp = 92f,
+            overscrollDamping = 0.60f,
         )
+    }
+
+    fun View.performSubtleHaptic() {
+        if (!isEnabled() || !DataStore.hapticFeedback) return
+        runCatching {
+            performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+        }
     }
 
     private fun View.springFor(
@@ -104,24 +192,23 @@ object SmoothMotion {
         val syAnim = getTag(R.id.motion_tag_spring_y) as? SpringAnimation
         val storedX = getTag(R.id.motion_tag_base_sx) as? Float
         val storedY = getTag(R.id.motion_tag_base_sy) as? Float
-        if (storedX == null || (sxAnim?.isRunning != true)) {
-            val sx = scaleX.takeIf { it > 0.2f } ?: 1f
-            setTag(R.id.motion_tag_base_sx, sx)
+        if (storedX == null || sxAnim?.isRunning != true) {
+            setTag(R.id.motion_tag_base_sx, scaleX.takeIf { it > 0.2f } ?: 1f)
         }
-        if (storedY == null || (syAnim?.isRunning != true)) {
-            val sy = scaleY.takeIf { it > 0.2f } ?: 1f
-            setTag(R.id.motion_tag_base_sy, sy)
+        if (storedY == null || syAnim?.isRunning != true) {
+            setTag(R.id.motion_tag_base_sy, scaleY.takeIf { it > 0.2f } ?: 1f)
         }
         val baseX = (getTag(R.id.motion_tag_base_sx) as? Float) ?: 1f
         val baseY = (getTag(R.id.motion_tag_base_sy) as? Float) ?: 1f
         return baseX to baseY
     }
 
-    /**
-     * Attaches subtle, high-damping press feedback alongside existing click/long-click/drag listeners.
-     */
-    @SuppressLint("ClickableViewAccessibility")
     fun View.attachSmoothPress(scaleDown: Float = 0.972f) {
+        attachSmoothPress(isCompactButton = scaleDown <= 0.935f)
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    fun View.attachSmoothPress(isCompactButton: Boolean = false) {
         if (getTag(R.id.motion_tag_press_attached) == true) return
         setTag(R.id.motion_tag_press_attached, true)
 
@@ -130,14 +217,36 @@ object SmoothMotion {
         var downRawX = 0f
         var downRawY = 0f
 
+        fun releaseSpring(baseX: Float, baseY: Float, kickVelocity: Boolean) {
+            val p = params()
+            springFor(
+                R.id.motion_tag_spring_x,
+                DynamicAnimation.SCALE_X,
+                baseX,
+                p.releaseDampingX,
+                p.releaseStiffnessX,
+            ).apply {
+                if (kickVelocity && p.releaseVelocity > 0f) setStartVelocity(p.releaseVelocity)
+                start()
+            }
+            springFor(
+                R.id.motion_tag_spring_y,
+                DynamicAnimation.SCALE_Y,
+                baseY,
+                p.releaseDampingY,
+                p.releaseStiffnessY,
+            ).apply {
+                if (kickVelocity && p.releaseVelocity > 0f) setStartVelocity(-p.releaseVelocity * 0.6f)
+                start()
+            }
+        }
+
         setOnTouchListener { v, event ->
             if (!isEnabled()) {
                 if (isPressedMotion) {
                     isPressedMotion = false
-                    val bx = (v.getTag(R.id.motion_tag_base_sx) as? Float) ?: 1f
-                    val by = (v.getTag(R.id.motion_tag_base_sy) as? Float) ?: 1f
-                    v.scaleX = bx
-                    v.scaleY = by
+                    v.scaleX = (v.getTag(R.id.motion_tag_base_sx) as? Float) ?: 1f
+                    v.scaleY = (v.getTag(R.id.motion_tag_base_sy) as? Float) ?: 1f
                 }
                 return@setOnTouchListener false
             }
@@ -149,66 +258,42 @@ object SmoothMotion {
                     downRawY = event.rawY
                     val (baseX, baseY) = v.resolveBaseScale()
                     val p = params()
-                    val downOffset = (1f - scaleDown) * p.pressScaleMultiplier
-                    val factor = (1f - downOffset).coerceIn(0.86f, 0.994f)
+                    val sx = if (isCompactButton) p.pressBtnScale else p.pressCardScaleX
+                    val sy = if (isCompactButton) p.pressBtnScale else p.pressCardScaleY
                     isPressedMotion = true
                     v.springFor(
                         R.id.motion_tag_spring_x,
                         DynamicAnimation.SCALE_X,
-                        baseX * factor,
-                        0.98f,
-                        900f,
+                        baseX * sx,
+                        0.95f,
+                        820f,
                     ).start()
                     v.springFor(
                         R.id.motion_tag_spring_y,
                         DynamicAnimation.SCALE_Y,
-                        baseY * factor,
-                        0.98f,
-                        900f,
+                        baseY * sy,
+                        0.95f,
+                        820f,
                     ).start()
                 }
                 MotionEvent.ACTION_MOVE -> {
                     if (isPressedMotion && hypot(event.rawX - downRawX, event.rawY - downRawY) > touchSlop) {
                         isPressedMotion = false
-                        val p = params()
                         val baseX = (v.getTag(R.id.motion_tag_base_sx) as? Float) ?: 1f
                         val baseY = (v.getTag(R.id.motion_tag_base_sy) as? Float) ?: 1f
-                        v.springFor(
-                            R.id.motion_tag_spring_x,
-                            DynamicAnimation.SCALE_X,
-                            baseX,
-                            p.releaseDamping,
-                            p.releaseStiffness,
-                        ).start()
-                        v.springFor(
-                            R.id.motion_tag_spring_y,
-                            DynamicAnimation.SCALE_Y,
-                            baseY,
-                            p.releaseDamping,
-                            p.releaseStiffness,
-                        ).start()
+                        releaseSpring(baseX, baseY, kickVelocity = false)
                     }
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     if (isPressedMotion) {
                         isPressedMotion = false
-                        val p = params()
                         val baseX = (v.getTag(R.id.motion_tag_base_sx) as? Float) ?: 1f
                         val baseY = (v.getTag(R.id.motion_tag_base_sy) as? Float) ?: 1f
-                        v.springFor(
-                            R.id.motion_tag_spring_x,
-                            DynamicAnimation.SCALE_X,
+                        releaseSpring(
                             baseX,
-                            p.releaseDamping,
-                            p.releaseStiffness,
-                        ).start()
-                        v.springFor(
-                            R.id.motion_tag_spring_y,
-                            DynamicAnimation.SCALE_Y,
                             baseY,
-                            p.releaseDamping,
-                            p.releaseStiffness,
-                        ).start()
+                            kickVelocity = event.actionMasked == MotionEvent.ACTION_UP,
+                        )
                     }
                 }
             }
@@ -217,30 +302,36 @@ object SmoothMotion {
     }
 
     /**
-     * Plays a single crisp tap dip-and-settle pop on programmatic selection (e.g. Tab pills).
+     * Tactile pop pulse used for tabs, toggles, and interactive 5-bar stepper preview.
      */
-    fun View.playTapPop(dipFactor: Float = 0.93f) {
-        if (!isEnabled()) return
+    fun View.playTapPop(dipFactor: Float = 0.88f, levelOverride: Int? = null) {
+        val lvl = levelOverride ?: level()
+        if (lvl <= 0) return
         val (baseX, baseY) = resolveBaseScale()
-        val p = params()
-        val downOffset = (1f - dipFactor) * p.pressScaleMultiplier
-        val factor = (1f - downOffset).coerceIn(0.88f, 0.99f)
-        scaleX = baseX * factor
-        scaleY = baseY * factor
+        val p = params(lvl)
+        val scaleDip = (dipFactor * (p.pressBtnScale / 0.86f)).coerceIn(0.68f, 0.96f)
+        scaleX = baseX * scaleDip
+        scaleY = baseY * (scaleDip + (1f - scaleDip) * 0.18f)
         springFor(
             R.id.motion_tag_spring_x,
             DynamicAnimation.SCALE_X,
             baseX,
-            p.releaseDamping,
-            p.releaseStiffness,
-        ).start()
+            p.releaseDampingX,
+            p.releaseStiffnessX,
+        ).apply {
+            if (p.releaseVelocity > 0f) setStartVelocity(p.releaseVelocity * 1.4f)
+            start()
+        }
         springFor(
             R.id.motion_tag_spring_y,
             DynamicAnimation.SCALE_Y,
             baseY,
-            p.releaseDamping,
-            p.releaseStiffness,
-        ).start()
+            p.releaseDampingY,
+            p.releaseStiffnessY,
+        ).apply {
+            if (p.releaseVelocity > 0f) setStartVelocity(p.releaseVelocity * 0.9f)
+            start()
+        }
     }
 
     fun View.animatePopupBloomIn(pivotXRatio: Float, pivotYRatio: Float) {
@@ -253,8 +344,8 @@ object SmoothMotion {
         val p = params()
         pivotX = width * pivotXRatio
         pivotY = height * pivotYRatio
-        scaleX = 0.90f
-        scaleY = 0.86f
+        scaleX = p.popupStartScaleX
+        scaleY = p.popupStartScaleY
         alpha = 0f
 
         animate().cancel()
@@ -286,9 +377,181 @@ object SmoothMotion {
         }
     }
 
-    /**
-     * Smooth damped rubber-band overscroll on RecyclerViews.
-     */
+    fun View.animateBarShow(onFinished: () -> Unit) {
+        val p = params()
+        pivotX = width * 0.5f
+        pivotY = height * 0.9f
+        scaleX = (0.86f + (1f - p.popupStartScaleX) * -0.06f).coerceIn(0.78f, 0.95f)
+        scaleY = 0.84f
+        alpha = 0f
+
+        animate().setListener(null).withEndAction(null).cancel()
+        animate()
+            .alpha(1f)
+            .setDuration(150L)
+            .setInterpolator(smoothOutInterpolator)
+            .start()
+
+        springFor(
+            R.id.motion_tag_spring_x,
+            DynamicAnimation.SCALE_X,
+            1f,
+            p.popupDamping,
+            p.popupStiffness,
+        ).apply {
+            cancel()
+            start()
+        }
+        springFor(
+            R.id.motion_tag_spring_y,
+            DynamicAnimation.SCALE_Y,
+            1f,
+            p.popupDamping,
+            p.popupStiffness,
+        ).apply {
+            cancel()
+            start()
+        }
+        val tySpring = springFor(
+            R.id.motion_tag_spring_ty,
+            DynamicAnimation.TRANSLATION_Y,
+            0f,
+            p.popupDamping.coerceAtLeast(0.60f),
+            p.popupStiffness * 0.90f,
+        )
+        var endCalled = false
+        val listener = object : DynamicAnimation.OnAnimationEndListener {
+            override fun onAnimationEnd(
+                animation: DynamicAnimation<*>?,
+                canceled: Boolean,
+                value: Float,
+                velocity: Float,
+            ) {
+                animation?.removeEndListener(this)
+                if (!endCalled) {
+                    endCalled = true
+                    onFinished()
+                }
+            }
+        }
+        tySpring.cancel()
+        tySpring.addEndListener(listener)
+        tySpring.start()
+    }
+
+    fun View.animateFabMoveDelta(dx: Float, dy: Float, targetTransY: Float) {
+        if (!isEnabled()) {
+            translationX = 0f
+            translationY = targetTransY
+            return
+        }
+        val p = params()
+        if (abs(dx) > 0.5f) {
+            translationX = dx
+            springFor(
+                R.id.motion_tag_spring_tx,
+                DynamicAnimation.TRANSLATION_X,
+                0f,
+                p.popupDamping.coerceAtLeast(0.62f),
+                p.popupStiffness * 0.92f,
+            ).apply {
+                cancel()
+                start()
+            }
+        }
+        if (abs(dy) > 0.5f) {
+            translationY = dy
+        }
+        springFor(
+            R.id.motion_tag_spring_ty,
+            DynamicAnimation.TRANSLATION_Y,
+            targetTransY,
+            p.popupDamping.coerceAtLeast(0.62f),
+            p.popupStiffness * 0.92f,
+        ).apply {
+            cancel()
+            start()
+        }
+    }
+
+    fun AlertDialog.showSmooth(anchor: View? = null): AlertDialog {
+        if (anchor != null) TouchOriginTracker.capture(anchor)
+        if (!isEnabled()) {
+            window?.setWindowAnimations(0)
+            show()
+            return this
+        }
+        window?.setWindowAnimations(R.style.SmoothDialogExitOnlyAnimation)
+        show()
+        val decor = window?.decorView ?: return this
+        val target = decor.findViewById<View>(androidx.appcompat.R.id.parentPanel)
+            ?: decor.findViewById<ViewGroup>(android.R.id.content)?.children?.firstOrNull()
+            ?: return this
+        val origin = TouchOriginTracker.peekRecentPoint()
+        val p = params()
+        target.doOnPreDraw { v ->
+            val w = v.width.toFloat().coerceAtLeast(1f)
+            val h = v.height.toFloat().coerceAtLeast(1f)
+            val loc = IntArray(2)
+            v.getLocationOnScreen(loc)
+            val cx = loc[0] + w * 0.5f
+            val cy = loc[1] + h * 0.5f
+            if (origin != null) {
+                v.pivotX = (origin.x - loc[0]).coerceIn(w * 0.1f, w * 0.9f)
+                v.pivotY = (origin.y - loc[1]).coerceIn(h * 0.1f, h * 0.9f)
+                v.translationX = (origin.x - cx).coerceIn(-w * 0.45f, w * 0.45f) * 0.35f
+                v.translationY = (origin.y - cy).coerceIn(-h * 0.45f, h * 0.45f) * 0.35f
+            } else {
+                v.pivotX = w * 0.5f
+                v.pivotY = h * 0.5f
+                v.translationX = 0f
+                v.translationY = v.resources.displayMetrics.density * 14f
+            }
+            v.scaleX = p.popupStartScaleX.coerceAtLeast(0.45f)
+            v.scaleY = p.popupStartScaleY.coerceAtLeast(0.40f)
+            v.alpha = 0f
+            v.animate()
+                .alpha(1f)
+                .setDuration(150L)
+                .setInterpolator(smoothOutInterpolator)
+                .start()
+            v.springFor(R.id.motion_tag_spring_tx, DynamicAnimation.TRANSLATION_X, 0f, p.popupDamping.coerceAtLeast(0.62f), p.popupStiffness * 0.9f).start()
+            v.springFor(R.id.motion_tag_spring_ty, DynamicAnimation.TRANSLATION_Y, 0f, p.popupDamping.coerceAtLeast(0.62f), p.popupStiffness * 0.9f).start()
+            v.springFor(R.id.motion_tag_spring_x, DynamicAnimation.SCALE_X, 1f, p.popupDamping, p.popupStiffness).start()
+            v.springFor(R.id.motion_tag_spring_y, DynamicAnimation.SCALE_Y, 1f, p.popupDamping, p.popupStiffness).start()
+        }
+        return this
+    }
+
+    fun MaterialAlertDialogBuilder.showSmooth(anchor: View? = null): AlertDialog {
+        return create().showSmooth(anchor)
+    }
+
+    fun BottomSheetDialog.showSmooth(): BottomSheetDialog {
+        if (!isEnabled()) {
+            window?.setWindowAnimations(0)
+            show()
+            return this
+        }
+        show()
+        val sheet = findViewById<View>(com.google.android.material.R.id.design_bottom_sheet) ?: return this
+        val p = params()
+        sheet.doOnPreDraw { v ->
+            val h = v.height.toFloat().coerceAtLeast(200f)
+            v.pivotX = v.width * 0.5f
+            v.pivotY = h
+            v.translationY = h * 0.22f
+            v.scaleX = 0.95f
+            v.scaleY = 0.92f
+            v.alpha = 0f
+            v.animate().alpha(1f).setDuration(150L).setInterpolator(smoothOutInterpolator).start()
+            v.springFor(R.id.motion_tag_spring_ty, DynamicAnimation.TRANSLATION_Y, 0f, p.popupDamping.coerceAtLeast(0.65f), p.popupStiffness * 0.9f).start()
+            v.springFor(R.id.motion_tag_spring_x, DynamicAnimation.SCALE_X, 1f, p.popupDamping, p.popupStiffness).start()
+            v.springFor(R.id.motion_tag_spring_y, DynamicAnimation.SCALE_Y, 1f, p.popupDamping, p.popupStiffness).start()
+        }
+        return this
+    }
+
     fun RecyclerView.attachSmoothOverscroll() {
         if (getTag(R.id.motion_tag_overscroll_attached) == true) return
         setTag(R.id.motion_tag_overscroll_attached, true)
@@ -298,7 +561,7 @@ object SmoothMotion {
 
         fun updateTranslationFromPull() {
             val p = params()
-            val maxDp = 38f * p.pressScaleMultiplier.coerceAtLeast(0.45f)
+            val maxDp = p.overscrollMaxDp
             val sign = if (rawPullDp >= 0f) 1f else -1f
             val absDp = abs(rawPullDp)
             val dampedDp = maxDp * (1f - 1f / (1f + ln(1f + absDp / 24f) * 1.15f))
@@ -312,6 +575,11 @@ object SmoothMotion {
                 translationY = 0f
                 return
             }
+            if (!isEnabled()) {
+                (getTag(R.id.motion_tag_spring_ty) as? SpringAnimation)?.cancel()
+                translationY = 0f
+                return
+            }
             val p = params()
             springFor(
                 R.id.motion_tag_spring_ty,
@@ -321,7 +589,7 @@ object SmoothMotion {
                 380f,
             ).apply {
                 if (velocityPxPerSec != 0f) {
-                    setStartVelocity(velocityPxPerSec.coerceIn(-1800f, 1800f))
+                    setStartVelocity(velocityPxPerSec.coerceIn(-2200f, 2200f))
                 }
                 start()
             }
@@ -337,18 +605,12 @@ object SmoothMotion {
                 return object : EdgeEffect(view.context) {
                     private var pulled = false
 
-                    override fun setSize(width: Int, height: Int) {
-                        super.setSize(width, height)
-                    }
-
                     override fun isFinished(): Boolean = !pulled && abs(view.translationY) < 0.5f
 
                     override fun finish() {
                         pulled = false
                         rawPullDp = 0f
-                        if (view.translationY != 0f) {
-                            springBack(0f)
-                        }
+                        if (view.translationY != 0f) springBack(0f)
                     }
 
                     override fun onPull(deltaDistance: Float) {
@@ -359,8 +621,8 @@ object SmoothMotion {
                         if (!isEnabled()) return
                         pulled = true
                         val heightPx = view.height.coerceAtLeast(300)
-                        rawPullDp += dirSign * (deltaDistance * heightPx / density) * 0.55f
-                        rawPullDp = rawPullDp.coerceIn(-220f, 220f)
+                        rawPullDp += dirSign * (deltaDistance * heightPx / density) * 0.62f
+                        rawPullDp = rawPullDp.coerceIn(-260f, 260f)
                         updateTranslationFromPull()
                     }
 
@@ -373,7 +635,7 @@ object SmoothMotion {
                     override fun onAbsorb(velocity: Int) {
                         if (!isEnabled()) return
                         pulled = false
-                        val flingKick = dirSign * (velocity.coerceIn(0, 6000) * 0.14f)
+                        val flingKick = dirSign * (velocity.coerceIn(0, 6000) * 0.16f)
                         springBack(flingKick)
                     }
 
@@ -391,24 +653,26 @@ object SmoothMotion {
                 page.alpha = 1f
                 return@setPageTransformer
             }
+            val lvl = level()
             val absPos = abs(position).coerceIn(0f, 1f)
-            val scale = 1f - absPos * 0.025f
+            val scaleDrop = 0.015f + lvl * 0.006f
+            val scale = 1f - absPos * scaleDrop
             page.scaleX = scale
             page.scaleY = scale
-            page.alpha = 1f - absPos * 0.14f
+            page.alpha = 1f - absPos * 0.16f
         }
     }
 
     fun TabLayout.attachSmoothTabPop() {
         addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab?) {
-                tab?.view?.playTapPop(0.93f)
+                tab?.view?.playTapPop(0.88f)
             }
 
             override fun onTabUnselected(tab: TabLayout.Tab?) = Unit
 
             override fun onTabReselected(tab: TabLayout.Tab?) {
-                tab?.view?.playTapPop(0.93f)
+                tab?.view?.playTapPop(0.88f)
             }
         })
     }

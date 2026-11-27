@@ -7,6 +7,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import io.nekohasekai.sagernet.R
+import io.nekohasekai.sagernet.ui.motion.SmoothMotion.showSmooth
 
 fun Context.alert(text: String): AlertDialog {
     return MaterialAlertDialogBuilder(this).setTitle(R.string.error_title)
@@ -62,7 +63,7 @@ fun AlertDialog.tryToShow() {
                 "activity=${activity.javaClass.name}"
     )
     try {
-        show()
+        showSmooth()
     } catch (e: Exception) {
         Logs.e("AlertDialog.tryToShow failed while showing on a resolved Activity", e)
     }

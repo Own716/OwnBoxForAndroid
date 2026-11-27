@@ -249,14 +249,22 @@ class TelegramGroupedPreferenceDecoration(private val context: Context) : Recycl
     }
 
     companion object {
+        fun resolvedBgColor(ctx: Context): Int = when {
+            Theme.isBlackTheme(ctx) -> Color.BLACK
+            Theme.usingNightMode(ctx) -> Color.parseColor("#121212")
+            else -> Color.parseColor("#F5F5F7")
+        }
+
         fun applyTo(recyclerView: RecyclerView) {
             val ctx = recyclerView.context
-            val bgColor = when {
-                Theme.isBlackTheme(ctx) -> Color.BLACK
-                Theme.usingNightMode(ctx) -> Color.parseColor("#121212")
-                else -> Color.parseColor("#F5F5F7")
-            }
+            val bgColor = resolvedBgColor(ctx)
             recyclerView.setBackgroundColor(bgColor)
+            (recyclerView.parent as? View)?.setBackgroundColor(bgColor)
+            (recyclerView.parent?.parent as? View)?.let { gp ->
+                if (gp.id != R.id.fragment_holder && gp.id != R.id.settings) {
+                    gp.setBackgroundColor(bgColor)
+                }
+            }
             io.nekohasekai.sagernet.ui.motion.SmoothMotion.run {
                 recyclerView.attachSmoothOverscroll()
             }

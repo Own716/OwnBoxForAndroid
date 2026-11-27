@@ -1068,8 +1068,17 @@
     <string name="strategy_learned_cleared">已清除網站選擇記憶</string>
     <string name="lan_sharing_local_network_permission_denied">Android 17+ 需要授予區域網路權限才能使用區域網路共享。</string>
     <string name="motion_effect_level">靈動過渡動效</string>
-    <string name="motion_effect_off">關閉</string>
-    <string name="motion_effect_minimal">極簡順滑</string>
-    <string name="motion_effect_smooth">絲滑輕彈（推薦）</string>
-    <string name="motion_effect_lively">靈動 Q 彈</string>
+    <string name="motion_picker_hint">點擊下方階梯條可當場感受不同檔位的回彈力度</string>
+    <string name="motion_turn_off_btn">關閉過渡動效</string>
+    <string name="motion_level_0">關閉</string>
+    <string name="motion_level_1">微柔</string>
+    <string name="motion_level_2">緊緻</string>
+    <string name="motion_level_3">標準 Q 彈（推薦）</string>
+    <string name="motion_level_4">靈動果凍</string>
+    <string name="motion_level_5">拉滿超 Q 彈</string>
+    <string name="motion_step_1">1檔</string>
+    <string name="motion_step_2">2檔</string>
+    <string name="motion_step_3">3檔</string>
+    <string name="motion_step_4">4檔</string>
+    <string name="motion_step_5">5檔</string>
 </resources>

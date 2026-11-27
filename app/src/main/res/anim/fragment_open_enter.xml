@@ -1,20 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <set xmlns:android="http://schemas.android.com/apk/res/android"
-    android:interpolator="@interpolator/ios_smooth_out">
+    android:interpolator="@interpolator/ios_smooth_out"
+    android:zAdjustment="top">
     <translate
-        android:duration="260"
-        android:fromXDelta="18%"
+        android:duration="270"
+        android:fromXDelta="100%"
         android:toXDelta="0%" />
-    <scale
-        android:duration="260"
-        android:fromXScale="0.97"
-        android:fromYScale="0.97"
-        android:pivotX="50%"
-        android:pivotY="50%"
-        android:toXScale="1.0"
-        android:toYScale="1.0" />
-    <alpha
-        android:duration="180"
-        android:fromAlpha="0.0"
-        android:toAlpha="1.0" />
 </set>

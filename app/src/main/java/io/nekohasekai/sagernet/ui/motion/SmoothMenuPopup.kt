@@ -1,5 +1,6 @@
 package io.nekohasekai.sagernet.ui.motion
 
+import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.content.Context
 import android.content.res.ColorStateList
@@ -33,8 +34,8 @@ import io.nekohasekai.sagernet.ui.motion.SmoothMotion.attachSmoothPress
  * Anchored smooth floating popup menu preserving OwnBox Method A appearance:
  * - Zero full-screen dark scrim, zero outer drop shadow
  * - Soft cloud surface + 1dp fine border (@drawable/bg_popup_menu)
- * - Pure text rows (no item icons), group dividers, red danger items
- * - In-place submenu morphing with smooth height & cross-slide transitions
+ * - True button-origin expand & shrink-back collapse on every dismiss path
+ * - In-place submenu morphing & unified single-choice preference picker
  */
 object SmoothMenuPopup {
 
@@ -70,6 +71,138 @@ object SmoothMenuPopup {
         onDismiss: (() -> Unit)? = null,
     ): Handle? = showFromMenuInternal(context, anchor, menu, gravity, onItemSelected, onDismiss)
 
+    fun showSingleChoice(
+        context: Context,
+        anchor: View,
+        entries: Array<CharSequence>,
+        selectedIndex: Int,
+        onSelect: (Int) -> Unit,
+        onDismiss: (() -> Unit)? = null,
+    ): Handle? {
+        if (!anchor.isAttachedToWindow || entries.isEmpty()) return null
+
+        val dm = context.resources.displayMetrics
+        val density = dm.density
+        val popupWidthPx = (224f * density).toInt().coerceAtMost((dm.widthPixels * 0.78f).toInt())
+        val cornerRadiusPx = context.resources.getDimension(R.dimen.popup_corner_radius)
+        val maxCardHeightPx = (dm.heightPixels * 0.58f).toInt()
+
+        val primaryColor = context.getColorAttr(R.attr.colorPrimary)
+        val textPrimary = context.getColorAttr(android.R.attr.textColorPrimary)
+        val rippleColor = context.getColorAttr(R.attr.colorControlHighlight)
+        val surfaceColor = context.getColorAttr(R.attr.popupMenuSurfaceColor)
+        val isDark = ColorUtils.calculateLuminance(surfaceColor) < 0.5
+        val selectedPillBg = ColorUtils.compositeColors(
+            ColorUtils.setAlphaComponent(primaryColor, if (isDark) 52 else 32),
+            surfaceColor,
+        )
+
+        val card = buildPopupCard(context, cornerRadiusPx)
+        val popupState = PopupDismissController(card)
+        val popup = createAnimatedPopupWindow(card, popupWidthPx, popupState)
+
+        val container = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
+        }
+
+        val padH = (16f * density).toInt()
+        val padV = (10f * density).toInt()
+        val pillMarginH = (8f * density).toInt()
+        val pillMarginV = (2f * density).toInt()
+
+        for (index in entries.indices) {
+            val isSelected = index == selectedIndex
+            val row = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(padH - pillMarginH, padV, padH - pillMarginH, padV)
+                minimumHeight = (40f * density).toInt()
+                isClickable = true
+                isFocusable = true
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ).apply {
+                    setMargins(pillMarginH, pillMarginV, pillMarginH, pillMarginV)
+                }
+                val itemBg = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = 14f * density
+                    setColor(if (isSelected) selectedPillBg else Color.TRANSPARENT)
+                }
+                val mask = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = 14f * density
+                    setColor(Color.WHITE)
+                }
+                background = RippleDrawable(ColorStateList.valueOf(rippleColor), itemBg, mask)
+                attachSmoothPress(isCompactButton = false)
+                setOnClickListener {
+                    popup.dismiss()
+                    card.post { onSelect(index) }
+                }
+            }
+
+            val label = TextView(context).apply {
+                text = entries[index]
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                setTextColor(if (isSelected) primaryColor else textPrimary)
+                setTypeface(null, if (isSelected) Typeface.BOLD else Typeface.NORMAL)
+                maxLines = 2
+                ellipsize = TextUtils.TruncateAt.END
+            }
+            row.addView(label, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+
+            if (isSelected) {
+                val check = TextView(context).apply {
+                    text = "✓"
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                    setTypeface(null, Typeface.BOLD)
+                    setTextColor(primaryColor)
+                    setPadding((8f * density).toInt(), 0, 0, 0)
+                }
+                row.addView(check)
+            }
+            container.addView(row)
+        }
+
+        val scroll = ScrollView(context).apply {
+            isVerticalScrollBarEnabled = false
+            overScrollMode = View.OVER_SCROLL_NEVER
+            addView(container)
+        }
+        val cappedWrapper = object : FrameLayout(context) {
+            override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+                super.onMeasure(
+                    widthMeasureSpec,
+                    MeasureSpec.makeMeasureSpec(maxCardHeightPx, View.MeasureSpec.AT_MOST),
+                )
+            }
+        }.apply {
+            addView(
+                scroll,
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+        }
+        card.addView(
+            cappedWrapper,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+
+        showPositionedWithBloom(popup, card, container, anchor, Gravity.END, popupWidthPx, maxCardHeightPx, popupState, onDismiss)
+        return Handle { popup.dismiss() }
+    }
+
     private fun showFromMenuInternal(
         context: Context,
         anchor: View,
@@ -98,19 +231,7 @@ object SmoothMenuPopup {
             ((Color.alpha(strokeColor) * 0.65f).toInt()).coerceIn(28, 160),
         )
 
-        val card = FrameLayout(context).apply {
-            setBackgroundResource(R.drawable.bg_popup_menu)
-            elevation = 0f
-            outlineProvider = object : ViewOutlineProvider() {
-                override fun getOutline(view: View, outline: Outline) {
-                    outline.setRoundRect(0, 0, view.width, view.height, cornerRadiusPx)
-                }
-            }
-            clipToOutline = true
-            clipChildren = true
-            clipToPadding = true
-        }
-
+        val card = buildPopupCard(context, cornerRadiusPx)
         val contentSlot = FrameLayout(context).apply {
             clipChildren = true
             clipToPadding = false
@@ -123,51 +244,11 @@ object SmoothMenuPopup {
             ),
         )
 
-        val popup = PopupWindow(
-            card,
-            popupWidthPx,
-            ViewGroup.LayoutParams.WRAP_CONTENT,
-            true,
-        ).apply {
-            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-            isOutsideTouchable = true
-            elevation = 0f
-            animationStyle = 0
-        }
+        val popupState = PopupDismissController(card)
+        val popup = createAnimatedPopupWindow(card, popupWidthPx, popupState)
 
-        var isDismissing = false
-        var activeHeightAnim: ValueAnimator? = null
         val stack = ArrayList<MenuLevel>().apply {
             add(MenuLevel(backTitle = null, menu = menu))
-        }
-
-        var currentPivotXRatio = 0.88f
-        var currentPivotYRatio = 0.06f
-
-        fun dismissAnimated() {
-            if (isDismissing) return
-            isDismissing = true
-            activeHeightAnim?.cancel()
-            if (!SmoothMotion.isEnabled() || !card.isAttachedToWindow) {
-                if (popup.isShowing) popup.dismiss()
-                return
-            }
-            card.animate().cancel()
-            card.animate()
-                .alpha(0f)
-                .scaleX(0.92f)
-                .scaleY(0.92f)
-                .setDuration(110L)
-                .setInterpolator(SmoothMotion.smoothInInterpolator)
-                .withEndAction {
-                    if (popup.isShowing) popup.dismiss()
-                }
-                .start()
-        }
-
-        popup.setOnDismissListener {
-            activeHeightAnim?.cancel()
-            onDismiss?.invoke()
         }
 
         fun makeRowRipple(): RippleDrawable {
@@ -197,12 +278,12 @@ object SmoothMenuPopup {
             val isCheckbox = item.itemId == R.id.action_hide_unavailable
             if (isCheckbox) {
                 val boxSize = (18f * density).toInt()
-                val box = TextView(context).apply {
+                return TextView(context).apply {
                     gravity = Gravity.CENTER
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
                     setTypeface(null, Typeface.BOLD)
                     includeFontPadding = false
-                    val bg = GradientDrawable().apply {
+                    background = GradientDrawable().apply {
                         shape = GradientDrawable.RECTANGLE
                         cornerRadius = 5f * density
                         if (item.isChecked) {
@@ -213,7 +294,6 @@ object SmoothMenuPopup {
                             setStroke((1.4f * density).toInt().coerceAtLeast(1), textSecondary)
                         }
                     }
-                    background = bg
                     if (item.isChecked) {
                         text = "✓"
                         val onPrimary = if (ColorUtils.calculateLuminance(primaryColor) > 0.55) Color.BLACK else Color.WHITE
@@ -225,9 +305,8 @@ object SmoothMenuPopup {
                         marginStart = (10f * density).toInt()
                     }
                 }
-                return box
             }
-            val checkView = TextView(context).apply {
+            return TextView(context).apply {
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
                 setTypeface(null, Typeface.BOLD)
                 setTextColor(primaryColor)
@@ -240,14 +319,12 @@ object SmoothMenuPopup {
                     marginStart = (8f * density).toInt()
                 }
             }
-            return checkView
         }
 
         lateinit var renderCurrentLevel: (slideDir: Int) -> Unit
 
         fun dispatchLeafClick(item: MenuItem) {
-            if (isDismissing) return
-            dismissAnimated()
+            popup.dismiss()
             card.post {
                 val handledByMenu = runCatching {
                     val m = item.javaClass.getMethod("invoke")
@@ -259,7 +336,7 @@ object SmoothMenuPopup {
             }
         }
 
-        fun buildLevelView(level: MenuLevel): View {
+        fun buildLevelView(level: MenuLevel): Pair<View, LinearLayout> {
             val container = LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
                 layoutParams = ViewGroup.LayoutParams(
@@ -279,7 +356,7 @@ object SmoothMenuPopup {
                     background = makeRowRipple()
                     isClickable = true
                     isFocusable = true
-                    attachSmoothPress(0.975f)
+                    attachSmoothPress(isCompactButton = false)
                     setOnClickListener {
                         if (stack.size > 1) {
                             stack.removeAt(stack.lastIndex)
@@ -344,7 +421,7 @@ object SmoothMenuPopup {
                     isFocusable = item.isEnabled
                     alpha = if (item.isEnabled) 1f else 0.45f
                     if (item.isEnabled) {
-                        attachSmoothPress(0.975f)
+                        attachSmoothPress(isCompactButton = false)
                         setOnClickListener {
                             val sub = item.subMenu
                             if (hasSub && sub != null) {
@@ -391,7 +468,7 @@ object SmoothMenuPopup {
                 overScrollMode = View.OVER_SCROLL_NEVER
                 addView(container)
             }
-            return object : FrameLayout(context) {
+            val wrapper = object : FrameLayout(context) {
                 override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
                     val cappedSpec = MeasureSpec.makeMeasureSpec(maxCardHeightPx, MeasureSpec.AT_MOST)
                     super.onMeasure(widthMeasureSpec, cappedSpec)
@@ -405,14 +482,17 @@ object SmoothMenuPopup {
                     ),
                 )
             }
+            return wrapper to container
         }
 
+        var initialRowsContainer: LinearLayout? = null
         renderCurrentLevel = { slideDir ->
             val level = stack.last()
-            val newContent = buildLevelView(level)
+            val (newContent, rowsContainer) = buildLevelView(level)
+            if (slideDir == 0) initialRowsContainer = rowsContainer
             val oldHeight = contentSlot.height
 
-            activeHeightAnim?.cancel()
+            popupState.activeHeightAnim?.cancel()
             contentSlot.removeAllViews()
             contentSlot.addView(
                 newContent,
@@ -434,15 +514,15 @@ object SmoothMenuPopup {
                 contentSlot.layoutParams = contentSlot.layoutParams.apply {
                     height = oldHeight
                 }
-                activeHeightAnim = ValueAnimator.ofInt(oldHeight, targetHeight).apply {
-                    duration = 200L
+                popupState.activeHeightAnim = ValueAnimator.ofInt(oldHeight, targetHeight).apply {
+                    duration = 210L
                     interpolator = SmoothMotion.smoothOutInterpolator
                     addUpdateListener { anim ->
                         contentSlot.layoutParams = contentSlot.layoutParams.apply {
                             height = anim.animatedValue as Int
                         }
                     }
-                    addListener(object : android.animation.AnimatorListenerAdapter() {
+                    addListener(object : AnimatorListenerAdapter() {
                         override fun onAnimationEnd(animation: android.animation.Animator) {
                             contentSlot.layoutParams = contentSlot.layoutParams.apply {
                                 height = ViewGroup.LayoutParams.WRAP_CONTENT
@@ -452,13 +532,13 @@ object SmoothMenuPopup {
                     start()
                 }
 
-                val shiftPx = slideDir * 20f * density
+                val shiftPx = slideDir * 22f * density
                 newContent.translationX = shiftPx
                 newContent.alpha = 0f
                 newContent.animate()
                     .translationX(0f)
                     .alpha(1f)
-                    .setDuration(170L)
+                    .setDuration(180L)
                     .setInterpolator(SmoothMotion.smoothOutInterpolator)
                     .start()
             } else {
@@ -469,13 +549,118 @@ object SmoothMenuPopup {
         }
 
         renderCurrentLevel(0)
+        showPositionedWithBloom(
+            popup,
+            card,
+            initialRowsContainer,
+            anchor,
+            anchorGravity,
+            popupWidthPx,
+            maxCardHeightPx,
+            popupState,
+            onDismiss,
+        )
 
+        return Handle { popup.dismiss() }
+    }
+
+    private class PopupDismissController(val card: View) {
+        var pivotXRatio: Float = 0.88f
+        var pivotYRatio: Float = 0.06f
+        var isDismissing: Boolean = false
+        var activeHeightAnim: ValueAnimator? = null
+        var dismissNow: (() -> Unit)? = null
+    }
+
+    private fun buildPopupCard(context: Context, cornerRadiusPx: Float): FrameLayout {
+        return FrameLayout(context).apply {
+            setBackgroundResource(R.drawable.bg_popup_menu)
+            elevation = 0f
+            outlineProvider = object : ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: Outline) {
+                    outline.setRoundRect(0, 0, view.width, view.height, cornerRadiusPx)
+                }
+            }
+            clipToOutline = true
+            clipChildren = true
+            clipToPadding = true
+        }
+    }
+
+    private fun createAnimatedPopupWindow(
+        card: View,
+        popupWidthPx: Int,
+        state: PopupDismissController,
+    ): PopupWindow {
+        var allowSuperDismiss = false
+        val popup = object : PopupWindow(
+            card,
+            popupWidthPx,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            true,
+        ) {
+            override fun dismiss() {
+                if (allowSuperDismiss || !SmoothMotion.isEnabled() || !card.isAttachedToWindow) {
+                    allowSuperDismiss = true
+                    super.dismiss()
+                    return
+                }
+                if (state.isDismissing) return
+                state.isDismissing = true
+                state.activeHeightAnim?.cancel()
+                val p = SmoothMotion.params()
+                card.animate().cancel()
+                card.pivotX = card.width * state.pivotXRatio
+                card.pivotY = card.height * state.pivotYRatio
+                card.animate()
+                    .alpha(0f)
+                    .scaleX(p.popupCollapseScale)
+                    .scaleY(p.popupCollapseScale)
+                    .setDuration(p.popupCollapseDurationMs)
+                    .setInterpolator(SmoothMotion.smoothInInterpolator)
+                    .withEndAction {
+                        allowSuperDismiss = true
+                        try {
+                            if (isShowing) super.dismiss()
+                        } catch (_: Throwable) {}
+                    }
+                    .start()
+            }
+        }
+        state.dismissNow = {
+            allowSuperDismiss = true
+            card.animate().cancel()
+            state.activeHeightAnim?.cancel()
+            try {
+                if (popup.isShowing) popup.dismiss()
+            } catch (_: Throwable) {}
+        }
+        popup.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        popup.isOutsideTouchable = true
+        popup.elevation = 0f
+        popup.animationStyle = 0
+        return popup
+    }
+
+    private fun showPositionedWithBloom(
+        popup: PopupWindow,
+        card: FrameLayout,
+        rowsContainer: LinearLayout?,
+        anchor: View,
+        anchorGravity: Int,
+        popupWidthPx: Int,
+        maxCardHeightPx: Int,
+        state: PopupDismissController,
+        onDismiss: (() -> Unit)?,
+    ) {
+        val dm = card.context.resources.displayMetrics
+        val density = dm.density
         card.measure(
             View.MeasureSpec.makeMeasureSpec(popupWidthPx, View.MeasureSpec.EXACTLY),
             View.MeasureSpec.makeMeasureSpec(maxCardHeightPx, View.MeasureSpec.AT_MOST),
         )
-        val measuredW = card.measuredWidth
-        val measuredH = card.measuredHeight
+        val measuredW = card.measuredWidth.coerceAtLeast(1)
+        val measuredH = card.measuredHeight.coerceAtLeast(1)
 
         val anchorLoc = IntArray(2)
         anchor.getLocationOnScreen(anchorLoc)
@@ -502,16 +687,47 @@ object SmoothMenuPopup {
         }
         val clampedY = rawY.coerceIn(statusPad, (dm.heightPixels - measuredH - bottomPad).coerceAtLeast(statusPad))
 
-        currentPivotXRatio = if (preferRight) 0.90f else 0.10f
-        currentPivotYRatio = if (openAbove) 0.94f else 0.06f
+        val anchorCenterX = anchorLoc[0] + anchor.width * 0.5f
+        val anchorCenterY = anchorLoc[1] + anchor.height * 0.5f
+        state.pivotXRatio = ((anchorCenterX - clampedX) / measuredW.toFloat()).coerceIn(0.06f, 0.94f)
+        state.pivotYRatio = ((anchorCenterY - clampedY) / measuredH.toFloat()).coerceIn(0.04f, 0.96f)
 
         card.doOnPreDraw {
-            it.animatePopupBloomIn(currentPivotXRatio, currentPivotYRatio)
+            it.animatePopupBloomIn(state.pivotXRatio, state.pivotYRatio)
+            if (SmoothMotion.isEnabled() && rowsContainer != null) {
+                var rowIdx = 0
+                for (i in 0 until rowsContainer.childCount) {
+                    val child = rowsContainer.getChildAt(i)
+                    if (child.visibility != View.VISIBLE) continue
+                    val targetAlpha = child.alpha
+                    val delay = (rowIdx * 14L).coerceAtMost(90L)
+                    rowIdx++
+                    child.alpha = 0f
+                    child.translationY = 10f * density
+                    child.animate()
+                        .alpha(targetAlpha)
+                        .translationY(0f)
+                        .setStartDelay(delay)
+                        .setDuration(180L)
+                        .setInterpolator(SmoothMotion.smoothOutInterpolator)
+                        .start()
+                }
+            }
         }
 
+        val anchorDetachGuard = object : View.OnAttachStateChangeListener {
+            override fun onViewAttachedToWindow(v: View) = Unit
+            override fun onViewDetachedFromWindow(v: View) {
+                state.dismissNow?.invoke()
+            }
+        }
+        anchor.addOnAttachStateChangeListener(anchorDetachGuard)
+        popup.setOnDismissListener {
+            state.activeHeightAnim?.cancel()
+            anchor.removeOnAttachStateChangeListener(anchorDetachGuard)
+            onDismiss?.invoke()
+        }
         popup.showAtLocation(anchor, Gravity.NO_GRAVITY, clampedX, clampedY)
-
-        return Handle { dismissAnimated() }
     }
 
     private fun collectVisibleEntries(menu: Menu): List<MenuEntry> {

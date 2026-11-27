@@ -35,11 +35,17 @@ import androidx.core.graphics.ColorUtils
 import androidx.core.view.GravityCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.doOnPreDraw
 import androidx.core.view.updatePadding
 import androidx.preference.PreferenceDataStore
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.navigation.NavigationView
 import com.google.android.material.snackbar.Snackbar
+import io.nekohasekai.sagernet.ui.motion.SmoothMotion
+import io.nekohasekai.sagernet.ui.motion.SmoothMotion.animateFabMoveDelta
+import io.nekohasekai.sagernet.ui.motion.SmoothMotion.attachSmoothPress
+import io.nekohasekai.sagernet.ui.motion.SmoothMotion.playTapPop
+import io.nekohasekai.sagernet.ui.motion.SmoothMotion.showSmooth
 import io.nekohasekai.sagernet.BuildConfig
 import io.nekohasekai.sagernet.GroupType
 import io.nekohasekai.sagernet.Key
@@ -182,7 +188,51 @@ class MainActivity : ThemedActivity(),
         }
         navigation.setNavigationItemSelectedListener(this)
         rebuildDrawerItems()
+        var drawerCascadeArmed = true
         binding.drawerLayout.addDrawerListener(object : androidx.drawerlayout.widget.DrawerLayout.SimpleDrawerListener() {
+            override fun onDrawerSlide(drawerView: View, slideOffset: Float) {
+                if (slideOffset <= 0.01f) {
+                    drawerCascadeArmed = true
+                } else if (drawerCascadeArmed && slideOffset > 0.04f) {
+                    drawerCascadeArmed = false
+                    if (SmoothMotion.isEnabled()) {
+                        val shiftX = -dp(16).toFloat()
+                        val dur = 220L
+                        var step = 0
+                        for (i in 0 until drawerMenuItems.childCount) {
+                            val child = drawerMenuItems.getChildAt(i)
+                            if (child.visibility != View.VISIBLE || child.height <= 4) continue
+                            val delay = (step * 15L).coerceAtMost(110L)
+                            step++
+                            child.animate().cancel()
+                            child.translationX = shiftX
+                            child.alpha = 0.35f
+                            child.animate()
+                                .translationX(0f)
+                                .alpha(1f)
+                                .setStartDelay(delay)
+                                .setDuration(dur)
+                                .setInterpolator(SmoothMotion.smoothOutInterpolator)
+                                .start()
+                        }
+                        listOf(drawerSettingsButton, drawerAboutButton).forEach { btn ->
+                            val delay = (step * 15L).coerceAtMost(120L)
+                            step++
+                            btn.animate().cancel()
+                            btn.translationX = shiftX
+                            btn.alpha = 0.35f
+                            btn.animate()
+                                .translationX(0f)
+                                .alpha(1f)
+                                .setStartDelay(delay)
+                                .setDuration(dur)
+                                .setInterpolator(SmoothMotion.smoothOutInterpolator)
+                                .start()
+                        }
+                    }
+                }
+            }
+
             override fun onDrawerOpened(drawerView: View) {
                 updateProxyModeCard()
             }
@@ -329,7 +379,7 @@ class MainActivity : ThemedActivity(),
                 .setNeutralButton(R.string.preview_hint_dont_show_again) { _, _ ->
                     DataStore.previewHintDismissedVersion = BuildConfig.PRE_VERSION_NAME
                 }
-                .show()
+                .showSmooth()
         }
     }
 
@@ -419,7 +469,7 @@ class MainActivity : ThemedActivity(),
                     }
                 }
                 .setNegativeButton(android.R.string.cancel, null)
-                .show()
+                .showSmooth()
         } catch (e: Exception) {
             io.nekohasekai.sagernet.ktx.Logs.w(e)
         }
@@ -604,7 +654,7 @@ class MainActivity : ThemedActivity(),
             .setNeutralButton(R.string.action_learn_more) { _, _ ->
                 launchCustomTab("https://t.me/OwnBoxs")
             }
-            .show()
+            .showSmooth()
     }
 
     private fun showDownloadDialog(pluginEntry: PluginEntry) {
@@ -633,7 +683,7 @@ class MainActivity : ThemedActivity(),
                     downloadIndex -> launchCustomTab(pluginEntry.downloadSource.downloadLink)
                 }
             }
-            .show()
+            .showSmooth()
     }
 
     fun isCurrentFragment(@IdRes id: Int): Boolean {
@@ -807,7 +857,13 @@ class MainActivity : ThemedActivity(),
         val btnAppProxy = proxyModeView.findViewById<View>(R.id.btn_app_proxy)
         val btnCustomRoute = proxyModeView.findViewById<View>(R.id.btn_custom_route)
 
+        btnSmart.attachSmoothPress(isCompactButton = true)
+        btnGlobal.attachSmoothPress(isCompactButton = true)
+        btnAppProxy.attachSmoothPress(isCompactButton = true)
+        btnCustomRoute.attachSmoothPress(isCompactButton = true)
+
         btnSmart.setOnClickListener {
+            it.playTapPop(0.88f)
             if (DataStore.smartMode && !DataStore.globalMode) {
                 DataStore.smartMode = false
             } else {
@@ -822,6 +878,7 @@ class MainActivity : ThemedActivity(),
         }
 
         btnGlobal.setOnClickListener {
+            it.playTapPop(0.88f)
             if (DataStore.globalMode) {
                 DataStore.globalMode = false
             } else {
@@ -1070,6 +1127,9 @@ class MainActivity : ThemedActivity(),
 
     private fun syncFabPositionForBottomBar(style: Int = DataStore.bottomBarStyle.coerceIn(0, 2)) {
         val fabLp = binding.fab.layoutParams as? CoordinatorLayout.LayoutParams ?: return
+        val prevTop = binding.fab.top
+        val prevLeft = binding.fab.left
+        val wasLaidOut = binding.fab.isLaidOut && binding.fab.visibility == View.VISIBLE
         var lpChanged = false
 
         fun updateLp(
@@ -1171,20 +1231,29 @@ class MainActivity : ThemedActivity(),
             if (kotlin.math.abs(lastFabScrollTransY - desiredTransY) > 0.5f) {
                 lastFabScrollTransY = desiredTransY
                 binding.fab.animate().cancel()
-                binding.fab.animate()
-                    .translationY(desiredTransY)
-                    .setDuration(180L)
-                    .start()
                 binding.fabProgress.animate().cancel()
-                binding.fabProgress.animate()
-                    .translationY(desiredTransY)
-                    .setDuration(180L)
-                    .start()
+                if (SmoothMotion.isEnabled()) {
+                    binding.fab.animateFabMoveDelta(0f, binding.fab.translationY, desiredTransY)
+                    binding.fabProgress.animateFabMoveDelta(0f, binding.fabProgress.translationY, desiredTransY)
+                } else {
+                    binding.fab.translationY = desiredTransY
+                    binding.fabProgress.translationY = desiredTransY
+                }
             }
         }
 
         if (lpChanged) {
             binding.fab.layoutParams = fabLp
+            if (wasLaidOut && style != 2 && SmoothMotion.isEnabled()) {
+                binding.fab.doOnPreDraw {
+                    val dx = (prevLeft - it.left).toFloat()
+                    val dy = (prevTop - it.top).toFloat()
+                    if (kotlin.math.abs(dx) > 1f || kotlin.math.abs(dy) > 1f) {
+                        it.animateFabMoveDelta(dx, dy, lastFabScrollTransY)
+                        binding.fabProgress.animateFabMoveDelta(dx, dy, lastFabScrollTransY)
+                    }
+                }
+            }
         }
     }
 

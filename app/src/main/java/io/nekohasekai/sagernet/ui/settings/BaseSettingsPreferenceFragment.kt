@@ -25,6 +25,7 @@ abstract class BaseSettingsPreferenceFragment : PreferenceFragmentCompat() {
         setDividerHeight(0)
         listView.clipToPadding = false
         listView.setPadding(0, dp2px(8), 0, dp2px(120))
+        view.setBackgroundColor(TelegramGroupedPreferenceDecoration.resolvedBgColor(view.context))
         TelegramGroupedPreferenceDecoration.applyTo(listView)
     }
 

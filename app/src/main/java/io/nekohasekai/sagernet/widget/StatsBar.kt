@@ -680,19 +680,31 @@ class StatsBar @JvmOverloads constructor(
         alpha = 1f
         getBehavior().slideUp(this)
         animate().setListener(null).withEndAction(null).cancel()
-        if (!animated || !isLaidOut || height <= 0) {
+        (getTag(R.id.motion_tag_spring_ty) as? androidx.dynamicanimation.animation.SpringAnimation)?.cancel()
+        (getTag(R.id.motion_tag_spring_x) as? androidx.dynamicanimation.animation.SpringAnimation)?.cancel()
+        (getTag(R.id.motion_tag_spring_y) as? androidx.dynamicanimation.animation.SpringAnimation)?.cancel()
+
+        val shouldAnimate = animated &&
+            io.nekohasekai.sagernet.ui.motion.SmoothMotion.isEnabled() &&
+            isLaidOut &&
+            height > 0
+        if (!shouldAnimate) {
             isAnimatingVisibility = false
+            scaleX = 1f
+            scaleY = 1f
             translationY = 0f
+            onVisualBoundsChanged?.invoke()
             return
         }
         isAnimatingVisibility = true
-        animate()
-            .translationY(0f)
-            .setDuration(SHOW_ANIM_DURATION_MS)
-            .withEndAction {
+        if (translationY < 1f) translationY = hiddenOffset()
+        io.nekohasekai.sagernet.ui.motion.SmoothMotion.run {
+            animateBarShow {
                 isAnimatingVisibility = false
                 if (shouldShow() && !scrollHidden) {
                     translationY = 0f
+                    scaleX = 1f
+                    scaleY = 1f
                     alpha = 1f
                     isClickable = true
                 } else {
@@ -700,7 +712,7 @@ class StatsBar @JvmOverloads constructor(
                 }
                 onVisualBoundsChanged?.invoke()
             }
-            .start()
+        }
         onVisualBoundsChanged?.invoke()
     }
 
@@ -709,18 +721,37 @@ class StatsBar @JvmOverloads constructor(
         resetScrollDriverState()
         isClickable = false
         animate().setListener(null).withEndAction(null).cancel()
-        if (!animated || !isLaidOut || height <= 0) {
+        (getTag(R.id.motion_tag_spring_ty) as? androidx.dynamicanimation.animation.SpringAnimation)?.cancel()
+        (getTag(R.id.motion_tag_spring_x) as? androidx.dynamicanimation.animation.SpringAnimation)?.cancel()
+        (getTag(R.id.motion_tag_spring_y) as? androidx.dynamicanimation.animation.SpringAnimation)?.cancel()
+
+        val shouldAnimate = animated &&
+            io.nekohasekai.sagernet.ui.motion.SmoothMotion.isEnabled() &&
+            isLaidOut &&
+            height > 0
+        if (!shouldAnimate) {
+            scaleX = 1f
+            scaleY = 1f
             syncHiddenPosition()
             onVisualBoundsChanged?.invoke()
             return
         }
         isAnimatingVisibility = true
+        val p = io.nekohasekai.sagernet.ui.motion.SmoothMotion.params()
         val targetY = hiddenOffset()
+        pivotX = width * 0.5f
+        pivotY = height * 0.9f
         animate()
             .translationY(targetY)
-            .setDuration(HIDE_ANIM_DURATION_MS)
+            .scaleX(0.92f)
+            .scaleY(0.92f)
+            .alpha(0f)
+            .setDuration(p.popupCollapseDurationMs.coerceAtLeast(150L))
+            .setInterpolator(io.nekohasekai.sagernet.ui.motion.SmoothMotion.smoothInInterpolator)
             .withEndAction {
                 isAnimatingVisibility = false
+                scaleX = 1f
+                scaleY = 1f
                 if (!shouldShow() || scrollHidden) {
                     syncHiddenPosition()
                 } else {
@@ -736,6 +767,9 @@ class StatsBar @JvmOverloads constructor(
         isAnimatingVisibility = false
         getBehavior().slideDown(this)
         animate().setListener(null).withEndAction(null).cancel()
+        (getTag(R.id.motion_tag_spring_ty) as? androidx.dynamicanimation.animation.SpringAnimation)?.cancel()
+        if (scaleX != 1f) scaleX = 1f
+        if (scaleY != 1f) scaleY = 1f
         if (alpha != 0f) alpha = 0f
         if (isClickable) isClickable = false
         if (pendingDisconnectedReset) resetDisconnectedViews()
@@ -746,6 +780,9 @@ class StatsBar @JvmOverloads constructor(
     private fun cancelPendingTransition() {
         isAnimatingVisibility = false
         animate().setListener(null).withEndAction(null).cancel()
+        (getTag(R.id.motion_tag_spring_ty) as? androidx.dynamicanimation.animation.SpringAnimation)?.cancel()
+        (getTag(R.id.motion_tag_spring_x) as? androidx.dynamicanimation.animation.SpringAnimation)?.cancel()
+        (getTag(R.id.motion_tag_spring_y) as? androidx.dynamicanimation.animation.SpringAnimation)?.cancel()
     }
 
     private var lastMeasuredLatency: Int = -1

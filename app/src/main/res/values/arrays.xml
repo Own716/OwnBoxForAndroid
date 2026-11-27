@@ -856,17 +856,20 @@
         <item>br</item>
     </string-array>
 
-    <string-array name="motion_effect_entries">
-        <item>@string/motion_effect_off</item>
-        <item>@string/motion_effect_minimal</item>
-        <item>@string/motion_effect_smooth</item>
-        <item>@string/motion_effect_lively</item>
+    <string-array name="motion_intensity_levels">
+        <item>@string/motion_level_0</item>
+        <item>@string/motion_level_1</item>
+        <item>@string/motion_level_2</item>
+        <item>@string/motion_level_3</item>
+        <item>@string/motion_level_4</item>
+        <item>@string/motion_level_5</item>
     </string-array>
-    <string-array name="motion_effect_values" translatable="false">
-        <item>0</item>
-        <item>1</item>
-        <item>2</item>
-        <item>3</item>
+    <string-array name="motion_intensity_short_labels">
+        <item>@string/motion_step_1</item>
+        <item>@string/motion_step_2</item>
+        <item>@string/motion_step_3</item>
+        <item>@string/motion_step_4</item>
+        <item>@string/motion_step_5</item>
     </string-array>
 
 </resources>
