@@ -136,19 +136,21 @@ class UiPolishAndOverscrollContractTest {
             src.contains("TabLayout.MODE_FIXED") && src.contains("TabLayout.GRAVITY_FILL")
         )
         assertTrue(
-            "TabLayout must disable clipToOutline and horizontal fading edge to avoid inner arc artifacts",
-            src.contains("tabLayout.clipToOutline = false") &&
+            "TabLayout must clip strictly to outer capsule contour with horizontal fading edge disabled and top border redrawn",
+            src.contains("outline.setRoundRect(0, 0, view.width, view.height, view.height * 0.5f)") &&
+                src.contains("tabLayout.clipToOutline = true") &&
                 src.contains("tabLayout.isHorizontalFadingEdgeEnabled = false") &&
                 src.contains("groupTabEdgeOverlay?.updateStyle(")
         )
 
         val helperSrc = sourceFile("src/main/java/io/nekohasekai/sagernet/ui/FloatingCapsuleHelper.kt").readText()
         assertTrue(
-            "TabCapsuleEdgeOverlayView must render EVEN_ODD safety ring and clamped LinearGradient fade",
+            "TabCapsuleEdgeOverlayView must render EVEN_ODD safety ring, clamped LinearGradient fade, and outer hairline stroke",
             helperSrc.contains("class TabCapsuleEdgeOverlayView") &&
                 helperSrc.contains("Path.FillType.EVEN_ODD") &&
                 helperSrc.contains("LinearGradient(") &&
-                helperSrc.contains("Shader.TileMode.CLAMP")
+                helperSrc.contains("Shader.TileMode.CLAMP") &&
+                helperSrc.contains("canvas.drawRoundRect(strokeRect,")
         )
     }
 

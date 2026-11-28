@@ -1590,8 +1590,14 @@ class ConfigurationFragment @JvmOverloads constructor(
                 container.background = drawable
             }
         }
-        tabLayout.clipToOutline = false
-        tabLayout.outlineProvider = null
+        tabLayout.outlineProvider = object : android.view.ViewOutlineProvider() {
+            override fun getOutline(view: View, outline: android.graphics.Outline) {
+                if (view.width > 0 && view.height > 0) {
+                    outline.setRoundRect(0, 0, view.width, view.height, view.height * 0.5f)
+                }
+            }
+        }
+        tabLayout.clipToOutline = true
         if (tabLayout.paddingLeft != innerGap || tabLayout.paddingRight != innerGap) {
             tabLayout.setPadding(innerGap, 0, innerGap, 0)
         }
@@ -1599,8 +1605,9 @@ class ConfigurationFragment @JvmOverloads constructor(
         tabLayout.isHorizontalFadingEdgeEnabled = false
         groupTabEdgeOverlay?.updateStyle(
             fillColor = containerBgColor,
+            strokeColor = containerStrokeColor,
+            strokeWidthPx = 0.9f * density,
             innerGapPx = innerGap,
-            strokeInsetPx = 0.9f * density + 0.5f,
             fadingEdgePx = metrics.fadingEdgePx,
         )
         updateTabEdgeOverlayScrollState()

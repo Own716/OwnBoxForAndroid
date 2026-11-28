@@ -513,14 +513,17 @@ class TabCapsuleEdgeOverlayView @JvmOverloads constructor(
 ) : View(context, attrs, defStyleAttr) {
 
     private var fillColor: Int = Color.TRANSPARENT
+    private var strokeColor: Int = Color.TRANSPARENT
+    private var strokeWidthPx: Float = 0f
     private var innerGapPx: Int = 0
-    private var strokeInsetPx: Float = 0f
     private var fadingEdgePx: Int = 0
     private var leftFraction: Float = 0f
     private var rightFraction: Float = 0f
 
     private val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val fadePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    private val strokeRect = RectF()
     private val outerSafePath = Path()
     private val ringPath = Path().apply { fillType = Path.FillType.EVEN_ODD }
 
@@ -544,8 +547,9 @@ class TabCapsuleEdgeOverlayView @JvmOverloads constructor(
 
     fun updateStyle(
         fillColor: Int,
+        strokeColor: Int,
+        strokeWidthPx: Float,
         innerGapPx: Int,
-        strokeInsetPx: Float,
         fadingEdgePx: Int,
     ) {
         var changed = false
@@ -557,16 +561,20 @@ class TabCapsuleEdgeOverlayView @JvmOverloads constructor(
             rightShaderAlphaKey = -1
             changed = true
         }
+        if (this.strokeColor != strokeColor) {
+            this.strokeColor = strokeColor
+            changed = true
+        }
+        if (kotlin.math.abs(this.strokeWidthPx - strokeWidthPx) > 0.05f) {
+            this.strokeWidthPx = strokeWidthPx
+            pathsDirty = true
+            changed = true
+        }
         if (this.innerGapPx != innerGapPx) {
             this.innerGapPx = innerGapPx
             pathsDirty = true
             leftShader = null
             rightShader = null
-            changed = true
-        }
-        if (kotlin.math.abs(this.strokeInsetPx - strokeInsetPx) > 0.05f) {
-            this.strokeInsetPx = strokeInsetPx
-            pathsDirty = true
             changed = true
         }
         if (this.fadingEdgePx != fadingEdgePx) {
@@ -605,17 +613,33 @@ class TabCapsuleEdgeOverlayView @JvmOverloads constructor(
         val w = width.toFloat()
         val h = height.toFloat()
         val inset = innerGapPx.toFloat().coerceIn(0f, h * 0.25f)
-        val s = strokeInsetPx.coerceIn(0f, inset)
-        val outerR = ((h - s * 2f) * 0.5f).coerceAtLeast(0f)
+        val half = (strokeWidthPx * 0.5f).coerceIn(0f, inset)
+        val outerCenterR = ((h - half * 2f) * 0.5f).coerceAtLeast(0f)
         val innerR = ((h - inset * 2f) * 0.5f).coerceAtLeast(0f)
 
         if (pathsDirty || cachedWidth != width || cachedHeight != height) {
             outerSafePath.reset()
-            outerSafePath.addRoundRect(s, s, w - s, h - s, outerR, outerR, Path.Direction.CW)
+            outerSafePath.addRoundRect(
+                half,
+                half,
+                w - half,
+                h - half,
+                outerCenterR,
+                outerCenterR,
+                Path.Direction.CW,
+            )
 
             ringPath.reset()
             ringPath.fillType = Path.FillType.EVEN_ODD
-            ringPath.addRoundRect(s, s, w - s, h - s, outerR, outerR, Path.Direction.CW)
+            ringPath.addRoundRect(
+                half,
+                half,
+                w - half,
+                h - half,
+                outerCenterR,
+                outerCenterR,
+                Path.Direction.CW,
+            )
             ringPath.addRoundRect(
                 inset,
                 inset,
@@ -658,7 +682,7 @@ class TabCapsuleEdgeOverlayView @JvmOverloads constructor(
                     leftShaderAlphaKey = alphaMax
                 }
                 fadePaint.shader = leftShader
-                canvas.drawRect(s, s, inset + fadeLen, h - s, fadePaint)
+                canvas.drawRect(half, half, inset + fadeLen, h - half, fadePaint)
             }
 
             if (rightFraction > 0.01f) {
@@ -683,15 +707,22 @@ class TabCapsuleEdgeOverlayView @JvmOverloads constructor(
                     rightShaderAlphaKey = alphaMax
                 }
                 fadePaint.shader = rightShader
-                canvas.drawRect(w - inset - fadeLen, s, w - s, h - s, fadePaint)
+                canvas.drawRect(w - inset - fadeLen, half, w - half, h - half, fadePaint)
             }
 
             canvas.restoreToCount(saveCount)
         }
 
-        if (inset > s) {
+        if (inset > half) {
             ringPaint.color = fillColor
             canvas.drawPath(ringPath, ringPaint)
+        }
+
+        if (strokeWidthPx > 0f && Color.alpha(strokeColor) > 0) {
+            strokePaint.color = strokeColor
+            strokePaint.strokeWidth = strokeWidthPx
+            strokeRect.set(half, half, w - half, h - half)
+            canvas.drawRoundRect(strokeRect, outerCenterR, outerCenterR, strokePaint)
         }
     }
 }
