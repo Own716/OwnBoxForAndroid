@@ -211,6 +211,58 @@ class ConfigurationFragment @JvmOverloads constructor(
         internal val FALLBACK_EXPIRE_REGEX = Regex(".*(?:套餐到期|到期时间|过期时间|到期)[：:]\\s*([0-9]{4}[-/][0-9]{2}[-/][0-9]{2})", RegexOption.IGNORE_CASE)
         internal val FALLBACK_TRAFFIC_REGEX = Regex(".*(?:剩余流量|可用流量|剩余)[：:]\\s*([0-9.]+\\s*[KMGT]?B|无限|不限|不限量)", RegexOption.IGNORE_CASE)
         internal val FALLBACK_USED_REGEX = Regex(".*(?:已用流量|已用|已使用)[：:]\\s*([0-9.]+\\s*[KMGT]?B)", RegexOption.IGNORE_CASE)
+
+        internal data class TabCapsuleMetrics(
+            val outerHeightPx: Int,
+            val innerGapPx: Int,
+            val indicatorHeightPx: Int,
+            val indicatorRadiusPx: Float,
+            val fadingEdgePx: Int,
+        )
+
+        internal fun computeTabCapsuleMetrics(
+            density: Float,
+            tabFactor: Float,
+        ): TabCapsuleMetrics {
+            fun dp(v: Float) = (v * density + 0.5f).toInt()
+            val outerH = (dp(38f) * tabFactor).toInt().coerceIn(dp(26f), dp(54f))
+            val innerGap = (dp(3f) * tabFactor).toInt().coerceIn(dp(2f), dp(5f))
+            val indicatorH = (outerH - innerGap * 2).coerceAtLeast(dp(20f))
+            val fadingEdge = (dp(20f) * tabFactor).toInt().coerceIn(dp(14f), dp(28f))
+            return TabCapsuleMetrics(
+                outerHeightPx = outerH,
+                innerGapPx = innerGap,
+                indicatorHeightPx = indicatorH,
+                indicatorRadiusPx = indicatorH * 0.5f,
+                fadingEdgePx = fadingEdge,
+            )
+        }
+
+        internal data class TabHorizontalPadding(val startPx: Int, val endPx: Int)
+
+        internal fun computeAdaptiveScrollableTabPaddings(
+            textWidthsPx: List<Int>,
+            basePaddingPx: Int,
+            innerMarginPx: Int,
+            availableWidthPx: Int,
+        ): List<TabHorizontalPadding> {
+            val count = textWidthsPx.size
+            if (count == 0) return emptyList()
+            val totalMargins = if (count > 1) innerMarginPx * 2 * (count - 1) else 0
+            val naturalTotal = textWidthsPx.sumOf { it + basePaddingPx * 2 } + totalMargins
+            val leftover = availableWidthPx - naturalTotal
+            if (leftover <= 0) {
+                return List(count) { TabHorizontalPadding(basePaddingPx, basePaddingPx) }
+            }
+            val perTab = leftover / count
+            val remainder = leftover % count
+            return List(count) { i ->
+                val extra = perTab + if (i < remainder) 1 else 0
+                val extraStart = extra / 2
+                val extraEnd = extra - extraStart
+                TabHorizontalPadding(basePaddingPx + extraStart, basePaddingPx + extraEnd)
+            }
+        }
     }
 
     lateinit var adapter: GroupPagerAdapter
@@ -911,16 +963,45 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     private var pendingCenterTabRunnable: Runnable? = null
 
+    private fun syncTabLayoutModeForCount(count: Int): Boolean {
+        if (!::tabLayout.isInitialized || count <= 0) return false
+        var changed = false
+        if (count == 2) {
+            if (tabLayout.tabMode != TabLayout.MODE_FIXED) {
+                tabLayout.tabMode = TabLayout.MODE_FIXED
+                changed = true
+            }
+            if (tabLayout.tabGravity != TabLayout.GRAVITY_FILL) {
+                tabLayout.tabGravity = TabLayout.GRAVITY_FILL
+                changed = true
+            }
+        } else {
+            if (tabLayout.tabMode != TabLayout.MODE_SCROLLABLE) {
+                tabLayout.tabMode = TabLayout.MODE_SCROLLABLE
+                changed = true
+            }
+            if (tabLayout.tabGravity != TabLayout.GRAVITY_START) {
+                tabLayout.tabGravity = TabLayout.GRAVITY_START
+                changed = true
+            }
+        }
+        return changed
+    }
+
     private fun applyTabMargins() {
         if (!::tabLayout.isInitialized) return
         val slidingTabIndicator = tabLayout.getChildAt(0) as? ViewGroup ?: return
         val count = slidingTabIndicator.childCount
         if (count == 0) return
-        val innerMargin = dp2px(2)
-        val edgeMargin = dp2px(2)
+        syncTabLayoutModeForCount(count)
+        val isFixedTwoTabs = count == 2
+        val innerMargin = if (isFixedTwoTabs) 0 else dp2px(2)
+        val edgeMargin = 0
         val tabFactor = UiScaleManager.tabBarFactor()
         val applyScale = tabFactor != 1.0f
         val targetTextSizeSp = 13f * tabFactor
+        val baseTabPadH = (dp2px(14) * tabFactor).toInt().coerceIn(dp2px(10), dp2px(18))
+        val fixedTwoPadH = (dp2px(10) * tabFactor).toInt().coerceIn(dp2px(6), dp2px(14))
         val blockFocus = !SagerNet.isTv
         val selectedPos = tabLayout.selectedTabPosition
 
@@ -930,21 +1011,54 @@ class ConfigurationFragment @JvmOverloads constructor(
                 if (tabView.isFocusable) tabView.isFocusable = false
                 if (tabView.isFocusableInTouchMode) tabView.isFocusableInTouchMode = false
             }
+            if (tabView.minimumWidth != 0) {
+                tabView.minimumWidth = 0
+            }
             val lp = tabView.layoutParams as? ViewGroup.MarginLayoutParams
             if (lp != null) {
+                var lpChanged = false
+                if (lp is LinearLayout.LayoutParams) {
+                    val targetW = if (isFixedTwoTabs) 0 else ViewGroup.LayoutParams.WRAP_CONTENT
+                    val targetWeight = if (isFixedTwoTabs) 1f else 0f
+                    if (lp.width != targetW) {
+                        lp.width = targetW
+                        lpChanged = true
+                    }
+                    if (lp.weight != targetWeight) {
+                        lp.weight = targetWeight
+                        lpChanged = true
+                    }
+                }
                 val left = if (i == 0) edgeMargin else innerMargin
                 val right = if (i == count - 1) edgeMargin else innerMargin
                 if (lp.leftMargin != left || lp.rightMargin != right) {
                     lp.leftMargin = left
                     lp.rightMargin = right
-                    tabView.requestLayout()
+                    lpChanged = true
                 }
+                if (lpChanged) {
+                    tabView.layoutParams = lp
+                }
+            }
+            if (isFixedTwoTabs) {
+                if (tabView.paddingLeft != fixedTwoPadH || tabView.paddingRight != fixedTwoPadH) {
+                    tabView.setPadding(fixedTwoPadH, 0, fixedTwoPadH, 0)
+                }
+            } else if (tabView.paddingLeft == 0 && tabView.paddingRight == 0) {
+                tabView.setPadding(baseTabPadH, 0, baseTabPadH, 0)
             }
             if (tabView is ViewGroup) {
                 val targetTypeface = if (selectedPos == i) TAB_TYPEFACE_SELECTED else TAB_TYPEFACE_NORMAL
                 for (j in 0 until tabView.childCount) {
                     val child = tabView.getChildAt(j)
                     if (child is TextView) {
+                        if (!child.isSingleLine || child.maxLines != 1) {
+                            child.isSingleLine = true
+                            child.maxLines = 1
+                        }
+                        if (child.ellipsize != android.text.TextUtils.TruncateAt.END) {
+                            child.ellipsize = android.text.TextUtils.TruncateAt.END
+                        }
                         if (child.typeface !== targetTypeface) {
                             child.typeface = targetTypeface
                         }
@@ -969,10 +1083,10 @@ class ConfigurationFragment @JvmOverloads constructor(
     }
 
     /**
-     * Scheme A centering:
-     * - When total tabs width <= viewport width: center the entire strip via symmetrical horizontal padding.
-     * - When total tabs width > viewport width: keep padding 0 so first/last tabs stay flush at edges,
-     *   and scroll the selected tab to the horizontal center clamped within [0, maxScrollX].
+     * Adaptive tab strip layout:
+     * - 2 tabs: fill equally (50% / 50%) like segmented control.
+     * - 3+ tabs fitting within viewport: distribute leftover horizontal width evenly across tab paddings.
+     * - 3+ tabs overflowing viewport: keep compact base padding and center selected tab on scroll.
      */
     private fun updateTabBarCenteringPadding(): Boolean {
         if (!::tabLayout.isInitialized || isUserInteractingWithPager) return false
@@ -982,34 +1096,112 @@ class ConfigurationFragment @JvmOverloads constructor(
         val count = slidingTabIndicator.childCount
         if (count == 0) return false
 
-        var contentWidth = 0
-        for (i in 0 until count) {
-            val child = slidingTabIndicator.getChildAt(i)
-            val w = child.measuredWidth.takeIf { it > 0 } ?: child.width
-            if (w <= 0) return false
-            val lp = child.layoutParams as? ViewGroup.MarginLayoutParams
-            contentWidth += w + (lp?.leftMargin ?: 0) + (lp?.rightMargin ?: 0)
-        }
-
-        val targetPad = if (contentWidth < availableWidth) {
-            (availableWidth - contentWidth) / 2
-        } else {
-            0
-        }
-        if (slidingTabIndicator.paddingLeft != targetPad || slidingTabIndicator.paddingRight != targetPad) {
+        var changed = syncTabLayoutModeForCount(count)
+        if (slidingTabIndicator.paddingLeft != 0 || slidingTabIndicator.paddingRight != 0) {
             slidingTabIndicator.setPadding(
-                targetPad,
+                0,
                 slidingTabIndicator.paddingTop,
-                targetPad,
+                0,
                 slidingTabIndicator.paddingBottom
             )
-            return true
+            changed = true
         }
-        return false
+
+        if (count == 2) {
+            val tabFactor = UiScaleManager.tabBarFactor()
+            val fixedTwoPadH = (dp2px(10) * tabFactor).toInt().coerceIn(dp2px(6), dp2px(14))
+            for (i in 0 until count) {
+                val tabView = slidingTabIndicator.getChildAt(i)
+                if (tabView.minimumWidth != 0) {
+                    tabView.minimumWidth = 0
+                    changed = true
+                }
+                if (tabView.paddingLeft != fixedTwoPadH || tabView.paddingRight != fixedTwoPadH) {
+                    tabView.setPadding(fixedTwoPadH, 0, fixedTwoPadH, 0)
+                    changed = true
+                }
+                val lp = tabView.layoutParams as? LinearLayout.LayoutParams
+                if (lp != null && (lp.width != 0 || lp.weight != 1f || lp.leftMargin != 0 || lp.rightMargin != 0)) {
+                    lp.width = 0
+                    lp.weight = 1f
+                    lp.leftMargin = 0
+                    lp.rightMargin = 0
+                    tabView.layoutParams = lp
+                    changed = true
+                }
+            }
+            return changed
+        }
+
+        val tabFactor = UiScaleManager.tabBarFactor()
+        val baseTabPadH = (dp2px(14) * tabFactor).toInt().coerceIn(dp2px(10), dp2px(18))
+        val innerMargin = dp2px(2)
+        val fallbackTextSizePx = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_SP,
+            13f * tabFactor,
+            resources.displayMetrics
+        )
+        val measurePaint = android.text.TextPaint().apply {
+            typeface = TAB_TYPEFACE_SELECTED
+            textSize = fallbackTextSizePx
+        }
+        val textWidths = ArrayList<Int>(count)
+        for (i in 0 until count) {
+            val tabView = slidingTabIndicator.getChildAt(i) as? ViewGroup
+            var childTv: TextView? = null
+            if (tabView != null) {
+                for (j in 0 until tabView.childCount) {
+                    val c = tabView.getChildAt(j)
+                    if (c is TextView) {
+                        childTv = c
+                        break
+                    }
+                }
+            }
+            val label = childTv?.text?.takeIf { it.isNotEmpty() }
+                ?: tabLayout.getTabAt(i)?.text
+                ?: ""
+            measurePaint.textSize = childTv?.textSize ?: fallbackTextSizePx
+            val w = kotlin.math.ceil(android.text.Layout.getDesiredWidth(label, measurePaint).toDouble()).toInt()
+            textWidths.add(w.coerceAtLeast(1))
+        }
+
+        val paddings = computeAdaptiveScrollableTabPaddings(
+            textWidthsPx = textWidths,
+            basePaddingPx = baseTabPadH,
+            innerMarginPx = innerMargin,
+            availableWidthPx = availableWidth,
+        )
+
+        for (i in 0 until count) {
+            val tabView = slidingTabIndicator.getChildAt(i)
+            if (tabView.minimumWidth != 0) {
+                tabView.minimumWidth = 0
+                changed = true
+            }
+            val lp = tabView.layoutParams as? LinearLayout.LayoutParams
+            val leftM = if (i == 0) 0 else innerMargin
+            val rightM = if (i == count - 1) 0 else innerMargin
+            if (lp != null && (lp.width != ViewGroup.LayoutParams.WRAP_CONTENT || lp.weight != 0f || lp.leftMargin != leftM || lp.rightMargin != rightM)) {
+                lp.width = ViewGroup.LayoutParams.WRAP_CONTENT
+                lp.weight = 0f
+                lp.leftMargin = leftM
+                lp.rightMargin = rightM
+                tabView.layoutParams = lp
+                changed = true
+            }
+            val pad = paddings[i]
+            if (tabView.paddingLeft != pad.startPx || tabView.paddingRight != pad.endPx) {
+                tabView.setPadding(pad.startPx, 0, pad.endPx, 0)
+                changed = true
+            }
+        }
+        return changed
     }
 
     private fun computeCenteredTabScrollX(position: Int): Int? {
         if (!::tabLayout.isInitialized) return null
+        if (tabLayout.tabMode == TabLayout.MODE_FIXED) return 0
         val slidingTabIndicator = tabLayout.getChildAt(0) as? ViewGroup ?: return null
         val viewportWidth = tabLayout.width - tabLayout.paddingLeft - tabLayout.paddingRight
         if (viewportWidth <= 0) return null
@@ -1293,8 +1485,9 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
 
         // 1. Style Outer Big Capsule Track (groupTabContainer) & Top Bar Floating Capsules
-        val scaledCapsuleH = (dp2px(38) * tabFactor).toFloat().coerceIn(dp2px(26).toFloat(), dp2px(54).toFloat())
-        val containerRadius = scaledCapsuleH * 0.5f
+        val metrics = computeTabCapsuleMetrics(density, tabFactor)
+        val containerRadius = metrics.outerHeightPx * 0.5f
+        val innerGap = metrics.innerGapPx
         val containerBgColor: Int
         val containerStrokeColor: Int
         val shadowBaseColor: Int
@@ -1370,18 +1563,27 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
         tabLayout.outlineProvider = object : android.view.ViewOutlineProvider() {
             override fun getOutline(view: View, outline: android.graphics.Outline) {
-                val r = (view.height * 0.5f).coerceAtLeast(containerRadius)
-                outline.setRoundRect(0, 0, view.width, view.height, r)
+                val inset = innerGap.coerceAtMost((view.height / 4).coerceAtLeast(0))
+                val innerH = (view.height - inset * 2).coerceAtLeast(1)
+                val innerW = (view.width - inset * 2).coerceAtLeast(1)
+                if (innerW > 0 && innerH > 0) {
+                    outline.setRoundRect(
+                        inset,
+                        inset,
+                        view.width - inset,
+                        view.height - inset,
+                        innerH * 0.5f,
+                    )
+                }
             }
         }
         tabLayout.clipToOutline = true
-        val tabInnerInsetH = (dp2px(10) * tabFactor).toInt().coerceIn(dp2px(8), dp2px(14))
-        if (tabLayout.paddingLeft != tabInnerInsetH || tabLayout.paddingRight != tabInnerInsetH) {
-            tabLayout.setPadding(tabInnerInsetH, 0, tabInnerInsetH, 0)
+        if (tabLayout.paddingLeft != innerGap || tabLayout.paddingRight != innerGap) {
+            tabLayout.setPadding(innerGap, 0, innerGap, 0)
         }
         tabLayout.clipToPadding = true
         tabLayout.isHorizontalFadingEdgeEnabled = true
-        tabLayout.setFadingEdgeLength((dp2px(12) * tabFactor).toInt().coerceIn(dp2px(8), dp2px(16)))
+        tabLayout.setFadingEdgeLength(metrics.fadingEdgePx)
         setupTopBarFloatingCapsules(
             fillColor = containerBgColor,
             strokeColor = containerStrokeColor,
@@ -1429,6 +1631,14 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
 
         tabLayout.setBackgroundColor(Color.TRANSPARENT)
+        val indicatorDrawable = android.graphics.drawable.GradientDrawable().apply {
+            shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+            cornerRadius = metrics.indicatorRadiusPx
+            setColor(Color.WHITE)
+        }
+        tabLayout.setSelectedTabIndicator(indicatorDrawable)
+        @Suppress("DEPRECATION")
+        tabLayout.setSelectedTabIndicatorHeight(metrics.indicatorHeightPx)
         tabLayout.setSelectedTabIndicatorColor(capsuleBg)
         tabLayout.setTabTextColors(unselectedText, selectedText)
         tabLayout.tabRippleColor = android.content.res.ColorStateList.valueOf(Color.TRANSPARENT)
@@ -1772,7 +1982,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         }
 
         val tabFactor = UiScaleManager.tabBarFactor()
-        val scaledTabHeight = (dp2px(38) * tabFactor).toInt().coerceIn(dp2px(26), dp2px(54)) + dp2px(10)
+        val scaledTabHeight = computeTabCapsuleMetrics(resources.displayMetrics.density, tabFactor).outerHeightPx + dp2px(10)
         groupTabContainer?.layoutParams = groupTabContainer?.layoutParams?.apply {
             if (height != scaledTabHeight) {
                 height = scaledTabHeight
