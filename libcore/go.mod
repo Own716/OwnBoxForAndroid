@@ -12,7 +12,7 @@ require (
 	github.com/miekg/dns v1.1.72
 	github.com/oschwald/maxminddb-golang v1.13.1
 	github.com/sagernet/quic-go v0.66.0-sing-box-mod.1
-	github.com/sagernet/sing v0.9.7-0.20261125122036-9b11dbe28a7d
+	github.com/sagernet/sing v0.9.7-0.20261127131308-bbcd8ecc42a3
 	// 版本唯一来源是 ../nb4a.properties 的 SINGBOX_VERSION；此处仅为 Go
 	// module graph 所需占位值，实际源码始终由下方 replace 指向 CI 检出的官方 tag。
 	github.com/sagernet/sing-box v0.0.0
@@ -33,7 +33,7 @@ require (
 	github.com/caddyserver/zerossl v0.1.5 // indirect
 	github.com/cretz/bine v0.2.0 // indirect
 	github.com/database64128/netx-go v0.1.1 // indirect
-	github.com/database64128/tfo-go/v2 v2.3.2 // indirect
+	github.com/database64128/tfo-go/v2 v2.4.2 // indirect
 	github.com/florianl/go-nfqueue/v2 v2.1.0 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/go-chi/chi/v5 v5.2.5 // indirect

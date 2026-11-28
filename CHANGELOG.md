@@ -1,5 +1,12 @@
 # OwnBox for Android 更新日志 (Changelog)
 
+# OwnBox for Android v26.11.24.24-preview
+
+### 【升级 sing-box v1.15.0-alpha.15 核心】
+
+- **同步升级至最新官方内核（v1.15.0-alpha.15）**：为本地 HTTP 与混合代理入站增加请求头大小上限保护，防止异常超大请求耗尽内存；修复底层加密传输与内核 TLS 写记录宽度缺陷；同步升级 TCP 快速打开（TFO）底层网络库至 v2.4.2 并对齐基础工具库，进一步提升弱网与高负载连接稳定性。
+- **完整保留全部扩展协议与优化**：保留内置 Mieru、Juicity、VLESS + XHTTP、AnyTLS、智能策略组持久化记忆、并发赛马建连及零拷贝吞吐加速等全部功能。
+
 # OwnBox for Android v26.11.24.23-preview
 
 ### 【顶部分组栏多组切换空白修复】
