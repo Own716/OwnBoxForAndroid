@@ -140,7 +140,10 @@ class UiPolishAndOverscrollContractTest {
             src.contains("outline.setRoundRect(0, 0, view.width, view.height, view.height * 0.5f)") &&
                 src.contains("tabLayout.clipToOutline = true") &&
                 src.contains("tabLayout.isHorizontalFadingEdgeEnabled = false") &&
-                src.contains("groupTabEdgeOverlay?.updateStyle(")
+                src.contains("groupTabEdgeOverlay?.updateStyle(") &&
+                src.contains("computeFixedTabWeights(") &&
+                src.contains("if (position == 0) return 0") &&
+                src.contains("if (position == slidingTabIndicator.childCount - 1) return maxScrollX")
         )
 
         val helperSrc = sourceFile("src/main/java/io/nekohasekai/sagernet/ui/FloatingCapsuleHelper.kt").readText()
@@ -152,6 +155,28 @@ class UiPolishAndOverscrollContractTest {
                 helperSrc.contains("Shader.TileMode.CLAMP") &&
                 helperSrc.contains("canvas.drawRoundRect(strokeRect,")
         )
+    }
+
+    @Test
+    fun fixedTabWeights_handlesEqualProportionalAndOverflowingGroups() {
+        val basePad = 42
+        val availableWidth = 1000
+
+        // 2 tabs -> equal split
+        assertEquals(listOf(1f, 1f), ConfigurationFragment.computeFixedTabWeights(listOf(90, 120), basePad, availableWidth))
+
+        // 3 short fitting tabs -> equal 1f/1f/1f weights
+        assertEquals(listOf(1f, 1f, 1f), ConfigurationFragment.computeFixedTabWeights(listOf(90, 80, 100), basePad, availableWidth))
+
+        // 4 fitting tabs with 1 wider tab -> proportional non-null weights, wider tab gets higher weight
+        val w4 = ConfigurationFragment.computeFixedTabWeights(listOf(80, 80, 260, 80), basePad, availableWidth)
+        assertTrue("Fitting 4 tabs must use MODE_FIXED weights", w4 != null && w4.size == 4)
+        assertTrue("All weights must be positive", w4!!.all { it > 0f })
+        assertTrue("Wider tab must receive larger weight", w4[2] > w4[0] && w4[2] > w4[1] && w4[2] > w4[3])
+
+        // 6 overflowing tabs -> null (falls back to MODE_SCROLLABLE)
+        val w6 = ConfigurationFragment.computeFixedTabWeights(listOf(150, 150, 160, 170, 160, 180), basePad, availableWidth)
+        assertEquals(null, w6)
     }
 
     @Test
