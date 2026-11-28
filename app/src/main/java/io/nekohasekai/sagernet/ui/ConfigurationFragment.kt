@@ -267,6 +267,7 @@ class ConfigurationFragment @JvmOverloads constructor(
 
     lateinit var adapter: GroupPagerAdapter
     var groupTabContainer: View? = null
+    private var groupTabEdgeOverlay: TabCapsuleEdgeOverlayView? = null
     lateinit var tabLayout: TabLayout
     lateinit var groupPager: ViewPager2
 
@@ -1130,6 +1131,7 @@ class ConfigurationFragment @JvmOverloads constructor(
                     changed = true
                 }
             }
+            updateTabEdgeOverlayScrollState()
             return changed
         }
 
@@ -1196,7 +1198,34 @@ class ConfigurationFragment @JvmOverloads constructor(
                 changed = true
             }
         }
+        if (changed) {
+            tabLayout.post { updateTabEdgeOverlayScrollState() }
+        } else {
+            updateTabEdgeOverlayScrollState()
+        }
         return changed
+    }
+
+    private fun updateTabEdgeOverlayScrollState() {
+        val overlay = groupTabEdgeOverlay ?: return
+        if (!::tabLayout.isInitialized) return
+        if (tabLayout.tabMode == TabLayout.MODE_FIXED) {
+            overlay.updateScrollState(0f, 0f)
+            return
+        }
+        val strip = tabLayout.getChildAt(0)
+        val contentW = strip?.width ?: 0
+        val viewportW = (tabLayout.width - tabLayout.paddingLeft - tabLayout.paddingRight).coerceAtLeast(0)
+        val maxScroll = (contentW - viewportW).coerceAtLeast(0)
+        if (maxScroll <= 1) {
+            overlay.updateScrollState(0f, 0f)
+            return
+        }
+        val ramp = (12f * resources.displayMetrics.density).coerceAtLeast(1f)
+        val sx = tabLayout.scrollX.coerceIn(0, maxScroll)
+        val leftFrac = (sx / ramp).coerceIn(0f, 1f)
+        val rightFrac = ((maxScroll - sx) / ramp).coerceIn(0f, 1f)
+        overlay.updateScrollState(leftFrac, rightFrac)
     }
 
     private fun computeCenteredTabScrollX(position: Int): Int? {
@@ -1561,29 +1590,20 @@ class ConfigurationFragment @JvmOverloads constructor(
                 container.background = drawable
             }
         }
-        tabLayout.outlineProvider = object : android.view.ViewOutlineProvider() {
-            override fun getOutline(view: View, outline: android.graphics.Outline) {
-                val inset = innerGap.coerceAtMost((view.height / 4).coerceAtLeast(0))
-                val innerH = (view.height - inset * 2).coerceAtLeast(1)
-                val innerW = (view.width - inset * 2).coerceAtLeast(1)
-                if (innerW > 0 && innerH > 0) {
-                    outline.setRoundRect(
-                        inset,
-                        inset,
-                        view.width - inset,
-                        view.height - inset,
-                        innerH * 0.5f,
-                    )
-                }
-            }
-        }
-        tabLayout.clipToOutline = true
+        tabLayout.clipToOutline = false
+        tabLayout.outlineProvider = null
         if (tabLayout.paddingLeft != innerGap || tabLayout.paddingRight != innerGap) {
             tabLayout.setPadding(innerGap, 0, innerGap, 0)
         }
         tabLayout.clipToPadding = true
-        tabLayout.isHorizontalFadingEdgeEnabled = true
-        tabLayout.setFadingEdgeLength(metrics.fadingEdgePx)
+        tabLayout.isHorizontalFadingEdgeEnabled = false
+        groupTabEdgeOverlay?.updateStyle(
+            fillColor = containerBgColor,
+            innerGapPx = innerGap,
+            strokeInsetPx = 0.9f * density + 0.5f,
+            fadingEdgePx = metrics.fadingEdgePx,
+        )
+        updateTabEdgeOverlayScrollState()
         setupTopBarFloatingCapsules(
             fillColor = containerBgColor,
             strokeColor = containerStrokeColor,
@@ -1768,7 +1788,14 @@ class ConfigurationFragment @JvmOverloads constructor(
 
         groupPager = view.findViewById(R.id.group_pager)
         groupTabContainer = view.findViewById(R.id.group_tab_container)
+        groupTabEdgeOverlay = view.findViewById(R.id.group_tab_edge_overlay)
         tabLayout = view.findViewById(R.id.group_tab)
+        tabLayout.setOnScrollChangeListener { _, _, _, _, _ ->
+            updateTabEdgeOverlayScrollState()
+        }
+        tabLayout.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            updateTabEdgeOverlayScrollState()
+        }
         if (!SagerNet.isTv) {
             // Prevent HorizontalScrollView (TabLayout) from auto-scrolling to the last tab
             // when a button (e.g. subscription update) becomes disabled or focus shifts in touch mode.
@@ -2219,6 +2246,7 @@ class ConfigurationFragment @JvmOverloads constructor(
         topBarTitleViewRef = null
         topBarToolbarLayoutTarget = null
         topBarCapsulesDrawable = null
+        groupTabEdgeOverlay = null
         tabCapsuleDrawable = null
         tabCapsuleStyleKey = null
         lastStyledSortMenu = null

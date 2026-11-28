@@ -70,8 +70,9 @@ class UiPolishAndOverscrollContractTest {
         assertTrue(layoutSrc.contains("""android:paddingStart="3dp""""))
         assertTrue(layoutSrc.contains("""android:paddingEnd="3dp""""))
         assertTrue(layoutSrc.contains("""android:clipToPadding="true""""))
-        assertTrue(layoutSrc.contains("""android:requiresFadingEdge="horizontal""""))
-        assertTrue(layoutSrc.contains("""android:fadingEdgeLength="20dp""""))
+        assertFalse(layoutSrc.contains("""android:requiresFadingEdge="horizontal""""))
+        assertTrue(layoutSrc.contains("TabCapsuleEdgeOverlayView"))
+        assertTrue(layoutSrc.contains("group_tab_edge_overlay"))
         assertTrue(layoutSrc.contains("""app:tabIndicatorHeight="32dp""""))
         assertTrue(layoutSrc.contains("""app:tabMinWidth="0dp""""))
 
@@ -135,9 +136,19 @@ class UiPolishAndOverscrollContractTest {
             src.contains("TabLayout.MODE_FIXED") && src.contains("TabLayout.GRAVITY_FILL")
         )
         assertTrue(
-            "TabLayout outlineProvider must clip to concentric inner capsule",
-            src.contains("outline.setRoundRect(\n                    inset,\n                    inset,\n                    view.width - inset,\n                    view.height - inset,\n                    innerH * 0.5f") ||
-                src.contains("outline.setRoundRect(") && src.contains("innerH * 0.5f")
+            "TabLayout must disable clipToOutline and horizontal fading edge to avoid inner arc artifacts",
+            src.contains("tabLayout.clipToOutline = false") &&
+                src.contains("tabLayout.isHorizontalFadingEdgeEnabled = false") &&
+                src.contains("groupTabEdgeOverlay?.updateStyle(")
+        )
+
+        val helperSrc = sourceFile("src/main/java/io/nekohasekai/sagernet/ui/FloatingCapsuleHelper.kt").readText()
+        assertTrue(
+            "TabCapsuleEdgeOverlayView must render EVEN_ODD safety ring and clamped LinearGradient fade",
+            helperSrc.contains("class TabCapsuleEdgeOverlayView") &&
+                helperSrc.contains("Path.FillType.EVEN_ODD") &&
+                helperSrc.contains("LinearGradient(") &&
+                helperSrc.contains("Shader.TileMode.CLAMP")
         )
     }
 

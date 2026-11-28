@@ -1,14 +1,21 @@
 package io.nekohasekai.sagernet.ui
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.ColorFilter
+import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.graphics.RectF
+import android.graphics.Shader
 import android.graphics.drawable.Drawable
+import android.util.AttributeSet
+import android.view.View
+import androidx.core.graphics.ColorUtils
 import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -488,4 +495,203 @@ class DualFloatingCapsulesDrawable(
 
     @Deprecated("Deprecated in Java")
     override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
+}
+
+/**
+ * Pure-drawn same-color concentric safety ring + dynamic scroll feathering overlay
+ * inside [group_tab_container] (under the outer hairline border, above [TabLayout]).
+ *
+ * Replaces `TabLayout.clipToOutline` (3dp inset RoundRect Outline) and
+ * `requiresFadingEdge="horizontal"`, eliminating the GPU anti-aliasing inner arc
+ * artifact `(` and `)` while keeping scrolling labels & sliding pill confined within
+ * the 3dp concentric inner capsule.
+ */
+class TabCapsuleEdgeOverlayView @JvmOverloads constructor(
+    context: Context,
+    attrs: AttributeSet? = null,
+    defStyleAttr: Int = 0,
+) : View(context, attrs, defStyleAttr) {
+
+    private var fillColor: Int = Color.TRANSPARENT
+    private var innerGapPx: Int = 0
+    private var strokeInsetPx: Float = 0f
+    private var fadingEdgePx: Int = 0
+    private var leftFraction: Float = 0f
+    private var rightFraction: Float = 0f
+
+    private val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val fadePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val outerSafePath = Path()
+    private val ringPath = Path().apply { fillType = Path.FillType.EVEN_ODD }
+
+    private var cachedWidth: Int = 0
+    private var cachedHeight: Int = 0
+    private var pathsDirty: Boolean = true
+
+    private var leftShader: LinearGradient? = null
+    private var rightShader: LinearGradient? = null
+    private var leftShaderAlphaKey: Int = -1
+    private var rightShaderAlphaKey: Int = -1
+
+    init {
+        isClickable = false
+        isFocusable = false
+        importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+        clipToOutline = false
+        elevation = 0f
+        setWillNotDraw(false)
+    }
+
+    fun updateStyle(
+        fillColor: Int,
+        innerGapPx: Int,
+        strokeInsetPx: Float,
+        fadingEdgePx: Int,
+    ) {
+        var changed = false
+        if (this.fillColor != fillColor) {
+            this.fillColor = fillColor
+            leftShader = null
+            rightShader = null
+            leftShaderAlphaKey = -1
+            rightShaderAlphaKey = -1
+            changed = true
+        }
+        if (this.innerGapPx != innerGapPx) {
+            this.innerGapPx = innerGapPx
+            pathsDirty = true
+            leftShader = null
+            rightShader = null
+            changed = true
+        }
+        if (kotlin.math.abs(this.strokeInsetPx - strokeInsetPx) > 0.05f) {
+            this.strokeInsetPx = strokeInsetPx
+            pathsDirty = true
+            changed = true
+        }
+        if (this.fadingEdgePx != fadingEdgePx) {
+            this.fadingEdgePx = fadingEdgePx
+            leftShader = null
+            rightShader = null
+            changed = true
+        }
+        if (changed) {
+            invalidate()
+        }
+    }
+
+    fun updateScrollState(leftFraction: Float, rightFraction: Float) {
+        val clampedL = leftFraction.coerceIn(0f, 1f)
+        val clampedR = rightFraction.coerceIn(0f, 1f)
+        if (kotlin.math.abs(this.leftFraction - clampedL) > 0.008f ||
+            kotlin.math.abs(this.rightFraction - clampedR) > 0.008f
+        ) {
+            this.leftFraction = clampedL
+            this.rightFraction = clampedR
+            invalidate()
+        }
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        pathsDirty = true
+        leftShader = null
+        rightShader = null
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        if (width <= 0 || height <= 0 || Color.alpha(fillColor) == 0) return
+
+        val w = width.toFloat()
+        val h = height.toFloat()
+        val inset = innerGapPx.toFloat().coerceIn(0f, h * 0.25f)
+        val s = strokeInsetPx.coerceIn(0f, inset)
+        val outerR = ((h - s * 2f) * 0.5f).coerceAtLeast(0f)
+        val innerR = ((h - inset * 2f) * 0.5f).coerceAtLeast(0f)
+
+        if (pathsDirty || cachedWidth != width || cachedHeight != height) {
+            outerSafePath.reset()
+            outerSafePath.addRoundRect(s, s, w - s, h - s, outerR, outerR, Path.Direction.CW)
+
+            ringPath.reset()
+            ringPath.fillType = Path.FillType.EVEN_ODD
+            ringPath.addRoundRect(s, s, w - s, h - s, outerR, outerR, Path.Direction.CW)
+            ringPath.addRoundRect(
+                inset,
+                inset,
+                w - inset,
+                h - inset,
+                innerR,
+                innerR,
+                Path.Direction.CW,
+            )
+
+            cachedWidth = width
+            cachedHeight = height
+            pathsDirty = false
+        }
+
+        val fadeLen = fadingEdgePx.toFloat().coerceAtLeast(0f).coerceAtMost((w - inset * 2f) * 0.4f)
+        if (fadeLen > 0f && (leftFraction > 0.01f || rightFraction > 0.01f)) {
+            val saveCount = canvas.save()
+            canvas.clipPath(outerSafePath)
+
+            if (leftFraction > 0.01f) {
+                val alphaMax = (255f * leftFraction).roundToInt().coerceIn(0, 255)
+                if (leftShader == null || leftShaderAlphaKey != alphaMax) {
+                    val alphaMidHigh = (225f * leftFraction).roundToInt().coerceIn(0, 255)
+                    val alphaMidLow = (110f * leftFraction).roundToInt().coerceIn(0, 255)
+                    leftShader = LinearGradient(
+                        inset,
+                        0f,
+                        inset + fadeLen,
+                        0f,
+                        intArrayOf(
+                            ColorUtils.setAlphaComponent(fillColor, alphaMax),
+                            ColorUtils.setAlphaComponent(fillColor, alphaMidHigh),
+                            ColorUtils.setAlphaComponent(fillColor, alphaMidLow),
+                            ColorUtils.setAlphaComponent(fillColor, 0),
+                        ),
+                        floatArrayOf(0f, 0.22f, 0.58f, 1f),
+                        Shader.TileMode.CLAMP,
+                    )
+                    leftShaderAlphaKey = alphaMax
+                }
+                fadePaint.shader = leftShader
+                canvas.drawRect(s, s, inset + fadeLen, h - s, fadePaint)
+            }
+
+            if (rightFraction > 0.01f) {
+                val alphaMax = (255f * rightFraction).roundToInt().coerceIn(0, 255)
+                if (rightShader == null || rightShaderAlphaKey != alphaMax) {
+                    val alphaMidHigh = (225f * rightFraction).roundToInt().coerceIn(0, 255)
+                    val alphaMidLow = (110f * rightFraction).roundToInt().coerceIn(0, 255)
+                    rightShader = LinearGradient(
+                        w - inset - fadeLen,
+                        0f,
+                        w - inset,
+                        0f,
+                        intArrayOf(
+                            ColorUtils.setAlphaComponent(fillColor, 0),
+                            ColorUtils.setAlphaComponent(fillColor, alphaMidLow),
+                            ColorUtils.setAlphaComponent(fillColor, alphaMidHigh),
+                            ColorUtils.setAlphaComponent(fillColor, alphaMax),
+                        ),
+                        floatArrayOf(0f, 0.42f, 0.78f, 1f),
+                        Shader.TileMode.CLAMP,
+                    )
+                    rightShaderAlphaKey = alphaMax
+                }
+                fadePaint.shader = rightShader
+                canvas.drawRect(w - inset - fadeLen, s, w - s, h - s, fadePaint)
+            }
+
+            canvas.restoreToCount(saveCount)
+        }
+
+        if (inset > s) {
+            ringPaint.color = fillColor
+            canvas.drawPath(ringPath, ringPaint)
+        }
+    }
 }

@@ -91,8 +91,6 @@
             android:paddingStart="3dp"
             android:paddingEnd="3dp"
             android:clipToPadding="true"
-            android:requiresFadingEdge="horizontal"
-            android:fadingEdgeLength="20dp"
             app:tabContentStart="0dp"
             app:tabMinWidth="0dp"
             android:background="@android:color/transparent"
@@ -112,6 +110,13 @@
             app:tabTextAppearance="@style/Widget.SagerNet.TabLayout.TextAppearance.Capsule"
             app:tabSelectedTextAppearance="@style/Widget.SagerNet.TabLayout.TextAppearance.Capsule.Selected"
             app:tabUnboundedRipple="false" />
+
+        <io.nekohasekai.sagernet.ui.TabCapsuleEdgeOverlayView
+            android:id="@+id/group_tab_edge_overlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clickable="false"
+            android:focusable="false" />
 
     </FrameLayout>
 
